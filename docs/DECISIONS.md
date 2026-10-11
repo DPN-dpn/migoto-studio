@@ -63,14 +63,11 @@
 - 데스크톱(`src/platform/desktop.ts`)과 웹(`src/platform/web.ts`) 구현이 분리되어 있어 동일한 비즈니스 로직으로 배포됩니다.
 - 린트 엔진(`src/lint.ts`) 역시 독립적인 순수 로직으로 동작하여 모든 환경에서 일관되게 오류를 검사합니다.
 
-### 설치형 업데이트: GitHub Releases
-- `tauri-plugin-updater`로 GitHub Releases의 `latest.json`을 확인한다.
-- 릴리스 서명용 키 쌍을 만들고, 개인 키는 GitHub Secrets에만 보관한다 (저장소에 올리지 않는다).
-- GitHub Actions(`tauri-action`)가 태그(`v*`)를 푸시하면 Windows(필수) / macOS / Linux(선택) 설치 파일을 빌드해 릴리스에 올린다.
-- 앱 안에서: 시작 시 확인(설정에서 끌 수 있음) + "업데이트 확인" 버튼 → "새 버전이 있습니다" 안내 → 설치 후 재시작.
-- 문법 데이터(`upstream/`)는 앱 업데이트와 별개로 갱신할 수 있게 한다. 원본 확장 새 버전 감지 시 CI가 PR을 만들고, 머지하면 새 릴리스가 나간다.
-- 코드 서명 인증서가 없으면 Windows SmartScreen 경고가 뜰 수 있다. README에 안내하고, 인증서 도입은 추후 결정한다.
-- 설치형은 NSIS 설치 프로그램을 기본으로 한다 (제거 시 앱 데이터 삭제 옵션 훅을 쓰기 위해).
+### 설치형 업데이트 및 배포: GitHub Releases
+- GitHub Actions 워크플로(`.github/workflows/release.yml`)가 태그(`v*`) 푸시 또는 수동 실행 시 Windows 설치 파일(NSIS `.exe`)과 무설치 포터블 압축 파일(`.zip`)을 빌드하여 GitHub Releases에 자동 등록합니다.
+- 설치형은 NSIS 설치 프로그램을 기본으로 합니다 (제거 시 앱 데이터 삭제 옵션 훅 적용).
+- 포터블 버전은 실행 파일과 `portable.txt`가 동봉되어 프로그램 폴더 내 `data/`에 데이터를 격리 보관합니다.
+- 코드 서명 인증서가 없으면 Windows SmartScreen 경고가 뜰 수 있으므로 README에 안내하고, 추후 필요 시 도입을 검토합니다.
 
 ### 웹 배포: GitHub Pages
 - GitHub Actions가 웹 빌드를 만들어 Pages에 배포한다. 같은 릴리스 태그에서 설치 파일과 웹이 함께 나간다.

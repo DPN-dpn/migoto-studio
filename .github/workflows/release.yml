@@ -1,0 +1,105 @@
+name: Release Desktop App
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Release tag to publish (e.g. v0.1.0)'
+        required: true
+        default: 'v0.1.0'
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './src-tauri -> target'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Resolve tag name
+        id: vars
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "tag=${{ github.event.inputs.tag_name }}" >> $GITHUB_OUTPUT
+          else
+            echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Build Tauri Desktop App & Create GitHub Release
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ steps.vars.outputs.tag }}
+          releaseName: 'Migoto Studio ${{ steps.vars.outputs.tag }}'
+          releaseBody: |
+            ## Migoto Studio ${{ steps.vars.outputs.tag }}
+            
+            XXMI / 3DMigoto INI 에디터 데스크톱 릴리스입니다.
+            
+            ### 다운로드 안내
+            - **설치형 프로그램**: 아래 Assets에서 `Migoto Studio_${{ steps.vars.outputs.tag }}_x64-setup.exe`를 다운로드하여 설치하세요.
+              - 윈도우 시작 메뉴 및 프로그램 추가/제거에 등록됩니다.
+              - 제거 시 앱 데이터 폴더(`%APPDATA%\MigotoStudio`) 정리 체크박스를 지원합니다.
+            - **무설치 포터블 버전**: `Migoto-Studio_${{ steps.vars.outputs.tag }}_portable-x64.zip`을 다운로드하여 원하는 폴더에 압축 해제 후 바로 실행할 수 있습니다. (설정 및 백업이 프로그램 옆 `data/` 폴더에 보관됩니다.)
+            
+            ### 웹 버전 (브라우저 / PWA)
+            - 설치 없이 웹 브라우저에서 바로 사용하거나 PWA로 설치할 수도 있습니다:
+              👉 https://${{ github.repository_owner }}.github.io/migoto-studio/
+          releaseDraft: false
+          prerelease: false
+
+      - name: Create Portable Package
+        shell: pwsh
+        run: |
+          $ver = "${{ steps.vars.outputs.tag }}"
+          $dirName = "Migoto-Studio_${ver}_portable-x64"
+          New-Item -ItemType Directory -Force -Path $dirName | Out-Null
+          
+          # Locate built binary
+          if (Test-Path "src-tauri\target\release\app.exe") {
+            Copy-Item "src-tauri\target\release\app.exe" "$dirName\Migoto Studio.exe"
+          } elseif (Test-Path "src-tauri\target\release\Migoto Studio.exe") {
+            Copy-Item "src-tauri\target\release\Migoto Studio.exe" "$dirName\Migoto Studio.exe"
+          }
+          
+          # Portable mode marker
+          New-Item -ItemType File -Force -Path "$dirName\portable.txt" | Out-Null
+          
+          $zipName = "$dirName.zip"
+          Compress-Archive -Path "$dirName\*" -DestinationPath $zipName -Force
+          Write-Output "Created portable archive: $zipName"
+
+      - name: Upload Portable Package to Release
+        uses: softprops/action-gh-release@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.vars.outputs.tag }}
+          files: Migoto-Studio_*_portable-x64.zip
