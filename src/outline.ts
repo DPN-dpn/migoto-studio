@@ -28,7 +28,12 @@ export function parseSections(model: monaco.editor.ITextModel): Section[] {
   return out;
 }
 
-/** Left-hand section list: grouped, searchable, click to jump, follows the cursor. */
+const DEFAULT_WIDTH = 250;
+const MIN_WIDTH = 160;
+const MAX_WIDTH = 650;
+const STORAGE_KEY = 'migoto_sidebar_width';
+
+/** Left-hand section list: grouped, searchable, click to jump, follows the cursor, resizable. */
 export class OutlinePanel {
   private sections: Section[] = [];
   private filter = '';
@@ -37,7 +42,11 @@ export class OutlinePanel {
   private readonly list: HTMLElement;
   private readonly closedGroups = new Set<string>();
 
-  constructor(private editor: monaco.editor.IStandaloneCodeEditor, private root: HTMLElement) {
+  constructor(
+    private editor: monaco.editor.IStandaloneCodeEditor,
+    private root: HTMLElement,
+    private resizer?: HTMLElement | null,
+  ) {
     root.innerHTML = '';
     const title = document.createElement('h2');
     title.textContent = '섹션 목록';
@@ -50,6 +59,14 @@ export class OutlinePanel {
     this.list.className = 'outline-list';
     root.append(title, search, this.list);
 
+    // Restore saved width
+    const savedWidth = Number(localStorage.getItem(STORAGE_KEY)) || DEFAULT_WIDTH;
+    this.applyWidth(savedWidth);
+
+    if (this.resizer) {
+      this.setupResizer(this.resizer);
+    }
+
     const model = () => editor.getModel()!;
     const refresh = () => { this.sections = parseSections(model()); this.render(); };
     editor.onDidChangeModelContent(() => {
@@ -61,7 +78,53 @@ export class OutlinePanel {
     this.setActive(editor.getPosition()?.lineNumber ?? 1);
   }
 
-  setVisible(visible: boolean) { this.root.hidden = !visible; }
+  setVisible(visible: boolean) {
+    this.root.hidden = !visible;
+    if (this.resizer) this.resizer.hidden = !visible;
+    this.editor.layout();
+  }
+
+  private applyWidth(width: number) {
+    const maxWidth = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, window.innerWidth - 300));
+    const clamped = Math.max(MIN_WIDTH, Math.min(width, maxWidth));
+    this.root.style.width = `${clamped}px`;
+    try {
+      localStorage.setItem(STORAGE_KEY, String(clamped));
+    } catch {}
+    this.editor.layout();
+  }
+
+  private setupResizer(resizer: HTMLElement) {
+    let startX = 0;
+    let startWidth = 0;
+
+    const onMouseMove = (e: MouseEvent) => {
+      const dx = e.clientX - startX;
+      this.applyWidth(startWidth + dx);
+    };
+
+    const onMouseUp = () => {
+      document.body.classList.remove('resizing');
+      resizer.classList.remove('dragging');
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+      this.editor.layout();
+    };
+
+    resizer.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      startX = e.clientX;
+      startWidth = this.root.getBoundingClientRect().width;
+      document.body.classList.add('resizing');
+      resizer.classList.add('dragging');
+      window.addEventListener('mousemove', onMouseMove);
+      window.addEventListener('mouseup', onMouseUp);
+    });
+
+    resizer.addEventListener('dblclick', () => {
+      this.applyWidth(DEFAULT_WIDTH);
+    });
+  }
 
   private setActive(cursorLine: number) {
     let active = 0;

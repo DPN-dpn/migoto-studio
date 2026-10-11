@@ -45,7 +45,7 @@ async function boot() {
   });
 
   const doc = new DocumentManager(editor);
-  const outline = new OutlinePanel(editor, $('sidebar'));
+  const outline = new OutlinePanel(editor, $('sidebar'), $('sidebar-resizer'));
   $('btn-recent').hidden = !platform().capabilities.recentFiles;
 
   // ---- settings -> UI / editor ----
