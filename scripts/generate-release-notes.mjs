@@ -55,7 +55,19 @@ function getChangelogSection(targetVersion) {
   }
 
   const rawSection = result.join('\n').trim();
-  return rawSection.length > 0 ? rawSection : null;
+  if (rawSection.length > 0) return rawSection;
+
+  // Fallback: If only the current release section is in CHANGELOG.md, use it
+  const firstHeaderIdx = lines.findIndex((l) => l.trim().startsWith('## '));
+  if (firstHeaderIdx >= 0) {
+    const subLines = lines.slice(firstHeaderIdx + 1);
+    const endIdx = subLines.findIndex((l) => l.trim().startsWith('## ') || l.trim() === '---');
+    const fallbackLines = endIdx >= 0 ? subLines.slice(0, endIdx) : subLines;
+    const fallback = fallbackLines.join('\n').trim();
+    if (fallback.length > 0) return fallback;
+  }
+
+  return null;
 }
 
 /**

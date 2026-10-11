@@ -108,19 +108,17 @@ async function main() {
     console.log(`  ✓ src/updater/version.ts: CURRENT_APP_VERSION -> ${newVersion}`);
   } catch {}
 
-  // 5. Update CHANGELOG.md if [Unreleased] section exists
+  // 5. Update CHANGELOG.md version header
   const CHANGELOG_PATH = join(ROOT, 'CHANGELOG.md');
   try {
     const changelogContent = await readFile(CHANGELOG_PATH, 'utf8');
-    if (/##\s*\[Unreleased\]/i.test(changelogContent)) {
-      const today = new Date().toISOString().split('T')[0];
-      const updatedChangelog = changelogContent.replace(
-        /##\s*\[Unreleased\]/i,
-        `## [Unreleased]\n\n## [${newVersion}] - ${today}`
-      );
-      await writeFile(CHANGELOG_PATH, updatedChangelog);
-      console.log(`  ✓ CHANGELOG.md: [Unreleased] -> [${newVersion}] - ${today}`);
-    }
+    const today = new Date().toISOString().split('T')[0];
+    const updatedChangelog = changelogContent.replace(
+      /##\s*\[?[^\]\n]+\]?[^\n]*/,
+      `## [${newVersion}] - ${today}`
+    );
+    await writeFile(CHANGELOG_PATH, updatedChangelog);
+    console.log(`  ✓ CHANGELOG.md: [${newVersion}] - ${today}`);
   } catch {}
 
   console.log('\n[version] 모든 파일의 버전이 동기화되었습니다!');
