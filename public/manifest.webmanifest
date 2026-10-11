@@ -1,8 +1,9 @@
 {
+  "id": "migoto-studio",
   "name": "Migoto Studio",
   "short_name": "Migoto Studio",
   "description": "XXMI / 3DMigoto INI 에디터",
-  "start_url": "./",
+  "start_url": "./?source=pwa",
   "scope": "./",
   "display": "standalone",
   "background_color": "#1e1e1e",
@@ -25,6 +26,12 @@
       "src": "icon.svg",
       "sizes": "any",
       "type": "image/svg+xml"
+    }
+  ],
+  "related_applications": [
+    {
+      "platform": "webapp",
+      "url": "manifest.webmanifest"
     }
   ],
   "categories": ["utilities", "productivity", "developer tools"]

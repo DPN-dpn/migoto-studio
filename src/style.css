@@ -22,6 +22,7 @@
 }
 
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 
 html, body, #app {
   height: 100%;
@@ -112,9 +113,19 @@ button.primary:hover { filter: brightness(1.1); background: var(--accent); }
   align-items: center;
   gap: 4px;
 }
+.pwa-install-btn[hidden] {
+  display: none !important;
+}
 .pwa-install-btn:hover {
   background: var(--accent);
   color: var(--accent-fg);
+}
+
+@media (display-mode: standalone), (display-mode: window-controls-overlay), (display-mode: minimal-ui), (display-mode: fullscreen) {
+  #btn-pwa-install,
+  .pwa-install-btn {
+    display: none !important;
+  }
 }
 
 #sidebar {
