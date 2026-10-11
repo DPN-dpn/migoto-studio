@@ -1,6 +1,7 @@
 import { monaco } from './monaco';
 import { LANGUAGE_ID } from './grammar';
 import { parseJsonc } from './jsonc';
+import { platform } from '../platform';
 import upstreamSnippetsRaw from '../../upstream/snippets/migoto.snippets.json?raw';
 
 export interface Template {
@@ -14,6 +15,8 @@ export interface Template {
 }
 
 const STORAGE_CUSTOM_TEMPLATES = 'migoto_custom_templates';
+let customTemplatesCache: Template[] = [];
+let isTemplatesInitialized = false;
 
 /**
  * Starter blocks for the templates panel and completions. These are examples to fill in, not complete mods.
@@ -81,19 +84,71 @@ function upstreamTemplates(): (Template & { prefix: string })[] {
   });
 }
 
-/** Retrieve user-created custom templates from localStorage */
+/** Initialize custom templates from AppData (disk) or fallback to localStorage */
+export async function initCustomTemplates(): Promise<Template[]> {
+  if (isTemplatesInitialized) return getCustomTemplates();
+  try {
+    const p = platform();
+    let raw = '';
+    if (p.loadTemplatesText) {
+      raw = await p.loadTemplatesText();
+    }
+    if (!raw) {
+      raw = localStorage.getItem(STORAGE_CUSTOM_TEMPLATES) || '';
+      // Migrate existing templates from localStorage to AppData on desktop
+      if (raw && p.kind === 'desktop' && p.saveTemplatesText) {
+        p.saveTemplatesText(raw).catch(() => {});
+      }
+    }
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        customTemplatesCache = parsed.map((t) => ({ ...t, isCustom: true }));
+        try {
+          localStorage.setItem(STORAGE_CUSTOM_TEMPLATES, JSON.stringify(customTemplatesCache));
+        } catch {}
+      }
+    }
+  } catch (e) {
+    console.warn('Failed to initialize custom templates from AppData:', e);
+  }
+  isTemplatesInitialized = true;
+  return getCustomTemplates();
+}
+
+/** Persist custom templates to both localStorage and AppData (templates.json) */
+function persistCustomTemplates(list: Template[]): void {
+  customTemplatesCache = list.map((t) => ({ ...t, isCustom: true }));
+  const json = JSON.stringify(customTemplatesCache);
+  try {
+    localStorage.setItem(STORAGE_CUSTOM_TEMPLATES, json);
+  } catch {}
+  const p = platform();
+  if (p.saveTemplatesText) {
+    p.saveTemplatesText(json).catch((err) => {
+      console.warn('Failed to save templates to AppData:', err);
+    });
+  }
+}
+
+/** Retrieve user-created custom templates from memory / AppData / localStorage */
 export function getCustomTemplates(): Template[] {
+  if (customTemplatesCache.length > 0) {
+    return customTemplatesCache.map((t) => ({ ...t, isCustom: true }));
+  }
   try {
     const raw = localStorage.getItem(STORAGE_CUSTOM_TEMPLATES);
     if (!raw) return [];
     const list = JSON.parse(raw);
-    return Array.isArray(list) ? list.map((t) => ({ ...t, isCustom: true })) : [];
-  } catch {
-    return [];
-  }
+    if (Array.isArray(list)) {
+      customTemplatesCache = list.map((t) => ({ ...t, isCustom: true }));
+      return customTemplatesCache;
+    }
+  } catch {}
+  return [];
 }
 
-/** Save a new custom template to localStorage */
+/** Save a new custom template to AppData */
 export function saveCustomTemplate(t: {
   label: string;
   description: string;
@@ -111,18 +166,14 @@ export function saveCustomTemplate(t: {
     isCustom: true,
   };
   list.push(created);
-  try {
-    localStorage.setItem(STORAGE_CUSTOM_TEMPLATES, JSON.stringify(list));
-  } catch {}
+  persistCustomTemplates(list);
   return created;
 }
 
-/** Delete a custom template by id from localStorage */
+/** Delete a custom template by id from AppData */
 export function deleteCustomTemplate(id: string): void {
   const list = getCustomTemplates().filter((t) => t.id !== id);
-  try {
-    localStorage.setItem(STORAGE_CUSTOM_TEMPLATES, JSON.stringify(list));
-  } catch {}
+  persistCustomTemplates(list);
 }
 
 /** Returns all templates: user custom templates first, then built-in, then upstream */
@@ -130,10 +181,10 @@ export function getAllTemplates(): Template[] {
   return [...getCustomTemplates(), ...OWN_TEMPLATES, ...upstreamTemplates()];
 }
 
-/** Export all templates belonging to a specific group as JSON string */
+/** Export ONLY custom/user-added templates belonging to a specific group as JSON string */
 export function exportGroupTemplates(groupName: string): string {
-  const all = getAllTemplates();
-  const groupItems = all.filter((t) => t.group === groupName);
+  const custom = getCustomTemplates();
+  const groupItems = custom.filter((t) => t.group === groupName);
   const data = {
     version: 1,
     exportedAt: new Date().toISOString(),
@@ -165,7 +216,7 @@ export function exportAllCustomTemplates(): string {
 }
 
 /**
- * Import templates from JSON string.
+ * Import templates from JSON string into AppData.
  * Supports:
  * - { group: string, templates: Template[] }
  * - Template[]
@@ -221,7 +272,7 @@ export function importTemplates(jsonStr: string, targetGroup?: string): { count:
       importedCount++;
     }
 
-    localStorage.setItem(STORAGE_CUSTOM_TEMPLATES, JSON.stringify(current));
+    persistCustomTemplates(current);
     return { count: importedCount, groupName: finalGroupName };
   } catch (err: any) {
     throw new Error(err.message || '템플릿을 불러오는 중 오류가 발생했습니다.');

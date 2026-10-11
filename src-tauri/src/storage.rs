@@ -89,6 +89,21 @@ pub fn save_settings(json: String) -> Result<(), String> {
   fs::write(settings_path(), json).map_err(|e| format!("설정을 저장할 수 없습니다: {e}"))
 }
 
+fn templates_path() -> PathBuf {
+  data_dir().join("templates.json")
+}
+
+#[tauri::command]
+pub fn load_templates() -> String {
+  fs::read_to_string(templates_path()).unwrap_or_default()
+}
+
+#[tauri::command]
+pub fn save_templates(json: String) -> Result<(), String> {
+  serde_json::from_str::<serde_json::Value>(&json).map_err(|e| format!("템플릿 형식 오류: {e}"))?;
+  fs::write(templates_path(), json).map_err(|e| format!("템플릿을 저장할 수 없습니다: {e}"))
+}
+
 #[tauri::command]
 pub fn get_data_dir() -> String {
   data_dir().to_string_lossy().to_string()

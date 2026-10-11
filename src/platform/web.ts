@@ -531,6 +531,14 @@ export const web: Platform = {
     localStorage.setItem('migoto_studio_settings', json);
   },
 
+  async loadTemplatesText(): Promise<string> {
+    return localStorage.getItem('migoto_custom_templates') || '';
+  },
+
+  async saveTemplatesText(json: string): Promise<void> {
+    localStorage.setItem('migoto_custom_templates', json);
+  },
+
   async dataLocation(): Promise<string> {
     return '브라우저 로컬 저장소 (IndexedDB / localStorage)';
   },

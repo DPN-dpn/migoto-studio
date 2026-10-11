@@ -76,6 +76,9 @@ export interface Platform {
   /** Raw settings JSON, empty string if none saved yet. */
   loadSettingsText(): Promise<string>;
   saveSettingsText(json: string): Promise<void>;
+  /** Raw custom templates JSON stored in AppData. */
+  loadTemplatesText?(): Promise<string>;
+  saveTemplatesText?(json: string): Promise<void>;
   /** Human readable place where settings and backups are kept. */
   dataLocation(): Promise<string>;
 

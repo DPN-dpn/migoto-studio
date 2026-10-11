@@ -91,6 +91,8 @@ export const desktop: Platform = {
 
   loadSettingsText: () => invoke<string>('load_settings'),
   saveSettingsText: (json) => invoke('save_settings', { json }),
+  loadTemplatesText: () => invoke<string>('load_templates'),
+  saveTemplatesText: (json) => invoke('save_templates', { json }),
   dataLocation: () => invoke<string>('get_data_dir'),
 
   async askSaveChanges(fileName): Promise<SaveChoice> {

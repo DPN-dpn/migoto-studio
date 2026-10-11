@@ -45,6 +45,8 @@ pub fn run() {
       files::delete_entry,
       storage::load_settings,
       storage::save_settings,
+      storage::load_templates,
+      storage::save_templates,
       storage::get_data_dir,
       storage::is_portable_mode,
       backups::cleanup_backups,

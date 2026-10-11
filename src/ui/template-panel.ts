@@ -7,6 +7,7 @@ import {
   insertTemplate,
   exportGroupTemplates,
   importTemplates,
+  initCustomTemplates,
 } from '../core/templates';
 import { openModal } from './modal';
 
@@ -168,29 +169,34 @@ export class TemplatePanel {
       groupNameSpan.textContent = groupName;
       groupTitle.append(groupNameSpan);
 
-      const groupActions = document.createElement('div');
-      groupActions.className = 'template-group-actions';
+      // Only show export / import buttons for user custom template groups!
+      const hasCustom = items.some((t) => t.isCustom);
+      if (hasCustom) {
+        const groupActions = document.createElement('div');
+        groupActions.className = 'template-group-actions';
 
-      const exportGrpBtn = document.createElement('button');
-      exportGrpBtn.className = 'template-group-btn';
-      exportGrpBtn.title = `'${groupName}' 그룹 템플릿 내보내기 (.json)`;
-      exportGrpBtn.textContent = '📤 내보내기';
-      exportGrpBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        this.handleExportGroup(groupName);
-      });
+        const exportGrpBtn = document.createElement('button');
+        exportGrpBtn.className = 'template-group-btn';
+        exportGrpBtn.title = `'${groupName}' 그룹 템플릿 내보내기 (.json)`;
+        exportGrpBtn.textContent = '📤 내보내기';
+        exportGrpBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          this.handleExportGroup(groupName);
+        });
 
-      const importGrpBtn = document.createElement('button');
-      importGrpBtn.className = 'template-group-btn';
-      importGrpBtn.title = `'${groupName}' 그룹으로 템플릿 불러오기 (.json)`;
-      importGrpBtn.textContent = '📥 불러오기';
-      importGrpBtn.addEventListener('click', async (e) => {
-        e.stopPropagation();
-        await this.handleImport(groupName);
-      });
+        const importGrpBtn = document.createElement('button');
+        importGrpBtn.className = 'template-group-btn';
+        importGrpBtn.title = `'${groupName}' 그룹으로 템플릿 불러오기 (.json)`;
+        importGrpBtn.textContent = '📥 불러오기';
+        importGrpBtn.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          await this.handleImport(groupName);
+        });
 
-      groupActions.append(exportGrpBtn, importGrpBtn);
-      groupTitle.append(groupActions);
+        groupActions.append(exportGrpBtn, importGrpBtn);
+        groupTitle.append(groupActions);
+      }
+
       groupEl.append(groupTitle);
 
       for (const t of items) {

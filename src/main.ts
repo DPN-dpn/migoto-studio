@@ -15,7 +15,7 @@ import { ActivityBar } from './ui/activitybar';
 import { MenuBar } from './ui/menubar';
 import { getSettings, loadSettings, onSettingsChange } from './core/settings';
 import { OutlinePanel } from './ui/outline';
-import { registerSnippetCompletions } from './core/templates';
+import { registerSnippetCompletions, initCustomTemplates } from './core/templates';
 import { openSettings } from './ui/settings-ui';
 import { openHelp } from './ui/help-ui';
 import { lintModel, optionsFromSettings } from './core/lint';
@@ -34,6 +34,7 @@ async function boot() {
   await initPlatform();
   initPwa();
   const settings = await loadSettings();
+  await initCustomTemplates();
   // Drop expired safety backups (best effort; never blocks startup).
   platform().pruneBackups({ keepDays: settings.backupKeepDays, maxPerFile: settings.backupMaxPerFile }).catch(() => {});
   defineThemes();
