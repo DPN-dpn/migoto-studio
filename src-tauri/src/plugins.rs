@@ -114,8 +114,16 @@ pub fn list_disk_plugins() -> Result<Vec<PluginDiskInfo>, String> {
     for entry in entries.flatten() {
       let p = entry.path();
       if p.is_dir() {
-        let manifest_path = p.join("plugin.json");
-        let script_path = p.join("main.js");
+        let manifest_path = if p.join("manifest.json").exists() {
+          p.join("manifest.json")
+        } else {
+          p.join("plugin.json")
+        };
+        let script_path = if p.join("plugin.js").exists() {
+          p.join("plugin.js")
+        } else {
+          p.join("main.js")
+        };
         if manifest_path.exists() && script_path.exists() {
           if let (Ok(manifest_json), Ok(script_content)) = (
             fs::read_to_string(&manifest_path),

@@ -1764,11 +1764,52 @@ input:checked + .slider:before {
   color: var(--fg);
 }
 
+.plugin-form-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.plugin-form-row label {
+  font-size: 11px;
+  color: var(--fg-dim);
+  width: 65px;
+  flex-shrink: 0;
+}
+
+.plugin-form-row .plugin-input {
+  flex: 1;
+}
+
 .plugin-create-btn-row {
   display: flex;
   justify-content: flex-end;
   gap: 6px;
   margin-top: 4px;
+}
+
+.plugin-location-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: rgba(139, 124, 246, 0.12);
+  border: 1px solid rgba(139, 124, 246, 0.25);
+  color: var(--accent);
+  margin: 2px 0;
+  width: fit-content;
+}
+
+.plugin-location-badge .plugin-location-label {
+  font-weight: 600;
+  color: var(--fg);
+}
+
+.plugin-location-badge .plugin-location-val {
+  font-weight: 500;
+  color: var(--accent);
 }
 
 .plugin-search-wrap {

@@ -146,4 +146,14 @@ export const desktop: Platform = {
   },
   saveDiskPlugin: (id: string, manifestJson: string, scriptContent: string) =>
     invoke('save_disk_plugin', { id, manifestJson, scriptContent }),
+  pickPluginZip: async () => {
+    const picked = await open({
+      multiple: false,
+      directory: false,
+      filters: [{ name: '플러그인 압축 파일 (*.zip)', extensions: ['zip'] }],
+    });
+    if (typeof picked !== 'string') return null;
+    const bytes = await invoke<number[]>('read_binary_file', { path: picked });
+    return new Uint8Array(bytes);
+  },
 };

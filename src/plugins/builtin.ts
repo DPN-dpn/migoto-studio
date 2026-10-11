@@ -19,6 +19,7 @@ const PYTHON_RUNNER_MANIFEST: PluginManifest = {
   author: 'Migoto Studio',
   icon: '🐍',
   category: 'tools',
+  location: '좌측 사이드바 탭 (🐍)',
 };
 
 function createPythonRunnerPlugin(): MigotoPlugin {
@@ -209,6 +210,7 @@ const ASSET_VIEWER_MANIFEST: PluginManifest = {
   author: 'Migoto Studio',
   icon: '🖼',
   category: 'assets',
+  location: '파일 탐색기 & 에디터 탭 (.dds, 이미지)',
 };
 
 function createAssetViewerPlugin(): MigotoPlugin {
@@ -244,6 +246,7 @@ const AI_ASSISTANT_MANIFEST: PluginManifest = {
   author: 'Migoto Studio',
   icon: '🤖',
   category: 'ai',
+  location: '좌측 사이드바 탭 (🤖)',
 };
 
 function createAiAssistantPlugin(): MigotoPlugin {

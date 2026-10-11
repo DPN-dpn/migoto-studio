@@ -618,7 +618,17 @@ export const web: Platform = {
     });
   },
 
-  getPluginsDir: async () => '브라우저 로컬 저장소 (IndexedDB)',
+  deleteEntry: async (path: string) => {
+    try {
+      const stored = JSON.parse(localStorage.getItem('migoto_studio_web_plugins') || '{}');
+      if (stored[path]) {
+        delete stored[path];
+        localStorage.setItem('migoto_studio_web_plugins', JSON.stringify(stored));
+      }
+    } catch {}
+  },
+
+  getPluginsDir: async () => '브라우저 로컬 저장소 (localStorage)',
   openPluginsFolder: async () => {},
   readBinaryFile: async () => new Uint8Array(),
   execProcess: async () => ({
@@ -626,6 +636,44 @@ export const web: Platform = {
     stderr: '웹 브라우저 환경에서는 로컬 프로세스 실행이 지원되지 않습니다. 데스크톱 앱을 사용해 주세요.',
     exitCode: 1,
   }),
-  listDiskPlugins: async () => [],
-  saveDiskPlugin: async () => {},
+  listDiskPlugins: async () => {
+    try {
+      const stored = JSON.parse(localStorage.getItem('migoto_studio_web_plugins') || '{}');
+      return Object.values(stored);
+    } catch {
+      return [];
+    }
+  },
+  saveDiskPlugin: async (id: string, manifestJson: string, scriptContent: string) => {
+    try {
+      const stored = JSON.parse(localStorage.getItem('migoto_studio_web_plugins') || '{}');
+      stored[id] = { id, path: id, manifestJson, scriptContent };
+      localStorage.setItem('migoto_studio_web_plugins', JSON.stringify(stored));
+    } catch {}
+  },
+  pickPluginZip: async () => {
+    return new Promise((resolve) => {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '.zip,application/zip';
+      input.style.display = 'none';
+      input.onchange = async () => {
+        const file = input.files?.[0];
+        input.remove();
+        if (!file) return resolve(null);
+        try {
+          const buf = await file.arrayBuffer();
+          resolve(new Uint8Array(buf));
+        } catch {
+          resolve(null);
+        }
+      };
+      input.oncancel = () => {
+        input.remove();
+        resolve(null);
+      };
+      document.body.append(input);
+      input.click();
+    });
+  },
 };

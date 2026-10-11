@@ -2,6 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { decodeDDS } from '../src/plugins/dds-decoder.ts';
 import { BUILTIN_PLUGINS } from '../src/plugins/builtin.ts';
+import { validatePluginZip } from '../src/plugins/zip.ts';
+import { zipSync, strToU8 } from 'fflate';
 
 test('BUILTIN_PLUGINS registers 3 default plugins with unique IDs', () => {
   assert.equal(BUILTIN_PLUGINS.length, 3);
@@ -12,6 +14,7 @@ test('BUILTIN_PLUGINS registers 3 default plugins with unique IDs', () => {
     assert.ok(p.manifest.name);
     assert.ok(p.manifest.description);
     assert.ok(p.manifest.version);
+    assert.ok(p.manifest.location, `Plugin ${p.manifest.id} must have location specified`);
     assert.ok(typeof p.createPlugin === 'function');
   }
 });
@@ -93,5 +96,47 @@ test('builtin plugins activate with expected behavior', () => {
   assert.equal(registeredViews.length, 0);
   assert.equal(registeredCustomViewers.length, 1);
   assert.deepEqual(registeredCustomViewers[0].extensions, ['dds', 'png', 'jpg', 'jpeg', 'bmp', 'webp', 'gif']);
+});
+
+test('validatePluginZip successfully extracts valid plugin zip', () => {
+  const zip = zipSync({
+    'manifest.json': strToU8(JSON.stringify({ id: 'custom-tool', name: 'Custom Tool', location: '사이드바' })),
+    'plugin.js': strToU8('export default { activate() {} };'),
+    'readme.txt': strToU8('Some readme file'),
+  });
+
+  const res = validatePluginZip(zip);
+  assert.equal(res.manifest.id, 'custom-tool');
+  assert.equal(res.manifest.name, 'Custom Tool');
+  assert.equal(res.manifest.location, '사이드바');
+  assert.ok(res.scriptContent.includes('activate'));
+  assert.ok(res.files['plugin.json']);
+  assert.ok(res.files['main.js']);
+});
+
+test('validatePluginZip successfully extracts nested root folder zip', () => {
+  const zip = zipSync({
+    'my-plugin/plugin.json': strToU8(JSON.stringify({ id: 'nested-tool', name: 'Nested Tool' })),
+    'my-plugin/main.js': strToU8('console.log("nested");'),
+  });
+
+  const res = validatePluginZip(zip);
+  assert.equal(res.manifest.id, 'nested-tool');
+  assert.equal(res.manifest.name, 'Nested Tool');
+  assert.ok(res.scriptContent.includes('nested'));
+});
+
+test('validatePluginZip throws when manifest is missing', () => {
+  const zip = zipSync({
+    'main.js': strToU8('console.log(1);'),
+  });
+  assert.throws(() => validatePluginZip(zip), /manifest\.json.*설정 파일이 없습니다/);
+});
+
+test('validatePluginZip throws when script is missing', () => {
+  const zip = zipSync({
+    'manifest.json': strToU8(JSON.stringify({ id: 'no-script', name: 'No Script' })),
+  });
+  assert.throws(() => validatePluginZip(zip), /실행 스크립트.*없습니다/);
 });
 

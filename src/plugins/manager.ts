@@ -1,5 +1,6 @@
-import * as monaco from 'monaco-editor';
+import { monaco } from '../core/monaco';
 import { platform } from '../platform';
+import { validatePluginZip, type ExtractedPlugin } from './zip';
 import type { DocumentManager } from '../core/documents';
 import type { FileExplorer } from '../ui/explorer';
 import { openModal } from '../ui/modal';
@@ -14,6 +15,17 @@ import type {
   RegisteredSidebarView,
 } from './types';
 
+export { validatePluginZip, type ExtractedPlugin };
+
+export interface CreatePluginTemplateOptions {
+  id: string;
+  name: string;
+  icon?: string;
+  author?: string;
+  location?: string;
+  description?: string;
+}
+
 const STORAGE_ENABLED_PLUGINS = 'migoto_plugins_enabled';
 
 export class PluginManager {
@@ -25,12 +37,21 @@ export class PluginManager {
   private statusBarEl: HTMLElement | null = null;
   private pluginStatusBarItems: Map<string, HTMLElement> = new Map();
 
+  private doc: DocumentManager;
+  private editor: monaco.editor.IStandaloneCodeEditor;
+  private explorer?: FileExplorer;
+  private activityBar?: ActivityBar;
+
   constructor(
-    private doc: DocumentManager,
-    private editor: monaco.editor.IStandaloneCodeEditor,
-    private explorer?: FileExplorer,
-    private activityBar?: ActivityBar,
+    doc: DocumentManager,
+    editor: monaco.editor.IStandaloneCodeEditor,
+    explorer?: FileExplorer,
+    activityBar?: ActivityBar,
   ) {
+    this.doc = doc;
+    this.editor = editor;
+    this.explorer = explorer;
+    this.activityBar = activityBar;
     this.statusBarEl = document.getElementById('statusbar');
     this.doc.setPluginManager(this);
   }
@@ -319,8 +340,103 @@ export class PluginManager {
     return true;
   }
 
-  async createPluginTemplate(id: string, name: string, description = ''): Promise<boolean> {
-    const cleanId = id.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '-');
+  async installPluginFromZip(): Promise<boolean> {
+    if (!platform().pickPluginZip) {
+      this.showToast('플러그인 파일 선택이 지원되지 않는 환경입니다.', 'warn');
+      return false;
+    }
+
+    let bytes: Uint8Array | null = null;
+    try {
+      bytes = await platform().pickPluginZip!();
+    } catch (err) {
+      this.showToast(`파일 선택 실패: ${err}`, 'error');
+      return false;
+    }
+
+    if (!bytes || bytes.length === 0) {
+      return false; // User cancelled
+    }
+
+    let extracted: ExtractedPlugin;
+    try {
+      extracted = validatePluginZip(bytes);
+    } catch (err: any) {
+      this.showToast(err?.message || '유효하지 않은 플러그인 압축파일입니다.', 'error');
+      return false;
+    }
+
+    const { manifest, files, manifestJson, scriptContent } = extracted;
+
+    if (BUILTIN_PLUGINS.some((b) => b.manifest.id === manifest.id)) {
+      this.showToast(`기본 내장 플러그인 ID("${manifest.id}")는 덮어쓸 수 없습니다.`, 'error');
+      return false;
+    }
+
+    if (platform().kind === 'desktop' && platform().getPluginsDir && platform().writeBinaryFile) {
+      try {
+        const pluginsDir = await platform().getPluginsDir!();
+        const baseFolder = `${pluginsDir.replace(/\\/g, '/')}/${manifest.id}`;
+
+        for (const [relPath, fileData] of Object.entries(files)) {
+          const fullPath = `${baseFolder}/${relPath}`;
+          await platform().writeBinaryFile!(fullPath, fileData);
+        }
+      } catch (err) {
+        this.showToast(`플러그인 파일 저장 실패: ${err}`, 'error');
+        return false;
+      }
+    } else if (platform().saveDiskPlugin) {
+      try {
+        await platform().saveDiskPlugin!(manifest.id, manifestJson, scriptContent);
+      } catch (err) {
+        this.showToast(`플러그인 저장 실패: ${err}`, 'error');
+        return false;
+      }
+    }
+
+    await this.init();
+
+    if (!this.isEnabled(manifest.id)) {
+      await this.togglePlugin(manifest.id, true);
+    }
+
+    const extraNote = platform().kind === 'web'
+      ? ' (브라우저 저장소에 설치되었습니다)'
+      : '';
+    this.showToast(`플러그인 "${manifest.name}" 설치가 완료되었습니다!${extraNote}`, 'info');
+    return true;
+  }
+
+  async createPluginTemplate(
+    optionsOrId: string | CreatePluginTemplateOptions,
+    nameArg = '',
+    descArg = '',
+  ): Promise<boolean> {
+    let rawId: string;
+    let name: string;
+    let icon: string;
+    let author: string;
+    let location: string;
+    let description: string;
+
+    if (typeof optionsOrId === 'object') {
+      rawId = optionsOrId.id;
+      name = optionsOrId.name;
+      icon = optionsOrId.icon?.trim() || '🧩';
+      author = optionsOrId.author?.trim() || '사용자';
+      location = optionsOrId.location?.trim() || '좌측 사이드바 탭';
+      description = optionsOrId.description?.trim() || '사용자 정의 플러그인입니다.';
+    } else {
+      rawId = optionsOrId;
+      name = nameArg;
+      icon = '🧩';
+      author = '사용자';
+      location = '좌측 사이드바 탭';
+      description = descArg || '사용자 정의 플러그인입니다.';
+    }
+
+    const cleanId = rawId.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '-');
     if (!cleanId) {
       this.showToast('올바른 플러그인 ID를 입력해주세요.', 'warn');
       return false;
@@ -335,27 +451,34 @@ export class PluginManager {
       id: cleanId,
       name: name.trim() || cleanId,
       version: '1.0.0',
-      description: description.trim() || '사용자 정의 플러그인입니다.',
-      author: 'User',
-      icon: '🧩',
+      description,
+      author,
+      icon,
       category: 'tools',
+      location,
     };
 
     const starterScript = `// ${manifest.name} (${manifest.id})
+// 제작자: ${manifest.author}
+// 추가 위치: ${manifest.location}
 export default {
   activate(context) {
     console.log('[plugin] ${manifest.name} activated');
     context.ui.showToast('${manifest.name} 플러그인이 로드되었습니다!', 'info');
 
-    // 필요 시 사이드바 패널 등록 (좌측 툴바에 탭 추가):
-    // context.ui.registerSidebarView({
-    //   id: '${cleanId}',
-    //   title: '${manifest.name}',
-    //   icon: '🧩',
-    //   render(container) {
-    //     container.innerHTML = '<div style="padding:16px;"><h3>${manifest.name}</h3><p>플러그인 화면</p></div>';
-    //   }
-    // });
+    // 사이드바 패널 등록 (좌측 툴바에 ${manifest.icon} 탭 추가):
+    context.ui.registerSidebarView({
+      id: '${cleanId}',
+      title: '${manifest.name}',
+      icon: '${manifest.icon}',
+      render(container) {
+        container.innerHTML = \`<div style="padding:16px;">
+          <h3>${manifest.icon} ${manifest.name}</h3>
+          <p>${manifest.description}</p>
+          <p style="font-size:12px;color:#888;">제작: ${manifest.author} | 위치: ${manifest.location}</p>
+        </div>\`;
+      }
+    });
   },
   deactivate() {
     console.log('[plugin] ${manifest.name} deactivated');

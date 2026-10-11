@@ -7,6 +7,7 @@ export interface PluginManifest {
   icon?: string;
   main?: string;
   category?: 'tools' | 'assets' | 'ai' | 'general';
+  location?: string;
 }
 
 export interface PluginContext {

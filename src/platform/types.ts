@@ -98,6 +98,7 @@ export interface Platform {
   execProcess?(command: string, args: string[], cwd?: string): Promise<ProcessOutput>;
   listDiskPlugins?(): Promise<DiskPlugin[]>;
   saveDiskPlugin?(id: string, manifestJson: string, scriptContent: string): Promise<void>;
+  pickPluginZip?(): Promise<Uint8Array | null>;
 }
 
 export interface ProcessOutput {
