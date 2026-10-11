@@ -74,6 +74,7 @@
 
 ### 설치형 업데이트 및 배포: GitHub Releases
 - GitHub Actions 워크플로(`.github/workflows/release.yml`)가 태그(`v*`) 푸시 또는 수동 실행 시 Windows 설치 파일(NSIS `.exe`)과 무설치 포터블 압축 파일(`.zip`)을 빌드하여 GitHub Releases에 자동 등록합니다.
+- 번들 대상을 NSIS(`"targets": ["nsis"]`)로 지정하여 불필요한 WiX `.msi` 생성과 CI 빌드 오버헤드를 없애고, 사용자에게 친숙한 단일 `.exe` 설치 프로그램을 배포합니다.
 - 설치형은 NSIS 설치 프로그램을 기본으로 합니다 (제거 시 앱 데이터 삭제 옵션 훅 적용).
 - 포터블 버전은 실행 파일과 `portable.txt`가 동봉되어 프로그램 폴더 내 `data/`에 데이터를 격리 보관합니다.
 - 코드 서명 인증서가 없으면 Windows SmartScreen 경고가 뜰 수 있으므로 README에 안내하고, 추후 필요 시 도입을 검토합니다.
