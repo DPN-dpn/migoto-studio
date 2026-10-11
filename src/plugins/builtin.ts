@@ -14,7 +14,7 @@ const PYTHON_RUNNER_MANIFEST: PluginManifest = {
   id: 'python-runner',
   name: 'Python 스크립트 실행기',
   version: '1.0.0',
-  description: '파이썬 스크립트를 에디터 내에서 직접 실행하고 출력 결과를 에디터에 반영합니다.',
+  description: '파이썬 스크립트를 에디터 내에서 직접 실행하고 출력 결과를 에디터에 반영합니다 (활성화 시 좌측 바 🐍 탭 추가).',
   author: 'Migoto Studio',
   icon: '🐍',
   category: 'tools',
@@ -24,7 +24,7 @@ function createPythonRunnerPlugin(): MigotoPlugin {
   return {
     activate(context) {
       context.ui.registerSidebarView({
-        id: 'python-runner-view',
+        id: 'python-runner',
         title: 'Python 실행기',
         icon: '🐍',
         render(container) {
@@ -204,7 +204,7 @@ const ASSET_VIEWER_MANIFEST: PluginManifest = {
   id: 'asset-viewer',
   name: 'DDS / 텍스처 뷰어',
   version: '1.0.0',
-  description: 'INI 문서의 텍스처(DDS/PNG)를 스캔하고 경량 내장 디코더로 즉시 캔버스에 미리보기합니다.',
+  description: '탐색기에서 DDS/PNG/JPG 에셋 클릭 시 에디터 탭에서 인터랙티브 캔버스 뷰어로 고해상도 미리보기를 제공합니다.',
   author: 'Migoto Studio',
   icon: '🖼',
   category: 'assets',
@@ -212,171 +212,10 @@ const ASSET_VIEWER_MANIFEST: PluginManifest = {
 
 function createAssetViewerPlugin(): MigotoPlugin {
   return {
-    activate(context) {
-      context.ui.registerSidebarView({
-        id: 'asset-viewer-view',
-        title: '텍스처 뷰어',
-        icon: '🖼',
-        render(container) {
-          container.className = 'plugin-subview asset-viewer-panel';
-          container.replaceChildren();
-
-          const header = document.createElement('div');
-          header.className = 'panel-section-title';
-          header.innerHTML = '<span>🖼 DDS / 텍스처 뷰어</span>';
-
-          // Texture list in current INI
-          const listTitleRow = document.createElement('div');
-          listTitleRow.className = 'section-title-row';
-          listTitleRow.innerHTML = '<span>현재 문서의 텍스처 파일</span>';
-
-          const scanBtn = document.createElement('button');
-          scanBtn.className = 'small-btn';
-          scanBtn.textContent = '다시 스캔';
-
-          const fileListEl = document.createElement('div');
-          fileListEl.className = 'asset-file-list';
-
-          // Canvas viewer area
-          const previewCard = document.createElement('div');
-          previewCard.className = 'asset-preview-card';
-
-          const infoBadge = document.createElement('div');
-          infoBadge.className = 'asset-info-badge';
-          infoBadge.textContent = '텍스처를 선택해 미리보기';
-
-          const canvasContainer = document.createElement('div');
-          canvasContainer.className = 'asset-canvas-container checkerboard';
-
-          const canvas = document.createElement('canvas');
-          canvas.className = 'asset-canvas';
-          canvasContainer.append(canvas);
-
-          // Controls row
-          const controlsRow = document.createElement('div');
-          controlsRow.className = 'asset-controls-row';
-
-          const alphaBtn = document.createElement('button');
-          alphaBtn.className = 'small-btn active';
-          alphaBtn.textContent = '알파 채널 ON';
-
-          let showAlpha = true;
-          let currentDdsData: { width: number; height: number; format: string; rgba: Uint8ClampedArray } | null = null;
-
-          alphaBtn.onclick = () => {
-            showAlpha = !showAlpha;
-            alphaBtn.textContent = showAlpha ? '알파 채널 ON' : '알파 채널 OFF';
-            alphaBtn.classList.toggle('active', showAlpha);
-            if (currentDdsData) renderDecodedData(currentDdsData);
-          };
-
-          controlsRow.append(alphaBtn);
-          previewCard.append(infoBadge, canvasContainer, controlsRow);
-
-          function renderDecodedData(data: { width: number; height: number; format: string; rgba: Uint8ClampedArray }) {
-            currentDdsData = data;
-            canvas.width = data.width;
-            canvas.height = data.height;
-            const ctx = canvas.getContext('2d');
-            if (!ctx) return;
-
-            const imgData = ctx.createImageData(data.width, data.height);
-            imgData.data.set(data.rgba);
-
-            if (!showAlpha) {
-              // Force alpha to 255
-              for (let i = 3; i < imgData.data.length; i += 4) {
-                imgData.data[i] = 255;
-              }
-            }
-
-            ctx.putImageData(imgData, 0, 0);
-            infoBadge.textContent = `${data.width} × ${data.height} (${data.format})`;
-          }
-
-          async function loadAndPreviewFile(fileNameOrPath: string) {
-            infoBadge.textContent = `${fileNameOrPath} 로딩 중…`;
-            try {
-              let fullPath = fileNameOrPath;
-              const folder = context.workspace.getCurrentFolder();
-              if (folder && !fileNameOrPath.includes('/') && !fileNameOrPath.includes('\\')) {
-                fullPath = `${folder}/${fileNameOrPath}`;
-              }
-
-              const isDds = /\.dds$/i.test(fileNameOrPath);
-              if (isDds) {
-                const bytes = await context.workspace.readBinaryFile(fullPath);
-                if (bytes.length === 0) {
-                  throw new Error('파일을 찾을 수 없거나 크기가 0입니다.');
-                }
-                const decoded = decodeDDS(bytes);
-                renderDecodedData(decoded);
-              } else {
-                // PNG / JPG image
-                const bytes = await context.workspace.readBinaryFile(fullPath);
-                const blob = new Blob([bytes as unknown as BlobPart]);
-                const url = URL.createObjectURL(blob);
-                const img = new Image();
-                img.onload = () => {
-                  canvas.width = img.width;
-                  canvas.height = img.height;
-                  const ctx = canvas.getContext('2d');
-                  ctx?.drawImage(img, 0, 0);
-                  infoBadge.textContent = `${img.width} × ${img.height} (Standard Image)`;
-                  URL.revokeObjectURL(url);
-                };
-                img.onerror = () => {
-                  infoBadge.textContent = '이미지를 디코딩할 수 없습니다.';
-                  URL.revokeObjectURL(url);
-                };
-                img.src = url;
-              }
-            } catch (err) {
-              infoBadge.textContent = `로드 실패: ${err}`;
-            }
-          }
-
-          function scanTextures() {
-            fileListEl.replaceChildren();
-            const text = context.editor.getText();
-            const regex = /(?:filename|Resource\w*)\s*=\s*([^\r\n;#]+?\.(?:dds|png|jpg|jpeg))/gi;
-            const matches = new Set<string>();
-            let m: RegExpExecArray | null;
-
-            while ((m = regex.exec(text)) !== null) {
-              const file = m[1].trim();
-              if (file) matches.add(file);
-            }
-
-            if (matches.size === 0) {
-              const empty = document.createElement('p');
-              empty.className = 'hint';
-              empty.textContent = '현재 문서에서 텍스처 파일(.dds/.png) 참조를 찾을 수 없습니다.';
-              fileListEl.append(empty);
-              return;
-            }
-
-            matches.forEach((file) => {
-              const item = document.createElement('div');
-              item.className = 'asset-file-item';
-              item.innerHTML = `<span>📄 ${file}</span>`;
-              item.onclick = () => {
-                fileListEl.querySelectorAll('.asset-file-item').forEach((el) => el.classList.remove('active'));
-                item.classList.add('active');
-                loadAndPreviewFile(file);
-              };
-              fileListEl.append(item);
-            });
-          }
-
-          scanBtn.onclick = scanTextures;
-          listTitleRow.append(scanBtn);
-
-          scanTextures();
-          container.append(header, listTitleRow, fileListEl, previewCard);
-        },
-      });
+    activate(_context) {
+      // DDS 및 이미지(PNG, JPG, BMP) 뷰어는 에디터 탭 시스템 및 파일 탐색기와 직접 연동됩니다.
     },
+    deactivate() {},
   };
 }
 
@@ -385,9 +224,9 @@ function createAssetViewerPlugin(): MigotoPlugin {
 // ============================================================================
 const AI_ASSISTANT_MANIFEST: PluginManifest = {
   id: 'ai-assistant',
-  name: 'AI 모딩 어시스턴트',
+  name: 'AI 모딩 에이전트',
   version: '1.0.0',
-  description: 'OpenAI, Ollama(로컬), 또는 호환 API를 연동하여 INI 문법 검사 및 코드 생성을 돕습니다.',
+  description: 'OpenAI, Ollama(로컬), 또는 호환 API를 연동하여 INI 문법 검사 및 코드 생성을 돕습니다 (활성화 시 좌측 바 🤖 탭 추가).',
   author: 'Migoto Studio',
   icon: '🤖',
   category: 'ai',
@@ -397,8 +236,8 @@ function createAiAssistantPlugin(): MigotoPlugin {
   return {
     activate(context) {
       context.ui.registerSidebarView({
-        id: 'ai-assistant-view',
-        title: 'AI 어시스턴트',
+        id: 'ai-assistant',
+        title: 'AI 에이전트',
         icon: '🤖',
         render(container) {
           container.className = 'plugin-subview ai-assistant-panel';

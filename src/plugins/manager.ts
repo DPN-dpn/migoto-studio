@@ -4,6 +4,7 @@ import type { DocumentManager } from '../documents';
 import type { FileExplorer } from '../explorer';
 import { openModal } from '../modal';
 import { BUILTIN_PLUGINS } from './builtin';
+import type { ActivityBar } from '../activitybar';
 import type {
   MigotoPlugin,
   PluginContext,
@@ -17,6 +18,7 @@ const STORAGE_ENABLED_PLUGINS = 'migoto_plugins_enabled';
 export class PluginManager {
   private plugins: Map<string, PluginInstance> = new Map();
   private sidebarViews: Map<string, RegisteredSidebarView> = new Map();
+  private dynamicTabDisposers: Map<string, () => void> = new Map();
   private listeners: Set<() => void> = new Set();
   private statusBarEl: HTMLElement | null = null;
   private pluginStatusBarItems: Map<string, HTMLElement> = new Map();
@@ -25,8 +27,13 @@ export class PluginManager {
     private doc: DocumentManager,
     private editor: monaco.editor.IStandaloneCodeEditor,
     private explorer?: FileExplorer,
+    private activityBar?: ActivityBar,
   ) {
     this.statusBarEl = document.getElementById('statusbar');
+  }
+
+  setActivityBar(ab: ActivityBar) {
+    this.activityBar = ab;
   }
 
   onChange(fn: () => void): () => void {
@@ -156,6 +163,37 @@ export class PluginManager {
       onRegisterView: (view) => {
         this.sidebarViews.set(view.id, view);
         unregisterViews.push(view.id);
+
+        if (this.activityBar) {
+          const sidebarEl = document.getElementById('sidebar');
+          let panelEl = document.getElementById(`sidebar-panel-${view.id}`);
+          if (!panelEl) {
+            panelEl = document.createElement('div');
+            panelEl.id = `sidebar-panel-${view.id}`;
+            panelEl.className = 'sidebar-panel dynamic-plugin-panel';
+            panelEl.hidden = true;
+            sidebarEl?.appendChild(panelEl);
+          }
+
+          panelEl.replaceChildren();
+          const cleanup = view.render(panelEl);
+
+          const reg = this.activityBar.registerDynamicTab({
+            id: view.id,
+            icon: view.icon || '🧩',
+            title: view.title,
+            panelEl,
+          });
+
+          this.dynamicTabDisposers.set(view.id, () => {
+            reg.dispose();
+            if (typeof cleanup === 'function') {
+              try { cleanup(); } catch {}
+            }
+            panelEl?.remove();
+          });
+        }
+
         this.notify();
       },
       onRegisterStatusItem: (id, el) => {
@@ -172,7 +210,14 @@ export class PluginManager {
         try {
           plugin.deactivate?.();
         } catch {}
-        unregisterViews.forEach((vId) => this.sidebarViews.delete(vId));
+        unregisterViews.forEach((vId) => {
+          this.sidebarViews.delete(vId);
+          const disposer = this.dynamicTabDisposers.get(vId);
+          if (disposer) {
+            disposer();
+            this.dynamicTabDisposers.delete(vId);
+          }
+        });
         unregisterStatusItems.forEach((sId) => {
           this.pluginStatusBarItems.get(sId)?.remove();
           this.pluginStatusBarItems.delete(sId);
@@ -214,6 +259,104 @@ export class PluginManager {
     }
 
     this.notify();
+  }
+
+  isEnabled(pluginId: string): boolean {
+    return this.plugins.get(pluginId)?.enabled ?? false;
+  }
+
+  async deletePlugin(pluginId: string): Promise<boolean> {
+    const p = this.plugins.get(pluginId);
+    if (!p) return false;
+    if (p.isBuiltin) {
+      this.showToast('내장 플러그인은 삭제할 수 없습니다.', 'warn');
+      return false;
+    }
+
+    if (p.enabled) {
+      await this.togglePlugin(pluginId, false);
+    }
+
+    if (p.path && platform().deleteEntry) {
+      try {
+        await platform().deleteEntry!(p.path);
+      } catch (err) {
+        this.showToast(`플러그인 삭제 실패: ${err}`, 'error');
+        return false;
+      }
+    }
+
+    this.plugins.delete(pluginId);
+
+    try {
+      const savedStates: Record<string, boolean> = JSON.parse(
+        localStorage.getItem(STORAGE_ENABLED_PLUGINS) || '{}',
+      );
+      delete savedStates[pluginId];
+      localStorage.setItem(STORAGE_ENABLED_PLUGINS, JSON.stringify(savedStates));
+    } catch {}
+
+    this.notify();
+    this.showToast(`플러그인 "${p.manifest.name}"이(가) 삭제되었습니다.`, 'info');
+    return true;
+  }
+
+  async createPluginTemplate(id: string, name: string, description = ''): Promise<boolean> {
+    const cleanId = id.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '-');
+    if (!cleanId) {
+      this.showToast('올바른 플러그인 ID를 입력해주세요.', 'warn');
+      return false;
+    }
+
+    if (this.plugins.has(cleanId)) {
+      this.showToast('이미 존재하는 플러그인 ID입니다.', 'warn');
+      return false;
+    }
+
+    const manifest: PluginManifest = {
+      id: cleanId,
+      name: name.trim() || cleanId,
+      version: '1.0.0',
+      description: description.trim() || '사용자 정의 플러그인입니다.',
+      author: 'User',
+      icon: '🧩',
+      category: 'tools',
+    };
+
+    const starterScript = `// ${manifest.name} (${manifest.id})
+export default {
+  activate(context) {
+    console.log('[plugin] ${manifest.name} activated');
+    context.ui.showToast('${manifest.name} 플러그인이 로드되었습니다!', 'info');
+
+    // 필요 시 사이드바 패널 등록 (좌측 툴바에 탭 추가):
+    // context.ui.registerSidebarView({
+    //   id: '${cleanId}',
+    //   title: '${manifest.name}',
+    //   icon: '🧩',
+    //   render(container) {
+    //     container.innerHTML = '<div style="padding:16px;"><h3>${manifest.name}</h3><p>플러그인 화면</p></div>';
+    //   }
+    // });
+  },
+  deactivate() {
+    console.log('[plugin] ${manifest.name} deactivated');
+  }
+};
+`;
+
+    if (platform().saveDiskPlugin) {
+      try {
+        await platform().saveDiskPlugin!(cleanId, JSON.stringify(manifest, null, 2), starterScript);
+        this.showToast(`플러그인 "${manifest.name}"이(가) 생성되었습니다.`, 'info');
+        await this.init();
+        return true;
+      } catch (err) {
+        this.showToast(`플러그인 생성 실패: ${err}`, 'error');
+        return false;
+      }
+    }
+    return false;
   }
 
   async openPluginsFolder(): Promise<void> {

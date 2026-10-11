@@ -29,3 +29,8 @@
     Quit
   ${EndIf}
 !macroend
+
+!macro NSIS_HOOK_POSTINSTALL
+  ; Tell Windows shell to refresh icon and association cache immediately
+  System::Call 'shell32::SHChangeNotify(i 0x08000000, i 0, i 0, i 0)'
+!macroend

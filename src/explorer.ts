@@ -340,6 +340,8 @@ export class FileExplorer {
         }
       } else {
         const isIni = /\.(ini|3dm|migoto)$/i.test(entry.name);
+        const isDds = /\.dds$/i.test(entry.name);
+        const isImage = /\.(dds|png|jpe?g|bmp|webp|gif)$/i.test(entry.name);
         const isActive = entryKey === this.activeFilePath;
         if (isActive) node.classList.add('active');
 
@@ -349,12 +351,12 @@ export class FileExplorer {
         node.append(spacer);
 
         const icon = document.createElement('span');
-        icon.className = `tree-icon file-icon${isIni ? ' is-ini' : ''}`;
-        icon.innerHTML = isIni ? '📄' : '📝';
+        icon.className = `tree-icon file-icon${isIni ? ' is-ini' : isImage ? ' is-img' : ''}`;
+        icon.innerHTML = isIni ? '📄' : isImage ? '🖼️' : '📝';
         node.append(icon);
 
         const label = document.createElement('span');
-        label.className = `tree-label${isIni ? ' ini-file' : ''}`;
+        label.className = `tree-label${isIni ? ' ini-file' : isImage ? ' img-file' : ''}`;
         label.textContent = entry.name;
         node.append(label);
 
@@ -363,13 +365,22 @@ export class FileExplorer {
           badge.className = 'tree-badge';
           badge.textContent = 'INI';
           node.append(badge);
+        } else if (isImage) {
+          const badge = document.createElement('span');
+          badge.className = 'tree-badge img-badge';
+          badge.textContent = isDds ? 'DDS' : 'IMG';
+          node.append(badge);
         }
 
         node.title = entry.path || entry.name;
 
         node.addEventListener('click', () => {
           const ref: FileRef = platform().refFromId(entryKey);
-          this.doc.openFile(ref);
+          if (isImage) {
+            this.doc.openImageFile(ref);
+          } else {
+            this.doc.openFile(ref);
+          }
         });
 
         // Right-click context menu on file
@@ -419,10 +430,18 @@ export class FileExplorer {
 
       if (!entry.isDir) {
         // File item
-        addItem('에디터에서 열기', () => {
-          const ref: FileRef = platform().refFromId(entryKey);
-          this.doc.openFile(ref);
-        });
+        const isImage = /\.(dds|png|jpe?g|bmp|webp|gif)$/i.test(entry.name);
+        if (isImage) {
+          addItem('이미지 뷰어로 열기', () => {
+            const ref: FileRef = platform().refFromId(entryKey);
+            this.doc.openImageFile(ref);
+          });
+        } else {
+          addItem('에디터에서 열기', () => {
+            const ref: FileRef = platform().refFromId(entryKey);
+            this.doc.openFile(ref);
+          });
+        }
 
         addItem('경로 복사', () => {
           navigator.clipboard.writeText(entry.path || entry.name).catch(() => {});

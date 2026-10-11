@@ -123,6 +123,11 @@ export class TabBar {
       el.setAttribute('data-tab-id', tab.id);
       el.title = tab.file?.location ?? tab.title;
 
+      const iconSpan = document.createElement('span');
+      iconSpan.className = 'tab-icon';
+      iconSpan.textContent = tab.kind === 'image' ? '🖼️' : '📄';
+      el.append(iconSpan);
+
       const titleSpan = document.createElement('span');
       titleSpan.className = 'tab-title';
       titleSpan.textContent = tab.title;

@@ -51,7 +51,7 @@ async function boot() {
     scrollBeyondLastLine: false,
   });
 
-  const doc = new DocumentManager(editor);
+  const doc = new DocumentManager(editor, $('custom-viewer-container'));
   const outline = new OutlinePanel(editor, $('sidebar'), $('sidebar-panel-outline'), $('sidebar-resizer'));
   const explorer = new FileExplorer($('sidebar-panel-explorer'), doc);
   new TemplatePanel($('sidebar-panel-templates'), editor);
@@ -74,6 +74,8 @@ async function boot() {
     () => openSettings(),
     () => openHelp(),
   );
+
+  pluginManager.setActivityBar(activityBar);
 
   // Initialize plugins
   await pluginManager.init();

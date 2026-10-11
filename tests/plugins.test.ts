@@ -55,3 +55,36 @@ test('decodeDDS correctly parses valid mock DDS header', () => {
   assert.equal(decoded.rgba[2], 255); // Blue
   assert.equal(decoded.rgba[3], 255); // Alpha
 });
+
+test('builtin plugins activate with expected behavior', () => {
+  const registeredViews: any[] = [];
+  const mockContext: any = {
+    ui: {
+      registerSidebarView: (v: any) => registeredViews.push(v),
+      showToast: () => {},
+    },
+    editor: { getText: () => '', insertText: () => {} },
+    workspace: { getCurrentFolder: () => null, readBinaryFile: async () => new Uint8Array() },
+    storage: { get: () => null, set: () => {} },
+  };
+
+  const py = BUILTIN_PLUGINS.find((p) => p.manifest.id === 'python-runner')!;
+  py.createPlugin().activate(mockContext);
+  assert.equal(registeredViews.length, 1);
+  assert.equal(registeredViews[0].id, 'python-runner');
+  assert.equal(registeredViews[0].icon, '🐍');
+
+  registeredViews.length = 0;
+  const ai = BUILTIN_PLUGINS.find((p) => p.manifest.id === 'ai-assistant')!;
+  ai.createPlugin().activate(mockContext);
+  assert.equal(registeredViews.length, 1);
+  assert.equal(registeredViews[0].id, 'ai-assistant');
+  assert.equal(registeredViews[0].icon, '🤖');
+
+  registeredViews.length = 0;
+  const asset = BUILTIN_PLUGINS.find((p) => p.manifest.id === 'asset-viewer')!;
+  asset.createPlugin().activate(mockContext);
+  // Asset viewer should NOT register sidebar views (opens directly in editor tabs)
+  assert.equal(registeredViews.length, 0);
+});
+

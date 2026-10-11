@@ -1,16 +1,24 @@
 import { getSettings, updateSettings, onSettingsChange } from './settings';
 import type { OutlinePanel } from './outline';
 
-export type ActivityPanel = 'explorer' | 'outline' | 'templates' | 'plugins';
+export type ActivityPanel = 'explorer' | 'outline' | 'templates' | 'plugins' | string;
+
+export interface DynamicTab {
+  id: string;
+  icon: string;
+  title: string;
+  panelEl: HTMLElement;
+}
 
 /**
  * VS Code-style vertical Activity Bar on the far left.
- * Lets users switch between Explorer, Outline, Templates, and Plugins,
+ * Lets users switch between Explorer, Outline, Templates, Plugins, and dynamic plugin tabs,
  * or toggle the entire sidebar by clicking the active icon.
  * Bottom icons provide quick access to Settings and Help.
  */
 export class ActivityBar {
   private activePanel: ActivityPanel = 'explorer';
+  private dynamicTabs: Map<string, DynamicTab & { btnEl: HTMLElement }> = new Map();
 
   constructor(
     private barEl: HTMLElement,
@@ -32,6 +40,46 @@ export class ActivityBar {
     onSettingsChange(() => {
       this.syncWithSidebarVisibility();
     });
+  }
+
+  registerDynamicTab(tab: DynamicTab): { dispose: () => void } {
+    if (this.dynamicTabs.has(tab.id)) {
+      this.unregisterDynamicTab(tab.id);
+    }
+
+    const btn = document.createElement('button');
+    btn.className = 'act-btn';
+    btn.id = `act-${tab.id}`;
+    btn.title = tab.title;
+    btn.setAttribute('aria-label', tab.title);
+    btn.innerHTML = `<span>${tab.icon}</span>`;
+    btn.addEventListener('click', () => this.handlePanelClick(tab.id));
+
+    const actTop = this.barEl.querySelector('.act-top');
+    if (actTop) {
+      actTop.insertBefore(btn, this.pluginsBtn);
+    } else {
+      this.barEl.appendChild(btn);
+    }
+
+    this.dynamicTabs.set(tab.id, { ...tab, btnEl: btn });
+    this.updateActiveUi();
+
+    return {
+      dispose: () => this.unregisterDynamicTab(tab.id),
+    };
+  }
+
+  unregisterDynamicTab(id: string) {
+    const entry = this.dynamicTabs.get(id);
+    if (!entry) return;
+    entry.btnEl.remove();
+    this.dynamicTabs.delete(id);
+    if (this.activePanel === id) {
+      this.switchTo('explorer');
+    } else {
+      this.updateActiveUi();
+    }
   }
 
   get currentPanel(): ActivityPanel {
@@ -114,5 +162,13 @@ export class ActivityBar {
     this.panelOutline.hidden = this.activePanel !== 'outline';
     this.panelTemplates.hidden = this.activePanel !== 'templates';
     this.panelPlugins.hidden = this.activePanel !== 'plugins';
+
+    // Show/hide dynamic tabs
+    for (const [id, tab] of this.dynamicTabs) {
+      const isActive = isShowing && this.activePanel === id;
+      tab.btnEl.classList.toggle('active', isActive);
+      tab.btnEl.setAttribute('aria-pressed', String(isActive));
+      tab.panelEl.hidden = this.activePanel !== id;
+    }
   }
 }

@@ -37,6 +37,7 @@ jobs:
         uses: swatinem/rust-cache@v2
         with:
           workspaces: './src-tauri -> target'
+          key: ${{ hashFiles('src-tauri/icons/icon.ico') }}
 
       - name: Install dependencies
         run: npm ci
