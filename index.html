@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Migoto Studio - XXMI/3DMigoto INI 에디터" />
+    <title>Migoto Studio</title>
+  </head>
+  <body>
+    <div id="app">
+      <header id="titlebar">
+        <h1 id="app-title">Migoto Studio</h1>
+        <nav id="toolbar" aria-label="도구">
+          <button id="btn-new" title="새 파일 (Ctrl+N)">새 파일</button>
+          <button id="btn-open" title="파일 열기 (Ctrl+O)">열기</button>
+          <button id="btn-recent" title="최근 파일">최근 ▾</button>
+          <button id="btn-save" class="primary" title="저장 (Ctrl+S)">저장</button>
+          <button id="btn-saveas" title="다른 이름으로 저장 (Ctrl+Shift+S)">다른 이름으로</button>
+          <span class="divider"></span>
+          <button id="btn-insert" title="자주 쓰는 블록을 커서 위치에 넣기">삽입 ▾</button>
+          <button id="btn-restore" title="이전에 저장한 내용으로 되돌리기">백업 복원</button>
+          <span class="spacer"></span>
+          <button id="btn-outline" title="섹션 목록 보이기/숨기기">섹션 목록</button>
+          <button id="btn-theme" title="밝은/어두운 테마 전환">테마</button>
+          <button id="btn-settings" title="설정">설정</button>
+        </nav>
+        <span id="file-name">이름 없음</span>
+      </header>
+      <div id="workspace">
+        <aside id="sidebar" aria-label="섹션 목록"></aside>
+        <main id="editor"></main>
+      </div>
+      <footer id="statusbar">
+        <span id="status-pos">줄 1, 열 1</span>
+        <span class="status-right">
+          <button id="status-eol" class="status-btn" title="줄바꿈 방식 전환 (CRLF/LF)">CRLF</button>
+          <select id="status-encoding" class="status-btn" title="저장할 인코딩"></select>
+          <span id="status-grammar">문법: -</span>
+        </span>
+      </footer>
+      <ul id="recent-menu" class="popup-menu" hidden></ul>
+      <ul id="insert-menu" class="popup-menu" hidden></ul>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
