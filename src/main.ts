@@ -12,6 +12,7 @@ import { TEMPLATES, insertTemplate, registerSnippetCompletions } from './templat
 import { openSettings } from './settings-ui';
 import { openRestore } from './restore-ui';
 import { lintModel, optionsFromSettings } from './lint';
+import { registerSmartCompletions } from './completions';
 
 // Only the base editor worker is needed (no TS/JSON/CSS language services).
 (self as unknown as { MonacoEnvironment: monaco.Environment }).MonacoEnvironment = {
@@ -28,6 +29,7 @@ async function boot() {
   defineThemes();
   await registerMigotoLanguage();
   registerSnippetCompletions();
+  registerSmartCompletions();
 
   const editor = monaco.editor.create($('editor'), {
     value: '',
