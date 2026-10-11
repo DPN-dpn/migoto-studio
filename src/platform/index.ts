@@ -2,9 +2,11 @@ import type { Platform } from './types';
 
 let current: Platform | null = null;
 
-function isTauriEnvironment(): boolean {
+export function isTauriEnvironment(): boolean {
   return typeof window !== 'undefined' && ('__TAURI_INTERNALS__' in window || '__TAURI__' in window);
 }
+
+export const isDesktop = isTauriEnvironment();
 
 /**
  * Chooses the platform implementation once at startup.

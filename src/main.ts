@@ -13,6 +13,7 @@ import { openSettings } from './settings-ui';
 import { openRestore } from './restore-ui';
 import { lintModel, optionsFromSettings } from './lint';
 import { registerSmartCompletions } from './completions';
+import { initPwa } from './pwa';
 
 // Only the base editor worker is needed (no TS/JSON/CSS language services).
 (self as unknown as { MonacoEnvironment: monaco.Environment }).MonacoEnvironment = {
@@ -23,6 +24,7 @@ const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as 
 
 async function boot() {
   await initPlatform();
+  initPwa();
   const settings = await loadSettings();
   // Drop expired safety backups (best effort; never blocks startup).
   platform().pruneBackups({ keepDays: settings.backupKeepDays, maxPerFile: settings.backupMaxPerFile }).catch(() => {});

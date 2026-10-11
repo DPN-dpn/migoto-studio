@@ -103,6 +103,20 @@ button.primary:hover { filter: brightness(1.1); background: var(--accent); }
 .icon-btn:hover { color: var(--fg); }
 .icon-btn[aria-pressed='true'] { color: var(--accent); background: var(--bg-hover); }
 
+.pwa-install-btn {
+  background: var(--bg-hover);
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.pwa-install-btn:hover {
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+
 #sidebar {
   width: 250px;
   display: flex;
