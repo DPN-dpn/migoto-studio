@@ -25,10 +25,8 @@
 
 ### 설치 프로그램: 제거 시 앱데이터 삭제 옵션 (완료)
 - **프로그램을 삭제할 때 앱데이터 폴더(`%APPDATA%\MigotoStudio`)를 함께 삭제할 수 있는 옵션이 있어야 한다.**
-- 구현: Tauri NSIS 설치 프로그램 훅(`src-tauri/nsis-hooks.nsh`)의 `NSIS_HOOK_PREUNINSTALL` 매크로에서 폴더 존재 시 확인 대화상자(`MessageBox MB_YESNO`)를 표시합니다.
-  - 한국어(`$LANGUAGE 1042`) 및 영어 다국어 메시지 지원.
-  - [예] 클릭 시: `RMDir /r "$APPDATA\MigotoStudio"`로 설정 및 백업 데이터까지 완전 삭제.
-  - [아니오] 클릭 시: 사용자 데이터 및 백업을 보존하여 다음 설치 시 복원 가능.
+- 구현: Tauri NSIS 제거기의 기본 "앱 데이터 삭제" 체크박스 상태 변수(`$DeleteAppDataCheckboxState = 1`)를 `src-tauri/nsis-hooks.nsh`의 `NSIS_HOOK_POSTUNINSTALL` 훅에서 직접 참조합니다.
+  - 번거로운 확인 팝업 없이, 제거 화면의 체크박스 선택 여부에 따라 `%APPDATA%\MigotoStudio` 폴더를 자동으로 삭제하거나 보존합니다.
 - 포터블 모드는 프로그램 폴더를 지우면 데이터도 함께 삭제됩니다.
 
 ## 배포 방식 (설치형 + 웹, 둘 다 지원)
