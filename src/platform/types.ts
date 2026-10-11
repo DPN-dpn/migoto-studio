@@ -88,4 +88,26 @@ export interface Platform {
   onFileDrop(handler: (ref: FileRef) => void, onHover: (hovering: boolean) => void): Promise<void>;
   /** Registered handler decides whether the window may close (return true to close). */
   onCloseRequest(handler: () => Promise<boolean>): Promise<void>;
+
+  // ---- plugins & system ----
+  getPluginsDir?(): Promise<string>;
+  openPluginsFolder?(): Promise<void>;
+  readBinaryFile?(path: string): Promise<Uint8Array>;
+  execProcess?(command: string, args: string[], cwd?: string): Promise<ProcessOutput>;
+  listDiskPlugins?(): Promise<DiskPlugin[]>;
+  saveDiskPlugin?(id: string, manifestJson: string, scriptContent: string): Promise<void>;
 }
+
+export interface ProcessOutput {
+  stdout: string;
+  stderr: string;
+  exitCode: number;
+}
+
+export interface DiskPlugin {
+  id: string;
+  path: string;
+  manifestJson: string;
+  scriptContent: string;
+}
+

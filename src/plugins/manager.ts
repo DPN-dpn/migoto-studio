@@ -1,0 +1,394 @@
+import * as monaco from 'monaco-editor';
+import { platform } from '../platform';
+import type { DocumentManager } from '../documents';
+import type { FileExplorer } from '../explorer';
+import { openModal } from '../modal';
+import { BUILTIN_PLUGINS } from './builtin';
+import type {
+  MigotoPlugin,
+  PluginContext,
+  PluginInstance,
+  PluginManifest,
+  RegisteredSidebarView,
+} from './types';
+
+const STORAGE_ENABLED_PLUGINS = 'migoto_plugins_enabled';
+
+export class PluginManager {
+  private plugins: Map<string, PluginInstance> = new Map();
+  private sidebarViews: Map<string, RegisteredSidebarView> = new Map();
+  private listeners: Set<() => void> = new Set();
+  private statusBarEl: HTMLElement | null = null;
+  private pluginStatusBarItems: Map<string, HTMLElement> = new Map();
+
+  constructor(
+    private doc: DocumentManager,
+    private editor: monaco.editor.IStandaloneCodeEditor,
+    private explorer?: FileExplorer,
+  ) {
+    this.statusBarEl = document.getElementById('statusbar');
+  }
+
+  onChange(fn: () => void): () => void {
+    this.listeners.add(fn);
+    return () => this.listeners.delete(fn);
+  }
+
+  private notify() {
+    this.listeners.forEach((fn) => fn());
+  }
+
+  getPlugins(): PluginInstance[] {
+    return Array.from(this.plugins.values());
+  }
+
+  getSidebarViews(): RegisteredSidebarView[] {
+    return Array.from(this.sidebarViews.values());
+  }
+
+  async init(): Promise<void> {
+    const savedStates: Record<string, boolean> = (() => {
+      try {
+        return JSON.parse(localStorage.getItem(STORAGE_ENABLED_PLUGINS) || '{}');
+      } catch {
+        return {};
+      }
+    })();
+
+    // 1. Initialize built-in plugins
+    for (const def of BUILTIN_PLUGINS) {
+      const isEnabled = savedStates[def.manifest.id] !== false; // enabled by default
+      const instance: PluginInstance = {
+        manifest: def.manifest,
+        enabled: isEnabled,
+        isBuiltin: true,
+      };
+      this.plugins.set(def.manifest.id, instance);
+      if (isEnabled) {
+        await this.activatePlugin(instance, def.createPlugin());
+      }
+    }
+
+    // 2. Discover & initialize disk plugins in Desktop environment
+    await this.loadDiskPlugins(savedStates);
+
+    this.notify();
+  }
+
+  private async loadDiskPlugins(savedStates: Record<string, boolean>): Promise<void> {
+    if (!platform().listDiskPlugins) return;
+
+    try {
+      const diskList = await platform().listDiskPlugins!();
+
+      // Ensure built-ins are written to disk if empty so users can inspect/edit them
+      if (diskList.length === 0 && platform().saveDiskPlugin) {
+        for (const def of BUILTIN_PLUGINS) {
+          try {
+            await platform().saveDiskPlugin!(
+              def.manifest.id,
+              JSON.stringify(def.manifest, null, 2),
+              def.standaloneScript,
+            );
+          } catch {}
+        }
+      }
+
+      for (const disk of diskList) {
+        if (this.plugins.has(disk.id)) continue; // Built-in already registered
+
+        let manifest: PluginManifest;
+        try {
+          manifest = JSON.parse(disk.manifestJson);
+        } catch {
+          manifest = {
+            id: disk.id,
+            name: disk.id,
+            version: '1.0.0',
+            description: '로컬 플러그인',
+            author: 'Local',
+          };
+        }
+
+        const isEnabled = savedStates[manifest.id] !== false;
+        const instance: PluginInstance = {
+          manifest,
+          enabled: isEnabled,
+          isBuiltin: false,
+          path: disk.path,
+          scriptContent: disk.scriptContent,
+        };
+        this.plugins.set(manifest.id, instance);
+
+        if (isEnabled && disk.scriptContent) {
+          await this.loadAndActivateScriptPlugin(instance, disk.scriptContent);
+        }
+      }
+    } catch (err) {
+      console.warn('[plugins] Failed to load disk plugins:', err);
+    }
+  }
+
+  private async loadAndActivateScriptPlugin(
+    instance: PluginInstance,
+    scriptContent: string,
+  ): Promise<void> {
+    try {
+      // Dynamic ES module evaluation via Blob URL
+      const blob = new Blob([scriptContent], { type: 'application/javascript' });
+      const url = URL.createObjectURL(blob);
+      const mod = await import(/* @vite-ignore */ url);
+      URL.revokeObjectURL(url);
+
+      const plugin: MigotoPlugin = mod.default || mod;
+      await this.activatePlugin(instance, plugin);
+    } catch (err: any) {
+      instance.error = err.message || String(err);
+      console.error(`[plugins] Failed to activate plugin "${instance.manifest.name}":`, err);
+    }
+  }
+
+  private async activatePlugin(instance: PluginInstance, plugin: MigotoPlugin): Promise<void> {
+    const unregisterViews: string[] = [];
+    const unregisterStatusItems: string[] = [];
+
+    const context = this.createContext(instance.manifest, {
+      onRegisterView: (view) => {
+        this.sidebarViews.set(view.id, view);
+        unregisterViews.push(view.id);
+        this.notify();
+      },
+      onRegisterStatusItem: (id, el) => {
+        this.pluginStatusBarItems.set(id, el);
+        unregisterStatusItems.push(id);
+      },
+    });
+
+    try {
+      await plugin.activate(context);
+      instance.instance = plugin;
+      instance.error = undefined;
+      instance.cleanup = () => {
+        try {
+          plugin.deactivate?.();
+        } catch {}
+        unregisterViews.forEach((vId) => this.sidebarViews.delete(vId));
+        unregisterStatusItems.forEach((sId) => {
+          this.pluginStatusBarItems.get(sId)?.remove();
+          this.pluginStatusBarItems.delete(sId);
+        });
+      };
+    } catch (err: any) {
+      instance.error = err.message || String(err);
+      console.error(`[plugins] Exception in plugin activate (${instance.manifest.id}):`, err);
+    }
+  }
+
+  async togglePlugin(pluginId: string, enabled: boolean): Promise<void> {
+    const p = this.plugins.get(pluginId);
+    if (!p || p.enabled === enabled) return;
+
+    p.enabled = enabled;
+
+    const savedStates: Record<string, boolean> = (() => {
+      try {
+        return JSON.parse(localStorage.getItem(STORAGE_ENABLED_PLUGINS) || '{}');
+      } catch {
+        return {};
+      }
+    })();
+    savedStates[pluginId] = enabled;
+    localStorage.setItem(STORAGE_ENABLED_PLUGINS, JSON.stringify(savedStates));
+
+    if (!enabled) {
+      p.cleanup?.();
+      p.cleanup = undefined;
+      p.instance = undefined;
+    } else {
+      if (p.isBuiltin) {
+        const def = BUILTIN_PLUGINS.find((b) => b.manifest.id === pluginId);
+        if (def) await this.activatePlugin(p, def.createPlugin());
+      } else if (p.scriptContent) {
+        await this.loadAndActivateScriptPlugin(p, p.scriptContent);
+      }
+    }
+
+    this.notify();
+  }
+
+  async openPluginsFolder(): Promise<void> {
+    if (platform().openPluginsFolder) {
+      await platform().openPluginsFolder!();
+    }
+  }
+
+  showToast(message: string, type: 'info' | 'warn' | 'error' = 'info'): void {
+    let toastContainer = document.getElementById('plugin-toast-container');
+    if (!toastContainer) {
+      toastContainer = document.createElement('div');
+      toastContainer.id = 'plugin-toast-container';
+      document.body.append(toastContainer);
+    }
+
+    const toast = document.createElement('div');
+    toast.className = `plugin-toast toast-${type}`;
+    const icon = type === 'error' ? '⛔' : type === 'warn' ? '⚠' : 'ℹ';
+    toast.innerHTML = `<span class="toast-icon">${icon}</span><span class="toast-text">${message}</span>`;
+    toastContainer.append(toast);
+
+    setTimeout(() => {
+      toast.classList.add('fade-out');
+      setTimeout(() => toast.remove(), 300);
+    }, 3000);
+  }
+
+  private createContext(
+    manifest: PluginManifest,
+    callbacks: {
+      onRegisterView: (view: RegisteredSidebarView) => void;
+      onRegisterStatusItem: (id: string, el: HTMLElement) => void;
+    },
+  ): PluginContext {
+    return {
+      manifest,
+
+      editor: {
+        getText: () => this.editor.getValue(),
+        getSelectedText: () => {
+          const sel = this.editor.getSelection();
+          if (!sel) return '';
+          return this.editor.getModel()?.getValueInRange(sel) ?? '';
+        },
+        insertText: (text: string) => {
+          const sel = this.editor.getSelection();
+          const pos = this.editor.getPosition();
+          const range = sel && !sel.isEmpty()
+            ? sel
+            : new monaco.Range(pos?.lineNumber || 1, pos?.column || 1, pos?.lineNumber || 1, pos?.column || 1);
+
+          this.editor.pushUndoStop();
+          this.editor.executeEdits('plugin', [{ range, text }]);
+          this.editor.pushUndoStop();
+          this.editor.focus();
+        },
+        replaceSelection: (text: string) => {
+          const sel = this.editor.getSelection();
+          if (!sel) return;
+          this.editor.pushUndoStop();
+          this.editor.executeEdits('plugin', [{ range: sel, text }]);
+          this.editor.pushUndoStop();
+          this.editor.focus();
+        },
+        setCursor: (line: number, col: number) => {
+          this.editor.setPosition({ lineNumber: line, column: col });
+          this.editor.revealPositionInCenter({ lineNumber: line, column: col });
+          this.editor.focus();
+        },
+        getCursor: () => {
+          const p = this.editor.getPosition();
+          return { lineNumber: p?.lineNumber || 1, column: p?.column || 1 };
+        },
+      },
+
+      workspace: {
+        getCurrentFile: () => {
+          const file = this.doc.file;
+          if (!file) return null;
+          return {
+            name: this.doc.fileName,
+            path: file.id,
+            location: file.location,
+          };
+        },
+        getCurrentFolder: () => {
+          if (this.explorer && this.explorer.hasFolder) {
+            return (this.explorer as any).currentFolder?.id ?? null;
+          }
+          return null;
+        },
+        openFile: async (pathOrName: string) => {
+          const ref = platform().refFromId(pathOrName);
+          await this.doc.openFile(ref);
+        },
+        saveCurrentFile: async () => {
+          await this.doc.save();
+        },
+        readTextFile: async (path: string) => {
+          const ref = platform().refFromId(path);
+          const loaded = await platform().readFile(ref);
+          return loaded.text;
+        },
+        readBinaryFile: async (path: string) => {
+          if (platform().readBinaryFile) {
+            return platform().readBinaryFile!(path);
+          }
+          return new Uint8Array();
+        },
+      },
+
+      ui: {
+        registerSidebarView: (options) => {
+          callbacks.onRegisterView({
+            id: options.id,
+            pluginId: manifest.id,
+            title: options.title,
+            icon: options.icon,
+            render: options.render,
+          });
+        },
+        showModal: (title: string, render: (container: HTMLElement, close: () => void) => void) => {
+          const body = document.createElement('div');
+          body.className = 'plugin-modal-body';
+          let closeFn: (() => void) | null = null;
+          closeFn = openModal(title, body);
+          render(body, () => closeFn?.());
+        },
+        showToast: (message: string, type?: 'info' | 'warn' | 'error') => {
+          this.showToast(message, type);
+        },
+        registerStatusBarItem: (options) => {
+          if (!this.statusBarEl) return;
+          const btn = document.createElement('button');
+          btn.className = 'status-btn plugin-status-item';
+          btn.textContent = options.text;
+          if (options.tooltip) btn.title = options.tooltip;
+          if (options.onClick) btn.onclick = options.onClick;
+          this.statusBarEl.append(btn);
+          callbacks.onRegisterStatusItem(options.id, btn);
+        },
+      },
+
+      system: {
+        exec: async (command: string, args: string[] = [], cwd?: string) => {
+          if (platform().execProcess) {
+            return platform().execProcess!(command, args, cwd);
+          }
+          return {
+            stdout: '',
+            stderr: '이 플랫폼에서는 외부 프로세스 실행이 지원되지 않습니다.',
+            exitCode: 1,
+          };
+        },
+      },
+
+      storage: {
+        get: <T = any>(key: string, defaultValue?: T): T => {
+          try {
+            const raw = localStorage.getItem(`migoto_plugin_${manifest.id}_${key}`);
+            if (raw === null) return defaultValue as T;
+            return JSON.parse(raw);
+          } catch {
+            return defaultValue as T;
+          }
+        },
+        set: <T = any>(key: string, value: T): void => {
+          try {
+            localStorage.setItem(`migoto_plugin_${manifest.id}_${key}`, JSON.stringify(value));
+          } catch {}
+        },
+      },
+
+      fetch: (input, init) => window.fetch(input, init),
+    };
+  }
+}

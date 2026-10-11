@@ -617,4 +617,15 @@ export const web: Platform = {
       return (e.returnValue = '');
     });
   },
+
+  getPluginsDir: async () => '브라우저 로컬 저장소 (IndexedDB)',
+  openPluginsFolder: async () => {},
+  readBinaryFile: async () => new Uint8Array(),
+  execProcess: async () => ({
+    stdout: '',
+    stderr: '웹 브라우저 환경에서는 로컬 프로세스 실행이 지원되지 않습니다. 데스크톱 앱을 사용해 주세요.',
+    exitCode: 1,
+  }),
+  listDiskPlugins: async () => [],
+  saveDiskPlugin: async () => {},
 };

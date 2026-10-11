@@ -9,6 +9,8 @@ import { DocumentManager, ENCODING_LABELS, type Encoding } from './documents';
 import { TabBar } from './tabbar';
 import { FileExplorer } from './explorer';
 import { TemplatePanel } from './template-panel';
+import { PluginManager } from './plugins';
+import { PluginPanel } from './plugin-panel';
 import { ActivityBar } from './activitybar';
 import { MenuBar } from './menubar';
 import { getSettings, loadSettings, onSettingsChange } from './settings';
@@ -53,6 +55,8 @@ async function boot() {
   const outline = new OutlinePanel(editor, $('sidebar'), $('sidebar-panel-outline'), $('sidebar-resizer'));
   const explorer = new FileExplorer($('sidebar-panel-explorer'), doc);
   new TemplatePanel($('sidebar-panel-templates'), editor);
+  const pluginManager = new PluginManager(doc, editor, explorer);
+  new PluginPanel($('sidebar-panel-plugins'), pluginManager);
   new TabBar(doc, $('tabbar'), $('btn-new-tab'), $('tab-menu'));
 
   // ---- Activity Bar (세로 툴바) ----
@@ -61,13 +65,18 @@ async function boot() {
     $('act-explorer'),
     $('act-outline'),
     $('act-templates'),
+    $('act-plugins'),
     $('sidebar-panel-explorer'),
     $('sidebar-panel-outline'),
     $('sidebar-panel-templates'),
+    $('sidebar-panel-plugins'),
     outline,
     () => openSettings(),
     () => openHelp(),
   );
+
+  // Initialize plugins
+  await pluginManager.init();
 
   // Jump to next error/warning function
   const jumpNextLint = () => {

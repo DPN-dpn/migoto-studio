@@ -1,11 +1,11 @@
 import { getSettings, updateSettings, onSettingsChange } from './settings';
 import type { OutlinePanel } from './outline';
 
-export type ActivityPanel = 'explorer' | 'outline' | 'templates';
+export type ActivityPanel = 'explorer' | 'outline' | 'templates' | 'plugins';
 
 /**
  * VS Code-style vertical Activity Bar on the far left.
- * Lets users switch between Explorer (모드 파일 탐색기), Outline (섹션 목록), and Templates (코드 템플릿),
+ * Lets users switch between Explorer, Outline, Templates, and Plugins,
  * or toggle the entire sidebar by clicking the active icon.
  * Bottom icons provide quick access to Settings and Help.
  */
@@ -17,9 +17,11 @@ export class ActivityBar {
     private explorerBtn: HTMLElement,
     private outlineBtn: HTMLElement,
     private templatesBtn: HTMLElement,
+    private pluginsBtn: HTMLElement,
     private panelExplorer: HTMLElement,
     private panelOutline: HTMLElement,
     private panelTemplates: HTMLElement,
+    private panelPlugins: HTMLElement,
     private outline: OutlinePanel,
     private onOpenSettings: () => void,
     private onOpenHelp: () => void,
@@ -44,6 +46,7 @@ export class ActivityBar {
     this.explorerBtn.addEventListener('click', () => this.handlePanelClick('explorer'));
     this.outlineBtn.addEventListener('click', () => this.handlePanelClick('outline'));
     this.templatesBtn.addEventListener('click', () => this.handlePanelClick('templates'));
+    this.pluginsBtn.addEventListener('click', () => this.handlePanelClick('plugins'));
 
     const settingsBtn = this.barEl.querySelector('#act-settings');
     settingsBtn?.addEventListener('click', () => this.onOpenSettings());
@@ -92,6 +95,7 @@ export class ActivityBar {
     const isExp = isShowing && this.activePanel === 'explorer';
     const isOut = isShowing && this.activePanel === 'outline';
     const isTpl = isShowing && this.activePanel === 'templates';
+    const isPlg = isShowing && this.activePanel === 'plugins';
 
     this.explorerBtn.classList.toggle('active', isExp);
     this.explorerBtn.setAttribute('aria-pressed', String(isExp));
@@ -102,9 +106,13 @@ export class ActivityBar {
     this.templatesBtn.classList.toggle('active', isTpl);
     this.templatesBtn.setAttribute('aria-pressed', String(isTpl));
 
+    this.pluginsBtn.classList.toggle('active', isPlg);
+    this.pluginsBtn.setAttribute('aria-pressed', String(isPlg));
+
     // Show/hide sub-panels inside the sidebar
     this.panelExplorer.hidden = this.activePanel !== 'explorer';
     this.panelOutline.hidden = this.activePanel !== 'outline';
     this.panelTemplates.hidden = this.activePanel !== 'templates';
+    this.panelPlugins.hidden = this.activePanel !== 'plugins';
   }
 }

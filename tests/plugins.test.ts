@@ -1,0 +1,57 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { decodeDDS } from '../src/plugins/dds-decoder.ts';
+import { BUILTIN_PLUGINS } from '../src/plugins/builtin.ts';
+
+test('BUILTIN_PLUGINS registers 3 default plugins with unique IDs', () => {
+  assert.equal(BUILTIN_PLUGINS.length, 3);
+  const ids = BUILTIN_PLUGINS.map((p) => p.manifest.id);
+  assert.deepEqual(ids, ['python-runner', 'asset-viewer', 'ai-assistant']);
+
+  for (const p of BUILTIN_PLUGINS) {
+    assert.ok(p.manifest.name);
+    assert.ok(p.manifest.description);
+    assert.ok(p.manifest.version);
+    assert.ok(typeof p.createPlugin === 'function');
+  }
+});
+
+test('decodeDDS throws on invalid magic buffer', () => {
+  const invalid = new Uint8Array([0, 1, 2, 3]);
+  assert.throws(() => decodeDDS(invalid), /유효한 DDS 파일이 아닙니다/);
+});
+
+test('decodeDDS correctly parses valid mock DDS header', () => {
+  // Construct minimal valid DDS header for 4x4 DXT1
+  // Total size: 128 header + 8 bytes (1 block)
+  const buf = new Uint8Array(128 + 8);
+  const view = new DataView(buf.buffer);
+
+  // Magic 'DDS ' = 0x20534444
+  view.setUint32(0, 0x20534444, true);
+  // Header size = 124
+  view.setUint32(4, 124, true);
+  // Height = 4
+  view.setUint32(12, 4, true);
+  // Width = 4
+  view.setUint32(16, 4, true);
+  // PixelFormat Size = 32
+  view.setUint32(76, 32, true);
+  // FourCC = 'DXT1' = 0x31545844
+  view.setUint32(84, 0x31545844, true);
+
+  // Block data (white 4x4 block)
+  view.setUint16(128, 0xffff, true); // c0 = white
+  view.setUint16(130, 0x0000, true); // c1 = black
+  view.setUint32(132, 0x00000000, true); // code = all color 0 (white)
+
+  const decoded = decodeDDS(buf);
+  assert.equal(decoded.width, 4);
+  assert.equal(decoded.height, 4);
+  assert.equal(decoded.format, 'DXT1 (BC1)');
+  assert.equal(decoded.rgba.length, 4 * 4 * 4); // 64 bytes
+  assert.equal(decoded.rgba[0], 255); // Red
+  assert.equal(decoded.rgba[1], 255); // Green
+  assert.equal(decoded.rgba[2], 255); // Blue
+  assert.equal(decoded.rgba[3], 255); // Alpha
+});

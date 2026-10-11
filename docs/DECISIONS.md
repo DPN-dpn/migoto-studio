@@ -19,7 +19,7 @@
 | 백업 | 저장 전 이전 파일을 `<앱데이터>/backups`에 보관. 기본 7일, 파일당 10개 |
 | 린트 | 고급 수준까지 검사하되 규칙별로 설정에서 켜고 끌 수 있음 |
 | 설정 | 가능한 한 많은 기능을 설정에서 조절 가능하게 함 |
-| 플러그인 | JS/TS 우선. 외부 프로세스(Python 등)는 후속 (우선순위 낮음) |
+| 플러그인 | 좌측 액티비티 바(🧩) 통합. 순수 TS 플러그인 엔진 + Rust 백엔드 프로세스/바이너리 브릿지. 기본 3종 플러그인(Python 실행기, DDS 뷰어, AI 에이전트) 제공 |
 
 ## 구현 완료된 요구사항
 
@@ -95,6 +95,25 @@
   - 템플릿 추가/관리: 상단 `+ 추가` 버튼으로 모달을 띄워 템플릿 이름, 그룹/분류, 설명, 코드(플레이스홀더 포함)를 입력받아 `localStorage`에 영구 저장.
   - 사용자 등록 템플릿은 '사용자' 배지가 표시되며 삭제(`🗑`) 기능 지원.
   - 상단 메뉴바(`편집` -> `스니펫 템플릿 삽입`)와도 실시간 연동되어 등록한 커스텀 템플릿이 즉시 서브메뉴에 반영됨.
+
+### 플러그인 및 확장 기능 시스템 (완료)
+- **에디터 기능을 무한히 확장할 수 있는 플러그인 런타임과, 좌측 액티비티 바(🧩) 연동 및 기본 3대 플러그인을 제공한다.**
+- 구현:
+  - **백엔드 (`src-tauri/src/plugins.rs`, `src-tauri/src/lib.rs`)**:
+    - `exec_process`: Windows 환경에서 콘솔 창 깜빡임이 없도록 `CREATE_NO_WINDOW (0x08000000)` 플래그를 적용하여 Python 등 외부 프로세스를 백그라운드로 안전하게 실행.
+    - `read_binary_file`: 텍스처 파일(.dds 등) 바이트 스트림 로드.
+    - `list_disk_plugins`, `save_disk_plugin`, `open_plugins_folder`: 앱데이터 `plugins/` 폴더 관리 및 동적 플러그인 스캔.
+  - **플랫폼 추상화 계층 (`src/platform/`)**:
+    - `Platform` 인터페이스에 플러그인 프로세스 실행 및 바이너리 파일 입출력 메서드 정의. 웹 환경을 위한 fallback 로직 구현.
+  - **플러그인 코어 매니저 (`src/plugins/manager.ts`, `src/plugins/types.ts`)**:
+    - 플러그인 수명주기(`activate`, `deactivate`), `localStorage` 활성화 상태 영구화, 샌드박스형 `PluginContext` API (문서 접근, 에디터 조작, 파일 트리 탐색, 모달/토스트 알림, 프로세스 실행, 사이드바 뷰 등록).
+  - **기본 3대 내장 플러그인 (`src/plugins/builtin.ts`)**:
+    1. **Python Runner (`python-runner`)**: 인라인 코드/스크립트 파일 실행, 실시간 stdin/stdout 콘솔 출력, 에디터 커서 결과 삽입.
+    2. **Asset Viewer (`asset-viewer`)**: 현재 문서의 `filename = ` 텍스처 참조 자동 스캔, 외부 의존성 없는 자체 순수 TS DXT1/3/5/BGRA32 디코더(`src/plugins/dds-decoder.ts`)를 통한 체커보드 캔버스 렌더링.
+    3. **AI Assistant (`ai-assistant`)**: OpenAI/Ollama 호환 엔드포인트 대화형 모딩 어시스턴트, 코드 원클릭 삽입.
+  - **UI 통합 (`src/plugin-panel.ts`, `index.html`, `src/activitybar.ts`)**:
+    - 좌측 액티비티 바 4번째 탭 `act-plugins` (`🧩`, `Ctrl+Shift+X`).
+    - 상단 서브 탭(관리 목록 / 각 활성화된 플러그인의 전용 UI 뷰) 전환 및 토글 스위치 제공.
 
 
 ## 배포 방식 (설치형 + 웹, 둘 다 지원)

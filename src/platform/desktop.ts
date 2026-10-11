@@ -2,7 +2,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { getCurrentWebview } from '@tauri-apps/api/webview';
 import { message, open, save } from '@tauri-apps/plugin-dialog';
-import type { BackupEntry, BackupPolicy, DirEntry, Encoding, FileRef, LoadedFile, Platform, SaveChoice } from './types';
+import type { BackupEntry, BackupPolicy, DirEntry, DiskPlugin, Encoding, FileRef, LoadedFile, Platform, ProcessOutput, SaveChoice } from './types';
 
 const FILE_FILTERS = [
   { name: 'INI 파일', extensions: ['ini', '3dm', 'migoto'] },
@@ -122,4 +122,24 @@ export const desktop: Platform = {
       if (await handler()) await win.destroy();
     });
   },
+
+  getPluginsDir: () => invoke<string>('get_plugins_dir'),
+  openPluginsFolder: () => invoke('open_plugins_folder'),
+  readBinaryFile: async (path: string) => {
+    const bytes = await invoke<number[]>('read_binary_file', { path });
+    return new Uint8Array(bytes);
+  },
+  execProcess: (command: string, args: string[], cwd?: string) =>
+    invoke<ProcessOutput>('exec_process', { command, args, cwd }),
+  listDiskPlugins: async () => {
+    const list = await invoke<any[]>('list_disk_plugins');
+    return list.map((p) => ({
+      id: p.id,
+      path: p.path,
+      manifestJson: p.manifest_json,
+      scriptContent: p.script_content,
+    }));
+  },
+  saveDiskPlugin: (id: string, manifestJson: string, scriptContent: string) =>
+    invoke('save_disk_plugin', { id, manifestJson, scriptContent }),
 };

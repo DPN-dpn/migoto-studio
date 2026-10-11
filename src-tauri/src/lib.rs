@@ -1,5 +1,6 @@
 mod backups;
 mod files;
+mod plugins;
 mod storage;
 
 #[tauri::command]
@@ -49,6 +50,12 @@ pub fn run() {
       backups::cleanup_backups,
       backups::get_backup_dir,
       backups::list_backups,
+      plugins::get_plugins_dir,
+      plugins::open_plugins_folder,
+      plugins::read_binary_file,
+      plugins::exec_process,
+      plugins::list_disk_plugins,
+      plugins::save_disk_plugin,
       open_in_browser,
       relaunch_app,
     ])
