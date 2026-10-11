@@ -337,9 +337,26 @@ export function showUpdateModal(info: UpdateInfo) {
       } catch (err: any) {
         console.error('Update install failed:', err);
         statusEl.style.color = '#ef4444';
-        statusEl.textContent = `자동 업데이트 실패: ${err?.message || err}.`;
+        statusEl.innerHTML = `
+          <div style="font-weight: 600; margin-bottom: 4px;">⚠️ 자동 업데이트 실패 (${err?.message || err})</div>
+          <div style="font-size: 12px; color: var(--fg); line-height: 1.5;">
+            네트워크 연결 또는 권한 문제로 자동 설치를 완료하지 못했습니다.<br>
+            GitHub 릴리스 페이지에서 최신 설치 파일(.exe) 또는 무설치 포터블(.zip)을 직접 다운로드해 주세요.
+          </div>
+        `;
         installBtn.disabled = false;
+        installBtn.className = '';
         installBtn.textContent = '다시 시도';
+
+        if (!btnRow.querySelector('.gh-release-fallback-btn')) {
+          const ghBtn = document.createElement('button');
+          ghBtn.className = 'primary gh-release-fallback-btn';
+          ghBtn.textContent = '🌐 GitHub 릴리스 페이지 열기';
+          ghBtn.onclick = () => {
+            openExternalUrl(info.releaseUrl || GITHUB_RELEASES_URL);
+          };
+          btnRow.prepend(ghBtn);
+        }
       }
     };
     btnRow.append(installBtn);
@@ -376,7 +393,42 @@ export async function runUpdateCheck(silent = false) {
     }
   } catch (e) {
     if (!silent) {
-      await platform().showError('업데이트 확인 실패', `최신 버전을 확인하는 중 오류가 발생했습니다: ${e}`);
+      const body = document.createElement('div');
+      body.style.display = 'flex';
+      body.style.flexDirection = 'column';
+      body.style.gap = '12px';
+
+      const msgBox = document.createElement('div');
+      msgBox.innerHTML = `
+        <div style="color: #ef4444; font-weight: 600; margin-bottom: 4px;">업데이트 확인 실패</div>
+        <div style="font-size: 12px; color: var(--fg-dim); line-height: 1.5;">
+          최신 버전을 확인하는 중 오류가 발생했습니다: ${e}<br>
+          GitHub 릴리스 페이지에서 직접 최신 버전을 확인하고 다운로드하실 수 있습니다.
+        </div>
+      `;
+
+      const btnRow = document.createElement('div');
+      btnRow.style.display = 'flex';
+      btnRow.style.justifyContent = 'flex-end';
+      btnRow.style.gap = '8px';
+
+      let closeDialog = () => {};
+      const ghBtn = document.createElement('button');
+      ghBtn.className = 'primary';
+      ghBtn.textContent = '🌐 GitHub 릴리스 페이지 열기';
+      ghBtn.onclick = () => {
+        openExternalUrl(GITHUB_RELEASES_URL);
+        closeDialog();
+      };
+
+      const closeBtn = document.createElement('button');
+      closeBtn.textContent = '닫기';
+      closeBtn.onclick = () => closeDialog();
+
+      btnRow.append(ghBtn, closeBtn);
+      body.append(msgBox, btnRow);
+
+      closeDialog = openModal('업데이트 확인 실패', body);
     }
   }
 }

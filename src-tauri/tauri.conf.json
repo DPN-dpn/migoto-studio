@@ -47,7 +47,8 @@
           "English"
         ],
         "displayLanguageSelector": false,
-        "installerHooks": "nsis-hooks.nsh"
+        "installerHooks": "nsis-hooks.nsh",
+        "template": "installer.nsi"
       }
     },
     "android": {
