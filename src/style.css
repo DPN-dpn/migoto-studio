@@ -108,14 +108,169 @@ button.primary:hover { filter: brightness(1.1); background: var(--accent); }
 #file-name.dirty { color: var(--fg); }
 #file-name.dirty::before { content: '● '; color: var(--accent); }
 
-#editor {
+#editor-container {
   flex: 1 1 0px;
   width: 0;
   min-height: 0;
   min-width: 0;
   height: 100%;
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
   position: relative;
+}
+
+#tabbar-container {
+  display: flex;
+  align-items: center;
+  height: 35px;
+  min-height: 35px;
+  background: var(--bg-elev);
+  border-bottom: 1px solid var(--border);
+  user-select: none;
+  overflow: hidden;
+  padding-right: 4px;
+}
+
+#tabbar {
+  flex: 1;
+  display: flex;
+  height: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+#tabbar::-webkit-scrollbar {
+  display: none;
+}
+
+.tab-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  color: var(--fg-dim);
+  border-radius: 4px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.12s, color 0.12s;
+}
+.tab-action-btn:hover {
+  background: var(--bg-hover);
+  color: var(--fg);
+}
+
+.tab-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 100%;
+  padding: 0 8px 0 12px;
+  min-width: 90px;
+  max-width: 200px;
+  border-right: 1px solid var(--border);
+  background: var(--bg-elev);
+  color: var(--fg-dim);
+  font-size: 12px;
+  cursor: pointer;
+  position: relative;
+  flex-shrink: 0;
+  transition: background 0.12s, color 0.12s;
+  box-sizing: border-box;
+}
+
+.tab-item:hover {
+  background: var(--bg-hover);
+  color: var(--fg);
+}
+
+.tab-item.active {
+  background: var(--bg);
+  color: var(--fg);
+  font-weight: 500;
+  border-top: 2px solid var(--accent);
+}
+
+.tab-item .tab-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tab-item .tab-dirty {
+  display: none;
+  width: 14px;
+  height: 14px;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent);
+  font-size: 12px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.tab-item.dirty .tab-dirty {
+  display: inline-flex;
+}
+
+.tab-item .tab-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: none;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--fg-dim);
+  cursor: pointer;
+  flex-shrink: 0;
+  opacity: 0.65;
+  transition: background 0.1s, opacity 0.1s, color 0.1s;
+}
+
+.tab-item .tab-close:hover {
+  background: var(--bg-hover);
+  color: var(--fg);
+  opacity: 1;
+}
+
+/* When tab is dirty, show dirty dot by default and reveal close button on hover */
+.tab-item.dirty:not(:hover) .tab-close {
+  display: none;
+}
+.tab-item.dirty:hover .tab-dirty {
+  display: none;
+}
+.tab-item.dirty:hover .tab-close {
+  display: inline-flex;
+}
+
+#editor {
+  flex: 1 1 0px;
+  width: 100%;
+  min-height: 0;
+  min-width: 0;
+  height: 100%;
+  overflow: hidden;
+  position: relative;
+}
+
+#tab-menu {
+  min-width: 170px;
+}
+#tab-menu li.menu-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 
 #toolbar .divider { width: 1px; height: 18px; margin: 0 6px; background: var(--border); }

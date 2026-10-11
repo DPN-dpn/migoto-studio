@@ -6,6 +6,7 @@ import { initPlatform, platform } from './platform';
 import { LANGUAGE_ID, registerMigotoLanguage, upstreamGrammarVersion } from './grammar';
 import { defineThemes, THEME_DARK, THEME_LIGHT } from './theme';
 import { DocumentManager, ENCODING_LABELS, type Encoding } from './documents';
+import { TabBar } from './tabbar';
 import { getSettings, loadSettings, onSettingsChange, updateSettings } from './settings';
 import { OutlinePanel } from './outline';
 import { TEMPLATES, insertTemplate, registerSnippetCompletions } from './templates';
@@ -47,6 +48,7 @@ async function boot() {
 
   const doc = new DocumentManager(editor);
   const outline = new OutlinePanel(editor, $('sidebar'), $('sidebar-resizer'));
+  const tabbar = new TabBar(doc, $('tabbar'), $('btn-new-tab'), $('tab-menu'));
   $('btn-recent').hidden = !platform().capabilities.recentFiles;
 
   // ---- settings -> UI / editor ----
@@ -105,6 +107,10 @@ async function boot() {
   };
 
   editor.onDidChangeModelContent(scheduleLint);
+  editor.onDidChangeModel(() => {
+    scheduleLint();
+    updatePos();
+  });
   onSettingsChange(runLint);
 
   lintBtn.addEventListener('click', () => {
@@ -177,11 +183,15 @@ async function boot() {
     if (key === 's') run(() => (e.shiftKey ? doc.saveAs() : doc.save()));
     else if (key === 'o') run(() => doc.openDialog());
     else if (key === 'n') run(() => doc.newFile());
+    else if (key === 'w') run(() => doc.closeActiveTab());
+    else if (key === 'tab') run(() => (e.shiftKey ? doc.prevTab() : doc.nextTab()));
+    else if (key === 'pageup') run(() => doc.prevTab());
+    else if (key === 'pagedown') run(() => doc.nextTab());
     else if (key === ',') run(() => openSettings());
   }, true);
 
-  // ---- popup menus (recent files, insert) ----
-  const menus = [$('recent-menu'), $('insert-menu')];
+  // ---- popup menus (recent files, insert, tab context menu) ----
+  const menus = [$('recent-menu'), $('insert-menu'), $('tab-menu')];
   const closeMenus = () => menus.forEach((m) => { m.hidden = true; });
   const openMenu = (menu: HTMLElement, button: HTMLElement) => {
     const wasOpen = !menu.hidden;

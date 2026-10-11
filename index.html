@@ -52,7 +52,18 @@
       <div id="workspace">
         <aside id="sidebar" aria-label="섹션 목록"></aside>
         <div id="sidebar-resizer" class="resizer" role="separator" aria-orientation="vertical" title="드래그하여 섹션 목록 너비 조절 (더블 클릭 시 기본값으로 초기화)"></div>
-        <main id="editor"></main>
+        <div id="editor-container">
+          <div id="tabbar-container">
+            <div id="tabbar" role="tablist" aria-label="열린 파일 탭"></div>
+            <button id="btn-new-tab" class="tab-action-btn" title="새 파일 탭 (Ctrl+N)" aria-label="새 탭">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+              </svg>
+            </button>
+          </div>
+          <main id="editor"></main>
+        </div>
       </div>
       <footer id="statusbar">
         <span class="status-left">
@@ -67,6 +78,7 @@
       </footer>
       <ul id="recent-menu" class="popup-menu" hidden></ul>
       <ul id="insert-menu" class="popup-menu" hidden></ul>
+      <ul id="tab-menu" class="popup-menu" hidden></ul>
     </div>
     <script type="module" src="/src/main.ts"></script>
   </body>

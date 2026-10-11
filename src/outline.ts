@@ -76,6 +76,10 @@ export class OutlinePanel {
       window.clearTimeout(this.timer);
       this.timer = window.setTimeout(refresh, 250);
     });
+    editor.onDidChangeModel(() => {
+      refresh();
+      this.setActive(editor.getPosition()?.lineNumber ?? 1);
+    });
     editor.onDidChangeCursorPosition((e) => this.setActive(e.position.lineNumber));
     refresh();
     this.setActive(editor.getPosition()?.lineNumber ?? 1);
@@ -95,13 +99,17 @@ export class OutlinePanel {
     }
     const workspaceWidth = workspace.clientWidth;
     const workspaceHeight = workspace.clientHeight;
+    const tabbarContainer = document.getElementById('tabbar-container');
+    const tabbarHeight = tabbarContainer ? tabbarContainer.offsetHeight : 0;
+    const editorHeight = Math.max(0, workspaceHeight - tabbarHeight);
+
     if (this.root.hidden) {
-      this.editor.layout({ width: workspaceWidth, height: workspaceHeight });
+      this.editor.layout({ width: workspaceWidth, height: editorHeight });
     } else {
       const resizerWidth = this.resizer && !this.resizer.hidden ? this.resizer.offsetWidth : 0;
       const sidebarWidth = this.root.offsetWidth || this.currentWidth;
       const editorWidth = Math.max(MIN_EDITOR_WIDTH, workspaceWidth - sidebarWidth - resizerWidth);
-      this.editor.layout({ width: editorWidth, height: workspaceHeight });
+      this.editor.layout({ width: editorWidth, height: editorHeight });
     }
   }
 
@@ -109,6 +117,9 @@ export class OutlinePanel {
     const workspace = this.root.parentElement;
     const workspaceWidth = workspace ? workspace.clientWidth : window.innerWidth;
     const workspaceHeight = workspace ? workspace.clientHeight : window.innerHeight;
+    const tabbarContainer = document.getElementById('tabbar-container');
+    const tabbarHeight = tabbarContainer ? tabbarContainer.offsetHeight : 0;
+    const editorHeight = Math.max(0, workspaceHeight - tabbarHeight);
     const resizerWidth = this.resizer && !this.resizer.hidden ? this.resizer.offsetWidth : 0;
     const maxAllowed = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, workspaceWidth - MIN_EDITOR_WIDTH - resizerWidth));
     const clamped = Math.max(MIN_WIDTH, Math.min(width, maxAllowed));
@@ -120,7 +131,7 @@ export class OutlinePanel {
     } catch {}
 
     const editorWidth = Math.max(MIN_EDITOR_WIDTH, workspaceWidth - clamped - resizerWidth);
-    this.editor.layout({ width: editorWidth, height: workspaceHeight });
+    this.editor.layout({ width: editorWidth, height: editorHeight });
   }
 
   private setupResizer(resizer: HTMLElement) {
