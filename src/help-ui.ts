@@ -15,7 +15,7 @@ interface ShortcutCategory {
 
 const SHORTCUTS: ShortcutCategory[] = [
   {
-    title: '파일 및 기본 동작',
+    title: '파일 및 보기 동작',
     items: [
       { label: '저장', keys: 'Ctrl + S' },
       { label: '다른 이름으로 저장', keys: 'Ctrl + Shift + S' },
@@ -23,6 +23,8 @@ const SHORTCUTS: ShortcutCategory[] = [
       { label: '모드 폴더 열기 (탐색기)', keys: 'Ctrl + Shift + O' },
       { label: '새 파일 만들기 (새 탭)', keys: 'Ctrl + N' },
       { label: '현재 탭 닫기', keys: 'Ctrl + W' },
+      { label: '사이드바 표시 / 숨기기', keys: 'Ctrl + B' },
+      { label: '탐색기 열기', keys: 'Ctrl + Shift + E' },
       { label: '다음 / 이전 탭 전환', keys: 'Ctrl + Tab / Ctrl + Shift + Tab' },
       { label: '설정 열기', keys: 'Ctrl + ,' },
       { label: '도움말 및 단축키', keys: 'F1' },
@@ -31,8 +33,11 @@ const SHORTCUTS: ShortcutCategory[] = [
   {
     title: '검색 및 편집',
     items: [
+      { label: '실행 취소 / 다시 실행', keys: 'Ctrl + Z / Ctrl + Y' },
       { label: '찾기', keys: 'Ctrl + F' },
       { label: '찾기 및 바꾸기', keys: 'Ctrl + H' },
+      { label: '문서 서식 정리 (포맷팅)', keys: 'Alt + Shift + F' },
+      { label: '오류 위치로 이동', keys: 'F7' },
       { label: '줄 번호로 이동', keys: 'Ctrl + G' },
       { label: '줄 주석 토글 (;)', keys: 'Ctrl + /' },
       { label: '자동완성 창 수동 호출', keys: 'Ctrl + Space' },

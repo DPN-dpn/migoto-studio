@@ -104,12 +104,15 @@ export class OutlinePanel {
     const tabbarHeight = tabbarContainer ? tabbarContainer.offsetHeight : 0;
     const editorHeight = Math.max(0, workspaceHeight - tabbarHeight);
 
+    const activityBar = document.getElementById('activity-bar');
+    const activityBarWidth = activityBar && !activityBar.hidden ? activityBar.offsetWidth : 0;
+
     if (this.root.hidden) {
-      this.editor.layout({ width: workspaceWidth, height: editorHeight });
+      this.editor.layout({ width: Math.max(MIN_EDITOR_WIDTH, workspaceWidth - activityBarWidth), height: editorHeight });
     } else {
       const resizerWidth = this.resizer && !this.resizer.hidden ? this.resizer.offsetWidth : 0;
       const sidebarWidth = this.root.offsetWidth || this.currentWidth;
-      const editorWidth = Math.max(MIN_EDITOR_WIDTH, workspaceWidth - sidebarWidth - resizerWidth);
+      const editorWidth = Math.max(MIN_EDITOR_WIDTH, workspaceWidth - activityBarWidth - sidebarWidth - resizerWidth);
       this.editor.layout({ width: editorWidth, height: editorHeight });
     }
   }
@@ -122,7 +125,9 @@ export class OutlinePanel {
     const tabbarHeight = tabbarContainer ? tabbarContainer.offsetHeight : 0;
     const editorHeight = Math.max(0, workspaceHeight - tabbarHeight);
     const resizerWidth = this.resizer && !this.resizer.hidden ? this.resizer.offsetWidth : 0;
-    const maxAllowed = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, workspaceWidth - MIN_EDITOR_WIDTH - resizerWidth));
+    const activityBar = document.getElementById('activity-bar');
+    const activityBarWidth = activityBar && !activityBar.hidden ? activityBar.offsetWidth : 0;
+    const maxAllowed = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, workspaceWidth - activityBarWidth - MIN_EDITOR_WIDTH - resizerWidth));
     const clamped = Math.max(MIN_WIDTH, Math.min(width, maxAllowed));
 
     this.currentWidth = clamped;
@@ -131,16 +136,14 @@ export class OutlinePanel {
       localStorage.setItem(STORAGE_KEY, String(clamped));
     } catch {}
 
-    const editorWidth = Math.max(MIN_EDITOR_WIDTH, workspaceWidth - clamped - resizerWidth);
+    const editorWidth = Math.max(MIN_EDITOR_WIDTH, workspaceWidth - activityBarWidth - clamped - resizerWidth);
     this.editor.layout({ width: editorWidth, height: editorHeight });
   }
 
   private setupResizer(resizer: HTMLElement) {
     const onMouseMove = (e: MouseEvent) => {
-      const workspace = this.root.parentElement;
-      if (!workspace) return;
-      const workspaceRect = workspace.getBoundingClientRect();
-      const targetWidth = e.clientX - workspaceRect.left;
+      const sidebarRect = this.root.getBoundingClientRect();
+      const targetWidth = e.clientX - sidebarRect.left;
       this.applyWidth(targetWidth);
     };
 

@@ -8,12 +8,13 @@ import { defineThemes, THEME_DARK, THEME_LIGHT } from './theme';
 import { DocumentManager, ENCODING_LABELS, type Encoding } from './documents';
 import { TabBar } from './tabbar';
 import { FileExplorer } from './explorer';
-import { getSettings, loadSettings, onSettingsChange, updateSettings } from './settings';
+import { ActivityBar } from './activitybar';
+import { MenuBar } from './menubar';
+import { getSettings, loadSettings, onSettingsChange } from './settings';
 import { OutlinePanel } from './outline';
-import { TEMPLATES, insertTemplate, registerSnippetCompletions } from './templates';
+import { registerSnippetCompletions } from './templates';
 import { openSettings } from './settings-ui';
 import { openHelp } from './help-ui';
-import { openRestore } from './restore-ui';
 import { lintModel, optionsFromSettings } from './lint';
 import { registerSmartCompletions } from './completions';
 import { initPwa } from './pwa';
@@ -50,30 +51,44 @@ async function boot() {
   const doc = new DocumentManager(editor);
   const outline = new OutlinePanel(editor, $('sidebar'), $('sidebar-panel-outline'), $('sidebar-resizer'));
   const explorer = new FileExplorer($('sidebar-panel-explorer'), doc);
-  const tabbar = new TabBar(doc, $('tabbar'), $('btn-new-tab'), $('tab-menu'));
-  $('btn-recent').hidden = !platform().capabilities.recentFiles;
+  new TabBar(doc, $('tabbar'), $('btn-new-tab'), $('tab-menu'));
 
-  // ---- sidebar tabs (탐색기 / 섹션 목록) ----
-  const tabExplorer = $('sidebar-tab-explorer');
-  const tabOutline = $('sidebar-tab-outline');
-  const panelExplorer = $('sidebar-panel-explorer');
-  const panelOutline = $('sidebar-panel-outline');
+  // ---- Activity Bar (세로 툴바) ----
+  const activityBar = new ActivityBar(
+    $('activity-bar'),
+    $('act-explorer'),
+    $('act-outline'),
+    $('sidebar-panel-explorer'),
+    $('sidebar-panel-outline'),
+    outline,
+    () => openSettings(),
+    () => openHelp(),
+  );
 
-  const switchSidebarTab = (tab: 'explorer' | 'outline') => {
-    const isExplorer = tab === 'explorer';
-    tabExplorer.classList.toggle('active', isExplorer);
-    tabExplorer.setAttribute('aria-selected', String(isExplorer));
-    tabOutline.classList.toggle('active', !isExplorer);
-    tabOutline.setAttribute('aria-selected', String(!isExplorer));
-    panelExplorer.hidden = !isExplorer;
-    panelOutline.hidden = isExplorer;
-    if (!getSettings().showOutline) {
-      updateSettings({ showOutline: true });
-    }
+  // Jump to next error/warning function
+  const jumpNextLint = () => {
+    if (currentMarkers.length === 0) return;
+    const curPos = editor.getPosition();
+    const curLine = curPos?.lineNumber ?? 1;
+    const curCol = curPos?.column ?? 1;
+
+    const next = currentMarkers.find(
+      (m) => m.startLineNumber > curLine || (m.startLineNumber === curLine && m.startColumn > curCol),
+    ) ?? currentMarkers[0];
+
+    editor.setPosition({ lineNumber: next.startLineNumber, column: next.startColumn });
+    editor.revealPositionInCenter({ lineNumber: next.startLineNumber, column: next.startColumn });
+    editor.focus();
   };
 
-  tabExplorer.addEventListener('click', () => switchSidebarTab('explorer'));
-  tabOutline.addEventListener('click', () => switchSidebarTab('outline'));
+  // ---- Top Menu Bar ----
+  new MenuBar($('menubar'), {
+    doc,
+    editor,
+    explorer,
+    activityBar,
+    onJumpLint: jumpNextLint,
+  });
 
   // ---- settings -> UI / editor ----
   const applySettings = () => {
@@ -87,8 +102,6 @@ async function boot() {
       renderWhitespace: s.whitespace,
     });
     outline.setVisible(s.showOutline);
-    $('btn-outline').setAttribute('aria-pressed', String(s.showOutline));
-    $('btn-minimap').setAttribute('aria-pressed', String(s.minimap));
   };
   onSettingsChange(applySettings);
   applySettings();
@@ -137,20 +150,7 @@ async function boot() {
   });
   onSettingsChange(runLint);
 
-  lintBtn.addEventListener('click', () => {
-    if (currentMarkers.length === 0) return;
-    const curPos = editor.getPosition();
-    const curLine = curPos?.lineNumber ?? 1;
-    const curCol = curPos?.column ?? 1;
-
-    const next = currentMarkers.find(
-      (m) => m.startLineNumber > curLine || (m.startLineNumber === curLine && m.startColumn > curCol),
-    ) ?? currentMarkers[0];
-
-    editor.setPosition({ lineNumber: next.startLineNumber, column: next.startColumn });
-    editor.revealPositionInCenter({ lineNumber: next.startLineNumber, column: next.startColumn });
-    editor.focus();
-  });
+  lintBtn.addEventListener('click', jumpNextLint);
 
   // ---- status bar / title ----
   const posEl = $('status-pos');
@@ -184,93 +184,32 @@ async function boot() {
   refreshDocUi();
   $('status-grammar').textContent = `문법: migoto-ini v${upstreamGrammarVersion}`;
 
-  // ---- toolbar actions ----
-  $('btn-new').addEventListener('click', () => doc.newFile());
-  $('btn-open').addEventListener('click', () => doc.openDialog());
-  $('btn-open-folder').addEventListener('click', async () => {
-    switchSidebarTab('explorer');
-    await explorer.openFolderDialog();
-  });
-  $('btn-save').addEventListener('click', () => doc.save());
-  $('btn-saveas').addEventListener('click', () => doc.saveAs());
-  $('btn-restore').addEventListener('click', () => openRestore(doc));
-  $('btn-settings').addEventListener('click', () => openSettings());
-  $('btn-help').addEventListener('click', () => openHelp());
-  $('btn-outline').addEventListener('click', () => updateSettings({ showOutline: !getSettings().showOutline }));
-  $('btn-minimap').addEventListener('click', () => updateSettings({ minimap: !getSettings().minimap }));
-
+  // ---- Global keyboard shortcuts ----
   window.addEventListener('keydown', (e) => {
     if (e.key === 'F1') {
       e.preventDefault();
       openHelp();
       return;
     }
+    if (e.key === 'F7') {
+      e.preventDefault();
+      jumpNextLint();
+      return;
+    }
     if (!e.ctrlKey || e.altKey) return;
     const key = e.key.toLowerCase();
     const run = (fn: () => unknown) => { e.preventDefault(); fn(); };
     if (key === 's') run(() => (e.shiftKey ? doc.saveAs() : doc.save()));
-    else if (key === 'o') run(() => (e.shiftKey ? (switchSidebarTab('explorer'), explorer.openFolderDialog()) : doc.openDialog()));
+    else if (key === 'o') run(() => (e.shiftKey ? (activityBar.switchTo('explorer'), explorer.openFolderDialog()) : doc.openDialog()));
     else if (key === 'n') run(() => doc.newFile());
     else if (key === 'w') run(() => doc.closeActiveTab());
+    else if (key === 'b') run(() => activityBar.toggleSidebar());
+    else if (key === 'e' && e.shiftKey) run(() => activityBar.switchTo('explorer'));
     else if (key === 'tab') run(() => (e.shiftKey ? doc.prevTab() : doc.nextTab()));
     else if (key === 'pageup') run(() => doc.prevTab());
     else if (key === 'pagedown') run(() => doc.nextTab());
     else if (key === ',') run(() => openSettings());
   }, true);
-
-  // ---- popup menus (recent files, insert, tab context menu) ----
-  const menus = [$('recent-menu'), $('insert-menu'), $('tab-menu')];
-  const closeMenus = () => menus.forEach((m) => { m.hidden = true; });
-  const openMenu = (menu: HTMLElement, button: HTMLElement) => {
-    const wasOpen = !menu.hidden;
-    closeMenus();
-    if (wasOpen) return;
-    menu.style.left = `${Math.min(button.offsetLeft, window.innerWidth - 340)}px`;
-    menu.hidden = false;
-  };
-  const item = (text: string, onClick?: () => void, sub?: string) => {
-    const li = document.createElement('li');
-    li.textContent = text;
-    if (sub) li.append(Object.assign(document.createElement('small'), { textContent: sub }));
-    if (onClick) li.addEventListener('click', () => { closeMenus(); onClick(); });
-    else li.className = 'empty';
-    return li;
-  };
-
-  $('btn-recent').addEventListener('click', (e) => {
-    e.stopPropagation();
-    const menu = $('recent-menu');
-    menu.replaceChildren();
-    const recent = getSettings().recentFiles;
-    if (recent.length === 0) menu.append(item('최근에 연 파일이 없습니다'));
-    for (const path of recent) {
-      const li = item(path, () => doc.openFile(platform().refFromId(path)));
-      li.title = path;
-      menu.append(li);
-    }
-    openMenu(menu, $('btn-recent'));
-  });
-
-  $('btn-insert').addEventListener('click', (e) => {
-    e.stopPropagation();
-    const menu = $('insert-menu');
-    menu.replaceChildren();
-    let lastGroup = '';
-    for (const t of TEMPLATES) {
-      if (t.group !== lastGroup) {
-        lastGroup = t.group;
-        const g = document.createElement('li');
-        g.className = 'group';
-        g.textContent = t.group;
-        menu.append(g);
-      }
-      menu.append(item(t.label, () => insertTemplate(editor, t), t.description));
-    }
-    openMenu(menu, $('btn-insert'));
-  });
-
-  document.addEventListener('click', closeMenus);
-  window.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeMenus(); });
 
   // ---- drag & drop a file onto the window ----
   const hint = document.createElement('div');
