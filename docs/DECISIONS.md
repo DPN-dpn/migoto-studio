@@ -44,11 +44,10 @@
 | 경로 검사(파일 존재 여부 등) | 가능 | 제한적 (폴더 접근 권한을 받은 경우만) |
 | 업데이트 | GitHub Releases (아래) | 새로 배포하면 자동 반영 |
 
-### 구조 방침: 플랫폼 계층 분리
-- 화면/에디터/문법/린트 코드는 `invoke`나 Tauri API를 직접 부르지 않는다.
-- 파일, 설정, 백업, 대화상자는 `Platform` 인터페이스 뒤로 숨기고 `tauri` 구현과 `web` 구현을 둔다.
-- 웹 빌드에는 Tauri 코드를 포함하지 않는다 (Vite 빌드 타깃 분리).
-- 현재(2026-10) 코드는 `documents.ts`, `settings.ts`, `restore-ui.ts`, `main.ts`가 Tauri API를 직접 사용하고 있어 **분리 작업이 필요하다**. 린트/플러그인 작업 전에 먼저 한다.
+### 구조 방침: 플랫폼 계층 분리 (완료)
+- 화면/에디터/문법/린트 코드는 `invoke`나 Tauri API를 직접 부르지 않고, `Platform` 인터페이스(`src/platform/types.ts`)를 통해 동작합니다.
+- 데스크톱(`src/platform/desktop.ts`)과 웹(`src/platform/web.ts`) 구현이 분리되어 있어 동일한 비즈니스 로직으로 배포됩니다.
+- 린트 엔진(`src/lint.ts`) 역시 독립적인 순수 로직으로 동작하여 모든 환경에서 일관되게 오류를 검사합니다.
 
 ### 설치형 업데이트: GitHub Releases
 - `tauri-plugin-updater`로 GitHub Releases의 `latest.json`을 확인한다.

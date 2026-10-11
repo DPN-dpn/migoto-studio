@@ -42,7 +42,10 @@
         <main id="editor"></main>
       </div>
       <footer id="statusbar">
-        <span id="status-pos">줄 1, 열 1</span>
+        <span class="status-left">
+          <span id="status-pos">줄 1, 열 1</span>
+          <button id="status-lint" class="status-btn" title="오류/경고 위치로 이동">✓ 문제 없음</button>
+        </span>
         <span class="status-right">
           <button id="status-eol" class="status-btn" title="줄바꿈 방식 전환 (CRLF/LF)">CRLF</button>
           <select id="status-encoding" class="status-btn" title="저장할 인코딩"></select>

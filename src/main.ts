@@ -11,6 +11,7 @@ import { OutlinePanel } from './outline';
 import { TEMPLATES, insertTemplate, registerSnippetCompletions } from './templates';
 import { openSettings } from './settings-ui';
 import { openRestore } from './restore-ui';
+import { lintModel, optionsFromSettings } from './lint';
 
 // Only the base editor worker is needed (no TS/JSON/CSS language services).
 (self as unknown as { MonacoEnvironment: monaco.Environment }).MonacoEnvironment = {
@@ -60,6 +61,61 @@ async function boot() {
   onSettingsChange(applySettings);
   applySettings();
 
+  // ---- linter (오류 검사) ----
+  const lintBtn = $('status-lint');
+  let currentMarkers: monaco.editor.IMarkerData[] = [];
+  let lintTimer = 0;
+
+  const runLint = () => {
+    const model = editor.getModel();
+    if (!model) return;
+    const s = getSettings();
+    currentMarkers = lintModel(model, optionsFromSettings(s));
+    monaco.editor.setModelMarkers(model, 'migoto-lint', currentMarkers);
+
+    const errors = currentMarkers.filter((m) => m.severity === monaco.MarkerSeverity.Error);
+    const warnings = currentMarkers.filter((m) => m.severity === monaco.MarkerSeverity.Warning);
+    const infos = currentMarkers.filter((m) => m.severity === monaco.MarkerSeverity.Info);
+
+    if (currentMarkers.length === 0) {
+      lintBtn.textContent = '✓ 문제 없음';
+      lintBtn.className = 'status-btn clean';
+      lintBtn.title = s.lintEnabled ? '문서에 문법 오류가 없습니다' : '실시간 오류 검사가 꺼져 있습니다 (설정에서 켤 수 있습니다)';
+    } else {
+      const parts: string[] = [];
+      if (errors.length > 0) parts.push(`오류 ${errors.length}개`);
+      if (warnings.length > 0) parts.push(`경고 ${warnings.length}개`);
+      if (infos.length > 0) parts.push(`알림 ${infos.length}개`);
+
+      lintBtn.textContent = `${errors.length > 0 ? '⛔ ' : warnings.length > 0 ? '⚠ ' : 'ℹ '}${parts.join(', ')}`;
+      lintBtn.className = `status-btn ${errors.length > 0 ? 'has-error' : warnings.length > 0 ? 'has-warn' : 'has-info'}`;
+      lintBtn.title = '클릭하여 다음 문제 위치로 이동';
+    }
+  };
+
+  const scheduleLint = () => {
+    window.clearTimeout(lintTimer);
+    lintTimer = window.setTimeout(runLint, 250);
+  };
+
+  editor.onDidChangeModelContent(scheduleLint);
+  onSettingsChange(runLint);
+
+  lintBtn.addEventListener('click', () => {
+    if (currentMarkers.length === 0) return;
+    const curPos = editor.getPosition();
+    const curLine = curPos?.lineNumber ?? 1;
+    const curCol = curPos?.column ?? 1;
+
+    const next = currentMarkers.find(
+      (m) => m.startLineNumber > curLine || (m.startLineNumber === curLine && m.startColumn > curCol),
+    ) ?? currentMarkers[0];
+
+    editor.setPosition({ lineNumber: next.startLineNumber, column: next.startColumn });
+    editor.revealPositionInCenter({ lineNumber: next.startLineNumber, column: next.startColumn });
+    editor.focus();
+  });
+
   // ---- status bar / title ----
   const posEl = $('status-pos');
   const updatePos = () => {
@@ -86,6 +142,7 @@ async function boot() {
     const title = `${doc.isDirty ? '● ' : ''}${doc.fileName} - Migoto Studio`;
     document.title = title;
     platform().setTitle(title);
+    runLint();
   };
   doc.onChange(refreshDocUi);
   refreshDocUi();

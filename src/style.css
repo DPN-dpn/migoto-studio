@@ -151,8 +151,15 @@ button.primary:hover { filter: brightness(1.1); background: var(--accent); }
   border-top: 1px solid var(--border);
   user-select: none;
 }
+.status-left { display: flex; align-items: center; gap: 10px; }
 .status-right { display: flex; align-items: center; gap: 6px; }
 .status-btn { font-size: 11px; color: var(--fg-dim); padding: 1px 6px; }
+#status-lint { display: inline-flex; align-items: center; gap: 4px; border-radius: 4px; cursor: pointer; }
+#status-lint:hover { background: var(--bg-hover); color: var(--fg); }
+#status-lint.clean { color: var(--fg-dim); }
+#status-lint.has-info { color: #5ec8f2; }
+#status-lint.has-warn { color: #f59e0b; }
+#status-lint.has-error { color: #ef4444; font-weight: 600; }
 select.status-btn { background: transparent; appearance: none; text-align: center; }
 select.status-btn option { background: var(--bg-elev); color: var(--fg); }
 
