@@ -130,6 +130,104 @@ export function getAllTemplates(): Template[] {
   return [...getCustomTemplates(), ...OWN_TEMPLATES, ...upstreamTemplates()];
 }
 
+/** Export all templates belonging to a specific group as JSON string */
+export function exportGroupTemplates(groupName: string): string {
+  const all = getAllTemplates();
+  const groupItems = all.filter((t) => t.group === groupName);
+  const data = {
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    group: groupName,
+    templates: groupItems.map((t) => ({
+      label: t.label,
+      description: t.description,
+      body: t.body,
+      group: t.group,
+    })),
+  };
+  return JSON.stringify(data, null, 2);
+}
+
+/** Export all custom templates as JSON string */
+export function exportAllCustomTemplates(): string {
+  const all = getCustomTemplates();
+  const data = {
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    templates: all.map((t) => ({
+      label: t.label,
+      description: t.description,
+      body: t.body,
+      group: t.group,
+    })),
+  };
+  return JSON.stringify(data, null, 2);
+}
+
+/**
+ * Import templates from JSON string.
+ * Supports:
+ * - { group: string, templates: Template[] }
+ * - Template[]
+ * - Single Template
+ */
+export function importTemplates(jsonStr: string, targetGroup?: string): { count: number; groupName?: string } {
+  try {
+    const parsed = JSON.parse(jsonStr);
+    let items: any[] = [];
+    let fileGroup: string | undefined = undefined;
+
+    if (Array.isArray(parsed)) {
+      items = parsed;
+    } else if (parsed && Array.isArray(parsed.templates)) {
+      items = parsed.templates;
+      if (typeof parsed.group === 'string') {
+        fileGroup = parsed.group;
+      }
+    } else if (parsed && typeof parsed.label === 'string' && typeof parsed.body === 'string') {
+      items = [parsed];
+    } else {
+      throw new Error('유효한 템플릿 JSON 형식이 아닙니다.');
+    }
+
+    if (items.length === 0) {
+      throw new Error('가져올 템플릿 항목이 없습니다.');
+    }
+
+    const current = getCustomTemplates();
+    let importedCount = 0;
+    const finalGroupName = targetGroup || fileGroup;
+
+    for (const item of items) {
+      if (!item || typeof item.label !== 'string' || typeof item.body !== 'string') continue;
+      const grp = targetGroup || item.group || fileGroup || '가져온 템플릿';
+
+      // Check if duplicate label in same group exists in custom templates
+      const existingIdx = current.findIndex((c) => c.label === item.label.trim() && c.group === grp.trim());
+      const newT: Template = {
+        id: existingIdx >= 0 ? current[existingIdx].id : `custom_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+        label: item.label.trim(),
+        description: (item.description || '').trim(),
+        body: item.body,
+        group: grp.trim(),
+        isCustom: true,
+      };
+
+      if (existingIdx >= 0) {
+        current[existingIdx] = newT;
+      } else {
+        current.push(newT);
+      }
+      importedCount++;
+    }
+
+    localStorage.setItem(STORAGE_CUSTOM_TEMPLATES, JSON.stringify(current));
+    return { count: importedCount, groupName: finalGroupName };
+  } catch (err: any) {
+    throw new Error(err.message || '템플릿을 불러오는 중 오류가 발생했습니다.');
+  }
+}
+
 /** Static array of default templates for backwards compatibility */
 export const TEMPLATES: Template[] = [...OWN_TEMPLATES, ...upstreamTemplates()];
 

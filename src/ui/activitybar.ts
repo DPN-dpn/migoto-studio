@@ -110,6 +110,17 @@ export class ActivityBar {
     }
   }
 
+  reorderDynamicTabs(order: string[]) {
+    const container = this.barEl.querySelector<HTMLElement>('#act-plugins-custom');
+    if (!container) return;
+    for (const id of order) {
+      const entry = this.dynamicTabs.get(id);
+      if (entry && entry.btnEl) {
+        container.appendChild(entry.btnEl);
+      }
+    }
+  }
+
   get currentPanel(): ActivityPanel {
     return this.activePanel;
   }

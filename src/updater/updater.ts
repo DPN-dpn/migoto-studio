@@ -245,7 +245,7 @@ export function showUpdateModal(info: UpdateInfo) {
 
     body.append(closeBtn);
 
-    const close = openModal('업데이트 확인', body);
+    const close = openModal('업데이트 확인', body, { autoHeight: true });
     closeBtn.onclick = () => close();
     return;
   }
@@ -378,7 +378,7 @@ export function showUpdateModal(info: UpdateInfo) {
 
   body.append(btnRow);
 
-  closeDialog = openModal('Migoto Studio 업데이트 알림', body);
+  closeDialog = openModal('Migoto Studio 업데이트 알림', body, { autoHeight: true });
 }
 
 /**
@@ -428,7 +428,7 @@ export async function runUpdateCheck(silent = false) {
       btnRow.append(ghBtn, closeBtn);
       body.append(msgBox, btnRow);
 
-      closeDialog = openModal('업데이트 확인 실패', body);
+      closeDialog = openModal('업데이트 확인 실패', body, { autoHeight: true });
     }
   }
 }

@@ -5,8 +5,48 @@ import {
   saveCustomTemplate,
   deleteCustomTemplate,
   insertTemplate,
+  exportGroupTemplates,
+  importTemplates,
 } from '../core/templates';
 import { openModal } from './modal';
+
+function downloadJsonFile(filename: string, content: string) {
+  const blob = new Blob([content], { type: 'application/json;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.append(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+function pickJsonFile(): Promise<string | null> {
+  return new Promise((resolve) => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json,application/json';
+    input.style.display = 'none';
+    input.onchange = async () => {
+      const file = input.files?.[0];
+      input.remove();
+      if (!file) return resolve(null);
+      try {
+        const text = await file.text();
+        resolve(text);
+      } catch {
+        resolve(null);
+      }
+    };
+    input.oncancel = () => {
+      input.remove();
+      resolve(null);
+    };
+    document.body.append(input);
+    input.click();
+  });
+}
 
 export class TemplatePanel {
   private filter = '';
@@ -32,6 +72,17 @@ export class TemplatePanel {
     title.textContent = '코드 템플릿';
     titleRow.append(title);
 
+    const actions = document.createElement('div');
+    actions.className = 'template-header-actions';
+
+    const importBtn = document.createElement('button');
+    importBtn.className = 'template-add-btn';
+    importBtn.title = '템플릿 JSON 파일 불러오기';
+    importBtn.innerHTML = `<span>📥 불러오기</span>`;
+    importBtn.addEventListener('click', async () => {
+      await this.handleImport();
+    });
+
     const addBtn = document.createElement('button');
     addBtn.className = 'template-add-btn';
     addBtn.title = '새 템플릿 추가';
@@ -43,7 +94,9 @@ export class TemplatePanel {
       <span>추가</span>
     `;
     addBtn.addEventListener('click', () => this.openAddModal());
-    titleRow.append(addBtn);
+
+    actions.append(importBtn, addBtn);
+    titleRow.append(actions);
 
     header.append(titleRow);
 
@@ -110,7 +163,34 @@ export class TemplatePanel {
 
       const groupTitle = document.createElement('div');
       groupTitle.className = 'template-group-title';
-      groupTitle.textContent = groupName;
+
+      const groupNameSpan = document.createElement('span');
+      groupNameSpan.textContent = groupName;
+      groupTitle.append(groupNameSpan);
+
+      const groupActions = document.createElement('div');
+      groupActions.className = 'template-group-actions';
+
+      const exportGrpBtn = document.createElement('button');
+      exportGrpBtn.className = 'template-group-btn';
+      exportGrpBtn.title = `'${groupName}' 그룹 템플릿 내보내기 (.json)`;
+      exportGrpBtn.textContent = '📤 내보내기';
+      exportGrpBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.handleExportGroup(groupName);
+      });
+
+      const importGrpBtn = document.createElement('button');
+      importGrpBtn.className = 'template-group-btn';
+      importGrpBtn.title = `'${groupName}' 그룹으로 템플릿 불러오기 (.json)`;
+      importGrpBtn.textContent = '📥 불러오기';
+      importGrpBtn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        await this.handleImport(groupName);
+      });
+
+      groupActions.append(exportGrpBtn, importGrpBtn);
+      groupTitle.append(groupActions);
       groupEl.append(groupTitle);
 
       for (const t of items) {
@@ -275,5 +355,24 @@ export class TemplatePanel {
     });
 
     setTimeout(() => nameInput.focus(), 50);
+  }
+
+  private handleExportGroup(groupName: string) {
+    const json = exportGroupTemplates(groupName);
+    const safeName = groupName.replace(/[\\/:*?"<>|]/g, '_');
+    downloadJsonFile(`templates_${safeName}.json`, json);
+  }
+
+  private async handleImport(targetGroup?: string) {
+    const json = await pickJsonFile();
+    if (!json) return;
+    try {
+      const res = importTemplates(json, targetGroup);
+      const groupMsg = res.groupName ? ` ('${res.groupName}' 그룹)` : '';
+      alert(`${res.count}개의 템플릿을 성공적으로 불러왔습니다.${groupMsg}`);
+      this.renderList();
+    } catch (err: any) {
+      alert(`템플릿 불러오기 실패: ${err.message || err}`);
+    }
   }
 }

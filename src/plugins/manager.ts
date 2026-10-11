@@ -73,8 +73,57 @@ export class PluginManager {
     this.listeners.forEach((fn) => fn());
   }
 
+  private getStoredPluginOrder(): string[] {
+    try {
+      const raw = localStorage.getItem('migoto_plugin_order');
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  private saveStoredPluginOrder(order: string[]): void {
+    try {
+      localStorage.setItem('migoto_plugin_order', JSON.stringify(order));
+    } catch {}
+  }
+
+  getPluginOrder(): string[] {
+    const stored = this.getStoredPluginOrder();
+    const allIds = Array.from(this.plugins.keys());
+    const valid = stored.filter((id) => allIds.includes(id));
+    for (const id of allIds) {
+      if (!valid.includes(id)) valid.push(id);
+    }
+    return valid;
+  }
+
   getPlugins(): PluginInstance[] {
-    return Array.from(this.plugins.values());
+    const order = this.getPluginOrder();
+    const list = Array.from(this.plugins.values());
+    return list.sort((a, b) => {
+      const idxA = order.indexOf(a.manifest.id);
+      const idxB = order.indexOf(b.manifest.id);
+      return (idxA === -1 ? 999 : idxA) - (idxB === -1 ? 999 : idxB);
+    });
+  }
+
+  movePluginOrder(id: string, direction: 'up' | 'down'): void {
+    const order = this.getPluginOrder();
+    const idx = order.indexOf(id);
+    if (idx === -1) return;
+    if (direction === 'up' && idx > 0) {
+      const tmp = order[idx - 1];
+      order[idx - 1] = order[idx];
+      order[idx] = tmp;
+    } else if (direction === 'down' && idx < order.length - 1) {
+      const tmp = order[idx + 1];
+      order[idx + 1] = order[idx];
+      order[idx] = tmp;
+    }
+    this.saveStoredPluginOrder(order);
+    this.activityBar?.reorderDynamicTabs(order);
+    this.notify();
   }
 
   getSidebarViews(): RegisteredSidebarView[] {
@@ -213,6 +262,7 @@ export class PluginManager {
             title: view.title,
             panelEl,
           });
+          this.activityBar.reorderDynamicTabs(this.getPluginOrder());
 
           this.dynamicTabDisposers.set(view.id, () => {
             reg.dispose();

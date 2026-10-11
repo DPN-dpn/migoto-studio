@@ -1,7 +1,7 @@
 import { openModal } from './modal';
 import { platform } from '../platform';
 import { upstreamGrammarVersion } from '../core/grammar';
-import { CURRENT_APP_VERSION, runUpdateCheck } from '../updater/updater';
+import { CURRENT_APP_VERSION, runUpdateCheck, openExternalUrl } from '../updater/updater';
 
 interface ShortcutItem {
   label: string;
@@ -229,6 +229,10 @@ function renderAbout(): HTMLElement {
   ghLink.target = '_blank';
   ghLink.rel = 'noreferrer';
   ghLink.textContent = 'GitHub 저장소 방문';
+  ghLink.onclick = (e) => {
+    e.preventDefault();
+    openExternalUrl('https://github.com/DPN-dpn/migoto-studio');
+  };
   addItem('소스 코드', ghLink);
 
   const dataLocationEl = document.createElement('span');

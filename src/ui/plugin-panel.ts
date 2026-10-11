@@ -249,7 +249,7 @@ export class PluginPanel {
     const activeCount = plugins.filter((p) => p.enabled).length;
     const statsHint = document.createElement('div');
     statsHint.className = 'plugin-stats-hint';
-    statsHint.textContent = `전체 ${plugins.length}개 중 ${activeCount}개 활성화`;
+    statsHint.textContent = `전체 ${plugins.length}개 중 ${activeCount}개 활성화 (▲/▼로 툴바 순서 조절)`;
 
     searchWrap.append(searchInput, statsHint);
     container.append(searchWrap);
@@ -284,34 +284,12 @@ export class PluginPanel {
       return;
     }
 
-    // Group: Built-in first, then User
-    const builtinPlugins = filtered.filter((p) => p.isBuiltin);
-    const userPlugins = filtered.filter((p) => !p.isBuiltin);
-
-    if (builtinPlugins.length > 0) {
-      const sectionTitle = document.createElement('div');
-      sectionTitle.className = 'plugin-section-header';
-      sectionTitle.textContent = `기본 내장 플러그인 (${builtinPlugins.length})`;
-      container.append(sectionTitle);
-
-      for (const p of builtinPlugins) {
-        container.append(this.createPluginCard(p));
-      }
-    }
-
-    if (userPlugins.length > 0) {
-      const sectionTitle = document.createElement('div');
-      sectionTitle.className = 'plugin-section-header';
-      sectionTitle.textContent = `사용자 추가 플러그인 (${userPlugins.length})`;
-      container.append(sectionTitle);
-
-      for (const p of userPlugins) {
-        container.append(this.createPluginCard(p));
-      }
-    }
+    filtered.forEach((p, index) => {
+      container.append(this.createPluginCard(p, index, filtered.length));
+    });
   }
 
-  private createPluginCard(p: PluginInstance): HTMLElement {
+  private createPluginCard(p: PluginInstance, index: number, total: number): HTMLElement {
     const card = document.createElement('div');
     card.className = `plugin-card${p.enabled ? ' is-enabled' : ''}`;
 
@@ -321,14 +299,42 @@ export class PluginPanel {
     const iconName = document.createElement('div');
     iconName.className = 'plugin-card-title';
     iconName.innerHTML = `
+      <span class="plugin-order-num">${index + 1}.</span>
       <span class="plugin-icon">${p.manifest.icon || '🧩'}</span>
       <strong class="plugin-name">${p.manifest.name}</strong>
       <span class="plugin-version">v${p.manifest.version}</span>
     `;
 
-    // Right controls: toggle switch + (delete button if not builtin)
+    // Right controls: order buttons + toggle switch + (delete button if not builtin)
     const rightControls = document.createElement('div');
     rightControls.className = 'plugin-card-right';
+
+    // Up / Down order buttons
+    const reorderWrap = document.createElement('div');
+    reorderWrap.className = 'plugin-order-controls';
+
+    const upBtn = document.createElement('button');
+    upBtn.className = 'icon-btn plugin-order-btn';
+    upBtn.title = '위로 이동 (툴바 순서)';
+    upBtn.textContent = '▲';
+    upBtn.disabled = index === 0;
+    upBtn.onclick = (e) => {
+      e.stopPropagation();
+      this.manager.movePluginOrder(p.manifest.id, 'up');
+    };
+
+    const downBtn = document.createElement('button');
+    downBtn.className = 'icon-btn plugin-order-btn';
+    downBtn.title = '아래로 이동 (툴바 순서)';
+    downBtn.textContent = '▼';
+    downBtn.disabled = index === total - 1;
+    downBtn.onclick = (e) => {
+      e.stopPropagation();
+      this.manager.movePluginOrder(p.manifest.id, 'down');
+    };
+
+    reorderWrap.append(upBtn, downBtn);
+    rightControls.append(reorderWrap);
 
     if (!p.isBuiltin) {
       const deleteBtn = document.createElement('button');

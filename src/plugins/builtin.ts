@@ -15,7 +15,7 @@ const PYTHON_RUNNER_MANIFEST: PluginManifest = {
   id: 'python-runner',
   name: 'Python 스크립트 실행기',
   version: '1.0.0',
-  description: '파이썬 스크립트를 에디터 내에서 직접 실행하고 출력 결과를 에디터에 반영합니다 (활성화 시 좌측 바 🐍 탭 추가).',
+  description: '파이썬 스크립트를 에디터 내에서 직접 실행하고 출력 결과를 에디터에 반영합니다.',
   author: 'Migoto Studio',
   icon: '🐍',
   category: 'tools',
@@ -30,7 +30,7 @@ function createPythonRunnerPlugin(): MigotoPlugin {
         title: 'Python 실행기',
         icon: '🐍',
         render(container) {
-          container.className = 'plugin-subview python-runner-panel';
+          container.className = 'sidebar-panel dynamic-plugin-panel plugin-subview python-runner-panel';
           container.replaceChildren();
 
           // Header
@@ -242,7 +242,7 @@ const AI_ASSISTANT_MANIFEST: PluginManifest = {
   id: 'ai-assistant',
   name: 'AI 모딩 에이전트',
   version: '1.0.0',
-  description: 'OpenAI, Ollama(로컬), 또는 호환 API를 연동하여 INI 문법 검사 및 코드 생성을 돕습니다 (활성화 시 좌측 바 🤖 탭 추가).',
+  description: 'OpenAI, Ollama(로컬), 또는 호환 API를 연동하여 INI 문법 검사 및 코드 생성을 돕습니다.',
   author: 'Migoto Studio',
   icon: '🤖',
   category: 'ai',
@@ -257,7 +257,7 @@ function createAiAssistantPlugin(): MigotoPlugin {
         title: 'AI 에이전트',
         icon: '🤖',
         render(container) {
-          container.className = 'plugin-subview ai-assistant-panel';
+          container.className = 'sidebar-panel dynamic-plugin-panel plugin-subview ai-assistant-panel';
           container.replaceChildren();
 
           const header = document.createElement('div');

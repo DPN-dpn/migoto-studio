@@ -8,7 +8,7 @@ import { getAllTemplates, insertTemplate } from '../core/templates';
 import { openSettings } from './settings-ui';
 import { openHelp } from './help-ui';
 import { openRestore } from './restore-ui';
-import { runUpdateCheck } from '../updater/updater';
+import { runUpdateCheck, openExternalUrl } from '../updater/updater';
 
 export interface MenuBarCallbacks {
   doc: DocumentManager;
@@ -226,11 +226,11 @@ export class MenuBar {
           { divider: true },
           {
             label: '업데이트 확인…',
-            action: () => runUpdateCheck(true),
+            action: () => runUpdateCheck(false),
           },
           {
             label: 'GitHub 저장소 열기',
-            action: () => window.open('https://github.com/DPN-dpn/migoto-studio', '_blank'),
+            action: () => openExternalUrl('https://github.com/DPN-dpn/migoto-studio'),
           },
         ],
       },
