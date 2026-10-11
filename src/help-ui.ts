@@ -1,8 +1,7 @@
 import { openModal } from './modal';
 import { platform } from './platform';
 import { upstreamGrammarVersion } from './grammar';
-
-const APP_VERSION = '0.1.0';
+import { CURRENT_APP_VERSION, runUpdateCheck } from './updater';
 
 interface ShortcutItem {
   label: string;
@@ -148,16 +147,39 @@ function renderAbout(): HTMLElement {
   const h1 = document.createElement('h1');
   h1.textContent = 'Migoto Studio';
 
+  const verRow = document.createElement('div');
+  verRow.style.display = 'flex';
+  verRow.style.alignItems = 'center';
+  verRow.style.justifyContent = 'center';
+  verRow.style.gap = '8px';
+  verRow.style.marginTop = '6px';
+
   const ver = document.createElement('span');
   ver.className = 'version-tag';
-  ver.textContent = `v${APP_VERSION}`;
+  ver.textContent = `v${CURRENT_APP_VERSION}`;
+
+  const checkBtn = document.createElement('button');
+  checkBtn.style.fontSize = '11px';
+  checkBtn.style.padding = '2px 8px';
+  checkBtn.style.borderColor = 'var(--border)';
+  checkBtn.textContent = '업데이트 확인';
+  checkBtn.onclick = () => {
+    checkBtn.disabled = true;
+    checkBtn.textContent = '확인 중...';
+    runUpdateCheck(false).finally(() => {
+      checkBtn.disabled = false;
+      checkBtn.textContent = '업데이트 확인';
+    });
+  };
+
+  verRow.append(ver, checkBtn);
 
   const desc = document.createElement('p');
   desc.className = 'hint';
   desc.style.marginTop = '8px';
   desc.textContent = 'XXMI / 3DMigoto INI 파일을 위한 가벼운 스마트 에디터';
 
-  hero.append(h1, ver, desc);
+  hero.append(h1, verRow, desc);
 
   const details = document.createElement('div');
   details.className = 'about-details';

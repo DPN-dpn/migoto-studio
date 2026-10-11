@@ -17,6 +17,9 @@ export interface Settings {
   backupMaxPerFile: number;
   recentFiles: string[];
 
+  /** Automatically check for newer releases when the app launches. */
+  checkForUpdatesOnStartup: boolean;
+
   // Linter options
   lintEnabled: boolean;
   lintDuplicateSections: boolean;
@@ -38,6 +41,7 @@ export const DEFAULT_SETTINGS: Settings = {
   backupKeepDays: 7,
   backupMaxPerFile: 10,
   recentFiles: [],
+  checkForUpdatesOnStartup: true,
 
   lintEnabled: true,
   lintDuplicateSections: true,
@@ -72,6 +76,7 @@ export const SETTING_FIELDS: SettingField[] = [
   { key: 'fontSize', category: '화면', label: '글자 크기', type: 'number', min: 8, max: 40, unit: 'px', description: '편집 화면의 글자 크기입니다. (Ctrl + 마우스 휠로도 조절할 수 있습니다)' },
   { key: 'showOutline', category: '화면', label: '섹션 목록 표시', type: 'boolean', description: '왼쪽에 [섹션] 목록 패널을 보여줍니다.' },
   { key: 'minimap', category: '화면', label: '미니맵 표시', type: 'boolean', description: '오른쪽에 문서 전체를 축소해서 보여줍니다.' },
+  { key: 'checkForUpdatesOnStartup', category: '화면', label: '시작 시 업데이트 자동 확인', type: 'boolean', description: '앱 실행 시 백그라운드에서 최신 버전이 있는지 확인합니다.' },
   {
     key: 'whitespace', category: '편집', label: '공백 표시', type: 'choice',
     description: '공백과 탭을 점/화살표로 표시합니다.',

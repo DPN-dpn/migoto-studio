@@ -15,6 +15,7 @@ import { openRestore } from './restore-ui';
 import { lintModel, optionsFromSettings } from './lint';
 import { registerSmartCompletions } from './completions';
 import { initPwa } from './pwa';
+import { checkOnStartup } from './updater';
 
 // Only the base editor worker is needed (no TS/JSON/CSS language services).
 (self as unknown as { MonacoEnvironment: monaco.Environment }).MonacoEnvironment = {
@@ -242,6 +243,9 @@ async function boot() {
 
   // ---- ask before closing with unsaved changes ----
   await platform().onCloseRequest(() => doc.confirmDiscard());
+
+  // ---- check for newer releases in background ----
+  checkOnStartup();
 }
 
 boot().catch((e) => {

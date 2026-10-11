@@ -2,6 +2,27 @@ mod backups;
 mod files;
 mod storage;
 
+#[tauri::command]
+fn open_in_browser(url: String) -> Result<(), String> {
+  #[cfg(windows)]
+  {
+    std::process::Command::new("rundll32")
+      .args(["url.dll,FileProtocolHandler", &url])
+      .spawn()
+      .map_err(|e| e.to_string())?;
+    Ok(())
+  }
+  #[cfg(not(windows))]
+  {
+    Err("Unsupported platform".into())
+  }
+}
+
+#[tauri::command]
+fn relaunch_app(app: tauri::AppHandle) {
+  app.restart();
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
   // Keep the WebView2 cache inside the portable data folder (unless a dev environment already set it).
@@ -13,15 +34,19 @@ pub fn run() {
 
   tauri::Builder::default()
     .plugin(tauri_plugin_dialog::init())
+    .plugin(tauri_plugin_updater::Builder::new().build())
     .invoke_handler(tauri::generate_handler![
       files::open_file,
       files::save_file,
       storage::load_settings,
       storage::save_settings,
       storage::get_data_dir,
+      storage::is_portable_mode,
       backups::cleanup_backups,
       backups::get_backup_dir,
       backups::list_backups,
+      open_in_browser,
+      relaunch_app,
     ])
     .setup(|app| {
       if cfg!(debug_assertions) {

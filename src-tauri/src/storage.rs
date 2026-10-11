@@ -94,6 +94,16 @@ pub fn get_data_dir() -> String {
   data_dir().to_string_lossy().to_string()
 }
 
+#[tauri::command]
+pub fn is_portable_mode() -> bool {
+  if let Ok(exe) = std::env::current_exe() {
+    if let Some(dir) = exe.parent() {
+      return dir.join(PORTABLE_MARKER).exists();
+    }
+  }
+  false
+}
+
 #[cfg(test)]
 mod tests {
   use super::*;

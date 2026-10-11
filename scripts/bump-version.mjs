@@ -96,9 +96,21 @@ async function main() {
   await writeFile(CARGO_PATH, updatedCargo);
   console.log(`  ✓ src-tauri/Cargo.toml: ${cargoVersion} -> ${newVersion}`);
 
+  // 4. Update src/version.ts
+  const VERSION_PATH = join(ROOT, 'src', 'version.ts');
+  try {
+    const versionContent = await readFile(VERSION_PATH, 'utf8');
+    const updatedVersion = versionContent.replace(
+      /export const CURRENT_APP_VERSION = '[^']+';/,
+      `export const CURRENT_APP_VERSION = '${newVersion}';`
+    );
+    await writeFile(VERSION_PATH, updatedVersion);
+    console.log(`  ✓ src/version.ts: CURRENT_APP_VERSION -> ${newVersion}`);
+  } catch {}
+
   console.log('\n[version] 모든 파일의 버전이 동기화되었습니다!');
   console.log('배포 시 다음 명령어를 실행하세요:');
-  console.log(`  git add package.json src-tauri/tauri.conf.json src-tauri/Cargo.toml`);
+  console.log(`  git add package.json src-tauri/tauri.conf.json src-tauri/Cargo.toml src/version.ts`);
   console.log(`  git commit -m "버전 갱신: v${newVersion}"`);
   console.log(`  git tag v${newVersion}`);
   console.log(`  git push origin main`);
