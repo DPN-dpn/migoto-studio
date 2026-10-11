@@ -69,6 +69,53 @@ pub fn launch_installer_and_exit(app: tauri::AppHandle, path: String) -> Result<
 }
 
 #[tauri::command]
+pub fn download_and_install_update(app: tauri::AppHandle, url: String, version: String) -> Result<(), String> {
+  let temp_file = std::env::temp_dir().join(format!("MigotoStudio-Setup-v{version}.exe"));
+  let dest_path = temp_file.to_string_lossy().to_string();
+
+  #[cfg(windows)]
+  {
+    use std::os::windows::process::CommandExt;
+    // 1. Try curl.exe with follow-redirects (-fL) and silent output (-sS)
+    let mut curl = Command::new("curl.exe");
+    curl.args(["-fL", "-sS", "-o", &dest_path, &url]);
+    curl.creation_flags(0x08000000);
+    let curl_ok = match curl.status() {
+      Ok(s) => s.success() && temp_file.exists() && fs::metadata(&temp_file).map(|m| m.len() > 100_000).unwrap_or(false),
+      Err(_) => false,
+    };
+
+    if !curl_ok {
+      // 2. Fallback to PowerShell WebClient with TLS 1.2
+      let ps_script = format!(
+        "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; $wc = New-Object System.Net.WebClient; $wc.Headers.Add('User-Agent', 'MigotoStudio-Updater'); $wc.DownloadFile('{}', '{}')",
+        url.replace('\'', "''"),
+        dest_path.replace('\'', "''")
+      );
+      let mut ps = Command::new("powershell");
+      ps.args(["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", &ps_script]);
+      ps.creation_flags(0x08000000);
+      let ps_status = ps.status().map_err(|e| format!("PowerShell 다운로드 실패: {e}"))?;
+      if !ps_status.success() || !temp_file.exists() || fs::metadata(&temp_file).map(|m| m.len() < 100_000).unwrap_or(true) {
+        return Err("설치 파일 다운로드에 실패했습니다. GitHub 릴리스 페이지에서 직접 다운로드해 주세요.".into());
+      }
+    }
+
+    // Launch installer and exit
+    Command::new("cmd")
+      .args(["/c", "start", "", &dest_path])
+      .spawn()
+      .map_err(|e| format!("설치 파일 실행 실패: {e}"))?;
+    app.exit(0);
+    Ok(())
+  }
+  #[cfg(not(windows))]
+  {
+    Err("Windows 전용 기능입니다.".into())
+  }
+}
+
+#[tauri::command]
 pub fn exec_process(
   command: String,
   args: Vec<String>,

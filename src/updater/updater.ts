@@ -139,7 +139,7 @@ export async function checkUpdate(): Promise<UpdateInfo> {
   if (gh && isNewerVersion(currentVersion, gh.version)) {
     const canAutoInstall =
       platform().kind === 'desktop'
-        ? Boolean(!isPortable && gh.setupAssetUrl && platform().writeBinaryFile && platform().launchInstallerAndExit)
+        ? Boolean(!isPortable && gh.setupAssetUrl)
         : true;
 
     return {
@@ -153,37 +153,12 @@ export async function checkUpdate(): Promise<UpdateInfo> {
       canAutoInstall,
       downloadAndInstall: async (onProgress) => {
         if (platform().kind === 'desktop' && gh.setupAssetUrl) {
-          const res = await fetch(gh.setupAssetUrl);
-          if (!res.ok) throw new Error(`다운로드 실패 (${res.status} ${res.statusText})`);
-
-          const total = Number(res.headers.get('content-length') || 0);
-          const reader = res.body?.getReader();
-          if (!reader) throw new Error('응답 데이터를 읽을 수 없습니다.');
-
-          let received = 0;
-          const chunks: Uint8Array[] = [];
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            if (value) {
-              chunks.push(value);
-              received += value.length;
-              if (total > 0 && onProgress) {
-                onProgress(Math.min(100, Math.round((received / total) * 100)));
-              }
-            }
-          }
-
-          const combined = new Uint8Array(received);
-          let offset = 0;
-          for (const c of chunks) {
-            combined.set(c, offset);
-            offset += c.length;
-          }
-
-          const tempPath = `C:\\Windows\\Temp\\MigotoStudio-Setup-v${gh.version}.exe`;
-          await platform().writeBinaryFile!(tempPath, combined);
-          await platform().launchInstallerAndExit!(tempPath);
+          onProgress?.(30);
+          const { invoke } = await import('@tauri-apps/api/core');
+          await invoke('download_and_install_update', {
+            url: gh.setupAssetUrl,
+            version: gh.version,
+          });
         } else {
           // Web / PWA refresh
           if ('serviceWorker' in navigator) {
@@ -318,13 +293,11 @@ export function showUpdateModal(info: UpdateInfo) {
 
     installBtn.onclick = async () => {
       installBtn.disabled = true;
-      installBtn.textContent = '다운로드 중... (0%)';
-      statusEl.textContent = '최신 업데이트 패키지를 다운로드하고 있습니다. 잠시만 기다려주세요...';
+      installBtn.textContent = '다운로드 및 설치 준비 중...';
+      statusEl.textContent = '최신 설치 파일을 다운로드하고 있습니다. 다운로드가 완료되면 설치 프로그램이 자동으로 실행됩니다...';
 
       try {
-        await info.downloadAndInstall!((pct) => {
-          installBtn.textContent = `다운로드 중... (${pct}%)`;
-        });
+        await info.downloadAndInstall!();
         statusEl.textContent = '설치 관리자를 실행합니다...';
         installBtn.textContent = '설치 실행 중...';
 
