@@ -54,6 +54,8 @@ async function boot() {
       renderWhitespace: s.whitespace,
     });
     outline.setVisible(s.showOutline);
+    $('btn-outline').setAttribute('aria-pressed', String(s.showOutline));
+    $('btn-minimap').setAttribute('aria-pressed', String(s.minimap));
   };
   onSettingsChange(applySettings);
   applySettings();
@@ -97,6 +99,7 @@ async function boot() {
   $('btn-restore').addEventListener('click', () => openRestore(doc));
   $('btn-settings').addEventListener('click', () => openSettings());
   $('btn-outline').addEventListener('click', () => updateSettings({ showOutline: !getSettings().showOutline }));
+  $('btn-minimap').addEventListener('click', () => updateSettings({ minimap: !getSettings().minimap }));
 
   window.addEventListener('keydown', (e) => {
     if (!e.ctrlKey || e.altKey) return;

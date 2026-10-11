@@ -99,6 +99,10 @@ button.primary:hover { filter: brightness(1.1); background: var(--accent); }
 
 #toolbar .divider { width: 1px; height: 18px; margin: 0 6px; background: var(--border); }
 
+.icon-btn { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 28px; padding: 0; color: var(--fg-dim); }
+.icon-btn:hover { color: var(--fg); }
+.icon-btn[aria-pressed='true'] { color: var(--accent); background: var(--bg-hover); }
+
 #sidebar {
   width: 250px;
   display: flex;
