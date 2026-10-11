@@ -68,7 +68,7 @@ MigotoStudio/
 └─ webview2/       # 화면 엔진 캐시
 ```
 
-기본적으로 백업 보존을 위해 프로그램을 삭제해도 이 폴더는 남겨둘 수 있으며, 프로그램 제거(삭제) 시 나타나는 안내창에서 "예"를 누르면 앱 데이터 폴더까지 한 번에 깨끗하게 삭제할 수 있습니다.
+기본적으로 백업 보존을 위해 프로그램을 삭제해도 이 폴더는 남겨둘 수 있으며, 프로그램 제거(삭제) 화면에서 **"앱 데이터 삭제" 체크박스**를 선택하면 앱 데이터 폴더까지 한 번에 깨끗하게 삭제됩니다.
 
 ## 개발
 
@@ -87,9 +87,35 @@ Node.js와 Rust는 **프로젝트 폴더 안(`.toolchain/`)에만** 설치됩니
 ```
 
 ```powershell
-.\dev.ps1 npm run build                                  # 프런트엔드 빌드 + 타입 검사
-.\dev.ps1 cargo test --manifest-path src-tauri/Cargo.toml  # Rust 테스트
-.\dev.ps1 node scripts/sync-upstream.mjs                 # 원본 확장의 최신 문법 가져오기
+.\dev.ps1 npm test                                          # 유닛 테스트 실행 (16개 항목 검증)
+.\dev.ps1 npm run build                                     # 프런트엔드 빌드 + 타입 검사
+.\dev.ps1 cargo test --manifest-path src-tauri/Cargo.toml   # Rust 테스트
+.\dev.ps1 node scripts/sync-upstream.mjs                  # 원본 확장의 최신 문법 가져오기
+```
+
+### 빌드 및 배포 방법
+
+#### 1. 데스크톱 앱 정규 릴리스 배포 (GitHub Releases)
+새 버전을 공식 배포하려면 버전 태그를 만들어 푸시합니다:
+```powershell
+git tag v0.1.0                # 버전 태그 생성 (vX.Y.Z)
+git push origin v0.1.0        # 깃허브로 태그 푸시
+```
+- 푸시 즉시 GitHub Actions가 자동으로 실행되어 **설치형 인스톨러(`.exe`)**와 **무설치 포터블 압축 파일(`.zip`)**을 빌드하고, GitHub Releases 페이지에 다운로드 파일과 함께 릴리스를 등록합니다.
+- 태그 푸시 대신 깃허브 웹사이트의 **Actions > "Release Desktop App" > "Run workflow"**를 눌러 수동으로 즉시 릴리스를 빌드할 수도 있습니다.
+
+#### 2. 웹 버전 배포 (GitHub Pages / PWA)
+웹 소스(`src/`, `public/`, `index.html` 등)를 수정한 뒤 `main` 브랜치에 푸시하면 자동으로 배포됩니다:
+```powershell
+git push origin main          # 웹 앱 관련 파일 변경 시 GitHub Pages에 자동 반영
+```
+
+#### 3. 내 PC에서 로컬 직접 빌드
+깃허브 서버를 거치지 않고 내 PC에서 바로 실행/설치 파일을 만들 때 사용합니다:
+```powershell
+.\dev.ps1 npm run build             # 웹 정적 파일 빌드 (dist/ 생성)
+.\dev.ps1 npm run tauri build       # 윈도우 설치형 파일(.exe) 로컬 빌드
+# 생성 위치: src-tauri\target\release\bundle\nsis\Migoto Studio_<버전>_x64-setup.exe
 ```
 
 ### 개발 환경 제거
