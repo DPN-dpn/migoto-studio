@@ -796,6 +796,220 @@ body.resizing * {
 .hint { margin: 2px 0 0; font-size: 11px; color: var(--fg-dim); line-height: 1.5; }
 .outline-list .hint { padding: 6px 10px; }
 
+/* Template Panel */
+.template-header {
+  display: flex;
+  flex-direction: column;
+  padding: 8px 10px 6px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-elev);
+}
+
+.template-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  gap: 6px;
+}
+
+.template-title-row h2 {
+  margin: 0 !important;
+  padding: 0 !important;
+  font-size: 11px !important;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--fg);
+}
+
+.template-add-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: rgba(139, 124, 246, 0.15);
+  color: var(--accent);
+  border: 1px solid rgba(139, 124, 246, 0.3);
+}
+.template-add-btn:hover {
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+
+.template-header input[type='search'] {
+  margin: 0 !important;
+  padding: 4px 8px;
+  font: inherit;
+  font-size: 11px;
+  color: var(--fg);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+}
+.template-header input[type='search']:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+
+.template-list-container {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 6px 8px 12px;
+}
+
+.template-group {
+  margin-bottom: 12px;
+}
+
+.template-group-title {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--fg-dim);
+  text-transform: uppercase;
+  padding: 4px 4px 6px;
+}
+
+.template-card {
+  padding: 8px 10px;
+  margin-bottom: 6px;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: border-color 0.12s, background 0.12s, transform 0.08s;
+  user-select: none;
+}
+.template-card:hover {
+  background: var(--bg-hover);
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+
+.template-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.template-card-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fg);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.template-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.template-card-badge {
+  font-size: 9px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: rgba(139, 124, 246, 0.15);
+  color: var(--accent);
+  font-weight: 600;
+}
+.template-card-badge.custom {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+}
+
+.template-card-del-btn {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 3px;
+  color: var(--fg-dim);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  opacity: 0.7;
+}
+.template-card-del-btn:hover {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+  opacity: 1;
+}
+
+.template-card-desc {
+  margin: 0 0 6px;
+  font-size: 11px;
+  color: var(--fg-dim);
+  line-height: 1.4;
+}
+
+.template-card-preview {
+  margin: 0;
+  padding: 5px 8px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-family: 'Cascadia Code', Consolas, monospace;
+  font-size: 10px;
+  color: var(--fg-dim);
+  line-height: 1.35;
+  white-space: pre-wrap;
+  word-break: break-all;
+  opacity: 0.8;
+}
+
+/* Template Modal Form */
+.template-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.template-form .form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.template-form label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--fg);
+}
+.template-form input[type='text'],
+.template-form textarea {
+  font: inherit;
+  font-size: 12px;
+  color: var(--fg);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 10px;
+}
+.template-form textarea {
+  font-family: 'Cascadia Code', Consolas, monospace;
+  font-size: 11px;
+  resize: vertical;
+  line-height: 1.4;
+}
+.template-form input:focus,
+.template-form textarea:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+.modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 8px;
+}
+
 #statusbar {
   display: flex;
   justify-content: space-between;

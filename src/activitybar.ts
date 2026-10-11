@@ -1,11 +1,11 @@
 import { getSettings, updateSettings, onSettingsChange } from './settings';
 import type { OutlinePanel } from './outline';
 
-export type ActivityPanel = 'explorer' | 'outline';
+export type ActivityPanel = 'explorer' | 'outline' | 'templates';
 
 /**
  * VS Code-style vertical Activity Bar on the far left.
- * Lets users switch between Explorer (모드 파일 탐색기) and Outline (섹션 목록),
+ * Lets users switch between Explorer (모드 파일 탐색기), Outline (섹션 목록), and Templates (코드 템플릿),
  * or toggle the entire sidebar by clicking the active icon.
  * Bottom icons provide quick access to Settings and Help.
  */
@@ -16,8 +16,10 @@ export class ActivityBar {
     private barEl: HTMLElement,
     private explorerBtn: HTMLElement,
     private outlineBtn: HTMLElement,
+    private templatesBtn: HTMLElement,
     private panelExplorer: HTMLElement,
     private panelOutline: HTMLElement,
+    private panelTemplates: HTMLElement,
     private outline: OutlinePanel,
     private onOpenSettings: () => void,
     private onOpenHelp: () => void,
@@ -41,6 +43,7 @@ export class ActivityBar {
   private bindEvents() {
     this.explorerBtn.addEventListener('click', () => this.handlePanelClick('explorer'));
     this.outlineBtn.addEventListener('click', () => this.handlePanelClick('outline'));
+    this.templatesBtn.addEventListener('click', () => this.handlePanelClick('templates'));
 
     const settingsBtn = this.barEl.querySelector('#act-settings');
     settingsBtn?.addEventListener('click', () => this.onOpenSettings());
@@ -88,6 +91,7 @@ export class ActivityBar {
 
     const isExp = isShowing && this.activePanel === 'explorer';
     const isOut = isShowing && this.activePanel === 'outline';
+    const isTpl = isShowing && this.activePanel === 'templates';
 
     this.explorerBtn.classList.toggle('active', isExp);
     this.explorerBtn.setAttribute('aria-pressed', String(isExp));
@@ -95,8 +99,12 @@ export class ActivityBar {
     this.outlineBtn.classList.toggle('active', isOut);
     this.outlineBtn.setAttribute('aria-pressed', String(isOut));
 
+    this.templatesBtn.classList.toggle('active', isTpl);
+    this.templatesBtn.setAttribute('aria-pressed', String(isTpl));
+
     // Show/hide sub-panels inside the sidebar
     this.panelExplorer.hidden = this.activePanel !== 'explorer';
     this.panelOutline.hidden = this.activePanel !== 'outline';
+    this.panelTemplates.hidden = this.activePanel !== 'templates';
   }
 }

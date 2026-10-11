@@ -8,6 +8,7 @@ import { defineThemes, THEME_DARK, THEME_LIGHT } from './theme';
 import { DocumentManager, ENCODING_LABELS, type Encoding } from './documents';
 import { TabBar } from './tabbar';
 import { FileExplorer } from './explorer';
+import { TemplatePanel } from './template-panel';
 import { ActivityBar } from './activitybar';
 import { MenuBar } from './menubar';
 import { getSettings, loadSettings, onSettingsChange } from './settings';
@@ -51,6 +52,7 @@ async function boot() {
   const doc = new DocumentManager(editor);
   const outline = new OutlinePanel(editor, $('sidebar'), $('sidebar-panel-outline'), $('sidebar-resizer'));
   const explorer = new FileExplorer($('sidebar-panel-explorer'), doc);
+  new TemplatePanel($('sidebar-panel-templates'), editor);
   new TabBar(doc, $('tabbar'), $('btn-new-tab'), $('tab-menu'));
 
   // ---- Activity Bar (세로 툴바) ----
@@ -58,8 +60,10 @@ async function boot() {
     $('activity-bar'),
     $('act-explorer'),
     $('act-outline'),
+    $('act-templates'),
     $('sidebar-panel-explorer'),
     $('sidebar-panel-outline'),
+    $('sidebar-panel-templates'),
     outline,
     () => openSettings(),
     () => openHelp(),

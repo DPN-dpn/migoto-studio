@@ -4,7 +4,7 @@ import { getSettings, updateSettings } from './settings';
 import type { DocumentManager } from './documents';
 import type { FileExplorer } from './explorer';
 import type { ActivityBar } from './activitybar';
-import { TEMPLATES, insertTemplate } from './templates';
+import { getAllTemplates, insertTemplate } from './templates';
 import { openSettings } from './settings-ui';
 import { openHelp } from './help-ui';
 import { openRestore } from './restore-ui';
@@ -142,7 +142,7 @@ export class MenuBar {
           {
             label: '스니펫 템플릿 삽입',
             submenu: () => {
-              return TEMPLATES.map((t) => ({
+              return getAllTemplates().map((t) => ({
                 label: `[${t.group}] ${t.label}`,
                 action: () => insertTemplate(this.cb.editor, t),
               }));
@@ -175,6 +175,10 @@ export class MenuBar {
             {
               label: '섹션 목록 열기',
               action: () => this.cb.activityBar.switchTo('outline'),
+            },
+            {
+              label: '코드 템플릿 열기',
+              action: () => this.cb.activityBar.switchTo('templates'),
             },
             { divider: true },
             {
