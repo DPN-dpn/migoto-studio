@@ -10,6 +10,7 @@ import { getSettings, loadSettings, onSettingsChange, updateSettings } from './s
 import { OutlinePanel } from './outline';
 import { TEMPLATES, insertTemplate, registerSnippetCompletions } from './templates';
 import { openSettings } from './settings-ui';
+import { openHelp } from './help-ui';
 import { openRestore } from './restore-ui';
 import { lintModel, optionsFromSettings } from './lint';
 import { registerSmartCompletions } from './completions';
@@ -159,10 +160,16 @@ async function boot() {
   $('btn-saveas').addEventListener('click', () => doc.saveAs());
   $('btn-restore').addEventListener('click', () => openRestore(doc));
   $('btn-settings').addEventListener('click', () => openSettings());
+  $('btn-help').addEventListener('click', () => openHelp());
   $('btn-outline').addEventListener('click', () => updateSettings({ showOutline: !getSettings().showOutline }));
   $('btn-minimap').addEventListener('click', () => updateSettings({ minimap: !getSettings().minimap }));
 
   window.addEventListener('keydown', (e) => {
+    if (e.key === 'F1') {
+      e.preventDefault();
+      openHelp();
+      return;
+    }
     if (!e.ctrlKey || e.altKey) return;
     const key = e.key.toLowerCase();
     const run = (fn: () => unknown) => { e.preventDefault(); fn(); };
