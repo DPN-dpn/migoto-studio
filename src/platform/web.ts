@@ -74,6 +74,125 @@ function generateId(): string {
   return 'file_' + Math.random().toString(36).slice(2, 10) + '_' + Date.now();
 }
 
+const virtualDirectoryEntries = new Map<string, DirEntry[]>();
+
+function buildTreeFromFiles(files: FileList, rootId: string): { rootName: string; entries: DirEntry[] } {
+  if (files.length === 0) return { rootName: 'folder', entries: [] };
+  const firstPath = files[0].webkitRelativePath || files[0].name;
+  const rootName = firstPath.split('/')[0] || 'folder';
+
+  interface InternalNode {
+    name: string;
+    path: string;
+    isDir: boolean;
+    size: number;
+    file?: File;
+    children?: Map<string, InternalNode>;
+  }
+
+  const rootDir: Map<string, InternalNode> = new Map();
+
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+    const rel = file.webkitRelativePath || file.name;
+    const parts = rel.split('/');
+    const subParts = parts.length > 1 ? parts.slice(1) : parts;
+    if (subParts.length === 0) continue;
+
+    if (subParts.some((p) => p.startsWith('.') || p === 'node_modules' || p === '$RECYCLE.BIN')) {
+      continue;
+    }
+
+    let currentMap = rootDir;
+    let currentPath = '';
+
+    for (let j = 0; j < subParts.length; j++) {
+      const part = subParts[j];
+      currentPath = currentPath ? `${currentPath}/${part}` : part;
+      const isFile = j === subParts.length - 1;
+
+      if (isFile) {
+        currentMap.set(part, {
+          name: part,
+          path: currentPath,
+          isDir: false,
+          size: file.size,
+          file,
+        });
+      } else {
+        let dirNode = currentMap.get(part);
+        if (!dirNode) {
+          dirNode = {
+            name: part,
+            path: currentPath,
+            isDir: true,
+            size: 0,
+            children: new Map(),
+          };
+          currentMap.set(part, dirNode);
+        }
+        currentMap = dirNode.children!;
+      }
+    }
+  }
+
+  function convert(map: Map<string, InternalNode>): DirEntry[] {
+    const res: DirEntry[] = [];
+    for (const node of map.values()) {
+      if (node.isDir) {
+        res.push({
+          name: node.name,
+          path: node.path,
+          id: `${rootId}:${node.path}`,
+          isDir: true,
+          children: node.children ? convert(node.children) : [],
+        });
+      } else {
+        const fileId = generateId();
+        if (node.file) fileHandles.set(fileId, node.file);
+        res.push({
+          name: node.name,
+          path: node.path,
+          id: fileId,
+          isDir: false,
+          size: node.size,
+        });
+      }
+    }
+    res.sort((a, b) => {
+      if (a.isDir !== b.isDir) return a.isDir ? -1 : 1;
+      return a.name.toLowerCase().localeCompare(b.name.toLowerCase());
+    });
+    return res;
+  }
+
+  return { rootName, entries: convert(rootDir) };
+}
+
+function pickDirectoryWithInput(): Promise<{ name: string; id: string } | null> {
+  return new Promise((resolve) => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    (input as any).webkitdirectory = true;
+    input.style.display = 'none';
+    input.onchange = () => {
+      const files = input.files;
+      input.remove();
+      if (!files || files.length === 0) return resolve(null);
+      const id = generateId();
+      const { rootName, entries } = buildTreeFromFiles(files, id);
+      virtualDirectoryEntries.set(id, entries);
+      resolve({ name: rootName, id });
+    };
+    input.oncancel = () => {
+      input.remove();
+      resolve(null);
+    };
+    document.body.append(input);
+    input.click();
+  });
+}
+
 function decodeBuffer(buf: ArrayBuffer): LoadedFile {
   const bytes = new Uint8Array(buf);
   // UTF-8 BOM
@@ -181,7 +300,7 @@ export const web: Platform = {
   capabilities: {
     recentFiles: false, // Browser security prevents opening stored file paths arbitrarily
     saveInPlace: hasFSAccess,
-    directories: typeof window !== 'undefined' && 'showDirectoryPicker' in window,
+    directories: typeof window !== 'undefined',
   },
 
   async pickOpen(): Promise<FileRef | null> {
@@ -242,22 +361,37 @@ export const web: Platform = {
   },
 
   async pickDirectory(): Promise<{ name: string; id: string } | null> {
-    if (typeof window === 'undefined' || !('showDirectoryPicker' in window)) {
-      throw new Error('이 브라우저는 폴더 열기(showDirectoryPicker)를 지원하지 않습니다.');
+    if (typeof window !== 'undefined' && 'showDirectoryPicker' in window) {
+      try {
+        const dirHandle = await (window as any).showDirectoryPicker();
+        if (!dirHandle) return null;
+        const id = generateId();
+        directoryHandles.set(id, dirHandle);
+        return { name: dirHandle.name, id };
+      } catch (e: any) {
+        if (e.name === 'AbortError') return null;
+        console.warn('[web] showDirectoryPicker failed, attempting file input fallback:', e);
+        try {
+          const fallback = await pickDirectoryWithInput();
+          if (fallback) return fallback;
+        } catch {}
+        if (e.name === 'NotFoundError') {
+          throw new Error('선택한 폴더를 브라우저에서 찾을 수 없습니다. 바로가기, 네트워크 경로, 또는 클라우드 전용(OneDrive 등) 가상 폴더 대신 로컬 드라이브의 실제 폴더를 선택해 주세요.');
+        }
+        if (e.name === 'SecurityError') {
+          throw new Error('브라우저 보안 정책에 의해 시스템 민감 폴더(Windows, Program Files 등)는 접근이 제한됩니다. 다른 작업 폴더를 선택해 주세요.');
+        }
+        throw e;
+      }
     }
-    try {
-      const dirHandle = await (window as any).showDirectoryPicker();
-      if (!dirHandle) return null;
-      const id = generateId();
-      directoryHandles.set(id, dirHandle);
-      return { name: dirHandle.name, id };
-    } catch (e: any) {
-      if (e.name === 'AbortError') return null;
-      throw e;
-    }
+
+    return pickDirectoryWithInput();
   },
 
   async readDirectory(id: string): Promise<DirEntry[]> {
+    if (virtualDirectoryEntries.has(id)) {
+      return virtualDirectoryEntries.get(id)!;
+    }
     const handle = directoryHandles.get(id);
     if (!handle) throw new Error('폴더를 찾을 수 없습니다.');
     return scanDirHandle(handle, 4, '');

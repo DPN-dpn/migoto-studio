@@ -87,8 +87,10 @@ html, body {
 }
 
 #app-logo {
-  font-size: 15px;
-  line-height: 1;
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+  display: block;
 }
 
 #app-title {
