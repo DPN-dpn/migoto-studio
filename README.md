@@ -96,12 +96,22 @@ Node.js와 Rust는 **프로젝트 폴더 안(`.toolchain/`)에만** 설치됩니
 ### 빌드 및 배포 방법
 
 #### 1. 데스크톱 앱 정규 릴리스 배포 (GitHub Releases)
-새 버전을 공식 배포하려면 버전 태그를 만들어 푸시합니다:
+버전을 올리고 공식 릴리스를 배포할 때 사용합니다:
 ```powershell
-git tag v0.1.0                # 버전 태그 생성 (vX.Y.Z)
-git push origin v0.1.0        # 깃허브로 태그 푸시
+# 1) 버전 일괄 올리기 (package.json, tauri.conf.json, Cargo.toml 3개 파일 동시 동기화)
+.\dev.ps1 npm run bump:patch       # 패치 버전 올리기 (0.1.0 -> 0.1.1)
+# 또는 .\dev.ps1 npm run bump:minor # 마이너 버전 올리기 (0.1.0 -> 0.2.0)
+# 또는 .\dev.ps1 npm run bump 0.2.0 # 특정 버전 직접 지정
+
+# 2) 변경사항 커밋 및 태그 푸시
+git add .
+git commit -m "릴리스 v0.1.1"
+git push origin main
+git tag v0.1.1
+git push origin v0.1.1
 ```
 - 푸시 즉시 GitHub Actions가 자동으로 실행되어 **설치형 인스톨러(`.exe`)**와 **무설치 포터블 압축 파일(`.zip`)**을 빌드하고, GitHub Releases 페이지에 다운로드 파일과 함께 릴리스를 등록합니다.
+- *(참고: 로컬에서 버전 변경을 깜빡했더라도, GitHub Actions가 푸시된 태그 이름에 맞춰 모든 설정 파일의 버전을 자동으로 동기화한 후 빌드합니다.)*
 - 태그 푸시 대신 깃허브 웹사이트의 **Actions > "Release Desktop App" > "Run workflow"**를 눌러 수동으로 즉시 릴리스를 빌드할 수도 있습니다.
 
 #### 2. 웹 버전 배포 (GitHub Pages / PWA)

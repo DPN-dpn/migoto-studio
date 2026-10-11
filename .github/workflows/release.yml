@@ -51,6 +51,9 @@ jobs:
             echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
           fi
 
+      - name: Synchronize version files with release tag
+        run: node scripts/bump-version.mjs ${{ steps.vars.outputs.tag }}
+
       - name: Build Tauri Desktop App & Create GitHub Release
         uses: tauri-apps/tauri-action@v0
         env:
