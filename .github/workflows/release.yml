@@ -55,6 +55,10 @@ jobs:
       - name: Synchronize version files with release tag
         run: node scripts/bump-version.mjs ${{ steps.vars.outputs.tag }}
 
+      - name: Generate Release Notes
+        id: notes
+        run: node scripts/generate-release-notes.mjs ${{ steps.vars.outputs.tag }}
+
       - name: Build Tauri Desktop App & Create GitHub Release
         uses: tauri-apps/tauri-action@v0
         env:
@@ -63,20 +67,7 @@ jobs:
         with:
           tagName: ${{ steps.vars.outputs.tag }}
           releaseName: 'Migoto Studio ${{ steps.vars.outputs.tag }}'
-          releaseBody: |
-            ## Migoto Studio ${{ steps.vars.outputs.tag }}
-            
-            XXMI / 3DMigoto INI 에디터 데스크톱 릴리스입니다.
-            
-            ### 다운로드 안내
-            - **설치형 프로그램**: 아래 Assets에서 `Migoto Studio_${{ steps.vars.outputs.tag }}_x64-setup.exe`를 다운로드하여 설치하세요.
-              - 윈도우 시작 메뉴 및 프로그램 추가/제거에 등록됩니다.
-              - 제거 시 앱 데이터 폴더(`%APPDATA%\MigotoStudio`) 정리 체크박스를 지원합니다.
-            - **무설치 포터블 버전**: `Migoto-Studio_${{ steps.vars.outputs.tag }}_portable-x64.zip`을 다운로드하여 원하는 폴더에 압축 해제 후 바로 실행할 수 있습니다. (설정 및 백업이 프로그램 옆 `data/` 폴더에 보관됩니다.)
-            
-            ### 웹 버전 (브라우저 / PWA)
-            - 설치 없이 웹 브라우저에서 바로 사용하거나 PWA로 설치할 수도 있습니다:
-              👉 https://${{ github.repository_owner }}.github.io/migoto-studio/
+          releaseBody: ${{ steps.notes.outputs.body }}
           releaseDraft: false
           prerelease: false
 
@@ -107,4 +98,5 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tag_name: ${{ steps.vars.outputs.tag }}
+          body: ${{ steps.notes.outputs.body }}
           files: Migoto-Studio_*_portable-x64.zip

@@ -108,9 +108,24 @@ async function main() {
     console.log(`  ✓ src/updater/version.ts: CURRENT_APP_VERSION -> ${newVersion}`);
   } catch {}
 
+  // 5. Update CHANGELOG.md if [Unreleased] section exists
+  const CHANGELOG_PATH = join(ROOT, 'CHANGELOG.md');
+  try {
+    const changelogContent = await readFile(CHANGELOG_PATH, 'utf8');
+    if (/##\s*\[Unreleased\]/i.test(changelogContent)) {
+      const today = new Date().toISOString().split('T')[0];
+      const updatedChangelog = changelogContent.replace(
+        /##\s*\[Unreleased\]/i,
+        `## [Unreleased]\n\n## [${newVersion}] - ${today}`
+      );
+      await writeFile(CHANGELOG_PATH, updatedChangelog);
+      console.log(`  ✓ CHANGELOG.md: [Unreleased] -> [${newVersion}] - ${today}`);
+    }
+  } catch {}
+
   console.log('\n[version] 모든 파일의 버전이 동기화되었습니다!');
   console.log('배포 시 다음 명령어를 실행하세요:');
-  console.log(`  git add package.json src-tauri/tauri.conf.json src-tauri/Cargo.toml src/updater/version.ts`);
+  console.log(`  git add package.json src-tauri/tauri.conf.json src-tauri/Cargo.toml src/updater/version.ts CHANGELOG.md`);
   console.log(`  git commit -m "버전 갱신: v${newVersion}"`);
   console.log(`  git tag v${newVersion}`);
   console.log(`  git push origin main`);
