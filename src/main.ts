@@ -7,6 +7,7 @@ import { LANGUAGE_ID, registerMigotoLanguage, upstreamGrammarVersion } from './g
 import { defineThemes, THEME_DARK, THEME_LIGHT } from './theme';
 import { DocumentManager, ENCODING_LABELS, type Encoding } from './documents';
 import { TabBar } from './tabbar';
+import { FileExplorer } from './explorer';
 import { getSettings, loadSettings, onSettingsChange, updateSettings } from './settings';
 import { OutlinePanel } from './outline';
 import { TEMPLATES, insertTemplate, registerSnippetCompletions } from './templates';
@@ -47,9 +48,32 @@ async function boot() {
   });
 
   const doc = new DocumentManager(editor);
-  const outline = new OutlinePanel(editor, $('sidebar'), $('sidebar-resizer'));
+  const outline = new OutlinePanel(editor, $('sidebar'), $('sidebar-panel-outline'), $('sidebar-resizer'));
+  const explorer = new FileExplorer($('sidebar-panel-explorer'), doc);
   const tabbar = new TabBar(doc, $('tabbar'), $('btn-new-tab'), $('tab-menu'));
   $('btn-recent').hidden = !platform().capabilities.recentFiles;
+
+  // ---- sidebar tabs (탐색기 / 섹션 목록) ----
+  const tabExplorer = $('sidebar-tab-explorer');
+  const tabOutline = $('sidebar-tab-outline');
+  const panelExplorer = $('sidebar-panel-explorer');
+  const panelOutline = $('sidebar-panel-outline');
+
+  const switchSidebarTab = (tab: 'explorer' | 'outline') => {
+    const isExplorer = tab === 'explorer';
+    tabExplorer.classList.toggle('active', isExplorer);
+    tabExplorer.setAttribute('aria-selected', String(isExplorer));
+    tabOutline.classList.toggle('active', !isExplorer);
+    tabOutline.setAttribute('aria-selected', String(!isExplorer));
+    panelExplorer.hidden = !isExplorer;
+    panelOutline.hidden = isExplorer;
+    if (!getSettings().showOutline) {
+      updateSettings({ showOutline: true });
+    }
+  };
+
+  tabExplorer.addEventListener('click', () => switchSidebarTab('explorer'));
+  tabOutline.addEventListener('click', () => switchSidebarTab('outline'));
 
   // ---- settings -> UI / editor ----
   const applySettings = () => {
@@ -163,6 +187,10 @@ async function boot() {
   // ---- toolbar actions ----
   $('btn-new').addEventListener('click', () => doc.newFile());
   $('btn-open').addEventListener('click', () => doc.openDialog());
+  $('btn-open-folder').addEventListener('click', async () => {
+    switchSidebarTab('explorer');
+    await explorer.openFolderDialog();
+  });
   $('btn-save').addEventListener('click', () => doc.save());
   $('btn-saveas').addEventListener('click', () => doc.saveAs());
   $('btn-restore').addEventListener('click', () => openRestore(doc));
@@ -181,7 +209,7 @@ async function boot() {
     const key = e.key.toLowerCase();
     const run = (fn: () => unknown) => { e.preventDefault(); fn(); };
     if (key === 's') run(() => (e.shiftKey ? doc.saveAs() : doc.save()));
-    else if (key === 'o') run(() => doc.openDialog());
+    else if (key === 'o') run(() => (e.shiftKey ? (switchSidebarTab('explorer'), explorer.openFolderDialog()) : doc.openDialog()));
     else if (key === 'n') run(() => doc.newFile());
     else if (key === 'w') run(() => doc.closeActiveTab());
     else if (key === 'tab') run(() => (e.shiftKey ? doc.prevTab() : doc.nextTab()));

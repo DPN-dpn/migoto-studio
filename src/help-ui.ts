@@ -20,6 +20,7 @@ const SHORTCUTS: ShortcutCategory[] = [
       { label: '저장', keys: 'Ctrl + S' },
       { label: '다른 이름으로 저장', keys: 'Ctrl + Shift + S' },
       { label: '파일 열기', keys: 'Ctrl + O' },
+      { label: '모드 폴더 열기 (탐색기)', keys: 'Ctrl + Shift + O' },
       { label: '새 파일 만들기 (새 탭)', keys: 'Ctrl + N' },
       { label: '현재 탭 닫기', keys: 'Ctrl + W' },
       { label: '다음 / 이전 탭 전환', keys: 'Ctrl + Tab / Ctrl + Shift + Tab' },

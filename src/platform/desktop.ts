@@ -2,7 +2,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { getCurrentWebview } from '@tauri-apps/api/webview';
 import { message, open, save } from '@tauri-apps/plugin-dialog';
-import type { BackupEntry, BackupPolicy, Encoding, FileRef, LoadedFile, Platform, SaveChoice } from './types';
+import type { BackupEntry, BackupPolicy, DirEntry, Encoding, FileRef, LoadedFile, Platform, SaveChoice } from './types';
 
 const FILE_FILTERS = [
   { name: 'INI 파일', extensions: ['ini', '3dm', 'migoto'] },
@@ -20,7 +20,7 @@ interface RustBackup { path: string; timestamp_ms: number; size: number }
 /** Tauri desktop implementation: real files, backups and settings in the OS app-data folder (see src-tauri). */
 export const desktop: Platform = {
   kind: 'desktop',
-  capabilities: { recentFiles: true, saveInPlace: true },
+  capabilities: { recentFiles: true, saveInPlace: true, directories: true },
 
   async pickOpen() {
     const picked = await open({ multiple: false, directory: false, filters: FILE_FILTERS });
@@ -30,6 +30,19 @@ export const desktop: Platform = {
   async pickSave(suggested) {
     const picked = await save({ filters: FILE_FILTERS, defaultPath: suggested?.id });
     return picked ? refFromPath(picked) : null;
+  },
+
+  async pickDirectory() {
+    const picked = await open({ directory: true, multiple: false });
+    if (typeof picked !== 'string') return null;
+    return {
+      id: picked,
+      name: picked.split(/[\\/]/).filter(Boolean).pop() ?? picked,
+    };
+  },
+
+  async readDirectory(id: string): Promise<DirEntry[]> {
+    return invoke<DirEntry[]>('read_directory', { path: id, maxDepth: 5 });
   },
 
   refFromId: refFromPath,

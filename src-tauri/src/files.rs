@@ -107,6 +107,60 @@ pub fn save_file(
   })
 }
 
+#[derive(Serialize)]
+pub struct DirEntry {
+  pub name: String,
+  pub path: String,
+  pub is_dir: bool,
+  pub size: u64,
+  pub children: Option<Vec<DirEntry>>,
+}
+
+#[tauri::command]
+pub fn read_directory(path: String, max_depth: Option<u32>) -> Result<Vec<DirEntry>, String> {
+  let root = PathBuf::from(&path);
+  if !root.is_dir() {
+    return Err(format!("폴더를 찾을 수 없습니다: {path}"));
+  }
+  let depth = max_depth.unwrap_or(4);
+  scan_dir(&root, depth)
+}
+
+fn scan_dir(dir: &std::path::Path, remaining_depth: u32) -> Result<Vec<DirEntry>, String> {
+  let read = fs::read_dir(dir).map_err(|e| format!("폴더 읽기 실패: {e}"))?;
+  let mut entries = Vec::new();
+
+  for item in read.flatten() {
+    let name = item.file_name().to_string_lossy().to_string();
+    if name.starts_with('.') || name == "node_modules" || name == "$RECYCLE.BIN" {
+      continue;
+    }
+    let p = item.path();
+    let is_dir = p.is_dir();
+    let size = if is_dir { 0 } else { item.metadata().map(|m| m.len()).unwrap_or(0) };
+
+    let children = if is_dir && remaining_depth > 0 {
+      scan_dir(&p, remaining_depth - 1).ok()
+    } else {
+      None
+    };
+
+    entries.push(DirEntry {
+      name,
+      path: p.to_string_lossy().to_string(),
+      is_dir,
+      size,
+      children,
+    });
+  }
+
+  entries.sort_by(|a, b| {
+    b.is_dir.cmp(&a.is_dir).then_with(|| a.name.to_lowercase().cmp(&b.name.to_lowercase()))
+  });
+
+  Ok(entries)
+}
+
 #[cfg(test)]
 mod tests {
   use super::*;

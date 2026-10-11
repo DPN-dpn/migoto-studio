@@ -318,6 +318,230 @@ button.primary:hover { filter: brightness(1.1); background: var(--accent); }
 }
 #sidebar[hidden] { display: none !important; }
 
+/* Sidebar tab switcher */
+.sidebar-tabs {
+  display: flex;
+  height: 35px;
+  min-height: 35px;
+  background: var(--bg-elev);
+  border-bottom: 1px solid var(--border);
+  user-select: none;
+}
+
+.sidebar-tab {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 100%;
+  padding: 0 8px;
+  border: none;
+  border-radius: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--fg-dim);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color 0.12s, border-color 0.12s, background 0.12s;
+}
+
+.sidebar-tab:hover {
+  background: var(--bg-hover);
+  color: var(--fg);
+}
+
+.sidebar-tab.active {
+  color: var(--fg);
+  font-weight: 600;
+  border-bottom-color: var(--accent);
+  background: rgba(139, 124, 246, 0.06);
+}
+
+.sidebar-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+.sidebar-panel[hidden] {
+  display: none !important;
+}
+
+/* Explorer empty state */
+.explorer-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+  text-align: center;
+}
+
+.explorer-empty-icon {
+  color: var(--fg-dim);
+  margin-bottom: 10px;
+  opacity: 0.6;
+}
+
+.explorer-empty .hint {
+  margin-bottom: 14px;
+  line-height: 1.5;
+  font-size: 11px;
+  color: var(--fg-dim);
+}
+
+.open-folder-btn {
+  padding: 6px 14px;
+  font-size: 12px;
+}
+
+/* Explorer header */
+.explorer-header {
+  display: flex;
+  flex-direction: column;
+  padding: 8px 10px 6px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-elev);
+}
+
+.explorer-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  gap: 6px;
+}
+
+.explorer-folder-name {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--fg);
+  letter-spacing: 0.04em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+.explorer-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.explorer-actions .icon-btn {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border-radius: 4px;
+}
+
+.explorer-header input[type='search'] {
+  margin: 0;
+  padding: 4px 8px;
+  font: inherit;
+  font-size: 11px;
+  color: var(--fg);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+}
+.explorer-header input[type='search']:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+
+/* Tree View */
+.tree-container {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 4px 0 10px;
+}
+
+.tree-container .hint {
+  padding: 10px 14px;
+}
+
+.tree-node {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 24px;
+  padding-right: 8px;
+  cursor: pointer;
+  user-select: none;
+  font-size: 12px;
+  color: var(--fg-dim);
+  border-radius: 4px;
+  margin: 1px 4px;
+  transition: background 0.1s, color 0.1s;
+}
+
+.tree-node:hover {
+  background: var(--bg-hover);
+  color: var(--fg);
+}
+
+.tree-node.active {
+  background: var(--bg-hover);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.tree-chevron {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  color: var(--fg-dim);
+  transition: transform 0.15s ease;
+  transform: rotate(90deg);
+}
+
+.tree-chevron.collapsed {
+  transform: rotate(0deg);
+}
+
+.tree-chevron-spacer {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+.tree-icon {
+  font-size: 12px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.tree-label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tree-label.ini-file {
+  color: var(--fg);
+}
+
+.tree-badge {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: rgba(139, 124, 246, 0.18);
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
 .resizer {
   width: 6px;
   flex: 0 0 6px;

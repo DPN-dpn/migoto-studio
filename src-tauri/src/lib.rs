@@ -38,6 +38,7 @@ pub fn run() {
     .invoke_handler(tauri::generate_handler![
       files::open_file,
       files::save_file,
+      files::read_directory,
       storage::load_settings,
       storage::save_settings,
       storage::get_data_dir,

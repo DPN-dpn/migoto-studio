@@ -1,4 +1,4 @@
-import type { BackupEntry, BackupPolicy, Encoding, FileRef, LoadedFile, Platform, SaveChoice } from './types';
+import type { BackupEntry, BackupPolicy, DirEntry, Encoding, FileRef, LoadedFile, Platform, SaveChoice } from './types';
 import { openModal } from '../modal';
 
 const DB_NAME = 'MigotoStudioWeb';
@@ -25,6 +25,50 @@ function openDb(): Promise<IDBDatabase> {
 
 // In-memory registry of opened File / FileSystemFileHandle instances
 const fileHandles = new Map<string, FileSystemFileHandle | File>();
+const directoryHandles = new Map<string, any>();
+
+async function scanDirHandle(handle: any, depth: number, basePath: string): Promise<DirEntry[]> {
+  const entries: DirEntry[] = [];
+  try {
+    for await (const [name, entry] of handle.entries()) {
+      if (name.startsWith('.') || name === 'node_modules' || name === '$RECYCLE.BIN') continue;
+      const currentPath = basePath ? `${basePath}/${name}` : name;
+      const isDir = entry.kind === 'directory';
+      if (isDir) {
+        const children = depth > 0 ? await scanDirHandle(entry, depth - 1, currentPath) : undefined;
+        entries.push({
+          name,
+          path: currentPath,
+          id: currentPath,
+          isDir: true,
+          children,
+        });
+      } else {
+        const fileId = generateId();
+        fileHandles.set(fileId, entry);
+        let size = 0;
+        try {
+          const file = await entry.getFile();
+          size = file.size;
+        } catch {}
+        entries.push({
+          name,
+          path: currentPath,
+          id: fileId,
+          isDir: false,
+          size,
+        });
+      }
+    }
+  } catch (e) {
+    console.warn('[web] readDirectory error:', e);
+  }
+  entries.sort((a, b) => {
+    if (a.isDir !== b.isDir) return a.isDir ? -1 : 1;
+    return a.name.toLowerCase().localeCompare(b.name.toLowerCase());
+  });
+  return entries;
+}
 
 function generateId(): string {
   return 'file_' + Math.random().toString(36).slice(2, 10) + '_' + Date.now();
@@ -137,6 +181,7 @@ export const web: Platform = {
   capabilities: {
     recentFiles: false, // Browser security prevents opening stored file paths arbitrarily
     saveInPlace: hasFSAccess,
+    directories: typeof window !== 'undefined' && 'showDirectoryPicker' in window,
   },
 
   async pickOpen(): Promise<FileRef | null> {
@@ -194,6 +239,28 @@ export const web: Platform = {
     // Browser download fallback - simulate ref
     const id = generateId();
     return { id, name: suggestedName, location: suggestedName };
+  },
+
+  async pickDirectory(): Promise<{ name: string; id: string } | null> {
+    if (typeof window === 'undefined' || !('showDirectoryPicker' in window)) {
+      throw new Error('이 브라우저는 폴더 열기(showDirectoryPicker)를 지원하지 않습니다.');
+    }
+    try {
+      const dirHandle = await (window as any).showDirectoryPicker();
+      if (!dirHandle) return null;
+      const id = generateId();
+      directoryHandles.set(id, dirHandle);
+      return { name: dirHandle.name, id };
+    } catch (e: any) {
+      if (e.name === 'AbortError') return null;
+      throw e;
+    }
+  },
+
+  async readDirectory(id: string): Promise<DirEntry[]> {
+    const handle = directoryHandles.get(id);
+    if (!handle) throw new Error('폴더를 찾을 수 없습니다.');
+    return scanDirHandle(handle, 4, '');
   },
 
   refFromId(id: string): FileRef {

@@ -47,9 +47,10 @@ export class OutlinePanel {
   constructor(
     private editor: monaco.editor.IStandaloneCodeEditor,
     private root: HTMLElement,
+    private contentRoot: HTMLElement = root,
     private resizer?: HTMLElement | null,
   ) {
-    root.innerHTML = '';
+    contentRoot.innerHTML = '';
     const title = document.createElement('h2');
     title.textContent = '섹션 목록';
     const search = document.createElement('input');
@@ -59,7 +60,7 @@ export class OutlinePanel {
     search.addEventListener('input', () => { this.filter = search.value.trim().toLowerCase(); this.render(); });
     this.list = document.createElement('div');
     this.list.className = 'outline-list';
-    root.append(title, search, this.list);
+    contentRoot.append(title, search, this.list);
 
     // Restore saved width
     const savedWidth = Number(localStorage.getItem(STORAGE_KEY)) || DEFAULT_WIDTH;

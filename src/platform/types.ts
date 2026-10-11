@@ -33,6 +33,15 @@ export interface BackupEntry {
 
 export type SaveChoice = 'save' | 'discard' | 'cancel';
 
+export interface DirEntry {
+  name: string;
+  path: string;
+  id?: string;
+  isDir: boolean;
+  size?: number;
+  children?: DirEntry[];
+}
+
 export interface Platform {
   readonly kind: 'desktop' | 'web';
 
@@ -41,15 +50,19 @@ export interface Platform {
     recentFiles: boolean;
     /** Files can be saved in place (otherwise "save" downloads a copy). */
     saveInPlace: boolean;
+    /** Can open and read local directory tree */
+    directories: boolean;
   };
 
-  // ---- files ----
+  // ---- files & directories ----
   pickOpen(): Promise<FileRef | null>;
   pickSave(suggested?: FileRef | null): Promise<FileRef | null>;
   refFromId(id: string): FileRef;
   readFile(ref: FileRef): Promise<LoadedFile>;
   /** Writes the file. When `backup.enabled`, the previous contents are stored as a backup first. */
   writeFile(ref: FileRef, text: string, encoding: Encoding, backup: BackupPolicy): Promise<void>;
+  pickDirectory(): Promise<{ name: string; id: string } | null>;
+  readDirectory(id: string): Promise<DirEntry[]>;
 
   // ---- backups ----
   listBackups(ref: FileRef): Promise<BackupEntry[]>;

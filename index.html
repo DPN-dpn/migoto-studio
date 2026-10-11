@@ -17,6 +17,7 @@
         <nav id="toolbar" aria-label="도구">
           <button id="btn-new" title="새 파일 (Ctrl+N)">새 파일</button>
           <button id="btn-open" title="파일 열기 (Ctrl+O)">열기</button>
+          <button id="btn-open-folder" title="모드 폴더 열기">폴더 열기</button>
           <button id="btn-recent" title="최근 파일">최근 ▾</button>
           <button id="btn-save" class="primary" title="저장 (Ctrl+S)">저장</button>
           <button id="btn-saveas" title="다른 이름으로 저장 (Ctrl+Shift+S)">다른 이름으로</button>
@@ -24,7 +25,7 @@
           <button id="btn-insert" title="자주 쓰는 블록을 커서 위치에 넣기">삽입 ▾</button>
           <button id="btn-restore" title="이전에 저장한 내용으로 되돌리기">백업 복원</button>
           <span class="spacer"></span>
-          <button id="btn-outline" class="icon-btn" aria-pressed="true" aria-label="섹션 목록" title="섹션 목록 보이기/숨기기">
+          <button id="btn-outline" class="icon-btn" aria-pressed="true" aria-label="사이드바" title="사이드바 (탐색기/섹션) 보이기/숨기기">
             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <rect x="3" y="4" width="18" height="16" rx="2.5"/><line x1="9.5" y1="4" x2="9.5" y2="20"/>
               <line x1="5.8" y1="9" x2="7.4" y2="9"/><line x1="5.8" y1="12" x2="7.4" y2="12"/><line x1="5.8" y1="15" x2="7.4" y2="15"/>
@@ -50,7 +51,29 @@
         <span id="file-name">이름 없음</span>
       </header>
       <div id="workspace">
-        <aside id="sidebar" aria-label="섹션 목록"></aside>
+        <aside id="sidebar" aria-label="사이드바">
+          <div class="sidebar-tabs" role="tablist" aria-label="사이드바 탭">
+            <button id="sidebar-tab-explorer" class="sidebar-tab active" role="tab" aria-selected="true" title="모드 파일 탐색기">
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+              </svg>
+              <span>탐색기</span>
+            </button>
+            <button id="sidebar-tab-outline" class="sidebar-tab" role="tab" aria-selected="false" title="섹션 목록">
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="8" y1="6" x2="21" y2="6"></line>
+                <line x1="8" y1="12" x2="21" y2="12"></line>
+                <line x1="8" y1="18" x2="21" y2="18"></line>
+                <line x1="3" y1="6" x2="3.01" y2="6"></line>
+                <line x1="3" y1="12" x2="3.01" y2="12"></line>
+                <line x1="3" y1="18" x2="3.01" y2="18"></line>
+              </svg>
+              <span>섹션 목록</span>
+            </button>
+          </div>
+          <div id="sidebar-panel-explorer" class="sidebar-panel active"></div>
+          <div id="sidebar-panel-outline" class="sidebar-panel" hidden></div>
+        </aside>
         <div id="sidebar-resizer" class="resizer" role="separator" aria-orientation="vertical" title="드래그하여 섹션 목록 너비 조절 (더블 클릭 시 기본값으로 초기화)"></div>
         <div id="editor-container">
           <div id="tabbar-container">
