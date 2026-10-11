@@ -191,7 +191,10 @@ select.status-btn option { background: var(--bg-elev); color: var(--fg); }
 .modal > header { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid var(--border); }
 .modal > header h2 { margin: 0; font-size: 14px; }
 .modal-body { padding: 8px 16px 16px; overflow-y: auto; }
-.setting-group h3 { margin: 14px 0 4px; font-size: 11px; letter-spacing: 0.08em; color: var(--accent); }
+.tabs { display: flex; gap: 4px; margin: 4px 0 8px; border-bottom: 1px solid var(--border); }
+.tab { padding: 8px 14px; font-size: 13px; border-radius: 6px 6px 0 0; border-bottom: 2px solid transparent; color: var(--fg-dim); }
+.tab.active { color: var(--fg); font-weight: 600; border-bottom-color: var(--accent); }
+.setting-panel { min-height: 240px; }
 .setting-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 9px 0; border-bottom: 1px solid var(--border); }
 .setting-text label { font-size: 13px; }
 .setting-control { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }

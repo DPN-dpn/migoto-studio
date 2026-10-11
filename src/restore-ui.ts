@@ -1,19 +1,16 @@
-import { invoke } from '@tauri-apps/api/core';
-import { message } from '@tauri-apps/plugin-dialog';
 import { openModal } from './modal';
+import { platform } from './platform';
 import type { DocumentManager } from './documents';
-
-interface BackupInfo { path: string; timestamp_ms: number; size: number }
 
 const fmtSize = (n: number) => (n < 1024 ? `${n} B` : `${(n / 1024).toFixed(1)} KB`);
 
 /** Lists the automatic backups of the current file; restoring loads one into the editor (undoable, not saved yet). */
 export async function openRestore(doc: DocumentManager) {
-  if (!doc.path) {
-    await message('먼저 파일을 열거나 저장해야 백업을 볼 수 있습니다.', { title: '백업에서 복원' });
+  if (!doc.file) {
+    await platform().showInfo('백업에서 복원', '먼저 파일을 열거나 저장해야 백업을 볼 수 있습니다.');
     return;
   }
-  const backups = await invoke<BackupInfo[]>('list_backups', { path: doc.path });
+  const backups = await platform().listBackups(doc.file);
 
   const body = document.createElement('div');
   body.className = 'restore';
@@ -32,15 +29,15 @@ export async function openRestore(doc: DocumentManager) {
   for (const b of backups) {
     const li = document.createElement('li');
     const info = document.createElement('span');
-    info.textContent = `${new Date(b.timestamp_ms).toLocaleString('ko-KR')}  ·  ${fmtSize(b.size)}`;
+    info.textContent = `${new Date(b.timestamp).toLocaleString('ko-KR')}  ·  ${fmtSize(b.size)}`;
     const btn = document.createElement('button');
     btn.textContent = '복원';
     btn.addEventListener('click', async () => {
       try {
-        await doc.restoreFromBackup(b.path);
+        await doc.restoreText(await platform().readBackup(b));
         close();
       } catch (e) {
-        await message(String(e), { title: '복원하지 못했습니다', kind: 'error' });
+        await platform().showError('복원하지 못했습니다', String(e));
       }
     });
     li.append(info, btn);

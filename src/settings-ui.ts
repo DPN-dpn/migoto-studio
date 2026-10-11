@@ -1,49 +1,64 @@
-import { invoke } from '@tauri-apps/api/core';
+import { platform } from './platform';
 import { openModal } from './modal';
 import {
   DEFAULT_SETTINGS, SETTING_FIELDS, getSettings, updateSettings, type SettingField, type Settings,
 } from './settings';
 
-/** Settings screen, generated from SETTING_FIELDS. Every change is applied and saved immediately. */
+/** Remembered between openings so the dialog reopens on the tab the user was last using. */
+let lastCategory: string | null = null;
+
+/** Settings screen, generated from SETTING_FIELDS and split into one tab per category. Changes apply and save immediately. */
 export async function openSettings() {
+  const categories = [...new Set(SETTING_FIELDS.map((f) => f.category))];
+  let active = lastCategory && categories.includes(lastCategory) ? lastCategory : categories[0];
+
   const body = document.createElement('div');
   body.className = 'settings';
 
-  const render = () => {
-    const s = getSettings();
-    body.replaceChildren();
+  const tabs = document.createElement('div');
+  tabs.className = 'tabs';
+  tabs.setAttribute('role', 'tablist');
+  const panel = document.createElement('div');
+  panel.className = 'setting-panel';
+  panel.setAttribute('role', 'tabpanel');
 
-    const categories = [...new Set(SETTING_FIELDS.map((f) => f.category))];
+  const footer = document.createElement('div');
+  footer.className = 'setting-footer';
+  const reset = document.createElement('button');
+  const where = document.createElement('p');
+  where.className = 'hint';
+  platform().dataLocation().then((dir) => {
+    where.textContent = `설정과 백업은 이 폴더에 저장됩니다: ${dir}`;
+  }).catch(() => {});
+  footer.append(reset, where);
+
+  const render = () => {
+    lastCategory = active;
+    tabs.replaceChildren();
     for (const category of categories) {
-      const group = document.createElement('section');
-      group.className = 'setting-group';
-      const h = document.createElement('h3');
-      h.textContent = category;
-      group.append(h);
-      for (const field of SETTING_FIELDS.filter((f) => f.category === category)) {
-        group.append(renderField(field, s));
-      }
-      body.append(group);
+      const tab = document.createElement('button');
+      tab.className = 'tab' + (category === active ? ' active' : '');
+      tab.setAttribute('role', 'tab');
+      tab.setAttribute('aria-selected', String(category === active));
+      tab.textContent = category;
+      tab.addEventListener('click', () => { active = category; render(); });
+      tabs.append(tab);
     }
 
-    const footer = document.createElement('div');
-    footer.className = 'setting-footer';
-    const reset = document.createElement('button');
-    reset.textContent = '기본값으로 되돌리기';
-    reset.addEventListener('click', async () => {
-      const { recentFiles: _keep, ...defaults } = DEFAULT_SETTINGS;
-      await updateSettings(defaults);
-      render();
-    });
-    const where = document.createElement('p');
-    where.className = 'hint';
-    invoke<string>('get_data_dir').then((dir) => {
-      where.textContent = `설정과 백업은 이 폴더에 저장됩니다: ${dir}`;
-    }).catch(() => {});
-    footer.append(reset, where);
-    body.append(footer);
+    const s = getSettings();
+    panel.replaceChildren(...SETTING_FIELDS.filter((f) => f.category === active).map((f) => renderField(f, s)));
+
+    reset.textContent = `'${active}' 탭 기본값으로 되돌리기`;
   };
 
+  reset.addEventListener('click', async () => {
+    const patch: Record<string, unknown> = {};
+    for (const f of SETTING_FIELDS.filter((x) => x.category === active)) patch[f.key] = DEFAULT_SETTINGS[f.key];
+    await updateSettings(patch as Partial<Settings>);
+    render();
+  });
+
+  body.append(tabs, panel, footer);
   render();
   openModal('설정', body);
 }

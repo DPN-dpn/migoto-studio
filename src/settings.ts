@@ -1,4 +1,4 @@
-import { invoke } from '@tauri-apps/api/core';
+import { platform } from './platform';
 
 /** All user-adjustable options. Add new keys here with a default; old settings files keep working. */
 export interface Settings {
@@ -71,7 +71,7 @@ const listeners = new Set<(s: Settings) => void>();
 
 export async function loadSettings(): Promise<Settings> {
   try {
-    const raw = await invoke<string>('load_settings');
+    const raw = await platform().loadSettingsText();
     current = { ...DEFAULT_SETTINGS, ...(raw ? JSON.parse(raw) : {}) };
   } catch (e) {
     console.warn('settings: using defaults', e);
@@ -90,7 +90,7 @@ export async function updateSettings(patch: Partial<Settings>) {
   current = { ...current, ...patch };
   listeners.forEach((fn) => fn(current));
   try {
-    await invoke('save_settings', { json: JSON.stringify(current, null, 2) });
+    await platform().saveSettingsText(JSON.stringify(current, null, 2));
   } catch (e) {
     console.error('settings: save failed', e);
   }

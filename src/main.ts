@@ -1,9 +1,7 @@
 import './style.css';
 import { monaco } from './monaco';
 import EditorWorker from 'monaco-editor/editor/editor.worker.js?worker';
-import { getCurrentWindow } from '@tauri-apps/api/window';
-import { getCurrentWebview } from '@tauri-apps/api/webview';
-import { invoke } from '@tauri-apps/api/core';
+import { initPlatform, platform } from './platform';
 
 import { LANGUAGE_ID, registerMigotoLanguage, upstreamGrammarVersion } from './grammar';
 import { defineThemes, THEME_DARK, THEME_LIGHT } from './theme';
@@ -22,9 +20,10 @@ import { openRestore } from './restore-ui';
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
 async function boot() {
+  await initPlatform();
   const settings = await loadSettings();
   // Drop expired safety backups (best effort; never blocks startup).
-  invoke('cleanup_backups', { keepDays: settings.backupKeepDays, maxPerFile: settings.backupMaxPerFile }).catch(() => {});
+  platform().pruneBackups({ keepDays: settings.backupKeepDays, maxPerFile: settings.backupMaxPerFile }).catch(() => {});
   defineThemes();
   await registerMigotoLanguage();
   registerSnippetCompletions();
@@ -41,7 +40,7 @@ async function boot() {
 
   const doc = new DocumentManager(editor);
   const outline = new OutlinePanel(editor, $('sidebar'));
-  const appWindow = getCurrentWindow();
+  $('btn-recent').hidden = !platform().capabilities.recentFiles;
 
   // ---- settings -> UI / editor ----
   const applySettings = () => {
@@ -78,13 +77,13 @@ async function boot() {
   const refreshDocUi = () => {
     const nameEl = $('file-name');
     nameEl.textContent = doc.fileName;
-    nameEl.title = doc.path ?? '';
+    nameEl.title = doc.file?.location ?? '';
     nameEl.classList.toggle('dirty', doc.isDirty);
     encSelect.value = doc.encoding;
     $('status-eol').textContent = doc.eol;
     const title = `${doc.isDirty ? '● ' : ''}${doc.fileName} - Migoto Studio`;
     document.title = title;
-    appWindow.setTitle(title).catch(() => {});
+    platform().setTitle(title);
   };
   doc.onChange(refreshDocUi);
   refreshDocUi();
@@ -98,8 +97,6 @@ async function boot() {
   $('btn-restore').addEventListener('click', () => openRestore(doc));
   $('btn-settings').addEventListener('click', () => openSettings());
   $('btn-outline').addEventListener('click', () => updateSettings({ showOutline: !getSettings().showOutline }));
-  $('btn-theme').addEventListener('click', () =>
-    updateSettings({ theme: getSettings().theme === 'dark' ? 'light' : 'dark' }));
 
   window.addEventListener('keydown', (e) => {
     if (!e.ctrlKey || e.altKey) return;
@@ -137,7 +134,7 @@ async function boot() {
     const recent = getSettings().recentFiles;
     if (recent.length === 0) menu.append(item('최근에 연 파일이 없습니다'));
     for (const path of recent) {
-      const li = item(path, () => doc.openPath(path));
+      const li = item(path, () => doc.openFile(platform().refFromId(path)));
       li.title = path;
       menu.append(li);
     }
@@ -170,18 +167,10 @@ async function boot() {
   hint.id = 'drop-hint';
   hint.textContent = '여기에 놓아서 열기';
   document.body.append(hint);
-  await getCurrentWebview().onDragDropEvent((event) => {
-    const p = event.payload;
-    if (p.type === 'enter' || p.type === 'over') hint.classList.add('show');
-    else hint.classList.remove('show');
-    if (p.type === 'drop' && p.paths.length > 0) doc.openPath(p.paths[0]);
-  });
+  await platform().onFileDrop((ref) => doc.openFile(ref), (hovering) => hint.classList.toggle('show', hovering));
 
   // ---- ask before closing with unsaved changes ----
-  await appWindow.onCloseRequested(async (event) => {
-    event.preventDefault();
-    if (await doc.confirmDiscard()) await appWindow.destroy();
-  });
+  await platform().onCloseRequest(() => doc.confirmDiscard());
 }
 
 boot().catch((e) => {
