@@ -506,6 +506,26 @@ button.primary:hover { filter: brightness(1.1); background: var(--accent); }
   width: 100%;
 }
 
+.activity-bar-custom-plugins {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.activity-bar-separator {
+  width: 28px;
+  height: 1px;
+  background: var(--border);
+  margin: 2px 0;
+  flex-shrink: 0;
+}
+
+.activity-bar-separator[hidden] {
+  display: none !important;
+}
+
 .activity-bar-btn {
   width: 40px;
   height: 40px;
@@ -536,6 +556,14 @@ button.primary:hover { filter: brightness(1.1); background: var(--accent); }
 
 .activity-bar-btn svg {
   flex-shrink: 0;
+}
+
+.activity-bar-btn span {
+  font-size: 18px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 #sidebar {

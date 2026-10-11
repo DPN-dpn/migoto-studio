@@ -48,18 +48,38 @@ export class ActivityBar {
     }
 
     const btn = document.createElement('button');
-    btn.className = 'act-btn';
+    btn.className = 'activity-bar-btn';
     btn.id = `act-${tab.id}`;
     btn.title = tab.title;
     btn.setAttribute('aria-label', tab.title);
     btn.innerHTML = `<span>${tab.icon}</span>`;
     btn.addEventListener('click', () => this.handlePanelClick(tab.id));
 
-    const actTop = this.barEl.querySelector('.act-top');
-    if (actTop) {
-      actTop.insertBefore(btn, this.pluginsBtn);
-    } else {
-      this.barEl.appendChild(btn);
+    // Place into custom plugins container in activity-bar-top (below explorer/plugins with separator)
+    let container = this.barEl.querySelector<HTMLElement>('#act-plugins-custom');
+    let separator = this.barEl.querySelector<HTMLElement>('#act-plugins-separator');
+
+    if (!container) {
+      const actTop = this.barEl.querySelector<HTMLElement>('.activity-bar-top');
+      if (actTop) {
+        if (!separator) {
+          separator = document.createElement('div');
+          separator.id = 'act-plugins-separator';
+          separator.className = 'activity-bar-separator';
+          actTop.appendChild(separator);
+        }
+        container = document.createElement('div');
+        container.id = 'act-plugins-custom';
+        container.className = 'activity-bar-custom-plugins';
+        actTop.appendChild(container);
+      } else {
+        container = this.barEl;
+      }
+    }
+
+    container.appendChild(btn);
+    if (separator) {
+      separator.hidden = false;
     }
 
     this.dynamicTabs.set(tab.id, { ...tab, btnEl: btn });
@@ -75,6 +95,14 @@ export class ActivityBar {
     if (!entry) return;
     entry.btnEl.remove();
     this.dynamicTabs.delete(id);
+
+    if (this.dynamicTabs.size === 0) {
+      const separator = this.barEl.querySelector<HTMLElement>('#act-plugins-separator');
+      if (separator) {
+        separator.hidden = true;
+      }
+    }
+
     if (this.activePanel === id) {
       this.switchTo('explorer');
     } else {
