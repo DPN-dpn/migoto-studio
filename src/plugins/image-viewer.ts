@@ -1,4 +1,4 @@
-import { decodeDDS } from './plugins/dds-decoder.ts';
+import { decodeDDS } from './dds-decoder.ts';
 
 export interface ImageOpenInfo {
   name: string;
@@ -7,11 +7,12 @@ export interface ImageOpenInfo {
 }
 
 /**
- * Interactive Image / Texture Viewer component.
+ * Interactive Image / Texture Viewer component for plugins (e.g. asset-viewer).
  * Supports DDS (DXT1, DXT3, DXT5, RGBA) and standard web images (PNG, JPG, BMP, WebP).
  * Features checkerboard transparency, pan/drag, zoom (wheel & buttons), and format metadata.
  */
 export class ImageViewer {
+  private container: HTMLElement;
   private el: HTMLElement;
   private currentBlobUrl: string | null = null;
   private zoom = 1.0;
@@ -20,13 +21,13 @@ export class ImageViewer {
   private isDragging = false;
   private dragStartX = 0;
   private dragStartY = 0;
-  private initialFitDone = false;
 
   private canvasWrapper!: HTMLElement;
   private canvasEl!: HTMLCanvasElement;
   private zoomLabel!: HTMLElement;
 
-  constructor(private container: HTMLElement) {
+  constructor(container: HTMLElement) {
+    this.container = container;
     this.el = document.createElement('div');
     this.el.className = 'image-viewer-container';
     this.container.appendChild(this.el);
@@ -38,7 +39,6 @@ export class ImageViewer {
     this.zoom = 1.0;
     this.panX = 0;
     this.panY = 0;
-    this.initialFitDone = false;
 
     const isDds = /\.dds$/i.test(info.name);
     let format = isDds ? 'DDS' : info.name.split('.').pop()?.toUpperCase() ?? 'IMAGE';
@@ -209,7 +209,7 @@ export class ImageViewer {
     const availH = Math.max(100, rect.height - pad);
     const scaleX = availW / w;
     const scaleY = availH / h;
-    const fitScale = Math.min(scaleX, scaleY, 1.0); // Don't over-scale smaller images unless requested
+    const fitScale = Math.min(scaleX, scaleY, 1.0);
 
     this.zoom = Math.round(fitScale * 100) / 100;
     this.panX = 0;
@@ -236,7 +236,7 @@ export class ImageViewer {
     }, { passive: false });
 
     viewport.addEventListener('mousedown', (e) => {
-      if (e.button !== 0 && e.button !== 1) return; // Left or middle click
+      if (e.button !== 0 && e.button !== 1) return;
       this.isDragging = true;
       this.dragStartX = e.clientX - this.panX;
       this.dragStartY = e.clientY - this.panY;

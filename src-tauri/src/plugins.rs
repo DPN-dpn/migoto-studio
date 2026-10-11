@@ -43,6 +43,32 @@ pub fn read_binary_file(path: String) -> Result<Vec<u8>, String> {
 }
 
 #[tauri::command]
+pub fn write_binary_file(path: String, bytes: Vec<u8>) -> Result<(), String> {
+  let p = Path::new(&path);
+  if let Some(parent) = p.parent() {
+    let _ = fs::create_dir_all(parent);
+  }
+  fs::write(p, bytes).map_err(|e| format!("바이너리 파일 저장 실패: {e}"))
+}
+
+#[tauri::command]
+pub fn launch_installer_and_exit(app: tauri::AppHandle, path: String) -> Result<(), String> {
+  #[cfg(windows)]
+  {
+    Command::new("cmd")
+      .args(["/c", "start", "", &path])
+      .spawn()
+      .map_err(|e| format!("설치 파일 실행 실패: {e}"))?;
+    app.exit(0);
+    Ok(())
+  }
+  #[cfg(not(windows))]
+  {
+    Err("Windows 전용 기능입니다.".into())
+  }
+}
+
+#[tauri::command]
 pub fn exec_process(
   command: String,
   args: Vec<String>,

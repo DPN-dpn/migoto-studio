@@ -1,4 +1,4 @@
-import { getSettings, updateSettings, onSettingsChange } from './settings';
+import { getSettings, updateSettings, onSettingsChange } from '../core/settings';
 import type { OutlinePanel } from './outline';
 
 export type ActivityPanel = 'explorer' | 'outline' | 'templates' | 'plugins' | string;

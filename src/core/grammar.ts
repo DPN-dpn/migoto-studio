@@ -4,11 +4,11 @@ import { loadWASM, createOnigScanner, createOnigString } from 'vscode-oniguruma'
 import onigWasmUrl from 'vscode-oniguruma/release/onig.wasm?url';
 
 // Upstream files are used verbatim; see scripts/sync-upstream.mjs.
-import migotoGrammar from '../upstream/syntaxes/migoto.tmLanguage.json?raw';
-import regexpGrammar from '../upstream/syntaxes/regexp.tmLanguage.json?raw';
-import regexpReplaceGrammar from '../upstream/syntaxes/regexp-replace.tmLanguage.json?raw';
-import languageConfigRaw from '../upstream/migoto.language-configuration.json?raw';
-import upstreamVersion from '../upstream/VERSION?raw';
+import migotoGrammar from '../../upstream/syntaxes/migoto.tmLanguage.json?raw';
+import regexpGrammar from '../../upstream/syntaxes/regexp.tmLanguage.json?raw';
+import regexpReplaceGrammar from '../../upstream/syntaxes/regexp-replace.tmLanguage.json?raw';
+import languageConfigRaw from '../../upstream/migoto.language-configuration.json?raw';
+import upstreamVersion from '../../upstream/VERSION?raw';
 import { parseJsonc } from './jsonc';
 
 export const LANGUAGE_ID = 'migoto';
@@ -29,7 +29,10 @@ function pickScope(scopes: string[]): string {
 }
 
 class TextMateState implements monaco.languages.IState {
-  constructor(readonly stack: StateStack) {}
+  readonly stack: StateStack;
+  constructor(stack: StateStack) {
+    this.stack = stack;
+  }
   clone() { return new TextMateState(this.stack); }
   equals(other: monaco.languages.IState) {
     return other instanceof TextMateState && (other === this || other.stack.equals(this.stack));

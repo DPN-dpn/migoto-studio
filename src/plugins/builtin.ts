@@ -1,5 +1,6 @@
 import type { MigotoPlugin, PluginManifest } from './types';
 import { decodeDDS } from './dds-decoder.ts';
+import { ImageViewer } from './image-viewer.ts';
 
 export interface BuiltinPluginDef {
   manifest: PluginManifest;
@@ -212,8 +213,21 @@ const ASSET_VIEWER_MANIFEST: PluginManifest = {
 
 function createAssetViewerPlugin(): MigotoPlugin {
   return {
-    activate(_context) {
-      // DDS 및 이미지(PNG, JPG, BMP) 뷰어는 에디터 탭 시스템 및 파일 탐색기와 직접 연동됩니다.
+    activate(context) {
+      context.editor.registerCustomViewer({
+        id: 'asset-viewer',
+        name: 'DDS / 텍스처 뷰어',
+        extensions: ['dds', 'png', 'jpg', 'jpeg', 'bmp', 'webp', 'gif'],
+        render(container, file) {
+          const viewer = new ImageViewer(container);
+          viewer.show({
+            name: file.name,
+            path: file.path,
+            bytes: file.bytes,
+          });
+          return () => viewer.dispose();
+        },
+      });
     },
     deactivate() {},
   };

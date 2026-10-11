@@ -1,5 +1,5 @@
 import type { BackupEntry, BackupPolicy, DirEntry, Encoding, FileRef, LoadedFile, Platform, SaveChoice } from './types';
-import { openModal } from '../modal';
+import { openModal } from '../ui/modal';
 
 const DB_NAME = 'MigotoStudioWeb';
 const DB_VERSION = 1;

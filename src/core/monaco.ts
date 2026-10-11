@@ -32,7 +32,7 @@ import 'monaco-editor/editor/standalone/browser/quickAccess/standaloneGotoLineQu
 import 'monaco-editor/editor/standalone/browser/quickAccess/standaloneCommandsQuickAccess.js';
 import 'monaco-editor/editor/common/standaloneStrings.js';
 import 'monaco-editor/features/find/register.js';
-import '../node_modules/monaco-editor/esm/vs/base/browser/ui/codicons/codicon/codicon.css';
-import '../node_modules/monaco-editor/esm/vs/base/browser/ui/codicons/codicon/codicon-modifiers.css';
+import '../../node_modules/monaco-editor/esm/vs/base/browser/ui/codicons/codicon/codicon.css';
+import '../../node_modules/monaco-editor/esm/vs/base/browser/ui/codicons/codicon/codicon-modifiers.css';
 
 export { monaco };

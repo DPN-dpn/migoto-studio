@@ -1,4 +1,4 @@
-import type { PluginManager, PluginInstance } from './plugins';
+import type { PluginManager, PluginInstance } from '../plugins';
 
 export class PluginPanel {
   private searchQuery: string = '';

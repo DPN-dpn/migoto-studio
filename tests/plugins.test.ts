@@ -58,12 +58,17 @@ test('decodeDDS correctly parses valid mock DDS header', () => {
 
 test('builtin plugins activate with expected behavior', () => {
   const registeredViews: any[] = [];
+  const registeredCustomViewers: any[] = [];
   const mockContext: any = {
     ui: {
       registerSidebarView: (v: any) => registeredViews.push(v),
       showToast: () => {},
     },
-    editor: { getText: () => '', insertText: () => {} },
+    editor: {
+      getText: () => '',
+      insertText: () => {},
+      registerCustomViewer: (v: any) => registeredCustomViewers.push(v),
+    },
     workspace: { getCurrentFolder: () => null, readBinaryFile: async () => new Uint8Array() },
     storage: { get: () => null, set: () => {} },
   };
@@ -84,7 +89,9 @@ test('builtin plugins activate with expected behavior', () => {
   registeredViews.length = 0;
   const asset = BUILTIN_PLUGINS.find((p) => p.manifest.id === 'asset-viewer')!;
   asset.createPlugin().activate(mockContext);
-  // Asset viewer should NOT register sidebar views (opens directly in editor tabs)
+  // Asset viewer should NOT register sidebar views (opens directly in editor tabs via registerCustomViewer)
   assert.equal(registeredViews.length, 0);
+  assert.equal(registeredCustomViewers.length, 1);
+  assert.deepEqual(registeredCustomViewers[0].extensions, ['dds', 'png', 'jpg', 'jpeg', 'bmp', 'webp', 'gif']);
 });
 

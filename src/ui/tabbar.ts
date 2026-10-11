@@ -1,4 +1,4 @@
-import type { DocumentManager, DocumentTab } from './documents';
+import type { DocumentManager, DocumentTab } from '../core/documents';
 
 /**
  * Manages the horizontal tab strip for multi-document editing.
@@ -125,7 +125,7 @@ export class TabBar {
 
       const iconSpan = document.createElement('span');
       iconSpan.className = 'tab-icon';
-      iconSpan.textContent = tab.kind === 'image' ? '🖼️' : '📄';
+      iconSpan.textContent = tab.kind === 'custom' ? '🖼️' : '📄';
       el.append(iconSpan);
 
       const titleSpan = document.createElement('span');

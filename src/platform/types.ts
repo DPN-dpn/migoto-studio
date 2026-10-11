@@ -93,6 +93,8 @@ export interface Platform {
   getPluginsDir?(): Promise<string>;
   openPluginsFolder?(): Promise<void>;
   readBinaryFile?(path: string): Promise<Uint8Array>;
+  writeBinaryFile?(path: string, bytes: Uint8Array): Promise<void>;
+  launchInstallerAndExit?(path: string): Promise<void>;
   execProcess?(command: string, args: string[], cwd?: string): Promise<ProcessOutput>;
   listDiskPlugins?(): Promise<DiskPlugin[]>;
   saveDiskPlugin?(id: string, manifestJson: string, scriptContent: string): Promise<void>;

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { isNewerVersion } from '../src/version.ts';
+import { isNewerVersion } from '../src/updater/version.ts';
 
 test('isNewerVersion correctly compares semver strings', () => {
   // Newer patch

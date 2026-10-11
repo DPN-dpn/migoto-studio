@@ -1,7 +1,7 @@
 import { openModal } from './modal';
-import { platform } from './platform';
-import { upstreamGrammarVersion } from './grammar';
-import { CURRENT_APP_VERSION, runUpdateCheck } from './updater';
+import { platform } from '../platform';
+import { upstreamGrammarVersion } from '../core/grammar';
+import { CURRENT_APP_VERSION, runUpdateCheck } from '../updater/updater';
 
 interface ShortcutItem {
   label: string;

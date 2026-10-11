@@ -1,8 +1,8 @@
-import { platform } from './platform';
+import { platform } from '../platform';
 import { openModal } from './modal';
 import {
   DEFAULT_SETTINGS, SETTING_FIELDS, getSettings, updateSettings, type SettingField, type Settings,
-} from './settings';
+} from '../core/settings';
 
 /** Remembered between openings so the dialog reopens on the tab the user was last using. */
 let lastCategory: string | null = null;

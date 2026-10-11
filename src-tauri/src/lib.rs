@@ -53,6 +53,8 @@ pub fn run() {
       plugins::get_plugins_dir,
       plugins::open_plugins_folder,
       plugins::read_binary_file,
+      plugins::write_binary_file,
+      plugins::launch_installer_and_exit,
       plugins::exec_process,
       plugins::list_disk_plugins,
       plugins::save_disk_plugin,

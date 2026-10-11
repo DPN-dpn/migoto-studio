@@ -1,5 +1,5 @@
-import { platform, type DirEntry, type FileRef } from './platform';
-import type { DocumentManager } from './documents';
+import { platform, type DirEntry, type FileRef } from '../platform';
+import type { DocumentManager } from '../core/documents';
 
 const STORAGE_LAST_FOLDER = 'migoto_last_folder';
 
@@ -376,11 +376,7 @@ export class FileExplorer {
 
         node.addEventListener('click', () => {
           const ref: FileRef = platform().refFromId(entryKey);
-          if (isImage) {
-            this.doc.openImageFile(ref);
-          } else {
-            this.doc.openFile(ref);
-          }
+          this.doc.openFile(ref);
         });
 
         // Right-click context menu on file
@@ -431,17 +427,10 @@ export class FileExplorer {
       if (!entry.isDir) {
         // File item
         const isImage = /\.(dds|png|jpe?g|bmp|webp|gif)$/i.test(entry.name);
-        if (isImage) {
-          addItem('이미지 뷰어로 열기', () => {
-            const ref: FileRef = platform().refFromId(entryKey);
-            this.doc.openImageFile(ref);
-          });
-        } else {
-          addItem('에디터에서 열기', () => {
-            const ref: FileRef = platform().refFromId(entryKey);
-            this.doc.openFile(ref);
-          });
-        }
+        addItem(isImage ? '이미지 뷰어로 열기' : '에디터에서 열기', () => {
+          const ref: FileRef = platform().refFromId(entryKey);
+          this.doc.openFile(ref);
+        });
 
         addItem('경로 복사', () => {
           navigator.clipboard.writeText(entry.path || entry.name).catch(() => {});

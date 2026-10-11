@@ -1,7 +1,7 @@
 import { monaco } from './monaco';
 import { LANGUAGE_ID } from './grammar';
 import { parseJsonc } from './jsonc';
-import upstreamSnippetsRaw from '../upstream/snippets/migoto.snippets.json?raw';
+import upstreamSnippetsRaw from '../../upstream/snippets/migoto.snippets.json?raw';
 
 export interface Template {
   id?: string;

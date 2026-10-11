@@ -1,11 +1,12 @@
 import * as monaco from 'monaco-editor';
 import { platform } from '../platform';
-import type { DocumentManager } from '../documents';
-import type { FileExplorer } from '../explorer';
-import { openModal } from '../modal';
+import type { DocumentManager } from '../core/documents';
+import type { FileExplorer } from '../ui/explorer';
+import { openModal } from '../ui/modal';
 import { BUILTIN_PLUGINS } from './builtin';
-import type { ActivityBar } from '../activitybar';
+import type { ActivityBar } from '../ui/activitybar';
 import type {
+  CustomViewerDefinition,
   MigotoPlugin,
   PluginContext,
   PluginInstance,
@@ -18,6 +19,7 @@ const STORAGE_ENABLED_PLUGINS = 'migoto_plugins_enabled';
 export class PluginManager {
   private plugins: Map<string, PluginInstance> = new Map();
   private sidebarViews: Map<string, RegisteredSidebarView> = new Map();
+  private customViewers: Map<string, CustomViewerDefinition> = new Map();
   private dynamicTabDisposers: Map<string, () => void> = new Map();
   private listeners: Set<() => void> = new Set();
   private statusBarEl: HTMLElement | null = null;
@@ -30,6 +32,11 @@ export class PluginManager {
     private activityBar?: ActivityBar,
   ) {
     this.statusBarEl = document.getElementById('statusbar');
+    this.doc.setPluginManager(this);
+  }
+
+  getCustomViewer(ext: string): CustomViewerDefinition | undefined {
+    return this.customViewers.get(ext.toLowerCase().replace(/^\./, ''));
   }
 
   setActivityBar(ab: ActivityBar) {
@@ -158,6 +165,7 @@ export class PluginManager {
   private async activatePlugin(instance: PluginInstance, plugin: MigotoPlugin): Promise<void> {
     const unregisterViews: string[] = [];
     const unregisterStatusItems: string[] = [];
+    const unregisterCustomViewers: string[] = [];
 
     const context = this.createContext(instance.manifest, {
       onRegisterView: (view) => {
@@ -200,6 +208,13 @@ export class PluginManager {
         this.pluginStatusBarItems.set(id, el);
         unregisterStatusItems.push(id);
       },
+      onRegisterCustomViewer: (def) => {
+        def.extensions.forEach((ext) => {
+          const norm = ext.toLowerCase().replace(/^\./, '');
+          this.customViewers.set(norm, def);
+          unregisterCustomViewers.push(norm);
+        });
+      },
     });
 
     try {
@@ -221,6 +236,9 @@ export class PluginManager {
         unregisterStatusItems.forEach((sId) => {
           this.pluginStatusBarItems.get(sId)?.remove();
           this.pluginStatusBarItems.delete(sId);
+        });
+        unregisterCustomViewers.forEach((ext) => {
+          this.customViewers.delete(ext);
         });
       };
     } catch (err: any) {
@@ -390,6 +408,7 @@ export default {
     callbacks: {
       onRegisterView: (view: RegisteredSidebarView) => void;
       onRegisterStatusItem: (id: string, el: HTMLElement) => void;
+      onRegisterCustomViewer: (def: CustomViewerDefinition) => void;
     },
   ): PluginContext {
     return {
@@ -430,6 +449,9 @@ export default {
         getCursor: () => {
           const p = this.editor.getPosition();
           return { lineNumber: p?.lineNumber || 1, column: p?.column || 1 };
+        },
+        registerCustomViewer: (viewer: CustomViewerDefinition) => {
+          callbacks.onRegisterCustomViewer(viewer);
         },
       },
 

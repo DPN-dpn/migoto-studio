@@ -1,4 +1,4 @@
-import { platform } from './platform';
+import { platform } from '../platform';
 
 /** All user-adjustable options. Add new keys here with a default; old settings files keep working. */
 export interface Settings {
@@ -48,7 +48,7 @@ export const DEFAULT_SETTINGS: Settings = {
   lintUnclosedBlocks: true,
   lintComparisonInCondition: true,
   lintMissingResources: true,
-  lintUndeclaredVars: false,
+  lintUndeclaredVars: true,
   lintUnusedItems: false,
 };
 

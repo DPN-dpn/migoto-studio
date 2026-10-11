@@ -1,14 +1,14 @@
-import { monaco } from './monaco';
-import { platform } from './platform';
-import { getSettings, updateSettings } from './settings';
-import type { DocumentManager } from './documents';
+import { monaco } from '../core/monaco';
+import { platform } from '../platform';
+import { getSettings, updateSettings } from '../core/settings';
+import type { DocumentManager } from '../core/documents';
 import type { FileExplorer } from './explorer';
 import type { ActivityBar } from './activitybar';
-import { getAllTemplates, insertTemplate } from './templates';
+import { getAllTemplates, insertTemplate } from '../core/templates';
 import { openSettings } from './settings-ui';
 import { openHelp } from './help-ui';
 import { openRestore } from './restore-ui';
-import { runUpdateCheck } from './updater';
+import { runUpdateCheck } from '../updater/updater';
 
 export interface MenuBarCallbacks {
   doc: DocumentManager;

@@ -1,11 +1,11 @@
-import { monaco } from './monaco';
+import { monaco } from '../core/monaco';
 import {
   type Template,
   getAllTemplates,
   saveCustomTemplate,
   deleteCustomTemplate,
   insertTemplate,
-} from './templates';
+} from '../core/templates';
 import { openModal } from './modal';
 
 export class TemplatePanel {

@@ -1,6 +1,6 @@
 import { openModal } from './modal';
-import { platform } from './platform';
-import type { DocumentManager } from './documents';
+import { platform } from '../platform';
+import type { DocumentManager } from '../core/documents';
 
 const fmtSize = (n: number) => (n < 1024 ? `${n} B` : `${(n / 1024).toFixed(1)} KB`);
 

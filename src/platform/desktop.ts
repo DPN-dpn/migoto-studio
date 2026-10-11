@@ -129,6 +129,10 @@ export const desktop: Platform = {
     const bytes = await invoke<number[]>('read_binary_file', { path });
     return new Uint8Array(bytes);
   },
+  writeBinaryFile: (path: string, bytes: Uint8Array) =>
+    invoke('write_binary_file', { path, bytes: Array.from(bytes) }),
+  launchInstallerAndExit: (path: string) =>
+    invoke('launch_installer_and_exit', { path }),
   execProcess: (command: string, args: string[], cwd?: string) =>
     invoke<ProcessOutput>('exec_process', { command, args, cwd }),
   listDiskPlugins: async () => {

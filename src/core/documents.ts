@@ -1,12 +1,11 @@
 import { monaco } from './monaco';
-import { platform, type Encoding, type FileRef } from './platform';
+import { platform, type Encoding, type FileRef } from '../platform';
 import { getSettings, updateSettings } from './settings';
 import { LANGUAGE_ID } from './grammar';
-
-import { ImageViewer } from './image-viewer.ts';
+import type { CustomViewerDefinition } from '../plugins/types';
 
 export type { Encoding };
-export type TabKind = 'text' | 'image';
+export type TabKind = 'text' | 'custom';
 
 export const ENCODING_LABELS: Record<Encoding, string> = {
   'utf-8': 'UTF-8',
@@ -25,13 +24,19 @@ export interface DocumentTab {
   savedVersion: number;
   viewState: monaco.editor.ICodeEditorViewState | null;
   title: string;
-  imageBytes?: Uint8Array;
+  customViewerId?: string;
+  customBytes?: Uint8Array;
+  customCleanup?: (() => void) | void;
+}
+
+export interface PluginViewerProvider {
+  getCustomViewer(ext: string): CustomViewerDefinition | undefined;
 }
 
 /**
  * Manages multiple open documents (tabs) being edited:
  * - Each tab has its own Monaco text model, undo/redo history, saved version, and view state.
- * - Supports rich custom tabs (e.g. DDS/PNG image preview) alongside INI text tabs.
+ * - Supports rich custom tabs (registered dynamically by plugins) alongside INI text tabs.
  * - Switching tabs swaps models or custom viewers and restores scroll/cursor location.
  * - Dirty state uses Monaco's alternative version ID for accurate undo-to-clean detection.
  */
@@ -41,7 +46,7 @@ export class DocumentManager {
   private tabSeq = 0;
   private untitledSeq = 0;
   private listeners = new Set<() => void>();
-  private imageViewer: ImageViewer | null = null;
+  private pluginManager?: PluginViewerProvider;
 
   constructor(
     private editor: monaco.editor.IStandaloneCodeEditor,
@@ -50,15 +55,16 @@ export class DocumentManager {
     if (!this.customViewerContainer) {
       this.customViewerContainer = document.getElementById('custom-viewer-container') ?? undefined;
     }
-    if (this.customViewerContainer) {
-      this.imageViewer = new ImageViewer(this.customViewerContainer);
-    }
     const initialDummy = this.editor.getModel();
     const firstTab = this.createTab();
     this.tabs.push(firstTab);
     this.activeTabId = firstTab.id;
     this.editor.setModel(firstTab.model);
     initialDummy?.dispose();
+  }
+
+  setPluginManager(pm: PluginViewerProvider) {
+    this.pluginManager = pm;
   }
 
   get allTabs(): readonly DocumentTab[] {
@@ -75,7 +81,7 @@ export class DocumentManager {
   }
 
   isTabDirty(tab: DocumentTab): boolean {
-    if (tab.kind === 'image') return false;
+    if (tab.kind === 'custom') return false;
     return tab.model.getAlternativeVersionId() !== tab.savedVersion;
   }
 
@@ -95,21 +101,21 @@ export class DocumentManager {
     return this.activeTab?.encoding ?? 'utf-8';
   }
 
-  get eol(): 'CRLF' | 'LF' {
-    if (!this.activeTab) return 'CRLF';
-    return this.activeTab.model.getEOL() === '\r\n' ? 'CRLF' : 'LF';
+  get eol(): '\r\n' | '\n' {
+    return (this.activeTab?.model.getEOL() as '\r\n' | '\n') ?? '\r\n';
   }
 
-  onChange(fn: () => void) {
-    this.listeners.add(fn);
+  onChange(listener: () => void): () => void {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
   }
 
   private emit() {
-    this.listeners.forEach((fn) => fn());
+    this.listeners.forEach((l) => l());
   }
 
   private createTab(opts?: {
-    file?: FileRef | null;
+    file?: FileRef;
     title?: string;
     text?: string;
     encoding?: Encoding;
@@ -165,24 +171,36 @@ export class DocumentManager {
 
     if (this.activeTab && this.activeTab.kind === 'text') {
       this.activeTab.viewState = this.editor.saveViewState();
+    } else if (this.activeTab && this.activeTab.kind === 'custom') {
+      if (typeof this.activeTab.customCleanup === 'function') {
+        try { this.activeTab.customCleanup(); } catch {}
+      }
+      this.activeTab.customCleanup = undefined;
     }
 
     this.activeTabId = target.id;
     const editorEl = document.getElementById('editor');
 
-    if (target.kind === 'image') {
+    if (target.kind === 'custom') {
       if (editorEl) editorEl.style.display = 'none';
       if (this.customViewerContainer) {
         this.customViewerContainer.hidden = false;
-        this.imageViewer?.show({
-          name: target.title,
-          path: target.file?.location ?? target.title,
-          bytes: target.imageBytes ?? new Uint8Array(),
-        });
+        this.customViewerContainer.replaceChildren();
+
+        const ext = target.file?.name.split('.').pop()?.toLowerCase() ?? '';
+        const viewer = this.pluginManager?.getCustomViewer(ext);
+        if (viewer) {
+          target.customCleanup = viewer.render(this.customViewerContainer, {
+            name: target.title,
+            path: target.file?.location ?? target.title,
+            bytes: target.customBytes ?? new Uint8Array(),
+          });
+        }
       }
     } else {
       if (this.customViewerContainer) {
         this.customViewerContainer.hidden = true;
+        this.customViewerContainer.replaceChildren();
       }
       if (editorEl) editorEl.style.display = 'block';
       this.editor.setModel(target.model);
@@ -237,6 +255,11 @@ export class DocumentManager {
       }
     }
 
+    if (target.kind === 'custom' && typeof target.customCleanup === 'function') {
+      try { target.customCleanup(); } catch {}
+      target.customCleanup = undefined;
+    }
+
     const wasActive = target.id === this.activeTabId;
     this.tabs.splice(idx, 1);
     target.model.dispose();
@@ -277,9 +300,20 @@ export class DocumentManager {
   }
 
   async confirmDiscard(): Promise<boolean> {
-    const dirty = this.tabs.filter((t) => this.isTabDirty(t));
-    if (dirty.length === 0) return true;
+    return this.promptSaveDirty();
+  }
 
+  async closeAllTabs(): Promise<boolean> {
+    const list = [...this.tabs];
+    for (const t of list) {
+      const ok = await this.closeTab(t.id);
+      if (!ok) return false;
+    }
+    return true;
+  }
+
+  async promptSaveDirty(): Promise<boolean> {
+    const dirty = this.tabs.filter((t) => this.isTabDirty(t));
     for (const tab of dirty) {
       this.switchTab(tab.id);
       const choice = await platform().askSaveChanges(tab.title);
@@ -312,8 +346,19 @@ export class DocumentManager {
   }
 
   async openFile(ref: FileRef): Promise<void> {
+    const ext = ref.name.split('.').pop()?.toLowerCase() ?? '';
+    const customViewer = this.pluginManager?.getCustomViewer(ext);
+
+    if (customViewer) {
+      return this.openCustomViewerFile(ref, customViewer);
+    }
+
     if (/\.(dds|png|jpe?g|bmp|webp|gif)$/i.test(ref.name)) {
-      return this.openImageFile(ref);
+      await platform().showInfo(
+        '플러그인 필요',
+        `"${ref.name}" 파일을 미리보려면 좌측 [플러그인 관리]에서 'DDS / 텍스처 뷰어' 플러그인을 활성화해주세요.`,
+      );
+      return;
     }
 
     // 1. If already open in any tab, switch to it
@@ -363,7 +408,7 @@ export class DocumentManager {
     }
   }
 
-  async openImageFile(ref: FileRef): Promise<void> {
+  async openCustomViewerFile(ref: FileRef, viewer: CustomViewerDefinition): Promise<void> {
     const existing = this.tabs.find((t) => t.file?.id === ref.id);
     if (existing) {
       this.switchTab(existing.id);
@@ -376,8 +421,8 @@ export class DocumentManager {
         return;
       }
       const bytes = await platform().readBinaryFile!(ref.id);
-      const id = `img_tab_${Date.now()}_${++this.tabSeq}`;
-      const uri = monaco.Uri.parse(`imagefile:///tab-${id}/${encodeURIComponent(ref.name)}`);
+      const id = `custom_tab_${Date.now()}_${++this.tabSeq}`;
+      const uri = monaco.Uri.parse(`customfile:///tab-${id}/${encodeURIComponent(ref.name)}`);
       const dummyModel = monaco.editor.createModel('', 'plaintext', uri);
 
       if (
@@ -387,10 +432,11 @@ export class DocumentManager {
         this.activeTab.kind === 'text' &&
         this.activeTab.model.getValue().length === 0
       ) {
-        this.activeTab.kind = 'image';
+        this.activeTab.kind = 'custom';
         this.activeTab.file = ref;
         this.activeTab.title = ref.name;
-        this.activeTab.imageBytes = bytes;
+        this.activeTab.customBytes = bytes;
+        this.activeTab.customViewerId = viewer.id;
         this.activeTab.model = dummyModel;
         this.switchTab(this.activeTab.id, true);
         await this.rememberRecent(ref);
@@ -401,20 +447,21 @@ export class DocumentManager {
       const tab: DocumentTab = {
         id,
         file: ref,
-        kind: 'image',
+        kind: 'custom',
         encoding: 'utf-8',
         model: dummyModel,
         savedVersion: 1,
         viewState: null,
         title: ref.name,
-        imageBytes: bytes,
+        customBytes: bytes,
+        customViewerId: viewer.id,
       };
 
       this.tabs.push(tab);
       this.switchTab(tab.id, true);
       await this.rememberRecent(ref);
     } catch (e) {
-      await platform().showError('이미지 파일을 열 수 없습니다', String(e));
+      await platform().showError('파일을 열 수 없습니다', String(e));
     }
   }
 
@@ -443,7 +490,7 @@ export class DocumentManager {
   }
 
   private async writeTab(tab: DocumentTab, ref: FileRef): Promise<boolean> {
-    if (tab.kind === 'image') return true;
+    if (tab.kind === 'custom') return true;
     try {
       const s = getSettings();
       await platform().writeFile(ref, tab.model.getValue(), tab.encoding, {

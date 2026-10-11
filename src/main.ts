@@ -1,27 +1,27 @@
 import './style.css';
-import { monaco } from './monaco';
+import { monaco } from './core/monaco';
 import EditorWorker from 'monaco-editor/editor/editor.worker.js?worker';
 import { initPlatform, platform } from './platform';
 
-import { LANGUAGE_ID, registerMigotoLanguage, upstreamGrammarVersion } from './grammar';
-import { defineThemes, THEME_DARK, THEME_LIGHT } from './theme';
-import { DocumentManager, ENCODING_LABELS, type Encoding } from './documents';
-import { TabBar } from './tabbar';
-import { FileExplorer } from './explorer';
-import { TemplatePanel } from './template-panel';
+import { LANGUAGE_ID, registerMigotoLanguage, upstreamGrammarVersion } from './core/grammar';
+import { defineThemes, THEME_DARK, THEME_LIGHT } from './core/theme';
+import { DocumentManager, ENCODING_LABELS, type Encoding } from './core/documents';
+import { TabBar } from './ui/tabbar';
+import { FileExplorer } from './ui/explorer';
+import { TemplatePanel } from './ui/template-panel';
 import { PluginManager } from './plugins';
-import { PluginPanel } from './plugin-panel';
-import { ActivityBar } from './activitybar';
-import { MenuBar } from './menubar';
-import { getSettings, loadSettings, onSettingsChange } from './settings';
-import { OutlinePanel } from './outline';
-import { registerSnippetCompletions } from './templates';
-import { openSettings } from './settings-ui';
-import { openHelp } from './help-ui';
-import { lintModel, optionsFromSettings } from './lint';
-import { registerSmartCompletions } from './completions';
+import { PluginPanel } from './ui/plugin-panel';
+import { ActivityBar } from './ui/activitybar';
+import { MenuBar } from './ui/menubar';
+import { getSettings, loadSettings, onSettingsChange } from './core/settings';
+import { OutlinePanel } from './ui/outline';
+import { registerSnippetCompletions } from './core/templates';
+import { openSettings } from './ui/settings-ui';
+import { openHelp } from './ui/help-ui';
+import { lintModel, optionsFromSettings } from './core/lint';
+import { registerSmartCompletions } from './core/completions';
 import { initPwa } from './pwa';
-import { checkOnStartup } from './updater';
+import { checkOnStartup } from './updater/updater';
 
 // Only the base editor worker is needed (no TS/JSON/CSS language services).
 (self as unknown as { MonacoEnvironment: monaco.Environment }).MonacoEnvironment = {

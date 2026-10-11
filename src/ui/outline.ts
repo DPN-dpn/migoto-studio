@@ -1,4 +1,4 @@
-import { monaco } from './monaco';
+import { monaco } from '../core/monaco';
 
 interface Section { name: string; line: number; group: string }
 

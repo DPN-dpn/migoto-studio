@@ -1,6 +1,6 @@
-import { openModal } from './modal';
-import { platform } from './platform';
-import { getSettings } from './settings';
+import { openModal } from '../ui/modal';
+import { platform } from '../platform';
+import { getSettings } from '../core/settings';
 
 import { CURRENT_APP_VERSION, isNewerVersion } from './version';
 
@@ -22,6 +22,15 @@ export interface UpdateInfo {
   downloadAndInstall?: (onProgress?: (percent: number) => void) => Promise<void>;
 }
 
+interface GitHubReleaseData {
+  version: string;
+  body: string;
+  url: string;
+  publishedAt: string;
+  setupAssetUrl?: string;
+  setupAssetName?: string;
+}
+
 /**
  * Open external URL in the system browser.
  */
@@ -37,9 +46,9 @@ export async function openExternalUrl(url: string) {
 }
 
 /**
- * Query latest release from GitHub API as a reliable fallback.
+ * Query latest release from GitHub API.
  */
-async function fetchLatestFromGitHub(): Promise<{ version: string; body: string; url: string; publishedAt: string } | null> {
+async function fetchLatestFromGitHub(): Promise<GitHubReleaseData | null> {
   try {
     const res = await fetch(GITHUB_API_LATEST, {
       headers: { Accept: 'application/vnd.github.v3+json' },
@@ -47,11 +56,21 @@ async function fetchLatestFromGitHub(): Promise<{ version: string; body: string;
     if (!res.ok) return null;
     const data = await res.json();
     const tag = (data.tag_name || '').replace(/^v/i, '');
+
+    const assets = Array.isArray(data.assets) ? data.assets : [];
+    const setupAsset = assets.find(
+      (a: any) =>
+        typeof a.name === 'string' &&
+        (a.name.endsWith('-setup.exe') || (a.name.endsWith('.exe') && !a.name.includes('portable'))),
+    );
+
     return {
       version: tag,
       body: data.body || '',
       url: data.html_url || GITHUB_RELEASES_URL,
       publishedAt: data.published_at || '',
+      setupAssetUrl: setupAsset?.browser_download_url,
+      setupAssetName: setupAsset?.name,
     };
   } catch {
     return null;
@@ -118,6 +137,11 @@ export async function checkUpdate(): Promise<UpdateInfo> {
   // 2. Fallback check via GitHub Releases API
   const gh = await fetchLatestFromGitHub();
   if (gh && isNewerVersion(currentVersion, gh.version)) {
+    const canAutoInstall =
+      platform().kind === 'desktop'
+        ? Boolean(!isPortable && gh.setupAssetUrl && platform().writeBinaryFile && platform().launchInstallerAndExit)
+        : true;
+
     return {
       hasUpdate: true,
       currentVersion,
@@ -126,7 +150,49 @@ export async function checkUpdate(): Promise<UpdateInfo> {
       releaseNotes: gh.body || '새로운 버전이 등록되었습니다.',
       releaseUrl: gh.url,
       isPortable,
-      canAutoInstall: false,
+      canAutoInstall,
+      downloadAndInstall: async (onProgress) => {
+        if (platform().kind === 'desktop' && gh.setupAssetUrl) {
+          const res = await fetch(gh.setupAssetUrl);
+          if (!res.ok) throw new Error(`다운로드 실패 (${res.status} ${res.statusText})`);
+
+          const total = Number(res.headers.get('content-length') || 0);
+          const reader = res.body?.getReader();
+          if (!reader) throw new Error('응답 데이터를 읽을 수 없습니다.');
+
+          let received = 0;
+          const chunks: Uint8Array[] = [];
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            if (value) {
+              chunks.push(value);
+              received += value.length;
+              if (total > 0 && onProgress) {
+                onProgress(Math.min(100, Math.round((received / total) * 100)));
+              }
+            }
+          }
+
+          const combined = new Uint8Array(received);
+          let offset = 0;
+          for (const c of chunks) {
+            combined.set(c, offset);
+            offset += c.length;
+          }
+
+          const tempPath = `C:\\Windows\\Temp\\MigotoStudio-Setup-v${gh.version}.exe`;
+          await platform().writeBinaryFile!(tempPath, combined);
+          await platform().launchInstallerAndExit!(tempPath);
+        } else {
+          // Web / PWA refresh
+          if ('serviceWorker' in navigator) {
+            const regs = await navigator.serviceWorker.getRegistrations();
+            for (const r of regs) await r.update();
+          }
+          window.location.reload();
+        }
+      },
     };
   }
 
@@ -221,7 +287,7 @@ export function showUpdateModal(info: UpdateInfo) {
   notesBox.style.fontSize = '12px';
   notesBox.style.lineHeight = '1.6';
   notesBox.style.whiteSpace = 'pre-wrap';
-  notesBox.textContent = info.releaseNotes || '상세 변경 내용은 릴리스 페이지를 참조하세요.';
+  notesBox.textContent = info.releaseNotes || '상세 개선사항 및 버그 수정이 포함되어 있습니다.';
 
   body.append(notesTitle, notesBox);
 
@@ -231,9 +297,8 @@ export function showUpdateModal(info: UpdateInfo) {
   statusEl.style.color = 'var(--fg-dim)';
 
   if (info.isPortable) {
-    statusEl.innerHTML = '💡 <strong>포터블(무설치) 모드</strong>: 최신 포터블 <code>.zip</code> 파일을 다운로드하여 원하는 폴더에 압축 해제 후 실행하시면 기존 설정과 백업이 유지됩니다.';
-  } else if (!info.canAutoInstall) {
-    statusEl.textContent = '💡 GitHub Releases 페이지에서 최신 설치 파일(.exe) 또는 포터블(.zip)을 다운로드하실 수 있습니다.';
+    statusEl.innerHTML =
+      '💡 <strong>포터블 모드</strong>: 릴리스 페이지에서 최신 포터블 <code>.zip</code>을 받아 압축 해제하시면 데이터가 보존됩니다.';
   }
   body.append(statusEl);
 
@@ -249,7 +314,7 @@ export function showUpdateModal(info: UpdateInfo) {
   if (info.canAutoInstall && info.downloadAndInstall) {
     const installBtn = document.createElement('button');
     installBtn.className = 'primary';
-    installBtn.textContent = '지금 업데이트 설치';
+    installBtn.textContent = '🚀 지금 바로 업데이트';
 
     installBtn.onclick = async () => {
       installBtn.disabled = true;
@@ -260,8 +325,8 @@ export function showUpdateModal(info: UpdateInfo) {
         await info.downloadAndInstall!((pct) => {
           installBtn.textContent = `다운로드 중... (${pct}%)`;
         });
-        statusEl.textContent = '설치 준비가 완료되었습니다. 프로그램을 재시작합니다...';
-        installBtn.textContent = '재시작 중...';
+        statusEl.textContent = '설치 관리자를 실행합니다...';
+        installBtn.textContent = '설치 실행 중...';
 
         try {
           const { invoke } = await import('@tauri-apps/api/core');
@@ -272,19 +337,22 @@ export function showUpdateModal(info: UpdateInfo) {
       } catch (err: any) {
         console.error('Update install failed:', err);
         statusEl.style.color = '#ef4444';
-        statusEl.textContent = `자동 업데이트 실패: ${err?.message || err}. 릴리스 페이지에서 직접 다운로드해주세요.`;
-        installBtn.style.display = 'none';
+        statusEl.textContent = `자동 업데이트 실패: ${err?.message || err}.`;
+        installBtn.disabled = false;
+        installBtn.textContent = '다시 시도';
       }
     };
     btnRow.append(installBtn);
+  } else {
+    // Portable mode or fallback
+    const downloadBtn = document.createElement('button');
+    downloadBtn.className = 'primary';
+    downloadBtn.textContent = '최신 버전 다운로드';
+    downloadBtn.onclick = () => {
+      openExternalUrl(info.releaseUrl || GITHUB_RELEASES_URL);
+    };
+    btnRow.append(downloadBtn);
   }
-
-  const ghBtn = document.createElement('button');
-  ghBtn.textContent = '릴리스 페이지 열기';
-  ghBtn.onclick = () => {
-    openExternalUrl(info.releaseUrl || GITHUB_RELEASES_URL);
-  };
-  btnRow.append(ghBtn);
 
   const laterBtn = document.createElement('button');
   laterBtn.textContent = '닫기';
@@ -319,7 +387,6 @@ export async function runUpdateCheck(silent = false) {
 export function checkOnStartup() {
   const s = getSettings();
   if (s.checkForUpdatesOnStartup !== false) {
-    // Delay check slightly to not block initial render
     setTimeout(() => {
       runUpdateCheck(true);
     }, 2500);

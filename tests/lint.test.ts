@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { lintModel, stripComments, MarkerSeverity, type TextModelLike, type LintOptions } from '../src/lint.ts';
+import { lintModel, stripComments, MarkerSeverity, type TextModelLike, type LintOptions } from '../src/core/lint.ts';
 
 function createMockModel(content: string): TextModelLike {
   const lines = content.split(/\r?\n/);

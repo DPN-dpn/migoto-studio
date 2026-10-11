@@ -20,6 +20,7 @@ export interface PluginContext {
     replaceSelection(text: string): void;
     setCursor(line: number, col: number): void;
     getCursor(): { lineNumber: number; column: number };
+    registerCustomViewer(options: CustomViewerDefinition): void;
   };
 
   // ---- Workspace & files ----
@@ -80,6 +81,16 @@ export interface RegisteredSidebarView {
   title: string;
   icon: string;
   render: (container: HTMLElement) => void | (() => void);
+}
+
+export interface CustomViewerDefinition {
+  id: string;
+  name: string;
+  extensions: string[];
+  render: (
+    container: HTMLElement,
+    file: { name: string; path: string; bytes: Uint8Array },
+  ) => void | (() => void);
 }
 
 export interface PluginInstance {
