@@ -309,14 +309,19 @@ export class PluginPanel {
     const rightControls = document.createElement('div');
     rightControls.className = 'plugin-card-right';
 
-    // Up / Down order buttons
+    // Up / Down order buttons (combined stepper control)
     const reorderWrap = document.createElement('div');
     reorderWrap.className = 'plugin-order-controls';
 
     const upBtn = document.createElement('button');
-    upBtn.className = 'icon-btn plugin-order-btn';
+    upBtn.className = 'plugin-order-btn up-btn';
     upBtn.title = '위로 이동 (툴바 순서)';
-    upBtn.textContent = '▲';
+    upBtn.setAttribute('aria-label', '위로 이동');
+    upBtn.innerHTML = `
+      <svg viewBox="0 0 8 5" width="7" height="4.5" fill="currentColor">
+        <polygon points="4,0 8,5 0,5"/>
+      </svg>
+    `;
     upBtn.disabled = index === 0;
     upBtn.onclick = (e) => {
       e.stopPropagation();
@@ -324,9 +329,14 @@ export class PluginPanel {
     };
 
     const downBtn = document.createElement('button');
-    downBtn.className = 'icon-btn plugin-order-btn';
+    downBtn.className = 'plugin-order-btn down-btn';
     downBtn.title = '아래로 이동 (툴바 순서)';
-    downBtn.textContent = '▼';
+    downBtn.setAttribute('aria-label', '아래로 이동');
+    downBtn.innerHTML = `
+      <svg viewBox="0 0 8 5" width="7" height="4.5" fill="currentColor">
+        <polygon points="0,0 8,0 4,5"/>
+      </svg>
+    `;
     downBtn.disabled = index === total - 1;
     downBtn.onclick = (e) => {
       e.stopPropagation();
