@@ -1875,6 +1875,31 @@ input:checked + .slider:before {
 /* ==========================================================================
    Plugin Management Panel
    ========================================================================== */
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-elev);
+  min-height: 35px;
+  box-sizing: border-box;
+}
+
+.panel-actions {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: auto;
+}
+
+.panel-actions .icon-btn {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border-radius: 4px;
+}
+
 .plugin-manage-container {
   padding: 10px;
   display: flex;

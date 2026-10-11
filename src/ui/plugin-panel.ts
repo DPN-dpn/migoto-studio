@@ -19,13 +19,9 @@ export class PluginPanel {
     const plugins = this.manager.getPlugins();
     const isDesktop = platform().kind === 'desktop';
 
-    // 1. Header Row
+    // 1. Header Row (Actions)
     const header = document.createElement('div');
     header.className = 'panel-header';
-
-    const title = document.createElement('span');
-    title.className = 'panel-title';
-    title.textContent = '플러그인 관리';
 
     const actions = document.createElement('div');
     actions.className = 'panel-actions';
@@ -91,7 +87,7 @@ export class PluginPanel {
       actions.append(openFolderBtn);
     }
 
-    header.append(title, actions);
+    header.append(actions);
     this.root.append(header);
 
     // 2. Main Container
@@ -249,7 +245,7 @@ export class PluginPanel {
     const activeCount = plugins.filter((p) => p.enabled).length;
     const statsHint = document.createElement('div');
     statsHint.className = 'plugin-stats-hint';
-    statsHint.textContent = `전체 ${plugins.length}개 중 ${activeCount}개 활성화 (▲/▼로 툴바 순서 조절)`;
+    statsHint.textContent = `전체 ${plugins.length}개 중 ${activeCount}개 활성화`;
 
     searchWrap.append(searchInput, statsHint);
     container.append(searchWrap);
