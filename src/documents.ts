@@ -71,8 +71,12 @@ export class DocumentManager {
   }
 
   async openDialog() {
-    const ref = await platform().pickOpen();
-    if (ref) await this.openFile(ref);
+    try {
+      const ref = await platform().pickOpen();
+      if (ref) await this.openFile(ref);
+    } catch (e) {
+      await platform().showError('파일 열기 실패', String(e));
+    }
   }
 
   async openFile(ref: FileRef) {

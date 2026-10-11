@@ -107,6 +107,29 @@ function triggerDownload(fileName: string, data: Uint8Array) {
   URL.revokeObjectURL(url);
 }
 
+function pickOpenWithFileInput(): Promise<FileRef | null> {
+  return new Promise((resolve) => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.ini,.3dm,.migoto,.txt';
+    input.style.display = 'none';
+    input.onchange = () => {
+      const file = input.files?.[0];
+      input.remove();
+      if (!file) return resolve(null);
+      const id = generateId();
+      fileHandles.set(id, file);
+      resolve({ id, name: file.name, location: file.name });
+    };
+    input.oncancel = () => {
+      input.remove();
+      resolve(null);
+    };
+    document.body.append(input);
+    input.click();
+  });
+}
+
 const hasFSAccess = typeof window !== 'undefined' && 'showOpenFilePicker' in window;
 
 export const web: Platform = {
@@ -134,31 +157,15 @@ export const web: Platform = {
         return { id, name: handle.name, location: handle.name };
       } catch (err: any) {
         if (err.name === 'AbortError') return null;
-        throw err;
+        // When browser security blocks system/Program Files folders (SecurityError),
+        // automatically fall back to classic file input
+        console.warn('[web] showOpenFilePicker blocked or failed, falling back to file input:', err);
+        return pickOpenWithFileInput();
       }
     }
 
     // Fallback: file input element
-    return new Promise((resolve) => {
-      const input = document.createElement('input');
-      input.type = 'file';
-      input.accept = '.ini,.3dm,.migoto,.txt';
-      input.style.display = 'none';
-      input.onchange = () => {
-        const file = input.files?.[0];
-        input.remove();
-        if (!file) return resolve(null);
-        const id = generateId();
-        fileHandles.set(id, file);
-        resolve({ id, name: file.name, location: file.name });
-      };
-      input.oncancel = () => {
-        input.remove();
-        resolve(null);
-      };
-      document.body.append(input);
-      input.click();
-    });
+    return pickOpenWithFileInput();
   },
 
   async pickSave(suggested): Promise<FileRef | null> {
