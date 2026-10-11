@@ -63,6 +63,9 @@ export interface Platform {
   writeFile(ref: FileRef, text: string, encoding: Encoding, backup: BackupPolicy): Promise<void>;
   pickDirectory(): Promise<{ name: string; id: string } | null>;
   readDirectory(id: string): Promise<DirEntry[]>;
+  showInFolder?(path: string): Promise<void>;
+  createFile?(dirPath: string, fileName: string): Promise<FileRef | null>;
+  deleteEntry?(path: string): Promise<void>;
 
   // ---- backups ----
   listBackups(ref: FileRef): Promise<BackupEntry[]>;

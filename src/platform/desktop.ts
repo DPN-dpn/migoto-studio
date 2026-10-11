@@ -45,6 +45,22 @@ export const desktop: Platform = {
     return invoke<DirEntry[]>('read_directory', { path: id, maxDepth: 5 });
   },
 
+  async showInFolder(path: string) {
+    await invoke('show_in_folder', { path });
+  },
+
+  async createFile(dirPath: string, fileName: string): Promise<FileRef | null> {
+    const sep = dirPath.includes('/') ? '/' : '\\';
+    const cleanDir = dirPath.replace(/[\\/]+$/, '');
+    const fullPath = `${cleanDir}${sep}${fileName}`;
+    await invoke('create_file', { path: fullPath });
+    return refFromPath(fullPath);
+  },
+
+  async deleteEntry(path: string) {
+    await invoke('delete_entry', { path });
+  },
+
   refFromId: refFromPath,
 
   readFile: (ref) => invoke<LoadedFile>('open_file', { path: ref.id }),

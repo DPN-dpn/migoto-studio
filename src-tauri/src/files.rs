@@ -161,6 +161,50 @@ fn scan_dir(dir: &std::path::Path, remaining_depth: u32) -> Result<Vec<DirEntry>
   Ok(entries)
 }
 
+#[tauri::command]
+pub fn show_in_folder(path: String) -> Result<(), String> {
+  #[cfg(windows)]
+  {
+    use std::process::Command;
+    let p = std::path::PathBuf::from(&path);
+    if p.is_dir() {
+      Command::new("explorer").arg(&path).spawn().map_err(|e| e.to_string())?;
+    } else {
+      Command::new("explorer").args(["/select,", &path]).spawn().map_err(|e| e.to_string())?;
+    }
+    Ok(())
+  }
+  #[cfg(not(windows))]
+  {
+    let _ = path;
+    Ok(())
+  }
+}
+
+#[tauri::command]
+pub fn create_file(path: String) -> Result<(), String> {
+  let p = std::path::PathBuf::from(&path);
+  if p.exists() {
+    return Err("이미 존재하는 파일입니다.".into());
+  }
+  if let Some(parent) = p.parent() {
+    let _ = fs::create_dir_all(parent);
+  }
+  fs::write(&p, b"; [Section]\n").map_err(|e| format!("파일 생성 실패: {e}"))?;
+  Ok(())
+}
+
+#[tauri::command]
+pub fn delete_entry(path: String) -> Result<(), String> {
+  let p = std::path::PathBuf::from(&path);
+  if p.is_dir() {
+    fs::remove_dir_all(&p).map_err(|e| format!("폴더 삭제 실패: {e}"))?;
+  } else {
+    fs::remove_file(&p).map_err(|e| format!("파일 삭제 실패: {e}"))?;
+  }
+  Ok(())
+}
+
 #[cfg(test)]
 mod tests {
   use super::*;

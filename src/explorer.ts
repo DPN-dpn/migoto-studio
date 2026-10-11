@@ -12,6 +12,7 @@ export interface FolderRef {
  * File tree explorer for XXMI / 3DMigoto mod folders.
  * Allows modders to open a mod directory, view nested folders and INI files,
  * search/filter files, and click any INI file to open it in a tab.
+ * Includes a right-click context menu for quick file/folder actions.
  */
 export class FileExplorer {
   private currentFolder: FolderRef | null = null;
@@ -20,12 +21,16 @@ export class FileExplorer {
   private filter = '';
   private activeFilePath: string | null = null;
   private isLoading = false;
+  private menuEl: HTMLElement;
 
   constructor(
     private root: HTMLElement,
     private doc: DocumentManager,
+    menuEl?: HTMLElement,
     private onFolderChange?: (folder: FolderRef | null) => void,
   ) {
+    this.menuEl = menuEl || document.getElementById('explorer-menu') || document.createElement('ul');
+
     this.doc.onChange(() => {
       const curId = this.doc.file?.id ?? null;
       if (curId !== this.activeFilePath) {
@@ -37,6 +42,7 @@ export class FileExplorer {
     this.activeFilePath = this.doc.file?.id ?? null;
     this.render();
     this.tryRestoreLastFolder();
+    this.bindGlobalEvents();
   }
 
   get hasFolder(): boolean {
@@ -45,6 +51,17 @@ export class FileExplorer {
 
   get folderName(): string {
     return this.currentFolder?.name ?? '';
+  }
+
+  private bindGlobalEvents() {
+    document.addEventListener('click', () => this.closeMenu());
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') this.closeMenu();
+    });
+  }
+
+  private closeMenu() {
+    this.menuEl.hidden = true;
   }
 
   private async tryRestoreLastFolder() {
@@ -144,30 +161,28 @@ export class FileExplorer {
     this.root.replaceChildren();
 
     if (!this.currentFolder) {
-      const empty = document.createElement('div');
-      empty.className = 'explorer-empty';
+      const emptyState = document.createElement('div');
+      emptyState.className = 'explorer-empty';
 
       const icon = document.createElement('div');
       icon.className = 'explorer-empty-icon';
       icon.innerHTML = `
-        <svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
           <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
         </svg>
       `;
-      empty.append(icon);
 
-      const msg = document.createElement('p');
-      msg.className = 'hint';
-      msg.textContent = '모드 폴더를 열어 하위 INI 파일과 에셋들을 한눈에 탐색하고 전환하세요.';
-      empty.append(msg);
+      const hint = document.createElement('p');
+      hint.className = 'hint';
+      hint.textContent = '열린 모드 폴더가 없습니다.\n모드 폴더를 열어 파일을 탐색하세요.';
 
       const btn = document.createElement('button');
       btn.className = 'primary open-folder-btn';
-      btn.textContent = '폴더 열기';
+      btn.textContent = '모드 폴더 열기';
       btn.addEventListener('click', () => this.openFolderDialog());
-      empty.append(btn);
 
-      this.root.append(empty);
+      emptyState.append(icon, hint, btn);
+      this.root.append(emptyState);
       return;
     }
 
@@ -178,43 +193,29 @@ export class FileExplorer {
     const titleRow = document.createElement('div');
     titleRow.className = 'explorer-title-row';
 
-    const titleSpan = document.createElement('span');
-    titleSpan.className = 'explorer-folder-name';
-    titleSpan.textContent = this.currentFolder.name;
-    titleSpan.title = this.currentFolder.id;
-    titleRow.append(titleSpan);
+    const folderTitle = document.createElement('span');
+    folderTitle.className = 'explorer-folder-name';
+    folderTitle.textContent = this.currentFolder.name;
+    folderTitle.title = this.currentFolder.id;
+    titleRow.append(folderTitle);
 
     const actions = document.createElement('div');
     actions.className = 'explorer-actions';
 
-    const reloadBtn = document.createElement('button');
-    reloadBtn.className = 'icon-btn';
-    reloadBtn.title = '새로고침 (F5)';
-    reloadBtn.setAttribute('aria-label', '새로고침');
-    reloadBtn.innerHTML = `
+    // Refresh button
+    const refreshBtn = document.createElement('button');
+    refreshBtn.className = 'icon-btn';
+    refreshBtn.title = '폴더 새로고침';
+    refreshBtn.setAttribute('aria-label', '새로고침');
+    refreshBtn.innerHTML = `
       <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <polyline points="23 4 23 10 17 10"></polyline>
-        <polyline points="1 20 1 14 7 14"></polyline>
-        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+        <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.19"></path>
       </svg>
     `;
-    reloadBtn.addEventListener('click', () => this.reload());
-    actions.append(reloadBtn);
+    refreshBtn.addEventListener('click', () => this.reload());
+    actions.append(refreshBtn);
 
-    const changeBtn = document.createElement('button');
-    changeBtn.className = 'icon-btn';
-    changeBtn.title = '다른 폴더 열기';
-    changeBtn.setAttribute('aria-label', '다른 폴더 열기');
-    changeBtn.innerHTML = `
-      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
-        <line x1="12" y1="11" x2="12" y2="17"></line>
-        <line x1="9" y1="14" x2="15" y2="14"></line>
-      </svg>
-    `;
-    changeBtn.addEventListener('click', () => this.openFolderDialog());
-    actions.append(changeBtn);
-
+    // Close folder button
     const closeBtn = document.createElement('button');
     closeBtn.className = 'icon-btn';
     closeBtn.title = '폴더 닫기';
@@ -249,6 +250,13 @@ export class FileExplorer {
     const treeContainer = document.createElement('div');
     treeContainer.id = 'explorer-tree-container';
     treeContainer.className = 'tree-container';
+
+    // Right click on empty tree space
+    treeContainer.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      this.showContextMenu(e);
+    });
+
     this.root.append(treeContainer);
 
     this.renderTreeContainer();
@@ -318,6 +326,13 @@ export class FileExplorer {
           this.renderTreeContainer();
         });
 
+        // Right-click context menu on folder
+        node.addEventListener('contextmenu', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          this.showContextMenu(e, entry);
+        });
+
         parent.append(node);
 
         if (!isCollapsed && entry.children && entry.children.length > 0) {
@@ -357,8 +372,152 @@ export class FileExplorer {
           this.doc.openFile(ref);
         });
 
+        // Right-click context menu on file
+        node.addEventListener('contextmenu', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          this.showContextMenu(e, entry);
+        });
+
         parent.append(node);
       }
     }
+  }
+
+  private showContextMenu(e: MouseEvent, entry?: DirEntry) {
+    this.menuEl.replaceChildren();
+
+    const addItem = (label: string, action?: () => void, isDestructive = false) => {
+      const li = document.createElement('li');
+      li.textContent = label;
+      if (isDestructive) li.style.color = '#ef4444';
+      if (action) {
+        li.addEventListener('click', () => {
+          this.closeMenu();
+          action();
+        });
+      } else {
+        li.className = 'empty';
+      }
+      this.menuEl.append(li);
+    };
+
+    const addDivider = () => {
+      const sep = document.createElement('li');
+      sep.className = 'group';
+      sep.textContent = '─';
+      sep.style.fontSize = '9px';
+      sep.style.padding = '2px 10px';
+      sep.style.opacity = '0.35';
+      this.menuEl.append(sep);
+    };
+
+    const isDesktop = platform().kind === 'desktop';
+
+    if (entry) {
+      const entryKey = entry.id || entry.path;
+
+      if (!entry.isDir) {
+        // File item
+        addItem('에디터에서 열기', () => {
+          const ref: FileRef = platform().refFromId(entryKey);
+          this.doc.openFile(ref);
+        });
+
+        addItem('경로 복사', () => {
+          navigator.clipboard.writeText(entry.path || entry.name).catch(() => {});
+        });
+
+        if (isDesktop && entry.path) {
+          addItem('파일 탐색기에서 보기', () => {
+            platform().showInFolder?.(entry.path);
+          });
+        }
+
+        addDivider();
+
+        addItem('삭제', async () => {
+          if (!confirm(`'${entry.name}' 파일을 삭제하시겠습니까?`)) return;
+          try {
+            await platform().deleteEntry?.(entry.path);
+            await this.reload();
+          } catch (err) {
+            await platform().showError('삭제 실패', String(err));
+          }
+        }, true);
+      } else {
+        // Folder item
+        addItem('새 INI 파일 만들기…', async () => {
+          const input = prompt('새 INI 파일 이름을 입력하세요:', 'mod.ini');
+          if (!input) return;
+          const cleanName = input.trim().endsWith('.ini') ? input.trim() : `${input.trim()}.ini`;
+          try {
+            const ref = await platform().createFile?.(entry.path, cleanName);
+            await this.reload();
+            if (ref) await this.doc.openFile(ref);
+          } catch (err) {
+            await platform().showError('파일 생성 실패', String(err));
+          }
+        });
+
+        addItem('폴더 경로 복사', () => {
+          navigator.clipboard.writeText(entry.path || entry.name).catch(() => {});
+        });
+
+        if (isDesktop && entry.path) {
+          addItem('파일 탐색기에서 열기', () => {
+            platform().showInFolder?.(entry.path);
+          });
+        }
+
+        addItem('새로고침', () => this.reload());
+
+        addDivider();
+
+        addItem('폴더 삭제', async () => {
+          if (!confirm(`'${entry.name}' 폴더와 내부 파일들을 모두 삭제하시겠습니까?`)) return;
+          try {
+            await platform().deleteEntry?.(entry.path);
+            await this.reload();
+          } catch (err) {
+            await platform().showError('폴더 삭제 실패', String(err));
+          }
+        }, true);
+      }
+    } else if (this.currentFolder) {
+      // Empty area of tree
+      addItem('새 INI 파일 만들기…', async () => {
+        if (!this.currentFolder) return;
+        const input = prompt('새 INI 파일 이름을 입력하세요:', 'mod.ini');
+        if (!input) return;
+        const cleanName = input.trim().endsWith('.ini') ? input.trim() : `${input.trim()}.ini`;
+        try {
+          const ref = await platform().createFile?.(this.currentFolder.id, cleanName);
+          await this.reload();
+          if (ref) await this.doc.openFile(ref);
+        } catch (err) {
+          await platform().showError('파일 생성 실패', String(err));
+        }
+      });
+
+      addItem('새로고침', () => this.reload());
+
+      if (isDesktop && this.currentFolder.id) {
+        addItem('파일 탐색기에서 열기', () => {
+          if (this.currentFolder) platform().showInFolder?.(this.currentFolder.id);
+        });
+      }
+
+      addDivider();
+
+      addItem('폴더 닫기', () => this.closeFolder());
+    }
+
+    const menuWidth = 180;
+    const posX = Math.min(e.clientX, window.innerWidth - menuWidth - 8);
+    const posY = Math.min(e.clientY, window.innerHeight - 200);
+    this.menuEl.style.left = `${Math.max(8, posX)}px`;
+    this.menuEl.style.top = `${Math.max(8, posY)}px`;
+    this.menuEl.hidden = false;
   }
 }

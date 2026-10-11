@@ -263,6 +263,8 @@ export const web: Platform = {
     return scanDirHandle(handle, 4, '');
   },
 
+  async showInFolder(_path: string): Promise<void> {},
+
   refFromId(id: string): FileRef {
     const handle = fileHandles.get(id);
     const name = handle ? (handle as any).name || 'document.ini' : 'document.ini';
