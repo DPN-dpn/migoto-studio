@@ -1,6 +1,7 @@
 // Slim Monaco bundle: core API + only the editor features we use.
 // (monaco-editor's own `editor.main` also pulls in ~80 programming-language definitions and
 // TS/JSON/CSS/HTML language services, which this app does not need.)
+import 'monaco-editor/nls/lang/ko.js';
 import * as monaco from 'monaco-editor/editor/editor.api.js';
 
 import 'monaco-editor/editor/browser/coreCommands.js';
