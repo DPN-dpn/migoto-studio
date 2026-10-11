@@ -31,14 +31,16 @@ export function parseSections(model: monaco.editor.ITextModel): Section[] {
 const DEFAULT_WIDTH = 250;
 const MIN_WIDTH = 160;
 const MAX_WIDTH = 650;
+const MIN_EDITOR_WIDTH = 240;
 const STORAGE_KEY = 'migoto_sidebar_width';
 
-/** Left-hand section list: grouped, searchable, click to jump, follows the cursor, resizable. */
+/** Left-hand section list: grouped, searchable, click to jump, follows the cursor, resizable split panel. */
 export class OutlinePanel {
   private sections: Section[] = [];
   private filter = '';
   private activeLine = 0;
   private timer = 0;
+  private currentWidth = DEFAULT_WIDTH;
   private readonly list: HTMLElement;
   private readonly closedGroups = new Set<string>();
 
@@ -62,6 +64,7 @@ export class OutlinePanel {
     // Restore saved width
     const savedWidth = Number(localStorage.getItem(STORAGE_KEY)) || DEFAULT_WIDTH;
     this.applyWidth(savedWidth);
+    requestAnimationFrame(() => this.layoutEditor());
 
     if (this.resizer) {
       this.setupResizer(this.resizer);
@@ -81,26 +84,52 @@ export class OutlinePanel {
   setVisible(visible: boolean) {
     this.root.hidden = !visible;
     if (this.resizer) this.resizer.hidden = !visible;
-    this.editor.layout();
+    this.layoutEditor();
+  }
+
+  private layoutEditor() {
+    const workspace = this.root.parentElement;
+    if (!workspace) {
+      this.editor.layout();
+      return;
+    }
+    const workspaceWidth = workspace.clientWidth;
+    const workspaceHeight = workspace.clientHeight;
+    if (this.root.hidden) {
+      this.editor.layout({ width: workspaceWidth, height: workspaceHeight });
+    } else {
+      const resizerWidth = this.resizer && !this.resizer.hidden ? this.resizer.offsetWidth : 0;
+      const sidebarWidth = this.root.offsetWidth || this.currentWidth;
+      const editorWidth = Math.max(MIN_EDITOR_WIDTH, workspaceWidth - sidebarWidth - resizerWidth);
+      this.editor.layout({ width: editorWidth, height: workspaceHeight });
+    }
   }
 
   private applyWidth(width: number) {
-    const maxWidth = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, window.innerWidth - 300));
-    const clamped = Math.max(MIN_WIDTH, Math.min(width, maxWidth));
+    const workspace = this.root.parentElement;
+    const workspaceWidth = workspace ? workspace.clientWidth : window.innerWidth;
+    const workspaceHeight = workspace ? workspace.clientHeight : window.innerHeight;
+    const resizerWidth = this.resizer && !this.resizer.hidden ? this.resizer.offsetWidth : 0;
+    const maxAllowed = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, workspaceWidth - MIN_EDITOR_WIDTH - resizerWidth));
+    const clamped = Math.max(MIN_WIDTH, Math.min(width, maxAllowed));
+
+    this.currentWidth = clamped;
     this.root.style.width = `${clamped}px`;
     try {
       localStorage.setItem(STORAGE_KEY, String(clamped));
     } catch {}
-    this.editor.layout();
+
+    const editorWidth = Math.max(MIN_EDITOR_WIDTH, workspaceWidth - clamped - resizerWidth);
+    this.editor.layout({ width: editorWidth, height: workspaceHeight });
   }
 
   private setupResizer(resizer: HTMLElement) {
-    let startX = 0;
-    let startWidth = 0;
-
     const onMouseMove = (e: MouseEvent) => {
-      const dx = e.clientX - startX;
-      this.applyWidth(startWidth + dx);
+      const workspace = this.root.parentElement;
+      if (!workspace) return;
+      const workspaceRect = workspace.getBoundingClientRect();
+      const targetWidth = e.clientX - workspaceRect.left;
+      this.applyWidth(targetWidth);
     };
 
     const onMouseUp = () => {
@@ -108,13 +137,11 @@ export class OutlinePanel {
       resizer.classList.remove('dragging');
       window.removeEventListener('mousemove', onMouseMove);
       window.removeEventListener('mouseup', onMouseUp);
-      this.editor.layout();
+      this.layoutEditor();
     };
 
     resizer.addEventListener('mousedown', (e) => {
       e.preventDefault();
-      startX = e.clientX;
-      startWidth = this.root.getBoundingClientRect().width;
       document.body.classList.add('resizing');
       resizer.classList.add('dragging');
       window.addEventListener('mousemove', onMouseMove);
@@ -123,6 +150,14 @@ export class OutlinePanel {
 
     resizer.addEventListener('dblclick', () => {
       this.applyWidth(DEFAULT_WIDTH);
+    });
+
+    window.addEventListener('resize', () => {
+      if (!this.root.hidden) {
+        this.applyWidth(this.currentWidth);
+      } else {
+        this.layoutEditor();
+      }
     });
   }
 
