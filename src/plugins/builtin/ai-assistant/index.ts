@@ -236,19 +236,34 @@ export default definePlugin({
         const dockTop = document.createElement('div');
         dockTop.className = 'ai-input-dock-top';
 
-        // 옵션 체크박스 영역 (INI 전달 / 자동 반영)
+        // 옵션 영역 (컨텍스트 모드 선택 / 자동 반영)
         const dockOptions = document.createElement('div');
         dockOptions.className = 'ai-dock-options';
 
-        const attachLabel = document.createElement('label');
-        attachLabel.className = 'ai-attach-label';
-        attachLabel.title = '현재 에디터에 열려 있는 INI 파일 내용을 AI에게 함께 전달합니다.';
-        const attachInput = document.createElement('input');
-        attachInput.type = 'checkbox';
-        attachInput.checked = true;
-        const attachText = document.createElement('span');
-        attachText.textContent = 'INI 전달';
-        attachLabel.append(attachInput, attachText);
+        const contextSelectWrap = document.createElement('div');
+        contextSelectWrap.className = 'ai-context-select-wrap';
+
+        const contextSelect = document.createElement('select');
+        contextSelect.className = 'ai-context-select';
+        contextSelect.title = 'AI에게 전달할 컨텍스트 범위를 선택합니다.';
+
+        const optSmart = document.createElement('option');
+        optSmart.value = 'smart';
+        optSmart.textContent = '스마트 (개요+커서)';
+
+        const optFull = document.createElement('option');
+        optFull.value = 'full';
+        optFull.textContent = '전체 파일';
+
+        const optNone = document.createElement('option');
+        optNone.value = 'none';
+        optNone.textContent = '코드 제외';
+
+        contextSelect.append(optSmart, optFull, optNone);
+        contextSelect.value = context.storage.get('context_mode', 'smart');
+        contextSelect.onchange = () => context.storage.set('context_mode', contextSelect.value);
+
+        contextSelectWrap.append(contextSelect);
 
         const autoApplyLabel = document.createElement('label');
         autoApplyLabel.className = 'ai-attach-label';
@@ -261,7 +276,7 @@ export default definePlugin({
         autoApplyText.textContent = '자동 반영';
         autoApplyLabel.append(autoApplyInput, autoApplyText);
 
-        dockOptions.append(attachLabel, autoApplyLabel);
+        dockOptions.append(contextSelectWrap, autoApplyLabel);
 
         // 템플릿 드롭다운 버튼 & 메뉴
         const templateWrap = document.createElement('div');
@@ -521,6 +536,145 @@ export default definePlugin({
           });
         }
 
+        // 스마트 프롬프트 컨텍스트 빌더
+        function buildPromptContext(
+          userPrompt: string,
+          mode: 'smart' | 'full' | 'none',
+        ): {
+          promptText: string;
+          detail: string;
+        } {
+          if (mode === 'none') {
+            return {
+              promptText: userPrompt,
+              detail: '단독 질의 모드 (에디터 코드 제외)',
+            };
+          }
+
+          const file = context.workspace.getCurrentFile();
+          const currentFileName = file?.name || 'document.ini';
+          const fullText = context.editor.getText();
+          const allLines = fullText.split('\n');
+          const totalLines = allLines.length;
+
+          if (mode === 'full') {
+            return {
+              promptText: `${userPrompt}\n\n[현재 열린 파일: ${currentFileName} (전체 코드가 전달되었습니다)]\n\`\`\`ini\n${fullText}\n\`\`\``,
+              detail: `${currentFileName} (${totalLines}줄 전체 첨부)`,
+            };
+          }
+
+          // --- [스마트 모드: 개요 + 커서 섹션 + 질문 연관 섹션 발췌] ---
+          const doc = context.ini.parse(fullText);
+          const cursor = context.editor.getCursor();
+          const cursorLine = cursor?.lineNumber || 1;
+
+          // 1. 현재 커서가 위치한 섹션 탐색
+          const cursorSection = doc.sections.find(
+            (s) => cursorLine >= s.startLine && cursorLine <= s.endLine,
+          );
+
+          // 2. 사용자 질문 키워드와 매칭되는 관련 섹션 선별
+          const lowerPrompt = userPrompt.toLowerCase();
+          const matchedSections: typeof doc.sections = [];
+
+          for (const s of doc.sections) {
+            if (cursorSection && s.name === cursorSection.name) continue;
+            const lowerName = s.name.toLowerCase();
+
+            const hasNameMatch = lowerPrompt.includes(lowerName);
+            const hasPartMatch =
+              ((lowerPrompt.includes('hair') || lowerPrompt.includes('헤어')) && lowerName.includes('hair')) ||
+              ((lowerPrompt.includes('face') || lowerPrompt.includes('얼굴')) && lowerName.includes('face')) ||
+              ((lowerPrompt.includes('body') || lowerPrompt.includes('바디') || lowerPrompt.includes('몸')) && lowerName.includes('body')) ||
+              ((lowerPrompt.includes('skirt') || lowerPrompt.includes('치마')) && lowerName.includes('skirt')) ||
+              ((lowerPrompt.includes('dress') || lowerPrompt.includes('드레스') || lowerPrompt.includes('옷')) && (lowerName.includes('dress') || lowerName.includes('body'))) ||
+              ((lowerPrompt.includes('toggle') || lowerPrompt.includes('토글') || lowerPrompt.includes('키')) && (lowerName.startsWith('key') || lowerName.startsWith('constants'))) ||
+              ((lowerPrompt.includes('command') || lowerPrompt.includes('커맨드')) && lowerName.startsWith('commandlist'));
+
+            if (hasNameMatch || hasPartMatch) {
+              matchedSections.push(s);
+              if (matchedSections.length >= 3) break;
+            }
+          }
+
+          // 변수나 토글 관련 질문일 경우 Constants 섹션 우선 보강
+          const isVariableRelated =
+            lowerPrompt.includes('토글') ||
+            lowerPrompt.includes('toggle') ||
+            lowerPrompt.includes('키') ||
+            lowerPrompt.includes('key') ||
+            lowerPrompt.includes('변수') ||
+            lowerPrompt.includes('$');
+
+          if (isVariableRelated) {
+            const constSec = doc.getSection('Constants');
+            if (constSec && constSec !== cursorSection && !matchedSections.includes(constSec)) {
+              matchedSections.unshift(constSec);
+            }
+          }
+
+          // 3. 파일 전체 구조 요약본 (Outline) 생성
+          const outlineLines: string[] = [];
+          outlineLines.push(`[문서 구조 요약 - 총 ${doc.sections.length}개 섹션 선언됨]`);
+
+          for (const s of doc.sections) {
+            const grp = context.ini.classifySection(s.name);
+            const keyProp = s.properties['hash']
+              ? `hash=${s.properties['hash']}`
+              : s.properties['key']
+              ? `key=${s.properties['key']}`
+              : s.properties['type']
+              ? `type=${s.properties['type']}`
+              : '';
+            outlineLines.push(`- [${s.name}] (${grp}${keyProp ? `, ${keyProp}` : ''}, 라인 ${s.startLine}~${s.endLine})`);
+          }
+
+          const constSecForVars = doc.getSection('Constants');
+          const varNames = constSecForVars ? Object.keys(constSecForVars.variables) : [];
+          if (varNames.length > 0) {
+            outlineLines.push(`- 선언된 전역 변수: ${varNames.slice(0, 10).join(', ')}${varNames.length > 10 ? ' 외...' : ''}`);
+          }
+
+          // 4. 발췌 섹션 본문 묶음 생성
+          const excerptBlocks: string[] = [];
+
+          if (cursorSection) {
+            excerptBlocks.push(`; [현재 에디터 커서 위치 섹션 (${cursorSection.name})]\n${cursorSection.fullText}`);
+          }
+
+          for (const ms of matchedSections) {
+            excerptBlocks.push(`; [질문과 연관된 참고 섹션 (${ms.name})]\n${ms.fullText}`);
+          }
+
+          if (excerptBlocks.length === 0 && doc.sections.length > 0) {
+            const firstSec = doc.sections[0];
+            excerptBlocks.push(`; [파일 첫 번째 섹션 (${firstSec.name})]\n${firstSec.fullText}`);
+          }
+
+          const smartContextBody = [
+            `[현재 열린 파일: ${currentFileName} - 스마트 요약 및 발췌 컨텍스트]`,
+            outlineLines.join('\n'),
+            '',
+            '[수정 및 질문과 관련된 주요 섹션 본문 발췌]',
+            excerptBlocks.join('\n\n'),
+          ].join('\n');
+
+          const sentLines = smartContextBody.split('\n').length;
+          const savingsPercent = totalLines > 0 ? Math.max(0, Math.round(((totalLines - sentLines) / totalLines) * 100)) : 0;
+
+          const targetNames: string[] = [];
+          if (cursorSection) targetNames.push(`커서:[${cursorSection.name}]`);
+          matchedSections.forEach((m) => targetNames.push(`연관:[${m.name}]`));
+
+          const detail = `${currentFileName} (스마트 발췌: ${sentLines}줄 전달, 원본 ${totalLines}줄 대비 ${savingsPercent}% 토큰 절감, ${targetNames.join(', ') || '개요 전송'})`;
+
+          return {
+            promptText: `${userPrompt}\n\n${smartContextBody}`,
+            detail,
+          };
+        }
+
         // 대화 메시지 턴 전송
         async function sendMessage(userPrompt: string) {
           const trimmedPrompt = userPrompt.trim();
@@ -754,26 +908,19 @@ export default definePlugin({
           statusInfo.textContent = `${providerName} / ${model}`;
 
           const systemPrompt = `당신은 3DMigoto 및 XXMI (.ini) 모딩 전문 개발 도우미입니다.
-사용자의 INI 코드를 분석하거나 요청에 맞는 정확한 INI 섹션([KeyToggle], [TextureOverride], [Constants], [CommandList] 등)을 작성하세요.
-코드는 반드시 \`\`\`ini 코드 \`\`\` 마크다운 코드 블록으로 감싸서 작성해 주세요.`;
+사용자가 제공한 [문서 구조 요약] 및 [관련 섹션 본문]을 바탕으로 질문의 의도를 분석하고 정확한 INI 코드를 작성하세요.
 
-          let promptWithContext = trimmedPrompt;
-          if (attachInput.checked) {
-            const file = context.workspace.getCurrentFile();
-            const text = context.editor.getText();
-            const lineCount = text.split('\n').length;
-            const iniDoc = context.ini.parse(text);
-            promptWithContext += `\n\n[현재 열린 파일: ${file?.name || 'document.ini'}]\n\`\`\`ini\n${text}\n\`\`\``;
-            updateStep(
-              0,
-              'completed',
-              '컨텍스트 준비 완료',
-              `${file?.name || 'document.ini'} (${lineCount}줄, ${iniDoc.sections.length}개 섹션 분석 및 첨부됨)`,
-            );
-          } else {
-            updateStep(0, 'completed', '컨텍스트 준비 완료', '단독 질의 모드 (에디터 코드 제외)');
-          }
+[중요 작성 규칙]
+1. 파일 전체 코드를 처음부터 끝까지 다시 작성하지 마십시오.
+2. 사용자의 요청에 따라 새로 생성하거나 수정해야 할 특정 섹션([KeyToggle], [TextureOverride], [Constants], [CommandList] 등) 단위만 마크다운 \`\`\`ini 코드 \`\`\` 블록으로 작성하십시오.
+3. 에디터가 해당 섹션만 찾아 제자리(in-place)에 스마트 교체하므로, 변경이 필요한 섹션들만 온전하게 작성하면 됩니다.
+4. 코드 블록 외의 추가 설명이나 가이드는 명확하고 간결하게 작성하십시오.`;
 
+          const contextMode = (contextSelect.value || 'smart') as 'smart' | 'full' | 'none';
+          const ctxResult = buildPromptContext(trimmedPrompt, contextMode);
+          const promptWithContext = ctxResult.promptText;
+
+          updateStep(0, 'completed', '컨텍스트 준비 완료', ctxResult.detail);
           updateStep(1, 'completed', 'AI API 연결 준비 완료', `${providerName} (${model})`);
 
           // 전송 버튼을 [중단] 버튼으로 전환

@@ -2180,6 +2180,29 @@ input:checked + .slider:before {
   margin: 0;
 }
 
+.ai-context-select-wrap {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.ai-context-select {
+  height: 24px;
+  padding: 2px 6px;
+  font-size: 11px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--fg);
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.ai-context-select:focus {
+  border-color: var(--accent);
+}
+
 .ai-template-btn-wrap {
   position: relative;
   flex-shrink: 0;
