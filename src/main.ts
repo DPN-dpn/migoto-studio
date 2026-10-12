@@ -55,6 +55,47 @@ async function boot() {
     scrollBeyondLastLine: false,
   });
 
+  // ---- 3DMigoto Key Helper Context Menu Action ----
+  const isKeyLineContextKey = editor.createContextKey<boolean>('isKeyLine', false);
+  const updateKeyLineContext = (lineNum?: number) => {
+    const model = editor.getModel();
+    if (!model) {
+      isKeyLineContextKey.set(false);
+      return;
+    }
+    const targetLine = lineNum ?? (editor.getPosition()?.lineNumber || 1);
+    if (targetLine <= 0 || targetLine > model.getLineCount()) {
+      isKeyLineContextKey.set(false);
+      return;
+    }
+    const content = model.getLineContent(targetLine);
+    isKeyLineContextKey.set(/^\s*key\s*=/i.test(content));
+  };
+
+  editor.onDidChangeCursorPosition((e) => {
+    updateKeyLineContext(e.position.lineNumber);
+  });
+
+  editor.onContextMenu((e) => {
+    if (e.target && e.target.position) {
+      updateKeyLineContext(e.target.position.lineNumber);
+    } else {
+      updateKeyLineContext();
+    }
+  });
+
+  editor.addAction({
+    id: 'migoto-edit-key-binding',
+    label: '3DMigoto 키 바인딩 편집 (키 도우미)...',
+    keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.KeyK],
+    precondition: 'isKeyLine',
+    contextMenuGroupId: '1_modification',
+    contextMenuOrder: 1,
+    run: () => {
+      openKeyHelperModal(editor);
+    },
+  });
+
   const doc = new DocumentManager(editor, $('custom-viewer-container'));
   const diffViewer = new DiffViewer($('diff-container'), doc);
   doc.setDiffViewer(diffViewer);

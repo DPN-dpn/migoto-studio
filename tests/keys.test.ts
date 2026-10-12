@@ -5,6 +5,7 @@ import {
   VK_KEY_LIST,
   formatKeyBinding,
   generateKeySnippet,
+  parseKeyBindingLine,
 } from '../src/core/keys.ts';
 
 test('CODE_TO_VK maps common browser event codes to 3DMigoto virtual keys', () => {
@@ -62,6 +63,49 @@ test('formatKeyBinding generates correct 3DMigoto modifier strings', () => {
     formatKeyBinding({ vk: 'VK_X', ctrl: true, shift: true, win: true }),
     'ctrl shift windows VK_X'
   );
+
+  // Negative conditions (exclude)
+  assert.equal(
+    formatKeyBinding({ vk: 'VK_F1', ctrl: 'exclude' }),
+    'no_ctrl VK_F1'
+  );
+  assert.equal(
+    formatKeyBinding({ vk: 'VK_F2', ctrl: 'require', alt: 'exclude' }),
+    'ctrl no_alt VK_F2'
+  );
+  assert.equal(
+    formatKeyBinding({
+      vk: 'VK_SPACE',
+      ctrl: 'require',
+      alt: 'exclude',
+      shift: 'exclude',
+      win: 'exclude',
+    }),
+    'ctrl no_alt no_shift no_windows VK_SPACE'
+  );
+});
+
+test('parseKeyBindingLine extracts prefix, modifiers and virtual key from editor line', () => {
+  // Simple no_modifiers
+  const res1 = parseKeyBindingLine('key = no_modifiers VK_F1');
+  assert.ok(res1);
+  assert.equal(res1.prefix, 'key = ');
+  assert.equal(res1.vk, 'VK_F1');
+  assert.equal(res1.ctrl, 'none');
+  assert.equal(res1.alt, 'none');
+
+  // Indented line with positive and negative modifiers
+  const res2 = parseKeyBindingLine('    key = ctrl no_alt VK_SPACE');
+  assert.ok(res2);
+  assert.equal(res2.prefix, '    key = ');
+  assert.equal(res2.vk, 'VK_SPACE');
+  assert.equal(res2.ctrl, 'require');
+  assert.equal(res2.alt, 'exclude');
+  assert.equal(res2.shift, 'none');
+
+  // Non-key line
+  const res3 = parseKeyBindingLine('type = cycle');
+  assert.equal(res3, null);
 });
 
 test('generateKeySnippet creates expected formats', () => {

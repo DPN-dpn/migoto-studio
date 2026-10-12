@@ -1,6 +1,7 @@
 /** Minimal modal dialog. Only one is open at a time; Esc, ✕ or a click on the backdrop closes it. */
 export interface ModalOptions {
   autoHeight?: boolean;
+  className?: string;
 }
 
 let closeCurrent: (() => void) | null = null;
@@ -11,7 +12,10 @@ export function openModal(title: string, body: HTMLElement, options?: ModalOptio
   const backdrop = document.createElement('div');
   backdrop.className = 'modal-backdrop';
   const panel = document.createElement('section');
-  panel.className = 'modal' + (options?.autoHeight ? ' modal-auto' : '');
+  const classes = ['modal'];
+  if (options?.autoHeight) classes.push('modal-auto');
+  if (options?.className) classes.push(options.className);
+  panel.className = classes.join(' ');
   panel.setAttribute('role', 'dialog');
   panel.setAttribute('aria-label', title);
 

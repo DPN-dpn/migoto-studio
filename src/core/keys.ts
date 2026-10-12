@@ -187,22 +187,50 @@ export const VK_KEY_LIST: VkKeyItem[] = [
   { vk: 'VK_PAUSE', label: 'Pause / Break', category: '기호/기타' },
 ];
 
-/**
- * Formats modifier flags and virtual key code into 3DMigoto syntax:
- * e.g. "no_modifiers VK_F1" or "ctrl alt VK_1"
- */
-export function formatKeyBinding(options: {
+export type ModifierState = 'none' | 'require' | 'exclude';
+
+export interface KeyBindingOptions {
   vk: string;
-  ctrl?: boolean;
-  alt?: boolean;
-  shift?: boolean;
-  win?: boolean;
-}): string {
+  ctrl?: ModifierState | boolean;
+  alt?: ModifierState | boolean;
+  shift?: ModifierState | boolean;
+  win?: ModifierState | boolean;
+  explicitNoModifiers?: boolean;
+}
+
+/**
+ * Formats modifier flags (including negative conditions) and virtual key code into 3DMigoto syntax:
+ * e.g. "no_modifiers VK_F1", "ctrl no_alt VK_F1", or "no_ctrl VK_SPACE"
+ */
+export function formatKeyBinding(options: KeyBindingOptions): string {
+  if (options.explicitNoModifiers) {
+    return `no_modifiers ${options.vk}`;
+  }
+
+  const normalize = (val?: ModifierState | boolean): ModifierState => {
+    if (val === true) return 'require';
+    if (val === false || val === undefined) return 'none';
+    return val;
+  };
+
+  const ctrl = normalize(options.ctrl);
+  const alt = normalize(options.alt);
+  const shift = normalize(options.shift);
+  const win = normalize(options.win);
+
   const parts: string[] = [];
-  if (options.ctrl) parts.push('ctrl');
-  if (options.alt) parts.push('alt');
-  if (options.shift) parts.push('shift');
-  if (options.win) parts.push('windows');
+
+  if (ctrl === 'require') parts.push('ctrl');
+  else if (ctrl === 'exclude') parts.push('no_ctrl');
+
+  if (alt === 'require') parts.push('alt');
+  else if (alt === 'exclude') parts.push('no_alt');
+
+  if (shift === 'require') parts.push('shift');
+  else if (shift === 'exclude') parts.push('no_shift');
+
+  if (win === 'require') parts.push('windows');
+  else if (win === 'exclude') parts.push('no_windows');
 
   if (parts.length === 0) {
     parts.push('no_modifiers');
@@ -210,6 +238,78 @@ export function formatKeyBinding(options: {
 
   parts.push(options.vk);
   return parts.join(' ');
+}
+
+export interface ParsedKeyLine {
+  isKeyLine: boolean;
+  prefix: string; // e.g. "key = " or "    key = "
+  vk: string;
+  ctrl: ModifierState;
+  alt: ModifierState;
+  shift: ModifierState;
+  win: ModifierState;
+}
+
+/**
+ * Parses an existing editor line (e.g. "key = ctrl no_alt VK_F1") to extract its modifiers and virtual key.
+ */
+export function parseKeyBindingLine(lineText: string): ParsedKeyLine | null {
+  const match = /^(\s*key\s*=\s*)(.*)$/i.exec(lineText);
+  if (!match) return null;
+
+  const prefix = match[1];
+  const valuePart = match[2].trim();
+  const tokens = valuePart.split(/\s+/).filter(Boolean);
+
+  let vk = 'VK_F1';
+  let ctrl: ModifierState = 'none';
+  let alt: ModifierState = 'none';
+  let shift: ModifierState = 'none';
+  let win: ModifierState = 'none';
+
+  for (const token of tokens) {
+    const lower = token.toLowerCase();
+    if (lower === 'no_modifiers') {
+      ctrl = 'none';
+      alt = 'none';
+      shift = 'none';
+      win = 'none';
+    } else if (lower === 'ctrl') {
+      ctrl = 'require';
+    } else if (lower === 'no_ctrl') {
+      ctrl = 'exclude';
+    } else if (lower === 'alt') {
+      alt = 'require';
+    } else if (lower === 'no_alt') {
+      alt = 'exclude';
+    } else if (lower === 'shift') {
+      shift = 'require';
+    } else if (lower === 'no_shift') {
+      shift = 'exclude';
+    } else if (lower === 'windows') {
+      win = 'require';
+    } else if (lower === 'no_windows') {
+      win = 'exclude';
+    } else if (/^VK_/i.test(token)) {
+      vk = token.toUpperCase();
+    } else {
+      const upper = token.toUpperCase();
+      const direct = `VK_${upper}`;
+      if (VK_KEY_LIST.some((k) => k.vk === direct)) {
+        vk = direct;
+      }
+    }
+  }
+
+  return {
+    isKeyLine: true,
+    prefix,
+    vk,
+    ctrl,
+    alt,
+    shift,
+    win,
+  };
 }
 
 export type KeyInsertFormat = 'value' | 'line' | 'toggle' | 'hold';

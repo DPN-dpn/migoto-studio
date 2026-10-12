@@ -4,36 +4,48 @@ import {
   CODE_TO_VK,
   VK_KEY_LIST,
   formatKeyBinding,
-  generateKeySnippet,
-  type KeyInsertFormat,
+  parseKeyBindingLine,
+  type ModifierState,
   type VkKeyItem,
 } from '../core/keys';
 import { showToast } from './toast';
 
 /**
  * Opens the interactive Key Helper Modal dialog.
- * Captures real-time keyboard presses, converts them to 3DMigoto Virtual Key codes (VK_*),
- * and provides one-click insertion into the editor.
+ * When opened from a 'key = ...' line (e.g. via context menu), it initializes with the current line's
+ * value and directly updates that line upon apply.
+ * Supports positive and negative modifier conditions (ctrl, no_ctrl, alt, no_alt, etc.).
  */
-export function openKeyHelperModal(editor: monaco.editor.IStandaloneCodeEditor): void {
+export function openKeyHelperModal(editor: monaco.editor.ICodeEditor): void {
   const body = document.createElement('div');
   body.className = 'key-helper-modal-body';
 
   let currentVk = 'VK_F1';
-  let isCtrl = false;
-  let isAlt = false;
-  let isShift = false;
-  let isWin = false;
+  let ctrlState: ModifierState = 'none';
+  let altState: ModifierState = 'none';
+  let shiftState: ModifierState = 'none';
+  let winState: ModifierState = 'none';
   let currentFriendlyName = 'F1';
 
-  // Smart default format based on current line in editor
-  let insertFormat: KeyInsertFormat = 'line';
+  // Check if cursor/context is on an existing 'key = ...' line
   const pos = editor.getPosition();
   const model = editor.getModel();
+  let targetLineNumber: number | null = null;
+  let linePrefix = 'key = ';
+
   if (pos && model) {
-    const curLine = model.getLineContent(pos.lineNumber).trim();
-    if (/^key\s*=/i.test(curLine)) {
-      insertFormat = 'value';
+    const curLine = model.getLineContent(pos.lineNumber);
+    const parsed = parseKeyBindingLine(curLine);
+    if (parsed) {
+      targetLineNumber = pos.lineNumber;
+      linePrefix = parsed.prefix;
+      currentVk = parsed.vk;
+      ctrlState = parsed.ctrl;
+      altState = parsed.alt;
+      shiftState = parsed.shift;
+      winState = parsed.win;
+      const found = VK_KEY_LIST.find((k) => k.vk === currentVk);
+      if (found) currentFriendlyName = found.label;
     }
   }
 
@@ -43,9 +55,21 @@ export function openKeyHelperModal(editor: monaco.editor.IStandaloneCodeEditor):
   const captureSection = document.createElement('div');
   captureSection.className = 'key-capture-section';
 
+  const captureTitleRow = document.createElement('div');
+  captureTitleRow.className = 'key-section-title-row';
+
   const captureTitle = document.createElement('div');
   captureTitle.className = 'key-section-title';
   captureTitle.textContent = '실시간 키보드 입력 감지';
+
+  if (targetLineNumber) {
+    const lineBadge = document.createElement('span');
+    lineBadge.className = 'key-line-badge';
+    lineBadge.textContent = `${targetLineNumber}번 줄 구문 편집 중`;
+    captureTitleRow.append(captureTitle, lineBadge);
+  } else {
+    captureTitleRow.append(captureTitle);
+  }
 
   const captureBox = document.createElement('div');
   captureBox.className = 'key-capture-box';
@@ -53,102 +77,149 @@ export function openKeyHelperModal(editor: monaco.editor.IStandaloneCodeEditor):
 
   const capturePrompt = document.createElement('div');
   capturePrompt.className = 'key-capture-prompt';
-  capturePrompt.textContent = '여기를 클릭한 후 키보드를 누르세요 (예: F1, Ctrl+1, Space, Numpad 5 등)';
+  capturePrompt.textContent = '여기를 클릭한 후 키보드를 누르면 즉시 감지됩니다 (예: F1, Ctrl+1, Space 등)';
 
   const capturedDisplay = document.createElement('div');
   capturedDisplay.className = 'key-captured-display';
 
   captureBox.append(capturePrompt, capturedDisplay);
+  captureSection.append(captureTitleRow, captureBox);
 
-  // 2. Modifiers Checkbox Row
-  const modRow = document.createElement('div');
-  modRow.className = 'key-modifier-row';
+  // 2. Modifiers Section with Positive & Negative Conditions
+  const modSection = document.createElement('div');
+  modSection.className = 'key-mod-section';
 
-  const createModCheck = (label: string, getVal: () => boolean, setVal: (v: boolean) => void) => {
-    const wrap = document.createElement('label');
-    wrap.className = 'key-modifier-label';
-    const input = document.createElement('input');
-    input.type = 'checkbox';
-    input.checked = getVal();
-    input.onchange = () => {
-      setVal(input.checked);
-      updateDisplay();
-    };
-    wrap.append(input, document.createTextNode(` ${label}`));
-    return { wrap, input };
-  };
+  const modHeader = document.createElement('div');
+  modHeader.className = 'key-mod-header';
 
-  const chkCtrl = createModCheck('Ctrl', () => isCtrl, (v) => { isCtrl = v; });
-  const chkAlt = createModCheck('Alt', () => isAlt, (v) => { isAlt = v; });
-  const chkShift = createModCheck('Shift', () => isShift, (v) => { isShift = v; });
-  const chkWin = createModCheck('Win', () => isWin, (v) => { isWin = v; });
+  const modTitle = document.createElement('div');
+  modTitle.className = 'key-section-title';
+  modTitle.textContent = '수식키 조건 설정 (필수 / 부정 / 무관)';
 
-  const clearModsBtn = document.createElement('button');
-  clearModsBtn.className = 'small-btn key-clear-btn';
-  clearModsBtn.textContent = '수식키 초기화 (no_modifiers)';
-  clearModsBtn.onclick = () => {
-    isCtrl = false;
-    isAlt = false;
-    isShift = false;
-    isWin = false;
-    chkCtrl.input.checked = false;
-    chkAlt.input.checked = false;
-    chkShift.input.checked = false;
-    chkWin.input.checked = false;
+  const resetModsBtn = document.createElement('button');
+  resetModsBtn.className = 'small-btn key-clear-btn';
+  resetModsBtn.textContent = '수식키 초기화 (no_modifiers)';
+  resetModsBtn.onclick = () => {
+    ctrlState = 'none';
+    altState = 'none';
+    shiftState = 'none';
+    winState = 'none';
     updateDisplay();
+    updateSegmentButtons();
   };
 
-  modRow.append(chkCtrl.wrap, chkAlt.wrap, chkShift.wrap, chkWin.wrap, clearModsBtn);
+  modHeader.append(modTitle, resetModsBtn);
 
-  // 3. Format & Preview Section
-  const previewSection = document.createElement('div');
-  previewSection.className = 'key-preview-section';
+  const modGrid = document.createElement('div');
+  modGrid.className = 'key-mod-grid';
 
-  const formatTitle = document.createElement('div');
-  formatTitle.className = 'key-section-title';
-  formatTitle.textContent = '삽입 형식 선택';
+  interface ModConfig {
+    name: string;
+    get: () => ModifierState;
+    set: (s: ModifierState) => void;
+    requireLabel: string;
+    excludeLabel: string;
+  }
 
-  const formatOptionsRow = document.createElement('div');
-  formatOptionsRow.className = 'key-format-options';
-
-  const formats: { id: KeyInsertFormat; label: string; desc: string }[] = [
-    { id: 'value', label: '값만 삽입', desc: 'key = 뒤에 들어갈 값만 삽입' },
-    { id: 'line', label: '줄 전체 삽입', desc: 'key = ... 한 줄 전체 삽입' },
-    { id: 'toggle', label: '[KeyToggle] 섹션', desc: 'F1으로 변수를 0/1 토글하는 섹션' },
-    { id: 'hold', label: '[KeyHold] 섹션', desc: '키를 누르고 있는 동안만 켜지는 섹션' },
+  const modConfigs: ModConfig[] = [
+    {
+      name: 'Ctrl',
+      get: () => ctrlState,
+      set: (s) => { ctrlState = s; },
+      requireLabel: '+ ctrl (필수)',
+      excludeLabel: '- no_ctrl (부정)',
+    },
+    {
+      name: 'Alt',
+      get: () => altState,
+      set: (s) => { altState = s; },
+      requireLabel: '+ alt (필수)',
+      excludeLabel: '- no_alt (부정)',
+    },
+    {
+      name: 'Shift',
+      get: () => shiftState,
+      set: (s) => { shiftState = s; },
+      requireLabel: '+ shift (필수)',
+      excludeLabel: '- no_shift (부정)',
+    },
+    {
+      name: 'Win',
+      get: () => winState,
+      set: (s) => { winState = s; },
+      requireLabel: '+ windows (필수)',
+      excludeLabel: '- no_windows (부정)',
+    },
   ];
 
-  const radioInputs: HTMLInputElement[] = [];
-  formats.forEach((f) => {
-    const fLabel = document.createElement('label');
-    fLabel.className = 'key-format-radio-label';
-    const radio = document.createElement('input');
-    radio.type = 'radio';
-    radio.name = 'key_insert_format';
-    radio.value = f.id;
-    radio.checked = insertFormat === f.id;
-    radio.onchange = () => {
-      insertFormat = f.id;
+  const updateSegmentButtonsCallbacks: (() => void)[] = [];
+
+  modConfigs.forEach((cfg) => {
+    const itemRow = document.createElement('div');
+    itemRow.className = 'key-mod-item';
+
+    const itemLabel = document.createElement('span');
+    itemLabel.className = 'key-mod-item-name';
+    itemLabel.textContent = cfg.name;
+
+    const segGroup = document.createElement('div');
+    segGroup.className = 'key-seg-group';
+
+    const btnNone = document.createElement('button');
+    btnNone.type = 'button';
+    btnNone.className = 'key-seg-btn';
+    btnNone.textContent = '무관';
+
+    const btnRequire = document.createElement('button');
+    btnRequire.type = 'button';
+    btnRequire.className = 'key-seg-btn seg-require';
+    btnRequire.textContent = cfg.requireLabel;
+
+    const btnExclude = document.createElement('button');
+    btnExclude.type = 'button';
+    btnExclude.className = 'key-seg-btn seg-exclude';
+    btnExclude.textContent = cfg.excludeLabel;
+
+    const updateBtns = () => {
+      const cur = cfg.get();
+      btnNone.classList.toggle('is-selected', cur === 'none');
+      btnRequire.classList.toggle('is-selected', cur === 'require');
+      btnExclude.classList.toggle('is-selected', cur === 'exclude');
+    };
+
+    btnNone.onclick = () => {
+      cfg.set('none');
+      updateBtns();
       updateDisplay();
     };
-    radioInputs.push(radio);
 
-    const titleSpan = document.createElement('strong');
-    titleSpan.textContent = f.label;
-    const descSpan = document.createElement('span');
-    descSpan.className = 'key-format-desc';
-    descSpan.textContent = f.desc;
+    btnRequire.onclick = () => {
+      cfg.set('require');
+      updateBtns();
+      updateDisplay();
+    };
 
-    fLabel.append(radio, titleSpan, descSpan);
-    formatOptionsRow.append(fLabel);
+    btnExclude.onclick = () => {
+      cfg.set('exclude');
+      updateBtns();
+      updateDisplay();
+    };
+
+    updateBtns();
+    updateSegmentButtonsCallbacks.push(updateBtns);
+
+    segGroup.append(btnNone, btnRequire, btnExclude);
+    itemRow.append(itemLabel, segGroup);
+    modGrid.append(itemRow);
   });
 
-  const codePreview = document.createElement('pre');
-  codePreview.className = 'key-code-preview';
+  const updateSegmentButtons = () => {
+    updateSegmentButtonsCallbacks.forEach((fn) => fn());
+  };
 
-  previewSection.append(formatTitle, formatOptionsRow, codePreview);
+  modSection.append(modHeader, modGrid);
 
-  // 4. Virtual Keys Selector (Manual Search / Browsing)
+  // 3. Virtual Keys Selector (Manual Search / Browsing)
   const listSection = document.createElement('div');
   listSection.className = 'key-list-section';
 
@@ -162,7 +233,7 @@ export function openKeyHelperModal(editor: monaco.editor.IStandaloneCodeEditor):
   const searchInput = document.createElement('input');
   searchInput.type = 'search';
   searchInput.className = 'plugin-search-input key-search-input';
-  searchInput.placeholder = '가상 키 검색 (예: F1, Space, Numpad, Mouse, 방향키)…';
+  searchInput.placeholder = '가상 키 검색 (예: F1, Space, Numpad, Mouse)…';
 
   listHeader.append(listTitle, searchInput);
 
@@ -190,6 +261,7 @@ export function openKeyHelperModal(editor: monaco.editor.IStandaloneCodeEditor):
 
     filtered.forEach((item) => {
       const btn = document.createElement('button');
+      btn.type = 'button';
       btn.className = `key-item-btn${item.vk === currentVk ? ' is-selected' : ''}`;
       btn.title = item.description || `${item.label} (${item.vk})`;
       btn.innerHTML = `<span class="key-item-label">${item.label}</span><span class="key-item-vk">${item.vk}</span>`;
@@ -208,69 +280,83 @@ export function openKeyHelperModal(editor: monaco.editor.IStandaloneCodeEditor):
 
   listSection.append(listHeader, keysContainer);
 
-  // 5. Update display function
+  // 4. Preview Bar
+  const previewSection = document.createElement('div');
+  previewSection.className = 'key-preview-section';
+
+  const previewTitle = document.createElement('div');
+  previewTitle.className = 'key-section-title';
+  previewTitle.textContent = '최종 구문 미리보기';
+
+  const codePreview = document.createElement('div');
+  codePreview.className = 'key-code-preview';
+
+  previewSection.append(previewTitle, codePreview);
+
+  // 5. Update Display Function
   const updateDisplay = () => {
-    // 3DMigoto formatted string
     const keyString = formatKeyBinding({
       vk: currentVk,
-      ctrl: isCtrl,
-      alt: isAlt,
-      shift: isShift,
-      win: isWin,
+      ctrl: ctrlState,
+      alt: altState,
+      shift: shiftState,
+      win: winState,
     });
 
-    // Friendly display
     const comboParts: string[] = [];
-    if (isCtrl) comboParts.push('Ctrl');
-    if (isAlt) comboParts.push('Alt');
-    if (isShift) comboParts.push('Shift');
-    if (isWin) comboParts.push('Win');
+    if (ctrlState === 'require') comboParts.push('Ctrl');
+    else if (ctrlState === 'exclude') comboParts.push('(no_ctrl)');
+
+    if (altState === 'require') comboParts.push('Alt');
+    else if (altState === 'exclude') comboParts.push('(no_alt)');
+
+    if (shiftState === 'require') comboParts.push('Shift');
+    else if (shiftState === 'exclude') comboParts.push('(no_shift)');
+
+    if (winState === 'require') comboParts.push('Win');
+    else if (winState === 'exclude') comboParts.push('(no_windows)');
+
     comboParts.push(currentFriendlyName);
     const friendlyCombo = comboParts.join(' + ');
 
     capturedDisplay.innerHTML = `
       <div class="key-display-row">
-        <span class="key-display-tag">입력된 키:</span>
+        <span class="key-display-tag">조합:</span>
         <strong class="key-display-combo">${friendlyCombo}</strong>
       </div>
       <div class="key-display-row">
-        <span class="key-display-tag">3DMigoto:</span>
+        <span class="key-display-tag">3DMigoto 값:</span>
         <code class="key-display-code">${keyString}</code>
       </div>
     `;
 
-    // Code snippet preview
-    const snippet = generateKeySnippet(insertFormat, keyString);
-    codePreview.textContent = snippet;
+    codePreview.textContent = `${linePrefix}${keyString}`;
   };
 
-  // Keyboard capture event on captureBox
+  // Keyboard capture event
   captureBox.onfocus = () => {
     captureBox.classList.add('is-active');
-    capturePrompt.textContent = '키를 누르는 중입니다… 키보드를 누르면 즉시 감지됩니다.';
+    capturePrompt.textContent = '키보드를 누르면 즉시 감지됩니다.';
   };
 
   captureBox.onblur = () => {
     captureBox.classList.remove('is-active');
-    capturePrompt.textContent = '여기를 클릭한 후 키보드를 누르세요 (예: F1, Ctrl+1, Space, Numpad 5 등)';
+    capturePrompt.textContent = '여기를 클릭한 후 키보드를 누르면 즉시 감지됩니다 (예: F1, Ctrl+1, Space 등)';
   };
 
   captureBox.onkeydown = (e) => {
     e.preventDefault();
     e.stopPropagation();
 
-    // Modifier updates
-    isCtrl = e.ctrlKey;
-    isAlt = e.altKey;
-    isShift = e.shiftKey;
-    isWin = e.metaKey;
+    // Map physical modifiers
+    ctrlState = e.ctrlKey ? 'require' : 'none';
+    altState = e.altKey ? 'require' : 'none';
+    shiftState = e.shiftKey ? 'require' : 'none';
+    winState = e.metaKey ? 'require' : 'none';
 
-    chkCtrl.input.checked = isCtrl;
-    chkAlt.input.checked = isAlt;
-    chkShift.input.checked = isShift;
-    chkWin.input.checked = isWin;
+    updateSegmentButtons();
 
-    // Check if only modifier was pressed
+    // If only modifier was pressed, update display and return
     if (['Control', 'Alt', 'Shift', 'Meta'].includes(e.key)) {
       updateDisplay();
       return;
@@ -280,76 +366,88 @@ export function openKeyHelperModal(editor: monaco.editor.IStandaloneCodeEditor):
     const vk = CODE_TO_VK[e.code];
     if (vk) {
       currentVk = vk;
-      // Find matching item or use key label
       const item = VK_KEY_LIST.find((k) => k.vk === vk);
       currentFriendlyName = item ? item.label : e.key.toUpperCase();
       renderKeyItems(searchInput.value);
     } else if (e.key && e.key.length === 1) {
-      // Fallback single character
       const upper = e.key.toUpperCase();
-      const directVk = `VK_${upper}`;
-      currentVk = directVk;
+      currentVk = `VK_${upper}`;
       currentFriendlyName = upper;
     }
 
     updateDisplay();
   };
 
-  // Initial render
   updateDisplay();
 
   // 6. Action Buttons Bar
   const actionsBar = document.createElement('div');
   actionsBar.className = 'key-modal-actions';
 
-  const insertBtn = document.createElement('button');
-  insertBtn.className = 'primary key-action-btn';
-  insertBtn.textContent = '에디터에 삽입';
-  insertBtn.onclick = () => {
+  const applyBtn = document.createElement('button');
+  applyBtn.className = 'primary key-action-btn';
+  applyBtn.textContent = targetLineNumber ? '에디터에 적용' : '에디터에 삽입';
+
+  applyBtn.onclick = () => {
     const keyString = formatKeyBinding({
       vk: currentVk,
-      ctrl: isCtrl,
-      alt: isAlt,
-      shift: isShift,
-      win: isWin,
+      ctrl: ctrlState,
+      alt: altState,
+      shift: shiftState,
+      win: winState,
     });
-    const snippet = generateKeySnippet(insertFormat, keyString);
 
-    const selection = editor.getSelection();
-    const position = editor.getPosition();
-    const range = selection && !selection.isEmpty()
-      ? selection
-      : new monaco.Range(
-          position?.lineNumber || 1,
-          position?.column || 1,
-          position?.lineNumber || 1,
-          position?.column || 1,
-        );
+    if (targetLineNumber !== null && model) {
+      // Replace only the target line's value
+      const lineRange = new monaco.Range(
+        targetLineNumber,
+        1,
+        targetLineNumber,
+        model.getLineMaxColumn(targetLineNumber),
+      );
+      editor.pushUndoStop();
+      editor.executeEdits('key-helper', [{ range: lineRange, text: `${linePrefix}${keyString}` }]);
+      editor.pushUndoStop();
+      editor.focus();
+      closeFn?.();
+      showToast(`'${linePrefix}${keyString}' 적용 완료`, 'info');
+    } else {
+      // Insert at cursor / selection
+      const selection = editor.getSelection();
+      const position = editor.getPosition();
+      const range = selection && !selection.isEmpty()
+        ? selection
+        : new monaco.Range(
+            position?.lineNumber || 1,
+            position?.column || 1,
+            position?.lineNumber || 1,
+            position?.column || 1,
+          );
 
-    editor.pushUndoStop();
-    editor.executeEdits('key-helper', [{ range, text: snippet }]);
-    editor.pushUndoStop();
-    editor.focus();
-
-    closeFn?.();
-    showToast(`'${keyString}' 키 바인딩이 에디터에 삽입되었습니다.`, 'info');
+      const snippet = `key = ${keyString}`;
+      editor.pushUndoStop();
+      editor.executeEdits('key-helper', [{ range, text: snippet }]);
+      editor.pushUndoStop();
+      editor.focus();
+      closeFn?.();
+      showToast(`'${snippet}' 삽입 완료`, 'info');
+    }
   };
 
   const copyBtn = document.createElement('button');
   copyBtn.className = 'secondary key-action-btn';
-  copyBtn.textContent = '클립보드에 복사';
+  copyBtn.textContent = '값만 복사';
   copyBtn.onclick = async () => {
     const keyString = formatKeyBinding({
       vk: currentVk,
-      ctrl: isCtrl,
-      alt: isAlt,
-      shift: isShift,
-      win: isWin,
+      ctrl: ctrlState,
+      alt: altState,
+      shift: shiftState,
+      win: winState,
     });
-    const snippet = generateKeySnippet(insertFormat, keyString);
     try {
-      await navigator.clipboard.writeText(snippet);
-      showToast('키 바인딩 코드가 클립보드에 복사되었습니다.', 'info');
+      await navigator.clipboard.writeText(keyString);
+      showToast(`'${keyString}' 클립보드 복사 완료`, 'info');
     } catch {
       showToast('클립보드 복사 실패', 'warn');
     }
@@ -360,12 +458,15 @@ export function openKeyHelperModal(editor: monaco.editor.IStandaloneCodeEditor):
   cancelBtn.textContent = '닫기';
   cancelBtn.onclick = () => closeFn?.();
 
-  actionsBar.append(insertBtn, copyBtn, cancelBtn);
+  actionsBar.append(applyBtn, copyBtn, cancelBtn);
 
-  body.append(captureSection, modRow, previewSection, listSection, actionsBar);
+  body.append(captureSection, modSection, listSection, previewSection, actionsBar);
 
-  closeFn = openModal('3DMigoto 키 입력 도우미 (Key Helper)', body);
+  closeFn = openModal(
+    targetLineNumber ? `3DMigoto 키 바인딩 편집 (${targetLineNumber}번 줄)` : '3DMigoto 키 입력 도우미',
+    body,
+    { autoHeight: true, className: 'modal-key-helper' },
+  );
 
-  // Auto focus capture box on open
-  setTimeout(() => captureBox.focus(), 80);
+  setTimeout(() => captureBox.focus(), 60);
 }
