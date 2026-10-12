@@ -9,6 +9,7 @@ import { openSettings } from './settings-ui';
 import { openHelp } from './help-ui';
 import { openRestore } from './restore-ui';
 import { openCompareDialog } from './diff-dialog';
+import { openKeyHelperModal } from './key-helper';
 import { runUpdateCheck, openExternalUrl } from '../updater/updater';
 
 export interface MenuBarCallbacks {
@@ -162,6 +163,11 @@ export class MenuBar {
                 action: () => insertTemplate(this.cb.editor, t),
               }));
             },
+          },
+          {
+            label: '키 입력 도우미…',
+            shortcut: 'Ctrl+Shift+K',
+            action: () => openKeyHelperModal(this.cb.editor),
           },
           {
             label: '오류 검사 (다음 문제로 이동)',

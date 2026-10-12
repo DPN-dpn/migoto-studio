@@ -10,6 +10,7 @@ import {
   initCustomTemplates,
 } from '../core/templates';
 import { openModal } from './modal';
+import { openKeyHelperModal } from './key-helper';
 
 function downloadJsonFile(filename: string, content: string) {
   const blob = new Blob([content], { type: 'application/json;charset=utf-8' });
@@ -78,8 +79,14 @@ export class TemplatePanel {
 
     const importBtn = document.createElement('button');
     importBtn.className = 'template-add-btn';
+    const keyHelperBtn = document.createElement('button');
+    keyHelperBtn.className = 'template-add-btn';
+    keyHelperBtn.title = '3DMigoto 키 입력 도우미 열기 (Ctrl+Shift+K)';
+    keyHelperBtn.innerHTML = `<span>키 도우미</span>`;
+    keyHelperBtn.onclick = () => openKeyHelperModal(this.editor);
+
     importBtn.title = '템플릿 JSON 파일 불러오기';
-    importBtn.innerHTML = `<span>📥 불러오기</span>`;
+    importBtn.innerHTML = `<span>불러오기</span>`;
     importBtn.addEventListener('click', async () => {
       await this.handleImport();
     });
@@ -96,7 +103,7 @@ export class TemplatePanel {
     `;
     addBtn.addEventListener('click', () => this.openAddModal());
 
-    actions.append(importBtn, addBtn);
+    actions.append(keyHelperBtn, importBtn, addBtn);
     titleRow.append(actions);
 
     header.append(titleRow);
@@ -178,7 +185,7 @@ export class TemplatePanel {
         const exportGrpBtn = document.createElement('button');
         exportGrpBtn.className = 'template-group-btn';
         exportGrpBtn.title = `'${groupName}' 그룹 템플릿 내보내기 (.json)`;
-        exportGrpBtn.textContent = '📤 내보내기';
+        exportGrpBtn.textContent = '내보내기';
         exportGrpBtn.addEventListener('click', (e) => {
           e.stopPropagation();
           this.handleExportGroup(groupName);
@@ -187,7 +194,7 @@ export class TemplatePanel {
         const importGrpBtn = document.createElement('button');
         importGrpBtn.className = 'template-group-btn';
         importGrpBtn.title = `'${groupName}' 그룹으로 템플릿 불러오기 (.json)`;
-        importGrpBtn.textContent = '📥 불러오기';
+        importGrpBtn.textContent = '불러오기';
         importGrpBtn.addEventListener('click', async (e) => {
           e.stopPropagation();
           await this.handleImport(groupName);

@@ -22,6 +22,7 @@ import { lintModel, optionsFromSettings } from './core/lint';
 import { registerSmartCompletions } from './core/completions';
 import { DiffViewer } from './ui/diff-viewer';
 import { openCompareDialog } from './ui/diff-dialog';
+import { openKeyHelperModal } from './ui/key-helper';
 import { initPwa } from './pwa';
 import { checkOnStartup } from './updater/updater';
 
@@ -228,6 +229,7 @@ async function boot() {
     else if (key === 'b') run(() => activityBar.toggleSidebar());
     else if (key === 'e' && e.shiftKey) run(() => activityBar.switchTo('explorer'));
     else if (key === 'd' && e.shiftKey) run(() => openCompareDialog(doc));
+    else if (key === 'k' && e.shiftKey) run(() => openKeyHelperModal(editor));
     else if (key === 'tab') run(() => (e.shiftKey ? doc.prevTab() : doc.nextTab()));
     else if (key === 'pageup') run(() => doc.prevTab());
     else if (key === 'pagedown') run(() => doc.nextTab());
