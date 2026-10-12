@@ -109,7 +109,7 @@
     - 플러그인 수명주기(`activate`, `deactivate`), `localStorage` 활성화 상태 영구화, 샌드박스형 `PluginContext` API (문서 접근, 에디터 조작, 파일 트리 탐색, 모달/토스트 알림, 프로세스 실행, 사이드바 뷰 등록).
   - **기본 3대 내장 플러그인 (`src/plugins/builtin.ts`)**:
     1. **Python Runner (`python-runner`)**: 인라인 코드/스크립트 파일 실행, 실시간 stdin/stdout 콘솔 출력, 에디터 커서 결과 삽입.
-    2. **Asset Viewer (`asset-viewer`)**: 현재 문서의 `filename = ` 텍스처 참조 자동 스캔, 외부 의존성 없는 자체 순수 TS DXT1/3/5/BGRA32 디코더(`src/plugins/dds-decoder.ts`)를 통한 체커보드 캔버스 렌더링.
+    2. **Asset Viewer (`asset-viewer` v1.1.0)**: 외부 의존성 없는 자체 순수 TS 디코더(`src/plugins/dds-decoder.ts`)로 BC1~BC7, DX10 확장 헤더, sRGB/Linear 실시간 감마 전환 및 채널 필터링 지원 체커보드 캔버스 렌더링.
     3. **AI Assistant (`ai-assistant`)**: OpenAI/Ollama 호환 엔드포인트 대화형 모딩 어시스턴트, 코드 원클릭 삽입.
   - **UI 통합 (`src/plugin-panel.ts`, `index.html`, `src/activitybar.ts`)**:
     - 좌측 액티비티 바 4번째 탭 `act-plugins` (`🧩`, `Ctrl+Shift+X`).

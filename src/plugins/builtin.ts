@@ -205,10 +205,10 @@ if len(sys.argv) > 1:
 const ASSET_VIEWER_MANIFEST: PluginManifest = {
   id: 'asset-viewer',
   name: 'DDS / 텍스처 뷰어',
-  version: '1.0.0',
-  description: '탐색기에서 DDS/PNG/JPG 에셋 클릭 시 에디터 탭에서 인터랙티브 캔버스 뷰어로 고해상도 미리보기를 제공합니다.',
+  version: '1.1.0',
+  description: '탐색기에서 DDS/PNG/JPG 에셋 클릭 시 에디터 탭에서 인터랙티브 캔버스 뷰어로 고해상도 미리보기를 제공합니다. (BC1-BC7, sRGB/Linear, 채널 필터링 지원)',
   author: 'Migoto Studio',
-  icon: '🖼',
+  icon: 'IMG',
   category: 'assets',
   location: '파일 탐색기 & 에디터 탭 (.dds, 이미지)',
 };
@@ -521,7 +521,7 @@ export const BUILTIN_PLUGINS: BuiltinPluginDef[] = [
   {
     manifest: ASSET_VIEWER_MANIFEST,
     createPlugin: createAssetViewerPlugin,
-    standaloneScript: `// Asset Viewer Plugin\nexport default {\n  activate: (ctx) => console.log('Asset Viewer Activated'),\n};`,
+    standaloneScript: `// Asset Viewer Plugin v1.1.0\nexport default {\n  activate: (ctx) => console.log('Asset Viewer Activated'),\n};`,
   },
   {
     manifest: AI_ASSISTANT_MANIFEST,

@@ -17,6 +17,9 @@ test('BUILTIN_PLUGINS registers 3 default plugins with unique IDs', () => {
     assert.ok(p.manifest.location, `Plugin ${p.manifest.id} must have location specified`);
     assert.ok(typeof p.createPlugin === 'function');
   }
+
+  const asset = BUILTIN_PLUGINS.find((p) => p.manifest.id === 'asset-viewer')!;
+  assert.equal(asset.manifest.version, '1.1.0');
 });
 
 test('decodeDDS throws on invalid magic buffer', () => {
