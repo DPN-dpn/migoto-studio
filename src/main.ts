@@ -23,6 +23,11 @@ import { registerSmartCompletions } from './core/completions';
 import { DiffViewer } from './ui/diff-viewer';
 import { openCompareDialog } from './ui/diff-dialog';
 import { openKeyHelperModal } from './ui/key-helper';
+import {
+  registerSymbolProviders,
+  jumpToDefinition,
+  showReferencesDialog,
+} from './core/symbol-nav';
 import { initPwa } from './pwa';
 import { checkOnStartup } from './updater/updater';
 import { CURRENT_APP_VERSION } from './updater/version';
@@ -105,11 +110,35 @@ async function boot() {
   });
 
   const doc = new DocumentManager(editor, $('custom-viewer-container'));
+  registerSymbolProviders(monaco, doc);
   const diffViewer = new DiffViewer($('diff-container'), doc);
   doc.setDiffViewer(diffViewer);
   const outline = new OutlinePanel(editor, doc, $('sidebar'), $('sidebar-panel-outline'), $('sidebar-resizer'));
   const explorer = new FileExplorer($('sidebar-panel-explorer'), doc);
   new TemplatePanel($('sidebar-panel-templates'), editor);
+
+  // ---- Symbol Navigation Actions (F12 / Shift+F12) ----
+  editor.addAction({
+    id: 'migoto-go-to-definition',
+    label: '선언된 곳으로 이동 (Go to Definition)',
+    keybindings: [monaco.KeyCode.F12],
+    contextMenuGroupId: '10_navigation',
+    contextMenuOrder: 1,
+    run: () => {
+      jumpToDefinition(editor, doc, explorer);
+    },
+  });
+
+  editor.addAction({
+    id: 'migoto-find-references',
+    label: '참조 및 사용 위치 찾기 (Find Usages)...',
+    keybindings: [monaco.KeyMod.Shift | monaco.KeyCode.F12],
+    contextMenuGroupId: '10_navigation',
+    contextMenuOrder: 2,
+    run: () => {
+      showReferencesDialog(editor, doc, explorer);
+    },
+  });
   const pluginManager = new PluginManager(doc, editor, explorer);
   new PluginPanel($('sidebar-panel-plugins'), pluginManager);
   new TabBar(doc, $('tabbar'), $('btn-new-tab'), $('tab-menu'));
@@ -157,6 +186,8 @@ async function boot() {
     explorer,
     activityBar,
     onJumpLint: jumpNextLint,
+    onGoToDefinition: () => jumpToDefinition(editor, doc, explorer),
+    onFindReferences: () => showReferencesDialog(editor, doc, explorer),
   });
 
   // ---- settings -> UI / editor ----

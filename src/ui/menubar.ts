@@ -18,6 +18,8 @@ export interface MenuBarCallbacks {
   explorer: FileExplorer;
   activityBar: ActivityBar;
   onJumpLint: () => void;
+  onGoToDefinition: () => void;
+  onFindReferences: () => void;
 }
 
 interface MenuItemDef {
@@ -148,6 +150,17 @@ export class MenuBar {
             label: '바꾸기',
             shortcut: 'Ctrl+H',
             action: () => this.cb.editor.getAction('editor.action.startFindReplaceAction')?.run(),
+          },
+          { divider: true },
+          {
+            label: '선언으로 이동',
+            shortcut: 'F12',
+            action: () => this.cb.onGoToDefinition(),
+          },
+          {
+            label: '참조 및 사용 위치 찾기…',
+            shortcut: 'Shift+F12',
+            action: () => this.cb.onFindReferences(),
           },
           { divider: true },
           {
