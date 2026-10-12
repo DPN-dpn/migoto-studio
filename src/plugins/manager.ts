@@ -15,6 +15,7 @@ import type {
   PluginManifest,
   RegisteredSidebarView,
 } from './types';
+import { createUIBuilder } from './ui-builder';
 
 export { validatePluginZip, type ExtractedPlugin };
 
@@ -173,7 +174,7 @@ export class PluginManager {
             await platform().saveDiskPlugin!(
               def.manifest.id,
               JSON.stringify(def.manifest, null, 2),
-              def.standaloneScript,
+              def.standaloneScript || `// ${def.manifest.name}\nexport default {\n  activate(context) {\n    context.ui.showToast('${def.manifest.name} 플러그인이 로드되었습니다.');\n  }\n};\n`,
             );
           } catch { }
         }
@@ -650,6 +651,7 @@ export default {
       },
 
       ui: {
+        ...createUIBuilder(),
         registerSidebarView: (options) => {
           callbacks.onRegisterView({
             id: options.id,

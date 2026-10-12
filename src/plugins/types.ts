@@ -10,6 +10,13 @@ export interface PluginManifest {
   location?: string;
 }
 
+import type { PluginUIBuilder } from './ui-builder.ts';
+
+export interface SelectOption {
+  value: string;
+  label: string;
+}
+
 export interface PluginContext {
   manifest: PluginManifest;
 
@@ -50,7 +57,7 @@ export interface PluginContext {
       tooltip?: string;
       onClick?: () => void;
     }): void;
-  };
+  } & PluginUIBuilder;
 
   // ---- System execution (desktop) ----
   system: {

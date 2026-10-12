@@ -3,7 +3,17 @@ import assert from 'node:assert/strict';
 import { decodeDDS } from '../src/plugins/dds-decoder.ts';
 import { BUILTIN_PLUGINS } from '../src/plugins/builtin.ts';
 import { validatePluginZip } from '../src/plugins/zip.ts';
+import { definePlugin } from '../src/plugins/api.ts';
 import { zipSync, strToU8 } from 'fflate';
+
+test('definePlugin returns identical plugin definition with type inference', () => {
+  const plugin = definePlugin({
+    activate(ctx) {},
+    deactivate() {},
+  });
+  assert.equal(typeof plugin.activate, 'function');
+  assert.equal(typeof plugin.deactivate, 'function');
+});
 
 test('BUILTIN_PLUGINS registers 3 default plugins with unique IDs', () => {
   assert.equal(BUILTIN_PLUGINS.length, 3);

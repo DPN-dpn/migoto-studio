@@ -1,10 +1,10 @@
-import type { MigotoPlugin, PluginContext } from '../../types.ts';
+import { definePlugin, type PluginContext } from '../../api.ts';
 
 /**
  * AI 모딩 어시스턴트 플러그인
  * OpenAI 또는 로컬 Ollama 호환 API를 연동하여 INI 분석, 섹션 생성 및 질의응답을 수행합니다.
  */
-const aiAssistantPlugin: MigotoPlugin = {
+export default definePlugin({
   activate(context: PluginContext) {
     context.ui.registerSidebarView({
       id: 'ai-assistant',
@@ -14,172 +14,111 @@ const aiAssistantPlugin: MigotoPlugin = {
         container.className = 'sidebar-panel dynamic-plugin-panel plugin-subview ai-assistant-panel';
         container.replaceChildren();
 
-        const header = document.createElement('div');
-        header.className = 'panel-section-title';
-        header.innerHTML = '<span>AI 모딩 어시스턴트</span>';
+        // 1. 헤더 생성
+        const header = context.ui.createPanelHeader('AI 모딩 어시스턴트');
 
-        // Config Section (Collapsible)
-        const configDetails = document.createElement('details');
-        configDetails.className = 'ai-config-details';
-        const summary = document.createElement('summary');
-        summary.textContent = 'API 연결 설정 (OpenAI / Ollama)';
-        configDetails.append(summary);
+        // 2. 설정 영역 API
+        const urlInput = context.ui.createInput({
+          label: 'API URL:',
+          placeholder: 'https://api.openai.com/v1',
+          value: context.storage.get('api_url', 'https://api.openai.com/v1'),
+          onInput: (v) => context.storage.set('api_url', v.trim()),
+        });
 
-        const configBox = document.createElement('div');
-        configBox.className = 'ai-config-box';
+        const keyInput = context.ui.createInput({
+          label: 'API Key:',
+          type: 'password',
+          placeholder: 'sk-... (Ollama는 비워둠)',
+          value: context.storage.get('api_key', ''),
+          onInput: (v) => context.storage.set('api_key', v.trim()),
+        });
 
-        const urlRow = document.createElement('div');
-        urlRow.className = 'form-row';
-        const urlLabel = document.createElement('label');
-        urlLabel.textContent = 'API URL:';
-        const urlInput = document.createElement('input');
-        urlInput.className = 'plugin-input';
-        urlInput.placeholder = 'https://api.openai.com/v1';
-        urlInput.value = context.storage.get('api_url', 'https://api.openai.com/v1');
-        urlInput.oninput = () => context.storage.set('api_url', urlInput.value.trim());
-        urlRow.append(urlLabel, urlInput);
+        const modelInput = context.ui.createInput({
+          label: '모델명:',
+          placeholder: 'gpt-4o-mini 또는 llama3',
+          value: context.storage.get('model', 'gpt-4o-mini'),
+          onInput: (v) => context.storage.set('model', v.trim()),
+        });
 
-        const keyRow = document.createElement('div');
-        keyRow.className = 'form-row';
-        const keyLabel = document.createElement('label');
-        keyLabel.textContent = 'API Key:';
-        const keyInput = document.createElement('input');
-        keyInput.type = 'password';
-        keyInput.className = 'plugin-input';
-        keyInput.placeholder = 'sk-... (Ollama는 비워둠)';
-        keyInput.value = context.storage.get('api_key', '');
-        keyInput.oninput = () => context.storage.set('api_key', keyInput.value.trim());
-        keyRow.append(keyLabel, keyInput);
+        const configDetails = context.ui.createDetails({
+          summary: 'API 연결 설정 (OpenAI / Ollama)',
+          children: [urlInput.row, keyInput.row, modelInput.row],
+        });
 
-        const modelRow = document.createElement('div');
-        modelRow.className = 'form-row';
-        const modelLabel = document.createElement('label');
-        modelLabel.textContent = '모델명:';
-        const modelInput = document.createElement('input');
-        modelInput.className = 'plugin-input';
-        modelInput.placeholder = 'gpt-4o-mini 또는 llama3';
-        modelInput.value = context.storage.get('model', 'gpt-4o-mini');
-        modelInput.oninput = () => context.storage.set('model', modelInput.value.trim());
-        modelRow.append(modelLabel, modelInput);
+        // 3. 퀵 액션 프롬프트 툴바 API
+        const btnFix = context.ui.createButton({
+          text: '[분석] 문법/오류 분석',
+          variant: 'small',
+          onClick: () => {
+            promptTextarea.value = '현재 INI 파일의 문법적 오류나 권장되지 않는 작성 방식을 검사하고 수정안을 제시해 줘.';
+            sendMessage(promptTextarea.value);
+          },
+        });
 
-        configBox.append(urlRow, keyRow, modelRow);
-        configDetails.append(configBox);
+        const btnToggle = context.ui.createButton({
+          text: '[생성] 토글 키 섹션 생성',
+          variant: 'small',
+          onClick: () => {
+            promptTextarea.value = 'F1 키를 누르면 텍스처를 켜고 끄는 완전한 [KeyToggle] 및 관련 [Constants], [TextureOverride] 섹션을 만들어 줘.';
+            sendMessage(promptTextarea.value);
+          },
+        });
 
-        // Quick Action Prompts
+        const btnComment = context.ui.createButton({
+          text: '[주석] 섹션 한글 주석',
+          variant: 'small',
+          onClick: () => {
+            promptTextarea.value = '현재 파일의 각 섹션 위에 어떤 역할을 하는지 한국어로 상세한 주석을 달아줘.';
+            sendMessage(promptTextarea.value);
+          },
+        });
+
         const quickActionsRow = document.createElement('div');
         quickActionsRow.className = 'ai-quick-actions';
-
-        const btnFix = document.createElement('button');
-        btnFix.className = 'small-btn';
-        btnFix.textContent = '[분석] 문법/오류 분석';
-
-        const btnToggle = document.createElement('button');
-        btnToggle.className = 'small-btn';
-        btnToggle.textContent = '[생성] 토글 키 섹션 생성';
-
-        const btnComment = document.createElement('button');
-        btnComment.className = 'small-btn';
-        btnComment.textContent = '[주석] 섹션 한글 주석';
-
         quickActionsRow.append(btnFix, btnToggle, btnComment);
 
-        // Chat History Container
+        // 4. 대화 내역 컨테이너
         const chatHistory = document.createElement('div');
         chatHistory.className = 'ai-chat-history';
 
-        // Input area
+        // 5. 입력 영역 API
         const inputArea = document.createElement('div');
         inputArea.className = 'ai-input-area';
 
-        const attachRow = document.createElement('div');
-        attachRow.className = 'form-check-row';
-        const attachCheck = document.createElement('input');
-        attachCheck.type = 'checkbox';
-        attachCheck.id = 'ai-attach-file';
-        attachCheck.checked = true;
-        const attachLabel = document.createElement('label');
-        attachLabel.htmlFor = 'ai-attach-file';
-        attachLabel.textContent = '현재 열린 INI 파일 내용 함께 전달';
-        attachRow.append(attachCheck, attachLabel);
+        const attachCheck = context.ui.createCheckbox({
+          id: 'ai-attach-file',
+          label: '현재 열린 INI 파일 내용 함께 전달',
+          checked: true,
+        });
 
         const promptTextarea = document.createElement('textarea');
         promptTextarea.className = 'plugin-input ai-textarea';
         promptTextarea.placeholder = 'AI에게 INI 모딩 관련 질문이나 코드 작성을 요청하세요...';
         promptTextarea.rows = 3;
 
-        const sendBtn = document.createElement('button');
-        sendBtn.className = 'primary ai-send-btn';
-        sendBtn.textContent = '전송';
+        const sendBtn = context.ui.createButton({
+          text: '전송',
+          variant: 'primary',
+          onClick: () => sendMessage(promptTextarea.value),
+        });
 
-        inputArea.append(attachRow, promptTextarea, sendBtn);
+        inputArea.append(attachCheck.row, promptTextarea, sendBtn);
 
         function appendMessage(role: 'user' | 'assistant', text: string) {
-          const msgEl = document.createElement('div');
-          msgEl.className = `ai-message ${role}`;
-
-          const badge = document.createElement('div');
-          badge.className = 'ai-message-badge';
-          badge.textContent = role === 'user' ? '[질문]' : '[AI 어시스턴트]';
-          msgEl.append(badge);
-
-          const contentEl = document.createElement('div');
-          contentEl.className = 'ai-message-content';
-
-          // Extract code blocks if any
-          const codeBlockRegex = /```(?:ini)?([\s\S]*?)```/g;
-          let lastIdx = 0;
-          let match: RegExpExecArray | null;
-
-          while ((match = codeBlockRegex.exec(text)) !== null) {
-            const textBefore = text.slice(lastIdx, match.index);
-            if (textBefore) {
-              const p = document.createElement('p');
-              p.textContent = textBefore;
-              contentEl.append(p);
-            }
-
-            const codeContent = match[1].trim();
-            const codeBox = document.createElement('div');
-            codeBox.className = 'ai-code-block';
-
-            const pre = document.createElement('pre');
-            pre.textContent = codeContent;
-            codeBox.append(pre);
-
-            const btnBar = document.createElement('div');
-            btnBar.className = 'ai-code-bar';
-
-            const insertBtn = document.createElement('button');
-            insertBtn.className = 'small-btn';
-            insertBtn.textContent = '에디터에 삽입';
-            insertBtn.onclick = () => {
-              context.editor.insertText(codeContent + '\n');
+          const msgEl = context.ui.createChatMessage({
+            role,
+            badge: role === 'user' ? '[질문]' : '[AI 어시스턴트]',
+            content: text,
+            onInsertCode: (code) => {
+              context.editor.insertText(code + '\n');
               context.ui.showToast('에디터에 코드가 삽입되었습니다.', 'info');
-            };
-
-            const copyBtn = document.createElement('button');
-            copyBtn.className = 'small-btn';
-            copyBtn.textContent = '복사';
-            copyBtn.onclick = () => {
-              navigator.clipboard.writeText(codeContent);
+            },
+            onCopyCode: (code) => {
+              navigator.clipboard.writeText(code);
               context.ui.showToast('클립보드에 복사되었습니다.', 'info');
-            };
+            },
+          });
 
-            btnBar.append(insertBtn, copyBtn);
-            codeBox.append(btnBar);
-            contentEl.append(codeBox);
-
-            lastIdx = match.index + match[0].length;
-          }
-
-          const remaining = text.slice(lastIdx);
-          if (remaining) {
-            const p = document.createElement('p');
-            p.textContent = remaining;
-            contentEl.append(p);
-          }
-
-          msgEl.append(contentEl);
           chatHistory.append(msgEl);
           chatHistory.scrollTop = chatHistory.scrollHeight;
         }
@@ -198,7 +137,7 @@ const aiAssistantPlugin: MigotoPlugin = {
 코드는 반드시 \`\`\`ini 코드 \`\`\` 마크다운 코드 블록으로 감싸서 작성해 주세요.`;
 
           let promptWithContext = userPrompt;
-          if (attachCheck.checked) {
+          if (attachCheck.isChecked()) {
             const file = context.workspace.getCurrentFile();
             const text = context.editor.getText();
             promptWithContext += `\n\n[현재 열린 파일: ${file?.name || 'document.ini'}]\n\`\`\`ini\n${text}\n\`\`\``;
@@ -241,29 +180,9 @@ const aiAssistantPlugin: MigotoPlugin = {
           }
         }
 
-        sendBtn.onclick = () => sendMessage(promptTextarea.value);
-
-        btnFix.onclick = () => {
-          promptTextarea.value = '현재 INI 파일의 문법적 오류나 권장되지 않는 작성 방식을 검사하고 수정안을 제시해 줘.';
-          sendMessage(promptTextarea.value);
-        };
-
-        btnToggle.onclick = () => {
-          promptTextarea.value = 'F1 키를 누르면 텍스처를 켜고 끄는 완전한 [KeyToggle] 및 관련 [Constants], [TextureOverride] 섹션을 만들어 줘.';
-          sendMessage(promptTextarea.value);
-        };
-
-        btnComment.onclick = () => {
-          promptTextarea.value = '현재 파일의 각 섹션 위에 어떤 역할을 하는지 한국어로 상세한 주석을 달아줘.';
-          sendMessage(promptTextarea.value);
-        };
-
         container.append(header, configDetails, quickActionsRow, chatHistory, inputArea);
       },
     });
   },
   deactivate() {},
-};
-
-export default aiAssistantPlugin;
-export { aiAssistantPlugin };
+});
