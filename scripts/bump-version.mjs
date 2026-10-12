@@ -78,23 +78,45 @@ async function main() {
 
   console.log(`[version] 새 버전 적용: ${newVersion}`);
 
-  // 1. Update package.json
+  // 1. Update package.json & package-lock.json
   pkg.version = newVersion;
   await writeFile(PKG_PATH, JSON.stringify(pkg, null, 2) + '\n');
-  console.log(`  ✓ package.json: ${pkgVersion} -> ${newVersion}`);
+  console.log(`  [OK] package.json: ${pkgVersion} -> ${newVersion}`);
+
+  const LOCK_PATH = join(ROOT, 'package-lock.json');
+  try {
+    const lock = JSON.parse(await readFile(LOCK_PATH, 'utf8'));
+    lock.version = newVersion;
+    if (lock.packages && lock.packages['']) {
+      lock.packages[''].version = newVersion;
+    }
+    await writeFile(LOCK_PATH, JSON.stringify(lock, null, 2) + '\n');
+    console.log(`  [OK] package-lock.json: ${pkgVersion} -> ${newVersion}`);
+  } catch {}
 
   // 2. Update src-tauri/tauri.conf.json
   tauri.version = newVersion;
   await writeFile(TAURI_PATH, JSON.stringify(tauri, null, 2) + '\n');
-  console.log(`  ✓ src-tauri/tauri.conf.json: ${tauriVersion} -> ${newVersion}`);
+  console.log(`  [OK] src-tauri/tauri.conf.json: ${tauriVersion} -> ${newVersion}`);
 
-  // 3. Update src-tauri/Cargo.toml
+  // 3. Update src-tauri/Cargo.toml & Cargo.lock
   const updatedCargo = cargoContent.replace(
     /(\[package\][\s\S]*?^version\s*=\s*)"[^"]+"/m,
     `$1"${newVersion}"`
   );
   await writeFile(CARGO_PATH, updatedCargo);
-  console.log(`  ✓ src-tauri/Cargo.toml: ${cargoVersion} -> ${newVersion}`);
+  console.log(`  [OK] src-tauri/Cargo.toml: ${cargoVersion} -> ${newVersion}`);
+
+  const CARGO_LOCK_PATH = join(ROOT, 'src-tauri', 'Cargo.lock');
+  try {
+    const cargoLock = await readFile(CARGO_LOCK_PATH, 'utf8');
+    const updatedCargoLock = cargoLock.replace(
+      /(\[\[package\]\]\s*name\s*=\s*"migoto-studio"\s*version\s*=\s*)"[^"]+"/m,
+      `$1"${newVersion}"`
+    );
+    await writeFile(CARGO_LOCK_PATH, updatedCargoLock);
+    console.log(`  [OK] src-tauri/Cargo.lock: -> ${newVersion}`);
+  } catch {}
 
   // 4. Update src/updater/version.ts
   const VERSION_PATH = join(ROOT, 'src', 'updater', 'version.ts');

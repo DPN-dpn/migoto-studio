@@ -43,7 +43,7 @@ function main() {
   // 4. Git 커밋 및 태그 자동 생성
   console.log('[release] 4. Git 릴리스 커밋 및 태그 생성...');
   try {
-    execSync('git add package.json src-tauri/tauri.conf.json src-tauri/Cargo.toml src/updater/version.ts release-notes.md CHANGELOG.md', { cwd: ROOT, stdio: 'inherit' });
+    execSync('git add package.json package-lock.json src-tauri/tauri.conf.json src-tauri/Cargo.toml src-tauri/Cargo.lock src/updater/version.ts CHANGELOG.md', { cwd: ROOT, stdio: 'inherit' });
     execSync(`git commit -m "chore(release): v${newVersion} 버전 릴리스"`, { cwd: ROOT, stdio: 'inherit' });
     execSync(`git tag v${newVersion}`, { cwd: ROOT, stdio: 'inherit' });
 
