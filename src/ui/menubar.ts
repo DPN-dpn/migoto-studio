@@ -20,6 +20,7 @@ export interface MenuBarCallbacks {
   onJumpLint: () => void;
   onGoToDefinition: () => void;
   onFindReferences: () => void;
+  onFindInFiles: () => void;
 }
 
 interface MenuItemDef {
@@ -150,6 +151,11 @@ export class MenuBar {
             label: '바꾸기',
             shortcut: 'Ctrl+H',
             action: () => this.cb.editor.getAction('editor.action.startFindReplaceAction')?.run(),
+          },
+          {
+            label: '전체 파일에서 찾기',
+            shortcut: 'Ctrl+Shift+F',
+            action: () => this.cb.onFindInFiles(),
           },
           { divider: true },
           {

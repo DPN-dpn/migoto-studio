@@ -8,6 +8,7 @@ import { defineThemes, THEME_DARK, THEME_LIGHT } from './core/theme';
 import { DocumentManager, ENCODING_LABELS, type Encoding } from './core/documents';
 import { TabBar } from './ui/tabbar';
 import { FileExplorer } from './ui/explorer';
+import { SearchPanel } from './ui/search-panel';
 import { TemplatePanel } from './ui/template-panel';
 import { PluginManager } from './plugins';
 import { PluginPanel } from './ui/plugin-panel';
@@ -117,7 +118,30 @@ async function boot() {
   doc.setDiffViewer(diffViewer);
   const outline = new OutlinePanel(editor, doc, $('sidebar'), $('sidebar-panel-outline'), $('sidebar-resizer'));
   const explorer = new FileExplorer($('sidebar-panel-explorer'), doc);
+  const searchPanel = new SearchPanel($('sidebar-panel-search'), doc, editor, explorer);
   new TemplatePanel($('sidebar-panel-templates'), editor);
+
+  let activityBar: ActivityBar;
+
+  // ---- Global Search Helper ----
+  const openFindInFiles = () => {
+    activityBar?.switchTo('search');
+    const sel = editor.getSelection();
+    const model = editor.getModel();
+    let text = '';
+    if (sel && model && !sel.isEmpty()) {
+      text = model.getValueInRange(sel);
+    }
+    searchPanel.focusSearch(text);
+  };
+
+  // Global Ctrl+Shift+F shortcut
+  window.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'f' || e.key === 'F')) {
+      e.preventDefault();
+      openFindInFiles();
+    }
+  });
 
   // ---- Symbol Navigation Actions (F12 / Shift+F12) ----
   editor.addAction({
@@ -141,18 +165,31 @@ async function boot() {
       showReferencesDialog(editor, doc, explorer);
     },
   });
+
+  editor.addAction({
+    id: 'migoto-find-in-files',
+    label: '전체 파일에서 찾기 (Find in Files)...',
+    keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.KeyF],
+    contextMenuGroupId: '10_navigation',
+    contextMenuOrder: 3,
+    run: () => {
+      openFindInFiles();
+    },
+  });
   const pluginManager = new PluginManager(doc, editor, explorer);
   new PluginPanel($('sidebar-panel-plugins'), pluginManager);
   new TabBar(doc, $('tabbar'), $('btn-new-tab'), $('tab-menu'));
 
   // ---- Activity Bar (세로 툴바) ----
-  const activityBar = new ActivityBar(
+  activityBar = new ActivityBar(
     $('activity-bar'),
     $('act-explorer'),
+    $('act-search'),
     $('act-outline'),
     $('act-templates'),
     $('act-plugins'),
     $('sidebar-panel-explorer'),
+    $('sidebar-panel-search'),
     $('sidebar-panel-outline'),
     $('sidebar-panel-templates'),
     $('sidebar-panel-plugins'),
@@ -190,6 +227,7 @@ async function boot() {
     onJumpLint: jumpNextLint,
     onGoToDefinition: () => jumpToDefinition(editor, doc, explorer),
     onFindReferences: () => showReferencesDialog(editor, doc, explorer),
+    onFindInFiles: openFindInFiles,
   });
 
   // ---- settings -> UI / editor ----

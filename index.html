@@ -37,6 +37,12 @@
                 <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
               </svg>
             </button>
+            <button id="act-search" class="activity-bar-btn" title="전체 파일 검색 (Ctrl+Shift+F)" aria-label="검색">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              </svg>
+            </button>
             <button id="act-outline" class="activity-bar-btn" title="섹션 개요 목록" aria-label="섹션 목록">
               <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                 <line x1="8" y1="6" x2="21" y2="6"></line>
@@ -74,6 +80,7 @@
         </nav>
         <aside id="sidebar" aria-label="사이드바">
           <div id="sidebar-panel-explorer" class="sidebar-panel active"></div>
+          <div id="sidebar-panel-search" class="sidebar-panel" hidden></div>
           <div id="sidebar-panel-outline" class="sidebar-panel" hidden></div>
           <div id="sidebar-panel-templates" class="sidebar-panel" hidden></div>
           <div id="sidebar-panel-plugins" class="sidebar-panel" hidden></div>

@@ -2,7 +2,7 @@ import { getSettings, updateSettings, onSettingsChange } from '../core/settings'
 import type { OutlinePanel } from './outline';
 import { renderPluginIcon } from '../plugins/types';
 
-export type ActivityPanel = 'explorer' | 'outline' | 'templates' | 'plugins' | string;
+export type ActivityPanel = 'explorer' | 'search' | 'outline' | 'templates' | 'plugins' | string;
 
 export interface DynamicTab {
   id: string;
@@ -24,10 +24,12 @@ export class ActivityBar {
   constructor(
     private barEl: HTMLElement,
     private explorerBtn: HTMLElement,
+    private searchBtn: HTMLElement,
     private outlineBtn: HTMLElement,
     private templatesBtn: HTMLElement,
     private pluginsBtn: HTMLElement,
     private panelExplorer: HTMLElement,
+    private panelSearch: HTMLElement,
     private panelOutline: HTMLElement,
     private panelTemplates: HTMLElement,
     private panelPlugins: HTMLElement,
@@ -131,6 +133,7 @@ export class ActivityBar {
 
   private bindEvents() {
     this.explorerBtn.addEventListener('click', () => this.handlePanelClick('explorer'));
+    this.searchBtn.addEventListener('click', () => this.handlePanelClick('search'));
     this.outlineBtn.addEventListener('click', () => this.handlePanelClick('outline'));
     this.templatesBtn.addEventListener('click', () => this.handlePanelClick('templates'));
     this.pluginsBtn.addEventListener('click', () => this.handlePanelClick('plugins'));
@@ -177,12 +180,16 @@ export class ActivityBar {
     const isShowing = getSettings().showOutline;
 
     const isExp = isShowing && this.activePanel === 'explorer';
+    const isSrc = isShowing && this.activePanel === 'search';
     const isOut = isShowing && this.activePanel === 'outline';
     const isTpl = isShowing && this.activePanel === 'templates';
     const isPlg = isShowing && this.activePanel === 'plugins';
 
     this.explorerBtn.classList.toggle('active', isExp);
     this.explorerBtn.setAttribute('aria-pressed', String(isExp));
+
+    this.searchBtn.classList.toggle('active', isSrc);
+    this.searchBtn.setAttribute('aria-pressed', String(isSrc));
 
     this.outlineBtn.classList.toggle('active', isOut);
     this.outlineBtn.setAttribute('aria-pressed', String(isOut));
@@ -195,6 +202,7 @@ export class ActivityBar {
 
     // Show/hide sub-panels inside the sidebar
     this.panelExplorer.hidden = this.activePanel !== 'explorer';
+    this.panelSearch.hidden = this.activePanel !== 'search';
     this.panelOutline.hidden = this.activePanel !== 'outline';
     this.panelTemplates.hidden = this.activePanel !== 'templates';
     this.panelPlugins.hidden = this.activePanel !== 'plugins';

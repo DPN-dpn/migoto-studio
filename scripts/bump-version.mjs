@@ -130,25 +130,27 @@ async function main() {
     console.log(`  ✓ src/updater/version.ts: CURRENT_APP_VERSION -> ${newVersion}`);
   } catch {}
 
-  // 5. Update CHANGELOG.md (이전 릴리스 내역 자동 정리 및 현재 버전 헤더 적용)
+  // 5. Update CHANGELOG.md (미출시 섹션을 새 버전 헤더로 변경하며 과거 내역 보존)
   const CHANGELOG_PATH = join(ROOT, 'CHANGELOG.md');
   try {
     const changelogContent = (await readFile(CHANGELOG_PATH, 'utf8')).replace(/\r\n/g, '\n');
     const today = new Date().toISOString().split('T')[0];
 
-    // 현재 작성 중이던 미출시 내역 또는 대상 버전 내역만 추출
-    const unreleasedMatch = /(?:^|\n)##\s*\[?(?:다음 버전|Unreleased)\]?[^\n]*\n([\s\S]*?)(?=\n##\s|$)/.exec(changelogContent);
-    const targetMatch = new RegExp(`(?:^|\\n)##\\s*\\[?${newVersion.replace(/\\./g, '\\.')}\\]?[^\\n]*\\n([\\s\\S]*?)(?=\\n##\\s|$)`).exec(changelogContent);
-
-    const pendingNotes = (targetMatch && targetMatch[1].trim()) || (unreleasedMatch && unreleasedMatch[1].trim()) || '';
-
-    // 과거 누적된 이전 버전 기록을 지우고 현재 버전만 깔끔하게 유지
-    const updatedChangelog = pendingNotes
-      ? `# 릴리스 노트 (Release Notes)\n\n## [${newVersion}] - ${today}\n\n${pendingNotes}\n`
-      : `# 릴리스 노트 (Release Notes)\n\n## [${newVersion}] - ${today}\n\n`;
-
-    await writeFile(CHANGELOG_PATH, updatedChangelog);
-    console.log(`  ✓ CHANGELOG.md: [${newVersion}] - ${today} (이전 릴리스 내역 자동 정리 완료)`);
+    let updatedChangelog = changelogContent;
+    if (/(?:^|\n)##\s*\[?(?:다음 버전|Unreleased)\]?/.test(changelogContent)) {
+      updatedChangelog = changelogContent.replace(
+        /(?:^|\n)##\s*\[?(?:다음 버전|Unreleased)\]?[^\n]*/,
+        `\n## [${newVersion}] - ${today}`
+      );
+      if (!updatedChangelog.startsWith('# 릴리스 노트 (Release Notes)')) {
+        const titleMatch = /#\s*[^\n]+(?:\n|$)/.exec(updatedChangelog);
+        if (!titleMatch) {
+          updatedChangelog = `# 릴리스 노트 (Release Notes)\n\n` + updatedChangelog.trim();
+        }
+      }
+    }
+    await writeFile(CHANGELOG_PATH, updatedChangelog.trim() + '\n');
+    console.log(`  ✓ CHANGELOG.md: [${newVersion}] - ${today} (기존 릴리스 내역 보존)`);
   } catch {}
 
   console.log('\n[version] 모든 파일의 버전이 동기화되었습니다!');
