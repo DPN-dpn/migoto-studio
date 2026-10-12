@@ -20,6 +20,7 @@ import { openSettings } from './ui/settings-ui';
 import { openHelp } from './ui/help-ui';
 import { lintModel, optionsFromSettings } from './core/lint';
 import { registerSmartCompletions } from './core/completions';
+import { registerFoldingProvider } from './core/folding';
 import { DiffViewer } from './ui/diff-viewer';
 import { openCompareDialog } from './ui/diff-dialog';
 import { openKeyHelperModal } from './ui/key-helper';
@@ -57,6 +58,7 @@ async function boot() {
   await registerMigotoLanguage();
   registerSnippetCompletions();
   registerSmartCompletions();
+  registerFoldingProvider(monaco);
 
   const editor = monaco.editor.create($('editor'), {
     value: '',
