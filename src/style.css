@@ -2155,22 +2155,24 @@ input:checked + .slider:before {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 6px;
-  flex-wrap: wrap;
+  gap: 5px;
+  flex-wrap: nowrap;
+  min-width: 0;
 }
 
 .ai-dock-options {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
   min-width: 0;
-  flex-wrap: wrap;
+  flex-shrink: 1;
 }
 
 .ai-context-select-wrap {
   display: flex;
   align-items: center;
   min-width: 0;
+  flex-shrink: 1;
 }
 
 .ai-context-select {
@@ -2184,6 +2186,8 @@ input:checked + .slider:before {
   cursor: pointer;
   outline: none;
   transition: border-color 0.15s;
+  max-width: 80px;
+  text-overflow: ellipsis;
 }
 
 .ai-context-select:focus {
@@ -2192,7 +2196,7 @@ input:checked + .slider:before {
 
 .ai-auto-apply-toggle {
   height: 24px;
-  padding: 0 8px;
+  padding: 0 7px;
   font-size: 11px;
   font-weight: 500;
   border-radius: 4px;
@@ -2204,8 +2208,10 @@ input:checked + .slider:before {
   white-space: nowrap;
   display: inline-flex;
   align-items: center;
+  gap: 5px;
   justify-content: center;
   user-select: none;
+  flex-shrink: 0;
 }
 
 .ai-auto-apply-toggle:hover {
@@ -2221,6 +2227,16 @@ input:checked + .slider:before {
   font-weight: 600;
 }
 
+.ai-auto-apply-toggle.active::before {
+  content: '';
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #a78bfa;
+  box-shadow: 0 0 5px rgba(167, 139, 250, 0.8);
+}
+
 .ai-auto-apply-toggle.active:hover {
   background: rgba(139, 124, 246, 0.35);
   color: #ffffff;
@@ -2229,6 +2245,26 @@ input:checked + .slider:before {
 .ai-template-btn-wrap {
   position: relative;
   flex-shrink: 0;
+}
+
+.ai-template-btn-wrap .small-btn {
+  height: 24px;
+  padding: 0 7px;
+  font-size: 11px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--fg);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+.ai-template-btn-wrap .small-btn:hover {
+  background: var(--bg-hover);
+  border-color: var(--accent);
 }
 
 .ai-template-menu {

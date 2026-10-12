@@ -249,7 +249,7 @@ export default definePlugin({
 
         const optSmart = document.createElement('option');
         optSmart.value = 'smart';
-        optSmart.textContent = '스마트 (개요+커서)';
+        optSmart.textContent = '스마트';
 
         const optFull = document.createElement('option');
         optFull.value = 'full';
@@ -271,13 +271,12 @@ export default definePlugin({
         autoApplyToggle.type = 'button';
         autoApplyToggle.className = 'ai-auto-apply-toggle' + (isAutoApply ? ' active' : '');
         autoApplyToggle.title = '답변 완료 시 현재 열린 파일의 해당 섹션을 스마트하게 자동 교체/반영합니다.';
-        autoApplyToggle.textContent = isAutoApply ? '자동 반영: ON' : '자동 반영: OFF';
+        autoApplyToggle.textContent = '자동 반영';
 
         autoApplyToggle.onclick = () => {
           isAutoApply = !isAutoApply;
           context.storage.set('auto_apply', isAutoApply);
           autoApplyToggle.classList.toggle('active', isAutoApply);
-          autoApplyToggle.textContent = isAutoApply ? '자동 반영: ON' : '자동 반영: OFF';
           context.ui.showToast(`자동 반영이 ${isAutoApply ? '활성화' : '비활성화'}되었습니다.`, isAutoApply ? 'info' : 'warn');
         };
 
