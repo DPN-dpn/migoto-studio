@@ -2,16 +2,16 @@
 
 ## [다음 버전]
 
-### 플러그인 아이콘 시스템 개편
-- 플러그인 아이콘 해석기(resolvePluginIcon) 및 SVG 프리셋 시스템 도입
-  - 내장 플러그인 전용 고해상도 SVG 벡터 아이콘 적용:
-    - AI 모딩 에이전트: 스파클(Sparkles) AI 벡터 아이콘
-    - DDS / 텍스처 뷰어: 이미지(Image) 벡터 아이콘
-    - Python 스크립트 실행기: 공식 Python 로고 벡터 아이콘
-    - 리소스 파일 검사기: 파일 검사(File-Check) 벡터 아이콘
-    - ZZMI 지원: 게임 컨트롤러(Gamepad) 벡터 아이콘
-  - 사이드바 세로 툴바(Activity Bar) 및 플러그인 관리자 카드에서 고해상도 벡터 아이콘이 선명하게 표시되도록 렌더링 및 스타일 개선
-  - 서드파티 및 사용자 정의 플러그인에서 SVG 마크업, 프리셋 키워드(sparkles, python, image, file-check, gamepad 등), 이모지, 텍스트 약어를 모두 자유롭게 지원
+### 플러그인 아이콘 모듈화 및 자체 포함 구조로 개편
+- 플러그인 외부 공용 아이콘 파일(icons.ts)을 완전히 제거하고 각 플러그인 폴더에 자체 아이콘(icon.svg 및 icon.ts)을 포함하도록 모듈화:
+  - 플러그인은 외부 의존 없이 해당 폴더 하나만으로 완결되는 독립적인 구조 확립
+  - 내장 플러그인 5종 모두 자체 폴더 내에 SVG 벡터 아이콘 및 모듈 포함:
+    - AI 모딩 에이전트 (`ai-assistant/icon.svg`)
+    - DDS / 텍스처 뷰어 (`asset-viewer/icon.svg`)
+    - Python 스크립트 실행기 (`python-runner/icon.svg`)
+    - 리소스 파일 검사기 (`resource-checker/icon.svg`)
+    - ZZMI 지원 (`zzmi-support/icon.svg`)
+  - 플러그인 ZIP 패키지 및 사용자 정의 플러그인도 아카이브 내 `icon.svg` 파일을 포함하면 자동으로 인식하여 툴바 및 관리자에 렌더링 지원
 
 ### 섹션 목록(Outline) 탭 개선
 - 섹션 목록이 배경의 마지막 INI 문서가 아닌 사용자가 현재 '보고 있는' 활성 탭을 실시간으로 추적하도록 개선

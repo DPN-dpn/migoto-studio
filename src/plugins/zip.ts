@@ -87,6 +87,14 @@ export function validatePluginZip(bytes: Uint8Array): ExtractedPlugin {
     }
   }
 
+  // Resolve icon file from archive if referenced or present
+  const iconRef = manifest.icon?.trim() || 'icon.svg';
+  if (normalizedFiles[iconRef] && iconRef.endsWith('.svg')) {
+    manifest.icon = new TextDecoder('utf-8').decode(normalizedFiles[iconRef]);
+  } else if (normalizedFiles['icon.svg']) {
+    manifest.icon = new TextDecoder('utf-8').decode(normalizedFiles['icon.svg']);
+  }
+
   normalizedFiles['plugin.json'] = new TextEncoder().encode(JSON.stringify(manifest, null, 2));
   normalizedFiles['main.js'] = unzipped[scriptPath];
 

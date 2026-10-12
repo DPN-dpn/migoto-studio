@@ -1,6 +1,5 @@
 import { platform } from '../platform';
-import type { PluginManager, PluginInstance } from '../plugins';
-import { resolvePluginIcon } from '../plugins/icons';
+import { type PluginManager, type PluginInstance, renderPluginIcon } from '../plugins';
 
 export class PluginPanel {
   private searchQuery: string = '';
@@ -365,7 +364,7 @@ export class PluginPanel {
     titleClickArea.title = isCollapsed ? '클릭하여 상세 정보 펼치기' : '클릭하여 간략히 접기';
     titleClickArea.innerHTML = `
       <span class="plugin-order-num">${index + 1}.</span>
-      <span class="plugin-icon">${resolvePluginIcon(p.manifest.icon)}</span>
+      <span class="plugin-icon">${renderPluginIcon(p.manifest.icon)}</span>
       <strong class="plugin-name">${p.manifest.name}</strong>
       <span class="plugin-version">v${p.manifest.version}</span>
     `;

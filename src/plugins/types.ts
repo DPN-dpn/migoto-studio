@@ -10,6 +10,20 @@ export interface PluginManifest {
   location?: string;
 }
 
+/**
+ * 플러그인 아이콘 문자열(SVG 코드, 이미지 URL, 이모지, 텍스트)을 HTML 마크업으로 렌더링합니다.
+ */
+export function renderPluginIcon(icon: string | undefined | null, fallback = 'PLG'): string {
+  if (!icon) return fallback;
+  const trimmed = icon.trim();
+  if (!trimmed) return fallback;
+  if (trimmed.startsWith('<svg') || trimmed.startsWith('<img')) return trimmed;
+  if (trimmed.startsWith('data:image/') || trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+    return `<img src="${trimmed}" alt="icon" style="width:18px;height:18px;object-fit:contain;" />`;
+  }
+  return trimmed;
+}
+
 import type { PluginUIBuilder } from './ui-builder.ts';
 
 export interface SelectOption {

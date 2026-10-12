@@ -1,4 +1,5 @@
 import { definePlugin, type PluginContext } from '../../api.ts';
+import iconSvg from './icon.ts';
 
 /**
  * AI 모딩 어시스턴트 플러그인
@@ -9,7 +10,7 @@ export default definePlugin({
     context.ui.registerSidebarView({
       id: 'ai-assistant',
       title: 'AI 에이전트',
-      icon: 'sparkles',
+      icon: iconSvg,
       render(container) {
         container.className = 'sidebar-panel dynamic-plugin-panel plugin-subview ai-assistant-panel';
         container.replaceChildren();

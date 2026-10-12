@@ -1,4 +1,5 @@
 import { definePlugin, type PluginContext } from '../../api.ts';
+import iconSvg from './icon.ts';
 
 /**
  * Python 스크립트 실행기 플러그인
@@ -9,7 +10,7 @@ export default definePlugin({
     context.ui.registerSidebarView({
       id: 'python-runner',
       title: 'Python 실행기',
-      icon: 'python',
+      icon: iconSvg,
       render(container) {
         container.className = 'sidebar-panel dynamic-plugin-panel plugin-subview python-runner-panel';
         container.replaceChildren();

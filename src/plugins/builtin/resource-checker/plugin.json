@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "description": "ini 파일의 filename 구문에 적힌 리소스 파일(DDS, BUF, IB 등)의 실제 존재 여부를 검사하고 누락 시 경고를 표시합니다.",
   "author": "Migoto Studio",
-  "icon": "file-check",
+  "icon": "icon.svg",
   "category": "tools",
   "location": "에디터 린터",
   "main": "index.ts"
