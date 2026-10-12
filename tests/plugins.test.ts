@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { decodeDDS } from '../src/plugins/dds-decoder.ts';
+import { decodeDDS } from '../src/plugins/builtin/asset-viewer/dds-decoder.ts';
 import { BUILTIN_PLUGINS } from '../src/plugins/builtin.ts';
 import { validatePluginZip } from '../src/plugins/zip.ts';
 import { definePlugin } from '../src/plugins/api.ts';
