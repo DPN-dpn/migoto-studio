@@ -1,12 +1,16 @@
 # 릴리스 노트 (Release Notes)
 
-## [다음 버전]
+## [0.9.4] - 2026-10-12
 
 ### 신규 기능
+- AI 모딩 어시스턴트 Google Gemini 공식 연동 및 프리셋 추가: Google AI Studio(Gemini 1.5 Pro / Flash) 연동을 지원하고, 원클릭 프리셋 버튼(Google Gemini, OpenAI, 로컬 Ollama)을 통해 엔드포인트 URL 및 권장 모델명을 즉시 설정할 수 있도록 편의성 개선
 
 ### 기능 개선
+- AI 어시스턴트 API 엔드포인트 자동 보정: Google Generative Language 엔드포인트 입력 시 누락된 /openai 경로를 자동으로 보정하여 전송하도록 개선
+- 커뮤니티 배포 및 소개 가이드 문서 추가: 100% 인라인 스타일이 적용된 아카라이브 안내 글 초안(docs/arcalive-post-draft.html) 추가
 
 ### 버그 수정
+- 불필요한 일회성 릴리스 노트 업데이트 깃허브 액션 워크플로 제거
 
 ---
 
