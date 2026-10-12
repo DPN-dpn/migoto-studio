@@ -86,7 +86,7 @@ export class PluginManager {
   private saveStoredPluginOrder(order: string[]): void {
     try {
       localStorage.setItem('migoto_plugin_order', JSON.stringify(order));
-    } catch {}
+    } catch { }
   }
 
   getPluginOrder(): string[] {
@@ -175,7 +175,7 @@ export class PluginManager {
               JSON.stringify(def.manifest, null, 2),
               def.standaloneScript,
             );
-          } catch {}
+          } catch { }
         }
       }
 
@@ -268,7 +268,7 @@ export class PluginManager {
           this.dynamicTabDisposers.set(view.id, () => {
             reg.dispose();
             if (typeof cleanup === 'function') {
-              try { cleanup(); } catch {}
+              try { cleanup(); } catch { }
             }
             panelEl?.remove();
           });
@@ -296,7 +296,7 @@ export class PluginManager {
       instance.cleanup = () => {
         try {
           plugin.deactivate?.();
-        } catch {}
+        } catch { }
         unregisterViews.forEach((vId) => {
           this.sidebarViews.delete(vId);
           const disposer = this.dynamicTabDisposers.get(vId);
@@ -384,7 +384,7 @@ export class PluginManager {
       );
       delete savedStates[pluginId];
       localStorage.setItem(STORAGE_ENABLED_PLUGINS, JSON.stringify(savedStates));
-    } catch {}
+    } catch { }
 
     this.notify();
     this.showToast(`플러그인 "${p.manifest.name}"이(가) 삭제되었습니다.`, 'info');
@@ -511,7 +511,7 @@ export class PluginManager {
 
     const starterScript = `// ${manifest.name} (${manifest.id})
 // 제작자: ${manifest.author}
-// 추가 위치: ${manifest.location}
+// 위치: ${manifest.location}
 export default {
   activate(context) {
     console.log('[plugin] ${manifest.name} activated');
@@ -707,7 +707,7 @@ export default {
         set: <T = any>(key: string, value: T): void => {
           try {
             localStorage.setItem(`migoto_plugin_${manifest.id}_${key}`, JSON.stringify(value));
-          } catch {}
+          } catch { }
         },
       },
 

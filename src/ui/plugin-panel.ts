@@ -158,7 +158,7 @@ export class PluginPanel {
       const locRow = document.createElement('div');
       locRow.className = 'plugin-form-row';
       const locLabel = document.createElement('label');
-      locLabel.textContent = '추가 위치:';
+      locLabel.textContent = '위치:';
       const locInput = document.createElement('input');
       locInput.type = 'text';
       locInput.className = 'plugin-input';
@@ -384,7 +384,7 @@ export class PluginPanel {
     const locRow = document.createElement('div');
     locRow.className = 'plugin-location-badge';
     locRow.innerHTML = `
-      <span class="plugin-location-label">📍 추가 위치:</span>
+      <span class="plugin-location-label">위치:</span>
       <span class="plugin-location-val">${p.manifest.location || '좌측 사이드바 탭'}</span>
     `;
 

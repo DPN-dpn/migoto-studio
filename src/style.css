@@ -1824,11 +1824,12 @@ input:checked + .slider:before {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 14px;
+  padding: 6px 14px;
   background: var(--bg-elev);
   border-bottom: 1px solid var(--border);
   font-size: 12px;
   gap: 12px;
+  flex-wrap: wrap;
 }
 
 .image-viewer-file-info {
@@ -1841,7 +1842,13 @@ input:checked + .slider:before {
 }
 
 .image-viewer-icon {
-  font-size: 15px;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 5px;
+  border-radius: 3px;
+  background: var(--accent);
+  color: #ffffff;
+  letter-spacing: 0.5px;
 }
 
 .image-viewer-filename {
@@ -1862,6 +1869,58 @@ input:checked + .slider:before {
 .image-badge.format-badge {
   background: rgba(139, 124, 246, 0.2);
   color: var(--accent);
+  font-weight: 600;
+}
+
+.image-viewer-toolbar-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+.image-viewer-toolbar-section {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.image-viewer-group-label {
+  font-size: 11px;
+  color: var(--fg-dim);
+  user-select: none;
+}
+
+.image-viewer-toolbar-group {
+  display: inline-flex;
+  align-items: center;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px;
+  gap: 1px;
+}
+
+.image-viewer-toolbar-group .img-tool-btn {
+  border: none;
+  background: transparent;
+  padding: 2px 7px;
+  font-size: 11px;
+  border-radius: 3px;
+  color: var(--fg-dim);
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.image-viewer-toolbar-group .img-tool-btn:hover {
+  background: var(--bg-hover);
+  color: var(--fg);
+}
+
+.image-viewer-toolbar-group .img-tool-btn.active {
+  background: var(--accent);
+  color: #ffffff;
   font-weight: 600;
 }
 

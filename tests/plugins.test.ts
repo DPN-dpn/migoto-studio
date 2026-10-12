@@ -59,6 +59,69 @@ test('decodeDDS correctly parses valid mock DDS header', () => {
   assert.equal(decoded.rgba[3], 255); // Alpha
 });
 
+test('decodeDDS correctly parses DX10 header with BC7, BC1, BC3, and handles sRGB vs Linear', () => {
+  // Construct DDS with DX10 header (128 + 20 = 148 bytes header + 16 bytes data)
+  const buf = new Uint8Array(148 + 16);
+  const view = new DataView(buf.buffer);
+
+  // Magic 'DDS '
+  view.setUint32(0, 0x20534444, true);
+  view.setUint32(4, 124, true);
+  view.setUint32(12, 4, true); // height = 4
+  view.setUint32(16, 4, true); // width = 4
+  view.setUint32(76, 32, true);
+  view.setUint32(84, 0x30315844, true); // FourCC 'DX10'
+
+  // DX10 Header at offset 128: DXGI_FORMAT_BC7_UNORM_SRGB (99)
+  view.setUint32(128, 99, true); // dxgiFormat = 99
+  view.setUint32(132, 3, true); // D3D10_RESOURCE_DIMENSION_TEXTURE2D
+
+  // BC7 Mode 6 block: all white (64 bits of lowChunk except bits 0..5, highChunk all 1s)
+  const lowChunk = (~0x3fn) & 0xffffffffffffffffn;
+  const highChunk = 0xffffffffffffffffn;
+  view.setBigUint64(148, lowChunk, true);
+  view.setBigUint64(156, highChunk, true);
+
+  const decodedSRGB = decodeDDS(buf);
+  assert.equal(decodedSRGB.format, 'BC7 (sRGB)');
+  assert.equal(decodedSRGB.isSRGB, true);
+  assert.equal(decodedSRGB.dxgiFormat, 99);
+  assert.equal(decodedSRGB.width, 4);
+  assert.equal(decodedSRGB.height, 4);
+  assert.equal(decodedSRGB.rgba[0], 255);
+  assert.equal(decodedSRGB.rgba[1], 255);
+  assert.equal(decodedSRGB.rgba[2], 255);
+  assert.equal(decodedSRGB.rgba[3], 255);
+
+  // Switch to DXGI_FORMAT_BC7_UNORM (98) - Linear
+  view.setUint32(128, 98, true);
+  const decodedLinear = decodeDDS(buf);
+  assert.equal(decodedLinear.format, 'BC7 (Linear)');
+  assert.equal(decodedLinear.isSRGB, false);
+  assert.equal(decodedLinear.dxgiFormat, 98);
+
+  // Test DXGI_FORMAT_BC1_UNORM_SRGB (72)
+  view.setUint32(128, 72, true);
+  view.setUint16(148, 0xffff, true);
+  view.setUint16(150, 0x0000, true);
+  view.setUint32(152, 0x00000000, true);
+  const decodedBC1SRGB = decodeDDS(buf);
+  assert.equal(decodedBC1SRGB.format, 'BC1 (sRGB)');
+  assert.equal(decodedBC1SRGB.isSRGB, true);
+
+  // Test DXGI_FORMAT_BC3_UNORM_SRGB (78)
+  view.setUint32(128, 78, true);
+  const decodedBC3SRGB = decodeDDS(buf);
+  assert.equal(decodedBC3SRGB.format, 'BC3 (sRGB)');
+  assert.equal(decodedBC3SRGB.isSRGB, true);
+
+  // Test DXGI_FORMAT_BC5_UNORM (83)
+  view.setUint32(128, 83, true);
+  const decodedBC5 = decodeDDS(buf);
+  assert.equal(decodedBC5.format, 'BC5 (Linear)');
+  assert.equal(decodedBC5.isSRGB, false);
+});
+
 test('builtin plugins activate with expected behavior', () => {
   const registeredViews: any[] = [];
   const registeredCustomViewers: any[] = [];
