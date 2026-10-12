@@ -97,7 +97,7 @@
   - 상단 메뉴바(`편집` -> `스니펫 템플릿 삽입`)와도 실시간 연동되어 등록한 커스텀 템플릿이 즉시 서브메뉴에 반영됨.
 
 ### 플러그인 및 확장 기능 시스템 (완료)
-- **에디터 기능을 무한히 확장할 수 있는 플러그인 런타임과, 좌측 액티비티 바(🧩) 연동 및 기본 3대 플러그인을 제공한다.**
+- **에디터 기능을 무한히 확장할 수 있는 플러그인 런타임과, 좌측 액티비티 바 연동 및 기본 3대 플러그인을 제공한다.**
 - 구현:
   - **백엔드 (`src-tauri/src/plugins.rs`, `src-tauri/src/lib.rs`)**:
     - `exec_process`: Windows 환경에서 콘솔 창 깜빡임이 없도록 `CREATE_NO_WINDOW (0x08000000)` 플래그를 적용하여 Python 등 외부 프로세스를 백그라운드로 안전하게 실행.
@@ -107,12 +107,13 @@
     - `Platform` 인터페이스에 플러그인 프로세스 실행 및 바이너리 파일 입출력 메서드 정의. 웹 환경을 위한 fallback 로직 구현.
   - **플러그인 코어 매니저 (`src/plugins/manager.ts`, `src/plugins/types.ts`)**:
     - 플러그인 수명주기(`activate`, `deactivate`), `localStorage` 활성화 상태 영구화, 샌드박스형 `PluginContext` API (문서 접근, 에디터 조작, 파일 트리 탐색, 모달/토스트 알림, 프로세스 실행, 사이드바 뷰 등록).
-  - **기본 3대 내장 플러그인 (`src/plugins/builtin.ts`)**:
-    1. **Python Runner (`python-runner`)**: 인라인 코드/스크립트 파일 실행, 실시간 stdin/stdout 콘솔 출력, 에디터 커서 결과 삽입.
-    2. **Asset Viewer (`asset-viewer` v1.1.0)**: 외부 의존성 없는 자체 순수 TS 디코더(`src/plugins/dds-decoder.ts`)로 BC1~BC7, DX10 확장 헤더, sRGB/Linear 실시간 감마 전환 및 채널 필터링 지원 체커보드 캔버스 렌더링.
-    3. **AI Assistant (`ai-assistant`)**: OpenAI/Ollama 호환 엔드포인트 대화형 모딩 어시스턴트, 코드 원클릭 삽입.
+  - **기본 3대 내장 플러그인 (`src/plugins/builtin/<plugin-id>/`)**:
+    - 외부 플러그인과 동일한 규격(`plugin.json`, `index.ts`, `README.md`)으로 완전히 분리되어 새 플러그인 제작 시 모범 참조 예제 역할을 수행합니다.
+    1. **Python Runner (`python-runner`)**: 인라인 코드/스크립트 파일 실행, 실시간 stdin/stdout 콘솔 출력, 에디터 커서 결과 삽입. (`src/plugins/builtin/python-runner/`)
+    2. **Asset Viewer (`asset-viewer` v1.1.0)**: 외부 의존성 없는 자체 순수 TS 디코더로 BC1~BC7, DX10 확장 헤더, sRGB/Linear 실시간 감마 전환 및 채널 필터링 지원 체커보드 캔버스 렌더링. (`src/plugins/builtin/asset-viewer/`)
+    3. **AI Assistant (`ai-assistant`)**: OpenAI/Ollama 호환 엔드포인트 대화형 모딩 어시스턴트, 코드 원클릭 삽입. (`src/plugins/builtin/ai-assistant/`)
   - **UI 통합 (`src/plugin-panel.ts`, `index.html`, `src/activitybar.ts`)**:
-    - 좌측 액티비티 바 4번째 탭 `act-plugins` (`🧩`, `Ctrl+Shift+X`).
+    - 좌측 액티비티 바 4번째 탭 `act-plugins` (`Ctrl+Shift+X`).
     - 상단 서브 탭(관리 목록 / 각 활성화된 플러그인의 전용 UI 뷰) 전환 및 토글 스위치 제공.
 
 

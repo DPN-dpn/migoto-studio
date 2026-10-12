@@ -146,14 +146,14 @@ test('builtin plugins activate with expected behavior', () => {
   py.createPlugin().activate(mockContext);
   assert.equal(registeredViews.length, 1);
   assert.equal(registeredViews[0].id, 'python-runner');
-  assert.equal(registeredViews[0].icon, '🐍');
+  assert.equal(registeredViews[0].icon, 'PY');
 
   registeredViews.length = 0;
   const ai = BUILTIN_PLUGINS.find((p) => p.manifest.id === 'ai-assistant')!;
   ai.createPlugin().activate(mockContext);
   assert.equal(registeredViews.length, 1);
   assert.equal(registeredViews[0].id, 'ai-assistant');
-  assert.equal(registeredViews[0].icon, '🤖');
+  assert.equal(registeredViews[0].icon, 'AI');
 
   registeredViews.length = 0;
   const asset = BUILTIN_PLUGINS.find((p) => p.manifest.id === 'asset-viewer')!;

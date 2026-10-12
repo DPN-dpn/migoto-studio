@@ -259,7 +259,7 @@ export class PluginManager {
 
           const reg = this.activityBar.registerDynamicTab({
             id: view.id,
-            icon: view.icon || '🧩',
+            icon: view.icon || 'PLG',
             title: view.title,
             panelEl,
           });
@@ -474,14 +474,14 @@ export class PluginManager {
     if (typeof optionsOrId === 'object') {
       rawId = optionsOrId.id;
       name = optionsOrId.name;
-      icon = optionsOrId.icon?.trim() || '🧩';
+      icon = optionsOrId.icon?.trim() || 'PLG';
       author = optionsOrId.author?.trim() || '사용자';
       location = optionsOrId.location?.trim() || '좌측 사이드바 탭';
       description = optionsOrId.description?.trim() || '사용자 정의 플러그인입니다.';
     } else {
       rawId = optionsOrId;
       name = nameArg;
-      icon = '🧩';
+      icon = 'PLG';
       author = '사용자';
       location = '좌측 사이드바 탭';
       description = descArg || '사용자 정의 플러그인입니다.';

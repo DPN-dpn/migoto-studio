@@ -1,0 +1,11 @@
+{
+  "id": "python-runner",
+  "name": "Python 스크립트 실행기",
+  "version": "1.0.0",
+  "description": "파이썬 스크립트를 에디터 내에서 직접 실행하고 출력 결과를 에디터에 반영합니다.",
+  "author": "Migoto Studio",
+  "icon": "PY",
+  "category": "tools",
+  "location": "좌측 사이드바 탭 (PY)",
+  "main": "index.ts"
+}
