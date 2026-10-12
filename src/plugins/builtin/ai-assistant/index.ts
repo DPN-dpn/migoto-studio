@@ -3,7 +3,7 @@ import iconSvg from './icon.ts';
 
 /**
  * AI 모딩 어시스턴트 플러그인
- * OpenAI 또는 로컬 Ollama 호환 API를 연동하여 INI 분석, 섹션 생성 및 질의응답을 수행합니다.
+ * OpenAI 또는 Google Gemini, 로컬 Ollama 호환 API를 연동하여 INI 분석, 섹션 생성 및 질의응답을 수행합니다.
  */
 export default definePlugin({
   activate(context: PluginContext) {
@@ -15,14 +15,49 @@ export default definePlugin({
         container.className = 'sidebar-panel dynamic-plugin-panel plugin-subview ai-assistant-panel';
         container.replaceChildren();
 
-        // 1. 헤더 생성
-        const header = context.ui.createPanelHeader('AI 모딩 어시스턴트');
+        // 1. 상단 서브탭 바 (에이전트 / 설정)
+        const subtabBar = document.createElement('div');
+        subtabBar.className = 'ai-subtab-bar';
 
-        // 2. 설정 영역 API
+        const btnTabAgent = document.createElement('button');
+        btnTabAgent.className = 'ai-subtab-btn active';
+        btnTabAgent.textContent = '에이전트';
+
+        const btnTabSettings = document.createElement('button');
+        btnTabSettings.className = 'ai-subtab-btn';
+        btnTabSettings.textContent = '설정';
+
+        subtabBar.append(btnTabAgent, btnTabSettings);
+
+        // 2. 에이전트 화면 패널
+        const agentPane = document.createElement('div');
+        agentPane.className = 'ai-pane ai-agent-view';
+
+        // 3. 설정 화면 패널
+        const settingsPane = document.createElement('div');
+        settingsPane.className = 'ai-pane ai-settings-view';
+        settingsPane.hidden = true;
+
+        // 탭 전환 핸들러
+        btnTabAgent.onclick = () => {
+          btnTabAgent.classList.add('active');
+          btnTabSettings.classList.remove('active');
+          agentPane.hidden = false;
+          settingsPane.hidden = true;
+        };
+
+        btnTabSettings.onclick = () => {
+          btnTabSettings.classList.add('active');
+          btnTabAgent.classList.remove('active');
+          settingsPane.hidden = false;
+          agentPane.hidden = true;
+        };
+
+        // --- [설정 패널 구성] ---
         const urlInput = context.ui.createInput({
           label: 'API URL:',
           placeholder: 'https://generativelanguage.googleapis.com/v1beta/openai 또는 https://api.openai.com/v1',
-          value: context.storage.get('api_url', 'https://api.openai.com/v1'),
+          value: context.storage.get('api_url', 'https://generativelanguage.googleapis.com/v1beta/openai'),
           onInput: (v) => context.storage.set('api_url', v.trim()),
         });
 
@@ -37,13 +72,19 @@ export default definePlugin({
         const modelInput = context.ui.createInput({
           label: '모델명:',
           placeholder: 'gemini-flash-latest, gpt-4o-mini 등',
-          value: context.storage.get('model', 'gpt-4o-mini'),
+          value: context.storage.get('model', 'gemini-flash-latest'),
           onInput: (v) => context.storage.set('model', v.trim()),
         });
 
+        const presetCard = document.createElement('div');
+        presetCard.className = 'ai-settings-card';
+
+        const presetTitle = document.createElement('div');
+        presetTitle.className = 'ai-settings-card-title';
+        presetTitle.textContent = '빠른 프로바이더 설정';
+
         const presetRow = document.createElement('div');
         presetRow.className = 'ai-quick-actions';
-        presetRow.style.marginBottom = '6px';
 
         const btnPresetGemini = context.ui.createButton({
           text: 'Google Gemini',
@@ -88,95 +129,318 @@ export default definePlugin({
         });
 
         presetRow.append(btnPresetGemini, btnPresetOpenAI, btnPresetOllama);
+        presetCard.append(presetTitle, presetRow);
 
-        const configDetails = context.ui.createDetails({
-          summary: 'API 연결 설정 (Gemini / OpenAI / Ollama)',
-          children: [presetRow, urlInput.row, keyInput.row, modelInput.row],
-        });
+        const configCard = document.createElement('div');
+        configCard.className = 'ai-settings-card';
+        const configTitle = document.createElement('div');
+        configTitle.className = 'ai-settings-card-title';
+        configTitle.textContent = '연결 정보 입력';
+        configCard.append(configTitle, urlInput.row, keyInput.row, modelInput.row);
 
-        // 3. 퀵 액션 프롬프트 툴바 API
-        const btnFix = context.ui.createButton({
-          text: '[분석] 문법/오류 분석',
-          variant: 'small',
-          onClick: () => {
-            promptTextarea.value = '현재 INI 파일의 문법적 오류나 권장되지 않는 작성 방식을 검사하고 수정안을 제시해 줘.';
-            sendMessage(promptTextarea.value);
-          },
-        });
+        const guideCard = document.createElement('div');
+        guideCard.className = 'ai-settings-card';
+        guideCard.style.fontSize = '11px';
+        guideCard.style.color = 'var(--fg-dim)';
+        guideCard.style.lineHeight = '1.5';
+        guideCard.innerHTML = `
+          <div style="font-weight:600;color:var(--fg);margin-bottom:4px;">안내사항</div>
+          <div>- Google Gemini: Google AI Studio 키(AQ...) 입력 시 gemini-flash-latest 모델이 무료 제공됩니다.</div>
+          <div>- OpenAI: platform.openai.com API 키 및 gpt-4o-mini 모델을 권장합니다.</div>
+          <div>- Ollama: 로컬 PC에서 실행 중인 경우 키 없이 바로 연결할 수 있습니다.</div>
+        `;
 
-        const btnToggle = context.ui.createButton({
-          text: '[생성] 토글 키 섹션 생성',
-          variant: 'small',
-          onClick: () => {
-            promptTextarea.value = 'F1 키를 누르면 텍스처를 켜고 끄는 완전한 [KeyToggle] 및 관련 [Constants], [TextureOverride] 섹션을 만들어 줘.';
-            sendMessage(promptTextarea.value);
-          },
-        });
+        settingsPane.append(presetCard, configCard, guideCard);
 
-        const btnComment = context.ui.createButton({
-          text: '[주석] 섹션 한글 주석',
-          variant: 'small',
-          onClick: () => {
-            promptTextarea.value = '현재 파일의 각 섹션 위에 어떤 역할을 하는지 한국어로 상세한 주석을 달아줘.';
-            sendMessage(promptTextarea.value);
-          },
-        });
-
-        const quickActionsRow = document.createElement('div');
-        quickActionsRow.className = 'ai-quick-actions';
-        quickActionsRow.append(btnFix, btnToggle, btnComment);
-
-        // 4. 대화 내역 컨테이너
+        // --- [에이전트 패널 구성] ---
+        // 대화 히스토리 컨테이너 (스크롤 뷰)
         const chatHistory = document.createElement('div');
         chatHistory.className = 'ai-chat-history';
 
-        // 5. 입력 영역 API
-        const inputArea = document.createElement('div');
-        inputArea.className = 'ai-input-area';
+        // 대화가 비어있을 때 안내 문구
+        const emptyState = document.createElement('div');
+        emptyState.className = 'ai-empty-state';
+        emptyState.innerHTML = `
+          <div class="ai-empty-title">3DMigoto / XXMI 모딩 어시스턴트</div>
+          <div class="ai-empty-desc">INI 코드 분석이나 토글 키 생성 등 모딩 작업을 질문하거나<br>하단의 [템플릿 ▾] 버튼을 눌러 빠르게 요청해 보세요.</div>
+        `;
+        chatHistory.append(emptyState);
 
-        const attachCheck = context.ui.createCheckbox({
-          id: 'ai-attach-file',
-          label: '현재 열린 INI 파일 내용 함께 전달',
-          checked: true,
+        // 하단 고정 입력 영역 (Dock)
+        const inputDock = document.createElement('div');
+        inputDock.className = 'ai-input-dock';
+
+        const dockTop = document.createElement('div');
+        dockTop.className = 'ai-input-dock-top';
+
+        // 파일 첨부 체크박스
+        const attachLabel = document.createElement('label');
+        attachLabel.className = 'ai-attach-label';
+        const attachInput = document.createElement('input');
+        attachInput.type = 'checkbox';
+        attachInput.checked = true;
+        const attachText = document.createElement('span');
+        attachText.textContent = '현재 열린 INI 파일 전달';
+        attachLabel.append(attachInput, attachText);
+
+        // 템플릿 드롭다운 버튼 & 메뉴
+        const templateWrap = document.createElement('div');
+        templateWrap.className = 'ai-template-btn-wrap';
+
+        const templateBtn = document.createElement('button');
+        templateBtn.className = 'small-btn';
+        templateBtn.textContent = '템플릿 ▾';
+
+        const templateMenu = document.createElement('ul');
+        templateMenu.className = 'ai-template-menu';
+        templateMenu.hidden = true;
+
+        const templates: Array<{ label: string; text?: string; isAction?: boolean }> = [
+          {
+            label: '[분석] 문법 및 오류 분석',
+            text: '현재 INI 파일의 문법적 오류나 권장되지 않는 작성 방식을 검사하고 수정안을 제시해 줘.',
+          },
+          {
+            label: '[생성] 토글 키 섹션 생성',
+            text: 'F1 키를 누르면 텍스처를 켜고 끄는 완전한 [KeyToggle] 및 관련 [Constants], [TextureOverride] 섹션을 만들어 줘.',
+          },
+          {
+            label: '[주석] 섹션 한글 상세 주석',
+            text: '현재 파일의 각 섹션 위에 어떤 역할을 하는지 한국어로 상세한 주석을 달아줘.',
+          },
+          {
+            label: '[생성] 텍스처 오버라이드 기본형',
+            text: '해시 값을 기반으로 텍스처를 교체하는 표준 [TextureOverride] 섹션 템플릿을 작성해 줘.',
+          },
+          {
+            label: '[생성] 상수 및 커맨드리스트 생성',
+            text: '조건 분기 및 변수 제어를 위한 [Constants] 및 [CommandList] 섹션 예제를 만들어 줘.',
+          },
+          {
+            label: '---',
+          },
+          {
+            label: '[지우기] 대화 내역 초기화',
+            isAction: true,
+          },
+        ];
+
+        templates.forEach((item) => {
+          if (item.label === '---') {
+            const div = document.createElement('li');
+            div.className = 'ai-template-menu-divider';
+            templateMenu.append(div);
+            return;
+          }
+
+          const li = document.createElement('li');
+          li.className = 'ai-template-menu-item';
+          li.textContent = item.label;
+          li.onclick = (e) => {
+            e.stopPropagation();
+            templateMenu.hidden = true;
+            if (item.isAction) {
+              chatHistory.replaceChildren(emptyState);
+              context.ui.showToast('대화 내역이 초기화되었습니다.', 'info');
+              return;
+            }
+            if (item.text) {
+              dockTextarea.value = item.text;
+              dockTextarea.focus();
+            }
+          };
+          templateMenu.append(li);
         });
 
-        const promptTextarea = document.createElement('textarea');
-        promptTextarea.className = 'plugin-input ai-textarea';
-        promptTextarea.placeholder = 'AI에게 INI 모딩 관련 질문이나 코드 작성을 요청하세요...';
-        promptTextarea.rows = 3;
+        templateBtn.onclick = (e) => {
+          e.stopPropagation();
+          templateMenu.hidden = !templateMenu.hidden;
+        };
 
-        const sendBtn = context.ui.createButton({
-          text: '전송',
-          variant: 'primary',
-          onClick: () => sendMessage(promptTextarea.value),
-        });
+        templateWrap.append(templateBtn, templateMenu);
+        dockTop.append(attachLabel, templateWrap);
 
-        inputArea.append(attachCheck.row, promptTextarea, sendBtn);
+        // 하단 메인 입력창 및 전송 버튼
+        const dockMain = document.createElement('div');
+        dockMain.className = 'ai-input-dock-main';
 
-        function appendMessage(role: 'user' | 'assistant', text: string) {
-          const msgEl = context.ui.createChatMessage({
-            role,
-            badge: role === 'user' ? '[질문]' : '[AI 어시스턴트]',
-            content: text,
-            onInsertCode: (code) => {
-              context.editor.insertText(code + '\n');
+        const dockTextarea = document.createElement('textarea');
+        dockTextarea.className = 'ai-dock-textarea';
+        dockTextarea.placeholder = 'AI에게 질문이나 코드 작성을 요청하세요... (Enter로 전송, Shift+Enter 줄바꿈)';
+        dockTextarea.rows = 2;
+
+        const sendBtn = document.createElement('button');
+        sendBtn.className = 'primary ai-dock-send-btn';
+        sendBtn.textContent = '전송';
+
+        // 키보드 단축키: Enter 전송, Shift+Enter 줄바꿈
+        dockTextarea.onkeydown = (e) => {
+          if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            sendMessage(dockTextarea.value);
+          }
+        };
+
+        sendBtn.onclick = () => sendMessage(dockTextarea.value);
+
+        dockMain.append(dockTextarea, sendBtn);
+        inputDock.append(dockTop, dockMain);
+
+        agentPane.append(chatHistory, inputDock);
+
+        // 컨테이너 조립
+        container.append(subtabBar, agentPane, settingsPane);
+
+        // 템플릿 메뉴 외부 클릭 시 닫기
+        const onDocClick = (e: MouseEvent) => {
+          if (!templateMenu.hidden && !templateWrap.contains(e.target as Node)) {
+            templateMenu.hidden = true;
+          }
+        };
+        document.addEventListener('click', onDocClick);
+
+        // 마크다운 응답 렌더링 헬퍼
+        function renderAssistantContent(targetEl: HTMLElement, text: string) {
+          targetEl.replaceChildren();
+          const codeBlockRegex = /```(?:[a-zA-Z0-9_-]+)?([\s\S]*?)```/g;
+          let lastIdx = 0;
+          let match: RegExpExecArray | null;
+
+          while ((match = codeBlockRegex.exec(text)) !== null) {
+            const textBefore = text.slice(lastIdx, match.index);
+            if (textBefore.trim()) {
+              const p = document.createElement('p');
+              p.textContent = textBefore.trim();
+              targetEl.append(p);
+            }
+
+            const codeContent = match[1].trim();
+            const codeBox = document.createElement('div');
+            codeBox.className = 'ai-code-block';
+
+            const pre = document.createElement('pre');
+            pre.textContent = codeContent;
+            codeBox.append(pre);
+
+            const btnBar = document.createElement('div');
+            btnBar.className = 'ai-code-bar';
+
+            const insertBtn = document.createElement('button');
+            insertBtn.className = 'small-btn';
+            insertBtn.textContent = '에디터에 삽입';
+            insertBtn.onclick = () => {
+              context.editor.insertText(codeContent + '\n');
               context.ui.showToast('에디터에 코드가 삽입되었습니다.', 'info');
-            },
-            onCopyCode: (code) => {
-              navigator.clipboard.writeText(code);
-              context.ui.showToast('클립보드에 복사되었습니다.', 'info');
-            },
-          });
+            };
 
-          chatHistory.append(msgEl);
-          chatHistory.scrollTop = chatHistory.scrollHeight;
+            const copyBtn = document.createElement('button');
+            copyBtn.className = 'small-btn';
+            copyBtn.textContent = '복사';
+            copyBtn.onclick = () => {
+              navigator.clipboard.writeText(codeContent);
+              context.ui.showToast('클립보드에 복사되었습니다.', 'info');
+            };
+
+            btnBar.append(insertBtn, copyBtn);
+            codeBox.append(btnBar);
+            targetEl.append(codeBox);
+
+            lastIdx = match.index + match[0].length;
+          }
+
+          const remaining = text.slice(lastIdx);
+          if (remaining.trim()) {
+            const p = document.createElement('p');
+            p.textContent = remaining.trim();
+            targetEl.append(p);
+          }
         }
 
+        // 대화 메시지 턴 전송
         async function sendMessage(userPrompt: string) {
-          if (!userPrompt.trim()) return;
-          let apiUrl = (context.storage.get('api_url', 'https://api.openai.com/v1') as string).replace(/\/+$/, '');
+          const trimmedPrompt = userPrompt.trim();
+          if (!trimmedPrompt) return;
+
+          // 첫 메시지 전송 시 초기 안내 상태 제거
+          if (emptyState.parentElement) {
+            emptyState.remove();
+          }
+
+          dockTextarea.value = '';
+
+          // 1. 대화 턴 그룹 생성
+          const turnGroup = document.createElement('div');
+          turnGroup.className = 'ai-turn-group';
+
+          // 2. 상단 고정 사용자 질문 카드 (Sticky)
+          const userBubble = document.createElement('div');
+          userBubble.className = 'ai-turn-header';
+
+          const userHeaderTop = document.createElement('div');
+          userHeaderTop.className = 'ai-turn-header-top';
+
+          const badge = document.createElement('span');
+          badge.className = 'ai-turn-badge';
+          badge.textContent = '질문';
+          userHeaderTop.append(badge);
+
+          const isLong = trimmedPrompt.length > 80 || trimmedPrompt.includes('\n');
+          let toggleBtn: HTMLButtonElement | null = null;
+
+          if (isLong) {
+            toggleBtn = document.createElement('button');
+            toggleBtn.className = 'ai-turn-toggle-btn';
+            toggleBtn.textContent = '더보기';
+            userHeaderTop.append(toggleBtn);
+          }
+
+          const promptTextEl = document.createElement('div');
+          promptTextEl.className = `ai-turn-prompt-text${isLong ? ' truncated' : ''}`;
+          promptTextEl.textContent = trimmedPrompt;
+
+          if (toggleBtn) {
+            let expanded = false;
+            const toggleHandler = (e: MouseEvent) => {
+              e.stopPropagation();
+              expanded = !expanded;
+              if (expanded) {
+                promptTextEl.classList.remove('truncated');
+                toggleBtn!.textContent = '접기';
+              } else {
+                promptTextEl.classList.add('truncated');
+                toggleBtn!.textContent = '더보기';
+              }
+            };
+            toggleBtn.onclick = toggleHandler;
+            userBubble.onclick = (e) => {
+              // 텍스트 영역 클릭 시에도 토글
+              if ((e.target as HTMLElement).tagName !== 'BUTTON') {
+                toggleHandler(e);
+              }
+            };
+          }
+
+          userBubble.append(userHeaderTop, promptTextEl);
+          turnGroup.append(userBubble);
+
+          // 3. 어시스턴트 답변 영역
+          const assistantBubble = document.createElement('div');
+          assistantBubble.className = 'ai-assistant-bubble';
+
+          const loadingNotice = document.createElement('div');
+          loadingNotice.style.color = 'var(--fg-dim)';
+          loadingNotice.style.fontSize = '11px';
+          loadingNotice.textContent = '답변을 생성하고 있습니다...';
+          assistantBubble.append(loadingNotice);
+
+          turnGroup.append(assistantBubble);
+          chatHistory.append(turnGroup);
+          chatHistory.scrollTop = chatHistory.scrollHeight;
+
+          // 4. API 호출 준비
+          let apiUrl = (context.storage.get('api_url', 'https://generativelanguage.googleapis.com/v1beta/openai') as string).replace(/\/+$/, '');
           const apiKey = (context.storage.get('api_key', '') as string).trim();
-          let model = (context.storage.get('model', 'gpt-4o-mini') as string).trim();
+          let model = (context.storage.get('model', 'gemini-flash-latest') as string).trim();
 
           // Google Gemini OpenAI endpoint auto-correction & model migration
           if (apiUrl.includes('generativelanguage.googleapis.com')) {
@@ -195,22 +459,19 @@ export default definePlugin({
             }
           }
 
-          appendMessage('user', userPrompt);
-          promptTextarea.value = '';
-
           const systemPrompt = `당신은 3DMigoto 및 XXMI (.ini) 모딩 전문 개발 도우미입니다.
 사용자의 INI 코드를 분석하거나 요청에 맞는 정확한 INI 섹션([KeyToggle], [TextureOverride], [Constants], [CommandList] 등)을 작성하세요.
 코드는 반드시 \`\`\`ini 코드 \`\`\` 마크다운 코드 블록으로 감싸서 작성해 주세요.`;
 
-          let promptWithContext = userPrompt;
-          if (attachCheck.isChecked()) {
+          let promptWithContext = trimmedPrompt;
+          if (attachInput.checked) {
             const file = context.workspace.getCurrentFile();
             const text = context.editor.getText();
             promptWithContext += `\n\n[현재 열린 파일: ${file?.name || 'document.ini'}]\n\`\`\`ini\n${text}\n\`\`\``;
           }
 
           sendBtn.disabled = true;
-          sendBtn.textContent = '답변 생성 중...';
+          sendBtn.textContent = '생성 중...';
 
           try {
             const headers: Record<string, string> = { 'Content-Type': 'application/json' };
@@ -241,17 +502,24 @@ export default definePlugin({
 
             const data = await res.json();
             const reply = data.choices?.[0]?.message?.content || '(응답 없음)';
-            appendMessage('assistant', reply);
+            renderAssistantContent(assistantBubble, reply);
           } catch (err: any) {
-            appendMessage('assistant', `[오류] 오류가 발생했습니다: ${err.message || err}`);
+            assistantBubble.replaceChildren();
+            const errP = document.createElement('p');
+            errP.style.color = '#ef4444';
+            errP.textContent = `[오류] ${err.message || err}`;
+            assistantBubble.append(errP);
             context.ui.showToast('AI 응답 생성 실패', 'error');
           } finally {
             sendBtn.disabled = false;
             sendBtn.textContent = '전송';
+            chatHistory.scrollTop = chatHistory.scrollHeight;
           }
         }
 
-        container.append(header, configDetails, quickActionsRow, chatHistory, inputArea);
+        return () => {
+          document.removeEventListener('click', onDocClick);
+        };
       },
     });
   },
