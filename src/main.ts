@@ -186,8 +186,9 @@ async function boot() {
     const model = editor.getModel();
     if (!model) return;
     const s = getSettings();
-    const baseMarkers = lintModel(model, optionsFromSettings(s));
+    const hasFolder = Boolean(explorer && explorer.hasFolder);
     const customMarkers = await pluginManager.runCustomLintRules(model);
+    const baseMarkers = lintModel(model, optionsFromSettings(s, hasFolder));
     currentMarkers = [...baseMarkers, ...customMarkers];
     monaco.editor.setModelMarkers(model, 'migoto-lint', currentMarkers);
 

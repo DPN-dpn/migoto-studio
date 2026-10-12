@@ -55,6 +55,8 @@ export interface CustomLintRule {
     file: { name: string; path: string; location: string } | null;
     folder: string | null;
     fileExists: (relativePath: string) => Promise<boolean>;
+    readTextFile?: (relativePath: string) => Promise<string>;
+    getAllFiles?: () => string[];
   }) => Promise<LintDiagnostic[]> | LintDiagnostic[];
 }
 
@@ -107,6 +109,7 @@ export interface PluginContext {
   linter: {
     registerRule(rule: CustomLintRule): () => void;
     registerAllowedResource(resourceOrPattern: string | RegExp): () => void;
+    registerAllowedVariable(variableOrPattern: string | RegExp | ((name: string) => boolean)): () => void;
   };
 
   // ---- Templates ----

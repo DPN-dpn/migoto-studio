@@ -7,7 +7,7 @@ import { openModal } from '../ui/modal';
 import { showToast } from '../ui/toast';
 import { BUILTIN_PLUGINS } from './builtin';
 import type { ActivityBar } from '../ui/activitybar';
-import { registerAllowedResource } from '../core/lint';
+import { registerAllowedResource, registerAllowedVariable } from '../core/lint';
 import { registerPluginTemplate } from '../core/templates';
 import type {
   CustomLintRule,
@@ -199,6 +199,18 @@ export class PluginManager {
       file: curFile,
       folder: curFolder,
       fileExists: fileExistsHelper,
+      readTextFile: async (relOrAbsPath: string): Promise<string> => {
+        let clean = relOrAbsPath.trim().replace(/^["']|["']$/g, '').trim();
+        if (curFolder && !clean.includes(':') && !clean.startsWith('/') && !clean.startsWith('\\')) {
+          clean = `${curFolder.replace(/\\/g, '/')}/${clean.replace(/\\/g, '/')}`;
+        }
+        const ref = platform().refFromId(clean);
+        const loaded = await platform().readFile(ref);
+        return loaded.text;
+      },
+      getAllFiles: (): string[] => {
+        return this.explorer && this.explorer.hasFolder ? this.explorer.getAllFilePaths() : [];
+      },
     };
 
     for (const rule of this.customLintRules.values()) {
@@ -863,6 +875,16 @@ export default {
         },
         registerAllowedResource: (pattern: string | RegExp) => {
           const unregister = registerAllowedResource(pattern);
+          this.triggerLint();
+          const cleanup = () => {
+            unregister();
+            this.triggerLint();
+          };
+          callbacks.onRegisterCleanup(cleanup);
+          return cleanup;
+        },
+        registerAllowedVariable: (pattern: string | RegExp | ((name: string) => boolean)) => {
+          const unregister = registerAllowedVariable(pattern);
           this.triggerLint();
           const cleanup = () => {
             unregister();

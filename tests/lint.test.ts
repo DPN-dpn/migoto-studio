@@ -186,3 +186,27 @@ filename = Textures/WEngineFX.dds
   assert.ok(markersWithoutZZMI.some((m) => m.message.includes('CommandList\\ZZMI\\SetTextures')));
 });
 
+test('single ini mode guides user to check namespace for undeclared and namespaced variables', () => {
+  // 1. Regular undeclared variable in single ini mode
+  const model1 = createMockModel('[Present]\n$costume = 1\n');
+  const markers1 = lintModel(model1, { ...defaultOptions, hasFolder: false });
+  const m1 = markers1.find((m) => m.message.includes('$costume'));
+  assert.ok(m1);
+  assert.ok(m1.message.includes('네임스페이스에 있는 변수인지 확인해야 합니다'));
+
+  // 2. Namespaced undeclared variable in single ini mode
+  const model2 = createMockModel('[Present]\nif $\\Raiden\\costume == 1\nendif');
+  const markers2 = lintModel(model2, { ...defaultOptions, hasFolder: false });
+  const m2 = markers2.find((m) => m.message.includes('costume'));
+  assert.ok(m2);
+  assert.ok(m2.message.includes('단일 ini 파일로 열려 있어 외부 네임스페이스를 확인할 수 없습니다'));
+  assert.ok(m2.message.includes('네임스페이스에 있는 변수인지 확인해야 합니다'));
+});
+
+test('folder mode delegates namespaced variables to custom lint rule', () => {
+  const model = createMockModel('[Present]\nif $\\Raiden\\costume == 1\nendif');
+  const markers = lintModel(model, { ...defaultOptions, hasFolder: true });
+  // In folder mode, core linter delegates $\Raiden\costume to workspace custom lint rule
+  assert.equal(markers.some((m) => m.message.includes('costume')), false);
+});
+

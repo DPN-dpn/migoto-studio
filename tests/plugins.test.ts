@@ -298,20 +298,22 @@ test('validatePluginZip throws when script is missing', () => {
   assert.throws(() => validatePluginZip(zip), /실행 스크립트.*없습니다/);
 });
 
-test('resource-checker plugin activates and registers lint rule without sidebar view', async () => {
+test('custom-lint (resource-checker) plugin activates and registers both resource and xxmi namespace lint rules', async () => {
   const def = BUILTIN_PLUGINS.find((p) => p.manifest.id === 'resource-checker')!;
   assert.ok(def);
+  assert.equal(def.manifest.name, '커스텀 린트');
   const plugin = def.createPlugin();
 
-  let registeredRule: any = null;
+  const registeredRules: any[] = [];
   let registeredView: any = null;
 
   const mockContext: any = {
     manifest: def.manifest,
     linter: {
       registerRule: (rule: any) => {
-        registeredRule = rule;
+        registeredRules.push(rule);
       },
+      registerAllowedVariable: () => () => {},
     },
     ui: {
       registerSidebarView: (view: any) => {
@@ -322,6 +324,7 @@ test('resource-checker plugin activates and registers lint rule without sidebar 
       getCurrentFolder: () => 'D:/Mods/Test',
       getCurrentFile: () => ({ name: 'test.ini', path: 'D:/Mods/Test/test.ini', location: 'disk' }),
       readDirectory: async () => [],
+      readTextFile: async () => '',
     },
     editor: {
       getText: () => 'filename = Meshes/NotExist.buf\n',
@@ -330,12 +333,16 @@ test('resource-checker plugin activates and registers lint rule without sidebar 
   };
 
   plugin.activate(mockContext);
-  assert.ok(registeredRule);
-  assert.equal(registeredRule.id, 'missing-resource-files');
+  assert.equal(registeredRules.length, 2);
   assert.equal(registeredView, null);
 
-  // Test rule check execution
-  const diags = await registeredRule.check({
+  const resourceRule = registeredRules.find((r) => r.id === 'missing-resource-files')!;
+  const nsRule = registeredRules.find((r) => r.id === 'xxmi-namespace-check')!;
+  assert.ok(resourceRule);
+  assert.ok(nsRule);
+
+  // 1. Test missing resource rule
+  const diags = await resourceRule.check({
     model: {
       getLineCount: () => 1,
       getLineContent: () => 'filename = Meshes/NotExist.buf',
@@ -347,8 +354,7 @@ test('resource-checker plugin activates and registers lint rule without sidebar 
   assert.equal(diags[0].severity, 'warning');
   assert.ok(diags[0].message.includes('Meshes/NotExist.buf'));
 
-  // Test when file exists
-  const diagsOk = await registeredRule.check({
+  const diagsOk = await resourceRule.check({
     model: {
       getLineCount: () => 1,
       getLineContent: () => 'filename = Meshes/Exists.buf',
@@ -357,6 +363,69 @@ test('resource-checker plugin activates and registers lint rule without sidebar 
     fileExists: async () => true,
   });
   assert.equal(diagsOk.length, 0);
+
+  // 2. Test XXMI namespace rule
+  const otherIniContent = `
+namespace = RaidenMod
+[Constants]
+global persist $costume = 1
+global $active = 1
+
+[CommandListSwapWeapon]
+handling = skip
+`;
+
+  const nsCtxBase = {
+    folder: 'D:/Mods/Test',
+    getAllFiles: () => ['Raiden.ini', 'test.ini'],
+    readTextFile: async (path: string) => {
+      if (path.includes('Raiden.ini')) return otherIniContent;
+      return '';
+    },
+    file: { name: 'test.ini', path: 'D:/Mods/Test/test.ini', location: 'disk' },
+    fileExists: async () => true,
+  };
+
+  // 2-a. Valid namespaced variable & commandlist
+  const validModel = {
+    getLineCount: () => 3,
+    getLineContent: (n: number) => {
+      if (n === 1) return 'if $\\RaidenMod\\costume == 1';
+      if (n === 2) return '    run = CommandList\\RaidenMod\\SwapWeapon';
+      return 'endif';
+    },
+    getValue: () => 'if $\\RaidenMod\\costume == 1\nrun = CommandList\\RaidenMod\\SwapWeapon\nendif',
+  };
+  const nsDiagsValid = await nsRule.check({ ...nsCtxBase, model: validModel });
+  assert.equal(nsDiagsValid.length, 0, 'Valid namespace variable and commandlist should have 0 diagnostics');
+
+  // 2-b. Unknown namespace
+  const unknownNsModel = {
+    getLineCount: () => 1,
+    getLineContent: () => 'if $\\UnknownMod\\costume == 1',
+    getValue: () => 'if $\\UnknownMod\\costume == 1',
+  };
+  const nsDiagsUnknown = await nsRule.check({ ...nsCtxBase, model: unknownNsModel });
+  assert.equal(nsDiagsUnknown.length, 1);
+  assert.ok(nsDiagsUnknown[0].message.includes("네임스페이스 'UnknownMod'을(를) 찾을 수 없습니다"));
+
+  // 2-c. Undeclared variable in valid namespace
+  const undeclaredVarModel = {
+    getLineCount: () => 1,
+    getLineContent: () => 'if $\\RaidenMod\\nonexistent == 1',
+    getValue: () => 'if $\\RaidenMod\\nonexistent == 1',
+  };
+  const nsDiagsUndeclared = await nsRule.check({ ...nsCtxBase, model: undeclaredVarModel });
+  assert.equal(nsDiagsUndeclared.length, 1);
+  assert.ok(nsDiagsUndeclared[0].message.includes("네임스페이스 'RaidenMod'에 선언되지 않은 변수 '$nonexistent'"));
+
+  // 2-d. Single ini mode (folder = null) returns 0 (handled by core linter)
+  const singleIniDiags = await nsRule.check({
+    ...nsCtxBase,
+    folder: null,
+    model: undeclaredVarModel,
+  });
+  assert.equal(singleIniDiags.length, 0);
 });
 
 test('zzmi-support plugin activates and registers allowed resource and code template without sidebar view', () => {

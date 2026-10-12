@@ -22,9 +22,10 @@ export interface LintOptions {
   missingResources: boolean;
   undeclaredVars: boolean;
   unusedItems: boolean;
+  hasFolder?: boolean;
 }
 
-export function optionsFromSettings(s: Settings): LintOptions {
+export function optionsFromSettings(s: Settings, hasFolder = false): LintOptions {
   return {
     enabled: s.lintEnabled,
     duplicateSections: s.lintDuplicateSections,
@@ -33,6 +34,7 @@ export function optionsFromSettings(s: Settings): LintOptions {
     missingResources: s.lintMissingResources,
     undeclaredVars: s.lintUndeclaredVars,
     unusedItems: s.lintUnusedItems,
+    hasFolder,
   };
 }
 
@@ -382,9 +384,20 @@ export function lintModel(model: TextModelLike, options: LintOptions): monaco.ed
     for (const ref of resourceRefs) {
       if (isAllowedResource(ref.name)) continue;
       if (!sections.has(ref.name.toLowerCase())) {
+        const isNamespaced = ref.name.includes('\\');
+        if (options.hasFolder && isNamespaced) {
+          // Folder mode: delegated to namespace lint rule
+          continue;
+        }
+        let message: string;
+        if (!options.hasFolder && isNamespaced) {
+          message = `참조된 섹션 '[${ref.name}]'을(를) 찾을 수 없습니다. 단일 ini 파일로 열려 있어 외부 네임스페이스를 확인할 수 없습니다. 네임스페이스에 정의된 섹션인지 확인해야 합니다.`;
+        } else {
+          message = `참조된 섹션 '[${ref.name}]'을(를) 찾을 수 없습니다. (다른 include 파일이나 네임스페이스에 정의되어 있다면 정상일 수 있습니다)`;
+        }
         markers.push({
           severity: MarkerSeverity.Warning,
-          message: `참조된 섹션 '[${ref.name}]'을(를) 찾을 수 없습니다. (다른 include 파일에 정의되어 있다면 정상일 수 있습니다)`,
+          message,
           startLineNumber: ref.line,
           startColumn: ref.col,
           endLineNumber: ref.line,
@@ -397,16 +410,34 @@ export function lintModel(model: TextModelLike, options: LintOptions): monaco.ed
   // 7. Undeclared variables check
   if (options.undeclaredVars) {
     for (const usage of varUsages) {
-      if (!declaredVars.has(usage.name)) {
-        markers.push({
-          severity: MarkerSeverity.Warning,
-          message: `선언되지 않은 변수 '$${usage.name}'입니다. [Constants] 섹션에 선언되어 있는지 확인하세요.`,
-          startLineNumber: usage.line,
-          startColumn: usage.col,
-          endLineNumber: usage.line,
-          endColumn: usage.endCol,
-        });
+      if (declaredVars.has(usage.name)) continue;
+      if (isAllowedVariable(usage.name)) continue;
+
+      const isNamespaced = usage.name.includes('\\');
+      if (options.hasFolder && isNamespaced) {
+        // Folder mode: delegated to custom lint rule across mod folder
+        continue;
       }
+
+      let message: string;
+      if (!options.hasFolder) {
+        if (isNamespaced) {
+          message = `선언되지 않은 변수 '$${usage.name}'입니다. 단일 ini 파일로 열려 있어 외부 네임스페이스를 확인할 수 없습니다. 네임스페이스에 있는 변수인지 확인해야 합니다.`;
+        } else {
+          message = `선언되지 않은 변수 '$${usage.name}'입니다. [Constants] 섹션에 선언되어 있거나 네임스페이스에 있는 변수인지 확인해야 합니다.`;
+        }
+      } else {
+        message = `선언되지 않은 변수 '$${usage.name}'입니다. [Constants] 섹션에 선언되어 있는지 확인하세요.`;
+      }
+
+      markers.push({
+        severity: MarkerSeverity.Warning,
+        message,
+        startLineNumber: usage.line,
+        startColumn: usage.col,
+        endLineNumber: usage.line,
+        endColumn: usage.endCol,
+      });
     }
   }
 
@@ -491,5 +522,34 @@ export function isAllowedResource(name: string): boolean {
 
 export function clearAllowedResources(): void {
   registeredAllowedResources = [];
+}
+
+let registeredAllowedVariables: (string | RegExp | ((name: string) => boolean))[] = [];
+
+export function registerAllowedVariable(pattern: string | RegExp | ((name: string) => boolean)): () => void {
+  registeredAllowedVariables.push(pattern);
+  return () => {
+    registeredAllowedVariables = registeredAllowedVariables.filter((p) => p !== pattern);
+  };
+}
+
+export function isAllowedVariable(name: string): boolean {
+  const norm = name.toLowerCase();
+  const trimmed = norm.startsWith('\\') ? norm.slice(1) : norm;
+  return registeredAllowedVariables.some((p) => {
+    if (typeof p === 'function') {
+      return p(name) || p(norm) || p(trimmed) || p(`\\${trimmed}`);
+    }
+    if (typeof p === 'string') {
+      const pNorm = p.toLowerCase();
+      const pTrimmed = pNorm.startsWith('\\') ? pNorm.slice(1) : pNorm;
+      return norm === pNorm || trimmed === pTrimmed;
+    }
+    return p.test(name) || p.test(norm) || p.test(trimmed) || p.test(`\\${trimmed}`);
+  });
+}
+
+export function clearAllowedVariables(): void {
+  registeredAllowedVariables = [];
 }
 
