@@ -238,6 +238,7 @@ export class PluginManager {
     const unregisterViews: string[] = [];
     const unregisterStatusItems: string[] = [];
     const unregisterCustomViewers: string[] = [];
+    const unregisterCleanups: Array<() => void> = [];
 
     const context = this.createContext(instance.manifest, {
       onRegisterView: (view) => {
@@ -288,6 +289,9 @@ export class PluginManager {
           unregisterCustomViewers.push(norm);
         });
       },
+      onRegisterCleanup: (fn) => {
+        unregisterCleanups.push(fn);
+      },
     });
 
     try {
@@ -298,6 +302,9 @@ export class PluginManager {
         try {
           plugin.deactivate?.();
         } catch { }
+        unregisterCleanups.forEach((fn) => {
+          try { fn(); } catch { }
+        });
         unregisterViews.forEach((vId) => {
           this.sidebarViews.delete(vId);
           const disposer = this.dynamicTabDisposers.get(vId);
@@ -568,6 +575,7 @@ export default {
       onRegisterView: (view: RegisteredSidebarView) => void;
       onRegisterStatusItem: (id: string, el: HTMLElement) => void;
       onRegisterCustomViewer: (def: CustomViewerDefinition) => void;
+      onRegisterCleanup: (fn: () => void) => void;
     },
   ): PluginContext {
     return {
@@ -579,6 +587,15 @@ export default {
           const sel = this.editor.getSelection();
           if (!sel) return '';
           return this.editor.getModel()?.getValueInRange(sel) ?? '';
+        },
+        setText: (text: string) => {
+          this.editor.setValue(text);
+        },
+        getLine: (lineNumber: number) => {
+          return this.editor.getModel()?.getLineContent(lineNumber) ?? '';
+        },
+        getLineCount: () => {
+          return this.editor.getModel()?.getLineCount() ?? 1;
         },
         insertText: (text: string) => {
           const sel = this.editor.getSelection();
@@ -608,6 +625,33 @@ export default {
         getCursor: () => {
           const p = this.editor.getPosition();
           return { lineNumber: p?.lineNumber || 1, column: p?.column || 1 };
+        },
+        onDidChangeText: (listener: (text: string) => void) => {
+          const disp = this.editor.onDidChangeModelContent(() => {
+            listener(this.editor.getValue());
+          });
+          const cleanup = () => disp.dispose();
+          callbacks.onRegisterCleanup(cleanup);
+          return cleanup;
+        },
+        onDidChangeCursor: (listener: (cursor: { lineNumber: number; column: number }) => void) => {
+          const disp = this.editor.onDidChangeCursorPosition((e) => {
+            listener({ lineNumber: e.position.lineNumber, column: e.position.column });
+          });
+          const cleanup = () => disp.dispose();
+          callbacks.onRegisterCleanup(cleanup);
+          return cleanup;
+        },
+        registerContextMenuAction: (options: { id: string; label: string; onClick: () => void }) => {
+          const action = this.editor.addAction({
+            id: `plugin-${manifest.id}-${options.id}`,
+            label: options.label,
+            contextMenuGroupId: 'navigation',
+            run: () => options.onClick(),
+          });
+          const cleanup = () => action.dispose();
+          callbacks.onRegisterCleanup(cleanup);
+          return cleanup;
         },
         registerCustomViewer: (viewer: CustomViewerDefinition) => {
           callbacks.onRegisterCustomViewer(viewer);
@@ -642,11 +686,54 @@ export default {
           const loaded = await platform().readFile(ref);
           return loaded.text;
         },
+        writeTextFile: async (path: string, text: string) => {
+          const ref = platform().refFromId(path);
+          await platform().writeFile(ref, text, 'utf-8', { enabled: false, keepDays: 0, maxPerFile: 0 });
+        },
         readBinaryFile: async (path: string) => {
           if (platform().readBinaryFile) {
             return platform().readBinaryFile!(path);
           }
           return new Uint8Array();
+        },
+        writeBinaryFile: async (path: string, bytes: Uint8Array) => {
+          if (platform().writeBinaryFile) {
+            await platform().writeBinaryFile!(path, bytes);
+          } else {
+            const blob = new Blob([bytes as unknown as BlobPart], { type: 'application/octet-stream' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = path.split(/[\/\\]/).pop() || 'download.bin';
+            a.click();
+            URL.revokeObjectURL(url);
+          }
+        },
+        readDirectory: async (dirPath?: string) => {
+          const target = dirPath || (this.explorer && this.explorer.hasFolder ? (this.explorer as any).currentFolder?.id : null);
+          if (!target) return [];
+          try {
+            return await platform().readDirectory(target);
+          } catch {
+            return [];
+          }
+        },
+        pickFile: async () => {
+          const picked = await platform().pickOpen();
+          return picked ? picked.id : null;
+        },
+        showInFolder: async (path: string) => {
+          if (platform().showInFolder) {
+            await platform().showInFolder!(path);
+          }
+        },
+        onDidChangeActiveFile: (listener: (file: { name: string; path: string; location: string } | null) => void) => {
+          const unlisten = this.doc.onChange(() => {
+            const file = this.doc.file;
+            listener(file ? { name: this.doc.fileName, path: file.id, location: file.location } : null);
+          });
+          callbacks.onRegisterCleanup(unlisten);
+          return unlisten;
         },
       },
 

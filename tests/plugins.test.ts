@@ -15,6 +15,49 @@ test('definePlugin returns identical plugin definition with type inference', () 
   assert.equal(typeof plugin.deactivate, 'function');
 });
 
+test('PluginContext contract supports extended editor and workspace capabilities', () => {
+  let invoked = false;
+  const plugin = definePlugin({
+    activate(context) {
+      assert.equal(typeof context.editor.setText, 'function');
+      assert.equal(typeof context.editor.getLine, 'function');
+      assert.equal(typeof context.editor.getLineCount, 'function');
+      assert.equal(typeof context.editor.onDidChangeText, 'function');
+      assert.equal(typeof context.editor.onDidChangeCursor, 'function');
+      assert.equal(typeof context.editor.registerContextMenuAction, 'function');
+      assert.equal(typeof context.workspace.writeTextFile, 'function');
+      assert.equal(typeof context.workspace.writeBinaryFile, 'function');
+      assert.equal(typeof context.workspace.readDirectory, 'function');
+      assert.equal(typeof context.workspace.pickFile, 'function');
+      assert.equal(typeof context.workspace.showInFolder, 'function');
+      assert.equal(typeof context.workspace.onDidChangeActiveFile, 'function');
+      invoked = true;
+    },
+  });
+
+  const mockContext: any = {
+    editor: {
+      setText: () => {},
+      getLine: () => '',
+      getLineCount: () => 1,
+      onDidChangeText: () => () => {},
+      onDidChangeCursor: () => () => {},
+      registerContextMenuAction: () => () => {},
+    },
+    workspace: {
+      writeTextFile: async () => {},
+      writeBinaryFile: async () => {},
+      readDirectory: async () => [],
+      pickFile: async () => null,
+      showInFolder: async () => {},
+      onDidChangeActiveFile: () => () => {},
+    },
+  };
+
+  plugin.activate(mockContext);
+  assert.ok(invoked);
+});
+
 test('BUILTIN_PLUGINS registers 3 default plugins with unique IDs', () => {
   assert.equal(BUILTIN_PLUGINS.length, 3);
   const ids = BUILTIN_PLUGINS.map((p) => p.manifest.id);

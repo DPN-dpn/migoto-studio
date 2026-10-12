@@ -353,6 +353,139 @@ export function createUIBuilder() {
       msgEl.append(contentEl);
       return msgEl;
     },
+
+    createBadge(options: {
+      text: string;
+      variant?: 'info' | 'success' | 'warn' | 'error' | 'neutral';
+    }): HTMLElement {
+      const span = document.createElement('span');
+      span.className = `plugin-badge badge-${options.variant || 'neutral'}`;
+      span.textContent = options.text;
+      return span;
+    },
+
+    createProgressBar(options?: {
+      value?: number;
+      max?: number;
+      label?: string;
+    }) {
+      const container = document.createElement('div');
+      container.className = 'plugin-progress-container';
+
+      const header = document.createElement('div');
+      header.className = 'plugin-progress-header';
+
+      const labelSpan = document.createElement('span');
+      labelSpan.textContent = options?.label || '';
+      const percentSpan = document.createElement('span');
+      header.append(labelSpan, percentSpan);
+
+      const track = document.createElement('div');
+      track.className = 'plugin-progress-track';
+
+      const fill = document.createElement('div');
+      fill.className = 'plugin-progress-fill';
+      track.append(fill);
+
+      let currentVal = options?.value ?? 0;
+      let currentMax = options?.max ?? 100;
+
+      const update = () => {
+        const pct = Math.min(100, Math.max(0, currentMax > 0 ? (currentVal / currentMax) * 100 : 0));
+        fill.style.width = `${pct}%`;
+        percentSpan.textContent = `${Math.round(pct)}%`;
+      };
+      update();
+
+      container.append(header, track);
+
+      return {
+        container,
+        setProgress(val: number, max?: number) {
+          currentVal = val;
+          if (max !== undefined) currentMax = max;
+          update();
+        },
+        setLabel(text: string) {
+          labelSpan.textContent = text;
+        },
+      };
+    },
+
+    createDivider(): HTMLElement {
+      const hr = document.createElement('div');
+      hr.className = 'plugin-divider';
+      return hr;
+    },
+
+    createTable(options: {
+      headers: string[];
+      rows?: Array<Array<string | HTMLElement>>;
+    }) {
+      const container = document.createElement('div');
+      container.className = 'plugin-table-container';
+
+      const table = document.createElement('table');
+      table.className = 'plugin-table';
+
+      const thead = document.createElement('thead');
+      const trHead = document.createElement('tr');
+      options.headers.forEach((h) => {
+        const th = document.createElement('th');
+        th.textContent = h;
+        trHead.append(th);
+      });
+      thead.append(trHead);
+      table.append(thead);
+
+      const tbody = document.createElement('tbody');
+      table.append(tbody);
+
+      const renderRows = (rowsList: Array<Array<string | HTMLElement>>) => {
+        tbody.replaceChildren();
+        rowsList.forEach((row) => {
+          const tr = document.createElement('tr');
+          row.forEach((cell) => {
+            const td = document.createElement('td');
+            if (typeof cell === 'string') {
+              td.textContent = cell;
+            } else {
+              td.append(cell);
+            }
+            tr.append(td);
+          });
+          tbody.append(tr);
+        });
+      };
+
+      if (options.rows) renderRows(options.rows);
+      container.append(table);
+
+      return {
+        container,
+        table,
+        tbody,
+        setRows(rows: Array<Array<string | HTMLElement>>) {
+          renderRows(rows);
+        },
+        addRow(row: Array<string | HTMLElement>) {
+          const tr = document.createElement('tr');
+          row.forEach((cell) => {
+            const td = document.createElement('td');
+            if (typeof cell === 'string') {
+              td.textContent = cell;
+            } else {
+              td.append(cell);
+            }
+            tr.append(td);
+          });
+          tbody.append(tr);
+        },
+        clear() {
+          tbody.replaceChildren();
+        },
+      };
+    },
   };
 }
 

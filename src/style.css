@@ -1620,6 +1620,86 @@ input:checked + .slider:before {
   margin: 0;
 }
 
+/* Plugin UI Builder: Badges, Progress, Divider, Table */
+.plugin-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 6px;
+  font-size: 10px;
+  font-weight: 500;
+  border-radius: 4px;
+  line-height: 1.2;
+}
+.badge-neutral { background: rgba(255, 255, 255, 0.08); color: var(--fg-dim); }
+.badge-info { background: rgba(99, 102, 241, 0.2); color: #a5b4fc; }
+.badge-success { background: rgba(34, 197, 94, 0.2); color: #86efac; }
+.badge-warn { background: rgba(234, 179, 8, 0.2); color: #fde047; }
+.badge-error { background: rgba(239, 68, 68, 0.2); color: #fca5a5; }
+
+.plugin-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 12px 0;
+  width: 100%;
+}
+
+.plugin-progress-container {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 8px 0;
+}
+.plugin-progress-header {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--fg-dim);
+}
+.plugin-progress-track {
+  width: 100%;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.plugin-progress-fill {
+  height: 100%;
+  background: var(--accent);
+  width: 0%;
+  transition: width 0.2s ease;
+}
+
+.plugin-table-container {
+  width: 100%;
+  overflow-x: auto;
+  margin: 8px 0;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+.plugin-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+.plugin-table th {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--fg-dim);
+  text-align: left;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+}
+.plugin-table td {
+  padding: 6px 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  color: var(--fg);
+}
+.plugin-table tr:last-child td {
+  border-bottom: none;
+}
+.plugin-table tr:hover td {
+  background: rgba(255, 255, 255, 0.02);
+}
+
 /* Asset Viewer Panel */
 .asset-file-list {
   max-height: 110px;

@@ -17,6 +17,9 @@ export interface SelectOption {
   label: string;
 }
 
+import type { DirEntry } from '../platform/types.ts';
+export type { DirEntry };
+
 export interface PluginContext {
   manifest: PluginManifest;
 
@@ -24,10 +27,16 @@ export interface PluginContext {
   editor: {
     getText(): string;
     getSelectedText(): string;
+    setText(text: string): void;
+    getLine(lineNumber: number): string;
+    getLineCount(): number;
     insertText(text: string): void;
     replaceSelection(text: string): void;
     setCursor(line: number, col: number): void;
     getCursor(): { lineNumber: number; column: number };
+    onDidChangeText(listener: (text: string) => void): () => void;
+    onDidChangeCursor(listener: (cursor: { lineNumber: number; column: number }) => void): () => void;
+    registerContextMenuAction(options: { id: string; label: string; onClick: () => void }): () => void;
     registerCustomViewer(options: CustomViewerDefinition): void;
   };
 
@@ -38,7 +47,13 @@ export interface PluginContext {
     openFile(pathOrName: string): Promise<void>;
     saveCurrentFile(): Promise<void>;
     readTextFile(path: string): Promise<string>;
+    writeTextFile(path: string, text: string): Promise<void>;
     readBinaryFile(path: string): Promise<Uint8Array>;
+    writeBinaryFile(path: string, bytes: Uint8Array): Promise<void>;
+    readDirectory(dirPath?: string): Promise<DirEntry[]>;
+    pickFile(options?: { extensions?: string[]; title?: string }): Promise<string | null>;
+    showInFolder(path: string): Promise<void>;
+    onDidChangeActiveFile(listener: (file: { name: string; path: string; location: string } | null) => void): () => void;
   };
 
   // ---- UI integration ----
