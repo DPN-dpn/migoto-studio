@@ -30,6 +30,22 @@ export async function openRestore(doc: DocumentManager) {
     const li = document.createElement('li');
     const info = document.createElement('span');
     info.textContent = `${new Date(b.timestamp).toLocaleString('ko-KR')}  ·  ${fmtSize(b.size)}`;
+    const btnGroup = document.createElement('div');
+    btnGroup.style.display = 'flex';
+    btnGroup.style.gap = '6px';
+
+    const diffBtn = document.createElement('button');
+    diffBtn.textContent = '비교 (Diff)';
+    diffBtn.addEventListener('click', async () => {
+      try {
+        const text = await platform().readBackup(b);
+        close();
+        await doc.compareWithBackup(text, b.timestamp);
+      } catch (e) {
+        await platform().showError('비교하지 못했습니다', String(e));
+      }
+    });
+
     const btn = document.createElement('button');
     btn.textContent = '복원';
     btn.addEventListener('click', async () => {
@@ -40,7 +56,8 @@ export async function openRestore(doc: DocumentManager) {
         await platform().showError('복원하지 못했습니다', String(e));
       }
     });
-    li.append(info, btn);
+    btnGroup.append(diffBtn, btn);
+    li.append(info, btnGroup);
     list.append(li);
   }
   body.append(list);

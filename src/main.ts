@@ -20,6 +20,8 @@ import { openSettings } from './ui/settings-ui';
 import { openHelp } from './ui/help-ui';
 import { lintModel, optionsFromSettings } from './core/lint';
 import { registerSmartCompletions } from './core/completions';
+import { DiffViewer } from './ui/diff-viewer';
+import { openCompareDialog } from './ui/diff-dialog';
 import { initPwa } from './pwa';
 import { checkOnStartup } from './updater/updater';
 
@@ -53,6 +55,8 @@ async function boot() {
   });
 
   const doc = new DocumentManager(editor, $('custom-viewer-container'));
+  const diffViewer = new DiffViewer($('diff-container'), doc);
+  doc.setDiffViewer(diffViewer);
   const outline = new OutlinePanel(editor, $('sidebar'), $('sidebar-panel-outline'), $('sidebar-resizer'));
   const explorer = new FileExplorer($('sidebar-panel-explorer'), doc);
   new TemplatePanel($('sidebar-panel-templates'), editor);
@@ -117,6 +121,8 @@ async function boot() {
       minimap: { enabled: s.minimap },
       renderWhitespace: s.whitespace,
     });
+    diffViewer.updateTheme(s.theme as 'dark' | 'light');
+    diffViewer.updateOptions({ fontSize: s.fontSize });
     outline.setVisible(s.showOutline);
   };
   onSettingsChange(applySettings);
@@ -221,6 +227,7 @@ async function boot() {
     else if (key === 'w') run(() => doc.closeActiveTab());
     else if (key === 'b') run(() => activityBar.toggleSidebar());
     else if (key === 'e' && e.shiftKey) run(() => activityBar.switchTo('explorer'));
+    else if (key === 'd' && e.shiftKey) run(() => openCompareDialog(doc));
     else if (key === 'tab') run(() => (e.shiftKey ? doc.prevTab() : doc.nextTab()));
     else if (key === 'pageup') run(() => doc.prevTab());
     else if (key === 'pagedown') run(() => doc.nextTab());

@@ -2,10 +2,19 @@ import { monaco } from './monaco';
 import { platform, type Encoding, type FileRef } from '../platform';
 import { getSettings, updateSettings } from './settings';
 import { LANGUAGE_ID } from './grammar';
-import type { CustomViewerDefinition } from '../plugins/types';
-
+import { showToast } from '../ui/toast';
 export type { Encoding };
-export type TabKind = 'text' | 'custom';
+export type TabKind = 'text' | 'custom' | 'diff';
+
+export interface CustomViewerDefinition {
+  id: string;
+  name: string;
+  extensions: string[];
+  render(
+    container: HTMLElement,
+    file: { name: string; path: string; bytes: Uint8Array },
+  ): (() => void) | void;
+}
 
 export const ENCODING_LABELS: Record<Encoding, string> = {
   'utf-8': 'UTF-8',
@@ -14,6 +23,35 @@ export const ENCODING_LABELS: Record<Encoding, string> = {
   'utf-16be': 'UTF-16 BE',
   cp949: 'CP949 (한글 ANSI)',
 };
+
+const BINARY_EXTENSIONS = new Set([
+  'dds', 'png', 'jpg', 'jpeg', 'bmp', 'webp', 'gif', 'tga', 'ico', 'tiff', 'psd',
+  'exe', 'dll', 'bin', 'dat', 'zip', '7z', 'rar', 'tar', 'gz',
+  'buf', 'ib', 'vb',
+]);
+
+export interface DiffTabInfo {
+  originalTitle: string;
+  modifiedTitle: string;
+  originalModel: monaco.editor.ITextModel;
+  modifiedModel: monaco.editor.ITextModel;
+  sourceTabId?: string;
+}
+
+export interface OpenDiffOptions {
+  title?: string;
+  originalTitle: string;
+  modifiedTitle: string;
+  originalText: string;
+  modifiedText: string;
+  languageId?: string;
+  sourceTabId?: string;
+  file?: FileRef | null;
+}
+
+export interface DiffViewerHandler {
+  showDiffTab(tab: DocumentTab): void;
+}
 
 export interface DocumentTab {
   id: string;
@@ -27,16 +65,17 @@ export interface DocumentTab {
   customViewerId?: string;
   customBytes?: Uint8Array;
   customCleanup?: (() => void) | void;
+  diffInfo?: DiffTabInfo;
 }
 
-export interface PluginViewerProvider {
+export interface CustomViewerProvider {
   getCustomViewer(ext: string): CustomViewerDefinition | undefined;
 }
 
 /**
  * Manages multiple open documents (tabs) being edited:
  * - Each tab has its own Monaco text model, undo/redo history, saved version, and view state.
- * - Supports rich custom tabs (registered dynamically by plugins) alongside INI text tabs.
+ * - Supports rich custom tabs (registered dynamically via CustomViewerProvider) alongside INI text tabs.
  * - Switching tabs swaps models or custom viewers and restores scroll/cursor location.
  * - Dirty state uses Monaco's alternative version ID for accurate undo-to-clean detection.
  */
@@ -46,7 +85,8 @@ export class DocumentManager {
   private tabSeq = 0;
   private untitledSeq = 0;
   private listeners = new Set<() => void>();
-  private pluginManager?: PluginViewerProvider;
+  private viewerProvider?: CustomViewerProvider;
+  private diffViewer?: DiffViewerHandler;
 
   constructor(
     private editor: monaco.editor.IStandaloneCodeEditor,
@@ -63,8 +103,12 @@ export class DocumentManager {
     initialDummy?.dispose();
   }
 
-  setPluginManager(pm: PluginViewerProvider) {
-    this.pluginManager = pm;
+  setViewerProvider(provider: CustomViewerProvider) {
+    this.viewerProvider = provider;
+  }
+
+  setDiffViewer(dv: DiffViewerHandler) {
+    this.diffViewer = dv;
   }
 
   get allTabs(): readonly DocumentTab[] {
@@ -81,7 +125,7 @@ export class DocumentManager {
   }
 
   isTabDirty(tab: DocumentTab): boolean {
-    if (tab.kind === 'custom') return false;
+    if (tab.kind === 'custom' || tab.kind === 'diff') return false;
     return tab.model.getAlternativeVersionId() !== tab.savedVersion;
   }
 
@@ -180,27 +224,45 @@ export class DocumentManager {
 
     this.activeTabId = target.id;
     const editorEl = document.getElementById('editor');
+    const customContainer = this.customViewerContainer;
+    const diffContainer = document.getElementById('diff-container');
 
-    if (target.kind === 'custom') {
+    if (target.kind === 'diff') {
       if (editorEl) editorEl.style.display = 'none';
-      if (this.customViewerContainer) {
-        this.customViewerContainer.hidden = false;
-        this.customViewerContainer.replaceChildren();
+      if (customContainer) customContainer.hidden = true;
+      if (diffContainer) diffContainer.hidden = false;
+      this.diffViewer?.showDiffTab(target);
+    } else if (target.kind === 'custom') {
+      if (diffContainer) diffContainer.hidden = true;
+      if (editorEl) editorEl.style.display = 'none';
+      if (customContainer) {
+        customContainer.hidden = false;
+        customContainer.replaceChildren();
 
         const ext = target.file?.name.split('.').pop()?.toLowerCase() ?? '';
-        const viewer = this.pluginManager?.getCustomViewer(ext);
+        const viewer = this.viewerProvider?.getCustomViewer(ext);
         if (viewer) {
-          target.customCleanup = viewer.render(this.customViewerContainer, {
+          target.customCleanup = viewer.render(customContainer, {
             name: target.title,
             path: target.file?.location ?? target.title,
             bytes: target.customBytes ?? new Uint8Array(),
           });
+        } else {
+          const placeholder = document.createElement('div');
+          placeholder.className = 'binary-file-placeholder';
+          placeholder.innerHTML = `
+            <div class="binary-placeholder-icon">📦</div>
+            <div class="binary-placeholder-title">${target.title}</div>
+            <div class="binary-placeholder-desc">바이너리 파일이거나 열 수 있는 전용 뷰어가 없습니다.</div>
+          `;
+          customContainer.append(placeholder);
         }
       }
     } else {
-      if (this.customViewerContainer) {
-        this.customViewerContainer.hidden = true;
-        this.customViewerContainer.replaceChildren();
+      if (diffContainer) diffContainer.hidden = true;
+      if (customContainer) {
+        customContainer.hidden = true;
+        customContainer.replaceChildren();
       }
       if (editorEl) editorEl.style.display = 'block';
       this.editor.setModel(target.model);
@@ -258,6 +320,11 @@ export class DocumentManager {
     if (target.kind === 'custom' && typeof target.customCleanup === 'function') {
       try { target.customCleanup(); } catch {}
       target.customCleanup = undefined;
+    }
+
+    if (target.kind === 'diff' && target.diffInfo) {
+      target.diffInfo.originalModel.dispose();
+      target.diffInfo.modifiedModel.dispose();
     }
 
     const wasActive = target.id === this.activeTabId;
@@ -347,18 +414,14 @@ export class DocumentManager {
 
   async openFile(ref: FileRef): Promise<void> {
     const ext = ref.name.split('.').pop()?.toLowerCase() ?? '';
-    const customViewer = this.pluginManager?.getCustomViewer(ext);
+    const customViewer = this.viewerProvider?.getCustomViewer(ext);
 
     if (customViewer) {
       return this.openCustomViewerFile(ref, customViewer);
     }
 
-    if (/\.(dds|png|jpe?g|bmp|webp|gif)$/i.test(ref.name)) {
-      await platform().showInfo(
-        '플러그인 필요',
-        `"${ref.name}" 파일을 미리보려면 좌측 [플러그인 관리]에서 'DDS / 텍스처 뷰어' 플러그인을 활성화해주세요.`,
-      );
-      return;
+    if (BINARY_EXTENSIONS.has(ext)) {
+      return this.openCustomViewerFile(ref);
     }
 
     // 1. If already open in any tab, switch to it
@@ -408,7 +471,7 @@ export class DocumentManager {
     }
   }
 
-  async openCustomViewerFile(ref: FileRef, viewer: CustomViewerDefinition): Promise<void> {
+  async openCustomViewerFile(ref: FileRef, viewer?: CustomViewerDefinition): Promise<void> {
     const existing = this.tabs.find((t) => t.file?.id === ref.id);
     if (existing) {
       this.switchTab(existing.id);
@@ -416,11 +479,13 @@ export class DocumentManager {
     }
 
     try {
-      if (!platform().readBinaryFile) {
-        await platform().showError('지원되지 않음', '이 환경에서는 바이너리 파일 열기가 지원되지 않습니다.');
-        return;
+      let bytes = new Uint8Array();
+      if (platform().readBinaryFile) {
+        try {
+          const loaded = await platform().readBinaryFile!(ref.id);
+          bytes = new Uint8Array(loaded.buffer as ArrayBuffer, loaded.byteOffset, loaded.byteLength);
+        } catch {}
       }
-      const bytes = await platform().readBinaryFile!(ref.id);
       const id = `custom_tab_${Date.now()}_${++this.tabSeq}`;
       const uri = monaco.Uri.parse(`customfile:///tab-${id}/${encodeURIComponent(ref.name)}`);
       const dummyModel = monaco.editor.createModel('', 'plaintext', uri);
@@ -436,7 +501,7 @@ export class DocumentManager {
         this.activeTab.file = ref;
         this.activeTab.title = ref.name;
         this.activeTab.customBytes = bytes;
-        this.activeTab.customViewerId = viewer.id;
+        this.activeTab.customViewerId = viewer?.id;
         this.activeTab.model = dummyModel;
         this.switchTab(this.activeTab.id, true);
         await this.rememberRecent(ref);
@@ -454,7 +519,7 @@ export class DocumentManager {
         viewState: null,
         title: ref.name,
         customBytes: bytes,
-        customViewerId: viewer.id,
+        customViewerId: viewer?.id,
       };
 
       this.tabs.push(tab);
@@ -514,5 +579,152 @@ export class DocumentManager {
     if (!platform().capabilities.recentFiles) return;
     const recent = [ref.id, ...getSettings().recentFiles.filter((p) => p !== ref.id)].slice(0, 10);
     await updateSettings({ recentFiles: recent });
+  }
+
+  openDiffTab(options: OpenDiffOptions): DocumentTab {
+    const lang = options.languageId ?? LANGUAGE_ID;
+    const tabId = `diff_tab_${Date.now()}_${++this.tabSeq}`;
+    const origUri = monaco.Uri.parse(`diff-orig:///tab-${tabId}/${encodeURIComponent(options.originalTitle)}`);
+    const modUri = monaco.Uri.parse(`diff-mod:///tab-${tabId}/${encodeURIComponent(options.modifiedTitle)}`);
+
+    const originalModel = monaco.editor.createModel(options.originalText, lang, origUri);
+    const modifiedModel = monaco.editor.createModel(options.modifiedText, lang, modUri);
+
+    const title = options.title ?? `${options.originalTitle} ↔ ${options.modifiedTitle}`;
+
+    const tab: DocumentTab = {
+      id: tabId,
+      file: options.file ?? null,
+      kind: 'diff',
+      encoding: 'utf-8',
+      model: modifiedModel,
+      savedVersion: modifiedModel.getAlternativeVersionId(),
+      viewState: null,
+      title,
+      diffInfo: {
+        originalTitle: options.originalTitle,
+        modifiedTitle: options.modifiedTitle,
+        originalModel,
+        modifiedModel,
+        sourceTabId: options.sourceTabId,
+      },
+    };
+
+    this.tabs.push(tab);
+    this.switchTab(tab.id);
+    return tab;
+  }
+
+  applyDiffToSource(diffTabId: string): boolean {
+    const diffTab = this.tabs.find((t) => t.id === diffTabId);
+    if (!diffTab || diffTab.kind !== 'diff' || !diffTab.diffInfo?.sourceTabId) return false;
+
+    const sourceTab = this.tabs.find((t) => t.id === diffTab.diffInfo!.sourceTabId);
+    if (!sourceTab || sourceTab.kind !== 'text') return false;
+
+    const newText = diffTab.diffInfo.modifiedModel.getValue();
+    const fullRange = sourceTab.model.getFullModelRange();
+    sourceTab.model.pushEditOperations(
+      [],
+      [{ range: fullRange, text: newText }],
+      () => null,
+    );
+
+    this.switchTab(sourceTab.id);
+    this.closeTab(diffTabId);
+    return true;
+  }
+
+  async compareWithDisk(tabId?: string): Promise<void> {
+    const target = tabId ? this.tabs.find((t) => t.id === tabId) : this.activeTab;
+    if (!target || !target.file) {
+      await platform().showInfo('디스크 비교 불가', '파일로 저장되어 있지 않은 임시 문서입니다.');
+      return;
+    }
+
+    try {
+      const disk = await platform().readFile(target.file);
+      const currentText = target.model.getValue();
+      const fileName = target.file.name;
+
+      if (disk.text === currentText) {
+        showToast('디스크 저장본과 현재 내용이 완전히 일치합니다.', 'info');
+        return;
+      }
+
+      this.openDiffTab({
+        title: `${fileName} (디스크 ↔ 에디터)`,
+        originalTitle: `${fileName} (디스크 저장본)`,
+        modifiedTitle: `${fileName} (현재 에디터)`,
+        originalText: disk.text,
+        modifiedText: currentText,
+        sourceTabId: target.id,
+        file: target.file,
+      });
+    } catch (err) {
+      await platform().showError('디스크 파일 읽기 실패', String(err));
+    }
+  }
+
+  async compareWithClipboard(tabId?: string): Promise<void> {
+    const target = tabId ? this.tabs.find((t) => t.id === tabId) : this.activeTab;
+    if (!target) return;
+
+    try {
+      const clipText = await navigator.clipboard.readText();
+      if (!clipText || clipText.trim().length === 0) {
+        showToast('클립보드가 비어 있습니다.', 'warn');
+        return;
+      }
+
+      const currentText = target.model.getValue();
+      const fileName = target.title;
+
+      if (clipText === currentText) {
+        showToast('클립보드 내용과 현재 문서 내용이 완전히 일치합니다.', 'info');
+        return;
+      }
+
+      this.openDiffTab({
+        title: `${fileName} ↔ 클립보드`,
+        originalTitle: `${fileName} (현재 문서)`,
+        modifiedTitle: '클립보드 내용 (수정안)',
+        originalText: currentText,
+        modifiedText: clipText,
+        sourceTabId: target.id,
+        file: target.file,
+      });
+    } catch (err) {
+      showToast('클립보드 내용을 읽을 수 없습니다.', 'warn');
+    }
+  }
+
+  async compareWithBackup(backupText: string, backupTimestamp: number, tabId?: string): Promise<void> {
+    const target = tabId ? this.tabs.find((t) => t.id === tabId) : this.activeTab;
+    if (!target) return;
+
+    const currentText = target.model.getValue();
+    const fileName = target.title;
+    const timeStr = new Date(backupTimestamp).toLocaleString('ko-KR');
+
+    this.openDiffTab({
+      title: `${fileName} (${timeStr} 백업 ↔ 현재)`,
+      originalTitle: `${fileName} (${timeStr} 백업본)`,
+      modifiedTitle: `${fileName} (현재 에디터)`,
+      originalText: backupText,
+      modifiedText: currentText,
+      sourceTabId: target.id,
+      file: target.file,
+    });
+  }
+
+  compareTwoFiles(fileA: { name: string; text: string }, fileB: { name: string; text: string }): DocumentTab {
+    return this.openDiffTab({
+      title: `${fileA.name} ↔ ${fileB.name}`,
+      originalTitle: fileA.name,
+      modifiedTitle: fileB.name,
+      originalText: fileA.text,
+      modifiedText: fileB.text,
+    });
   }
 }

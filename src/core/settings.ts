@@ -54,7 +54,7 @@ export const DEFAULT_SETTINGS: Settings = {
 
 /**
  * Describes every setting shown in the settings screen. The screen is generated from this list,
- * so a new option only needs an entry here (plugins will be able to add entries too).
+ * so a new option only needs an entry here (extensions will be able to add entries too).
  */
 export type SettingField = {
   key: keyof Omit<Settings, 'recentFiles'>;

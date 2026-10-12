@@ -2267,4 +2267,316 @@ input:checked + .slider:before {
   transform: translateX(14px);
 }
 
+/* Binary file placeholder (when no custom viewer is registered) */
+.binary-file-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 8px;
+  color: var(--fg-dim);
+  user-select: none;
+  background: var(--bg);
+}
+
+.binary-placeholder-icon {
+  font-size: 36px;
+  margin-bottom: 4px;
+  opacity: 0.7;
+}
+
+.binary-placeholder-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--fg);
+}
+
+.binary-placeholder-desc {
+  font-size: 12px;
+  color: var(--fg-dim);
+}
+
+/* ============================================================================
+   Diff Viewer & Compare Panel
+   ============================================================================ */
+
+.diff-container-panel {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  background: var(--bg);
+  overflow: hidden;
+}
+
+.diff-header-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 14px;
+  background: var(--bg-subtle);
+  border-bottom: 1px solid var(--border);
+  min-height: 38px;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.diff-header-titles {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.diff-badge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 3px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.diff-badge-orig {
+  background: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.4);
+}
+
+.diff-badge-mod {
+  background: rgba(34, 197, 94, 0.2);
+  color: #22c55e;
+  border: 1px solid rgba(34, 197, 94, 0.4);
+}
+
+.diff-label {
+  font-weight: 500;
+  color: var(--fg);
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.diff-arrow-separator {
+  color: var(--fg-dim);
+  font-weight: 700;
+  margin: 0 4px;
+}
+
+.diff-stats-badge {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  margin-left: 8px;
+  font-weight: 600;
+}
+
+.diff-stats-badge.is-clean {
+  background: rgba(148, 163, 184, 0.15);
+  color: var(--fg-dim);
+}
+
+.diff-stats-badge.is-modified {
+  background: rgba(59, 130, 246, 0.2);
+  color: #3b82f6;
+  border: 1px solid rgba(59, 130, 246, 0.4);
+}
+
+.diff-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.diff-action-btn {
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--fg);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.diff-action-btn:hover {
+  background: var(--bg-hover);
+}
+
+.diff-action-btn.diff-btn-primary {
+  background: var(--accent);
+  color: #ffffff;
+  border-color: var(--accent);
+  font-weight: 600;
+}
+
+.diff-action-btn.diff-btn-primary:hover {
+  filter: brightness(1.1);
+}
+
+.diff-editor-mount {
+  flex: 1;
+  width: 100%;
+  height: calc(100% - 38px);
+  position: relative;
+  overflow: hidden;
+}
+
+/* ============================================================================
+   Compare Dialog Styles
+   ============================================================================ */
+
+.compare-dialog-body {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  max-width: 680px;
+  min-width: 520px;
+}
+
+.compare-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.compare-section-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fg);
+  margin: 0;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border);
+}
+
+.compare-quick-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.compare-quick-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg-subtle);
+  color: var(--fg);
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.15s ease;
+  gap: 6px;
+}
+
+.compare-quick-btn:hover:not(:disabled) {
+  border-color: var(--accent);
+  background: var(--bg-hover);
+  transform: translateY(-1px);
+}
+
+.compare-quick-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.compare-btn-icon {
+  font-size: 20px;
+}
+
+.compare-btn-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fg);
+}
+
+.compare-btn-desc {
+  font-size: 11px;
+  color: var(--fg-dim);
+  line-height: 1.4;
+}
+
+.compare-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.compare-select {
+  flex: 1;
+  padding: 6px 10px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--fg);
+  font-size: 12px;
+}
+
+.compare-action-submit {
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 4px;
+  border: none;
+  background: var(--accent);
+  color: #fff;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.compare-action-submit:hover {
+  filter: brightness(1.1);
+}
+
+.compare-paste-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.compare-paste-col {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.compare-paste-col label {
+  font-size: 11px;
+  color: var(--fg-dim);
+  font-weight: 500;
+}
+
+.compare-textarea {
+  width: 100%;
+  height: 110px;
+  padding: 8px;
+  font-family: 'Cascadia Code', Consolas, monospace;
+  font-size: 11px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--fg);
+  resize: vertical;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.compare-textarea:focus {
+  border-color: var(--accent);
+}
+
+.compare-paste-btn-row {
+  display: flex;
+  justify-content: flex-end;
+}
+
+
 

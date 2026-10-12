@@ -638,7 +638,20 @@ export const web: Platform = {
 
   getPluginsDir: async () => '브라우저 로컬 저장소 (localStorage)',
   openPluginsFolder: async () => {},
-  readBinaryFile: async () => new Uint8Array(),
+  readBinaryFile: async (path: string) => {
+    const handle = fileHandles.get(path);
+    if (handle) {
+      try {
+        if ('getFile' in handle) {
+          const file = await (handle as any).getFile();
+          return new Uint8Array(await file.arrayBuffer());
+        } else if (handle instanceof File) {
+          return new Uint8Array(await handle.arrayBuffer());
+        }
+      } catch {}
+    }
+    return new Uint8Array();
+  },
   execProcess: async () => ({
     stdout: '',
     stderr: '웹 브라우저 환경에서는 로컬 프로세스 실행이 지원되지 않습니다. 데스크톱 앱을 사용해 주세요.',

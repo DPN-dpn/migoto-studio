@@ -8,6 +8,7 @@ import { getAllTemplates, insertTemplate } from '../core/templates';
 import { openSettings } from './settings-ui';
 import { openHelp } from './help-ui';
 import { openRestore } from './restore-ui';
+import { openCompareDialog } from './diff-dialog';
 import { runUpdateCheck, openExternalUrl } from '../updater/updater';
 
 export interface MenuBarCallbacks {
@@ -99,6 +100,20 @@ export class MenuBar {
           {
             label: '백업 복원…',
             action: () => openRestore(this.cb.doc),
+          },
+          { divider: true },
+          {
+            label: '파일 비교 (Diff)…',
+            shortcut: 'Ctrl+K D',
+            action: () => openCompareDialog(this.cb.doc),
+          },
+          {
+            label: '디스크 저장본과 비교',
+            action: () => this.cb.doc.compareWithDisk(),
+          },
+          {
+            label: '클립보드와 비교',
+            action: () => this.cb.doc.compareWithClipboard(),
           },
           { divider: true },
           {

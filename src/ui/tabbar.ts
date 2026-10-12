@@ -1,4 +1,6 @@
 import type { DocumentManager, DocumentTab } from '../core/documents';
+import { platform } from '../platform';
+import { showToast } from './toast';
 
 /**
  * Manages the horizontal tab strip for multi-document editing.
@@ -7,6 +9,7 @@ import type { DocumentManager, DocumentTab } from '../core/documents';
  */
 export class TabBar {
   private activeMenuTabId: string | null = null;
+  private selectedForCompareTabId: string | null = null;
 
   constructor(
     private doc: DocumentManager,
@@ -84,7 +87,58 @@ export class TabBar {
     const hasRight = tabIdx >= 0 && tabIdx < this.doc.allTabs.length - 1;
 
     addMenuItem('닫기', 'Ctrl+W', () => this.doc.closeTab(tab.id));
-    addMenuItem('저장', 'Ctrl+S', () => this.doc.save(tab.id));
+    if (tab.kind === 'text') {
+      addMenuItem('저장', 'Ctrl+S', () => this.doc.save(tab.id));
+    }
+
+    if (tab.kind === 'text') {
+      const sep = document.createElement('li');
+      sep.className = 'group';
+      sep.textContent = '─';
+      sep.style.fontSize = '9px';
+      sep.style.padding = '2px 10px';
+      sep.style.opacity = '0.4';
+      this.menuEl.append(sep);
+
+      if (tab.file) {
+        addMenuItem('디스크 저장본과 비교', undefined, () => this.doc.compareWithDisk(tab.id));
+        addMenuItem('최근 백업본과 비교…', undefined, async () => {
+          if (!tab.file) return;
+          try {
+            const backups = await platform().listBackups(tab.file);
+            if (backups.length === 0) {
+              showToast('이 파일의 이전 백업본이 없습니다.', 'warn');
+              return;
+            }
+            const latest = backups[0];
+            const text = await platform().readBackup(latest);
+            await this.doc.compareWithBackup(text, latest.timestamp, tab.id);
+          } catch (err) {
+            showToast(`백업 비교 실패: ${err}`, 'error');
+          }
+        });
+      }
+      addMenuItem('클립보드와 비교', undefined, () => this.doc.compareWithClipboard(tab.id));
+
+      addMenuItem('비교할 탭으로 선택', undefined, () => {
+        this.selectedForCompareTabId = tab.id;
+        showToast(`'${tab.title}' 탭이 비교 대상으로 선택되었습니다.`, 'info');
+      });
+
+      if (this.selectedForCompareTabId && this.selectedForCompareTabId !== tab.id) {
+        const other = this.doc.allTabs.find((t) => t.id === this.selectedForCompareTabId);
+        if (other && other.kind === 'text') {
+          addMenuItem(`선택한 탭과 비교 ('${other.title}')`, undefined, () => {
+            this.doc.compareTwoFiles(
+              { name: `${other.title} (원본)`, text: other.model.getValue() },
+              { name: `${tab.title} (비교본)`, text: tab.model.getValue() },
+            );
+            this.selectedForCompareTabId = null;
+          });
+        }
+      }
+    }
+
     if (hasOthers) {
       const sep = document.createElement('li');
       sep.className = 'group';
@@ -100,9 +154,9 @@ export class TabBar {
       }
     }
 
-    const menuWidth = 180;
+    const menuWidth = 200;
     const posX = Math.min(e.clientX, window.innerWidth - menuWidth - 8);
-    const posY = Math.min(e.clientY, window.innerHeight - 150);
+    const posY = Math.min(e.clientY, window.innerHeight - 200);
     this.menuEl.style.left = `${Math.max(8, posX)}px`;
     this.menuEl.style.top = `${posY}px`;
     this.menuEl.hidden = false;
@@ -125,7 +179,7 @@ export class TabBar {
 
       const iconSpan = document.createElement('span');
       iconSpan.className = 'tab-icon';
-      iconSpan.textContent = tab.kind === 'custom' ? '🖼️' : '📄';
+      iconSpan.textContent = tab.kind === 'diff' ? '↔' : tab.kind === 'custom' ? '🖼' : '📄';
       el.append(iconSpan);
 
       const titleSpan = document.createElement('span');

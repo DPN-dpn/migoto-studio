@@ -4,6 +4,7 @@ import { validatePluginZip, type ExtractedPlugin } from './zip';
 import type { DocumentManager } from '../core/documents';
 import type { FileExplorer } from '../ui/explorer';
 import { openModal } from '../ui/modal';
+import { showToast } from '../ui/toast';
 import { BUILTIN_PLUGINS } from './builtin';
 import type { ActivityBar } from '../ui/activitybar';
 import type {
@@ -53,7 +54,7 @@ export class PluginManager {
     this.explorer = explorer;
     this.activityBar = activityBar;
     this.statusBarEl = document.getElementById('statusbar');
-    this.doc.setPluginManager(this);
+    this.doc.setViewerProvider(this);
   }
 
   getCustomViewer(ext: string): CustomViewerDefinition | undefined {
@@ -557,23 +558,7 @@ export default {
   }
 
   showToast(message: string, type: 'info' | 'warn' | 'error' = 'info'): void {
-    let toastContainer = document.getElementById('plugin-toast-container');
-    if (!toastContainer) {
-      toastContainer = document.createElement('div');
-      toastContainer.id = 'plugin-toast-container';
-      document.body.append(toastContainer);
-    }
-
-    const toast = document.createElement('div');
-    toast.className = `plugin-toast toast-${type}`;
-    const icon = type === 'error' ? '⛔' : type === 'warn' ? '⚠' : 'ℹ';
-    toast.innerHTML = `<span class="toast-icon">${icon}</span><span class="toast-text">${message}</span>`;
-    toastContainer.append(toast);
-
-    setTimeout(() => {
-      toast.classList.add('fade-out');
-      setTimeout(() => toast.remove(), 300);
-    }, 3000);
+    showToast(message, type);
   }
 
   private createContext(

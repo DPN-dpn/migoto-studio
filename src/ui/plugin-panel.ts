@@ -99,14 +99,14 @@ export class PluginPanel {
     notice.className = 'plugin-notice-banner';
     if (isDesktop) {
       notice.innerHTML = `
-        <div class="plugin-notice-title">🧩 플러그인 생태계</div>
+        <div class="plugin-notice-title">플러그인 생태계</div>
         <div class="plugin-notice-body">
-          활성화된 플러그인은 기능에 따라 좌측 툴바에 전용 탭(🐍, 🤖)으로 추가되거나, 탐색기 및 에디터 탭(🖼️)에 연동됩니다. <strong>+ 버튼</strong>으로 새 플러그인 압축파일(.zip)을 설치할 수 있습니다.
+          활성화된 플러그인은 기능에 따라 좌측 툴바에 전용 탭으로 추가되거나, 탐색기 및 에디터 탭에 연동됩니다. <strong>+ 버튼</strong>으로 새 플러그인 압축파일(.zip)을 설치할 수 있습니다.
         </div>
       `;
     } else {
       notice.innerHTML = `
-        <div class="plugin-notice-title">🧩 웹 플러그인 생태계</div>
+        <div class="plugin-notice-title">웹 플러그인 생태계</div>
         <div class="plugin-notice-body">
           웹 버전에서도 <strong>+ 버튼</strong>으로 플러그인 압축파일(.zip)을 추가해 사용할 수 있습니다. 외부 Python 실행 등 로컬 시스템 권한이 필요한 기능은 데스크톱 앱 버전을 이용해 주세요.
         </div>

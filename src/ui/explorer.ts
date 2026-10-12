@@ -1,5 +1,6 @@
 import { platform, type DirEntry, type FileRef } from '../platform';
 import type { DocumentManager } from '../core/documents';
+import { showToast } from './toast';
 
 const STORAGE_LAST_FOLDER = 'migoto_last_folder';
 
@@ -22,6 +23,7 @@ export class FileExplorer {
   private activeFilePath: string | null = null;
   private isLoading = false;
   private menuEl: HTMLElement;
+  private compareCandidate: DirEntry | null = null;
 
   constructor(
     private root: HTMLElement,
@@ -425,12 +427,33 @@ export class FileExplorer {
       const entryKey = entry.id || entry.path;
 
       if (!entry.isDir) {
-        // File item
-        const isImage = /\.(dds|png|jpe?g|bmp|webp|gif)$/i.test(entry.name);
-        addItem(isImage ? '이미지 뷰어로 열기' : '에디터에서 열기', () => {
+        addItem('열기', () => {
           const ref: FileRef = platform().refFromId(entryKey);
           this.doc.openFile(ref);
         });
+
+        addItem('비교할 파일로 선택', () => {
+          this.compareCandidate = entry;
+          showToast(`'${entry.name}' 파일이 비교 대상으로 선택되었습니다.`, 'info');
+        });
+
+        if (this.compareCandidate && (this.compareCandidate.id || this.compareCandidate.path) !== entryKey) {
+          addItem(`선택한 파일과 비교 ('${this.compareCandidate.name}')`, async () => {
+            try {
+              const candRef = platform().refFromId(this.compareCandidate!.id || this.compareCandidate!.path);
+              const targetRef = platform().refFromId(entryKey);
+              const fileA = await platform().readFile(candRef);
+              const fileB = await platform().readFile(targetRef);
+              this.doc.compareTwoFiles(
+                { name: `${this.compareCandidate!.name} (원본)`, text: fileA.text },
+                { name: `${entry.name} (비교본)`, text: fileB.text },
+              );
+              this.compareCandidate = null;
+            } catch (err) {
+              await platform().showError('파일 비교 실패', String(err));
+            }
+          });
+        }
 
         addItem('경로 복사', () => {
           navigator.clipboard.writeText(entry.path || entry.name).catch(() => {});

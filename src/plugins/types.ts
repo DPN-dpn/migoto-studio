@@ -84,15 +84,8 @@ export interface RegisteredSidebarView {
   render: (container: HTMLElement) => void | (() => void);
 }
 
-export interface CustomViewerDefinition {
-  id: string;
-  name: string;
-  extensions: string[];
-  render: (
-    container: HTMLElement,
-    file: { name: string; path: string; bytes: Uint8Array },
-  ) => void | (() => void);
-}
+import type { CustomViewerDefinition } from '../core/documents';
+export type { CustomViewerDefinition };
 
 export interface PluginInstance {
   manifest: PluginManifest;
