@@ -1,3 +1,6 @@
+import type { IniSection, IniDocument, IniMergeResult } from '../core/ini.ts';
+export type { IniSection, IniDocument, IniMergeResult } from '../core/ini.ts';
+
 export interface PluginManifest {
   id: string;
   name: string;
@@ -115,6 +118,14 @@ export interface PluginContext {
   // ---- Templates ----
   templates: {
     registerTemplate(template: PluginTemplate): () => void;
+  };
+
+  // ---- INI parsing & structure analysis ----
+  ini: {
+    parse(text?: string): IniDocument;
+    classifySection(name: string): string;
+    merge(targetText: string, sourceText: string, options?: { appendNew?: boolean }): IniMergeResult;
+    formatSection(name: string, properties: Record<string, string>, options?: { comments?: string[]; variables?: Record<string, string> }): string;
   };
 
   // ---- UI integration ----

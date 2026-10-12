@@ -1,133 +1,6 @@
 import { definePlugin, type PluginContext } from '../../api.ts';
 import iconSvg from './icon.ts';
 
-interface IniSectionBlock {
-  name: string;
-  header: string;
-  fullText: string;
-}
-
-/**
- * 텍스트에서 INI 섹션들을 파싱하여 상단 주석/변수(preamble)와 개별 섹션 블록들로 분리합니다.
- */
-function parseIniSectionsFromText(text: string): {
-  preamble: string;
-  sections: IniSectionBlock[];
-} {
-  const lines = text.split(/\r?\n/);
-  const sectionHeaderRegex = /^\s*\[([^\]\r\n]+)\]/;
-  const sections: IniSectionBlock[] = [];
-
-  let firstSectionLineIdx = -1;
-  const sectionIndices: Array<{ name: string; header: string; lineIdx: number }> = [];
-
-  for (let i = 0; i < lines.length; i++) {
-    const match = sectionHeaderRegex.exec(lines[i]);
-    if (match) {
-      if (firstSectionLineIdx === -1) firstSectionLineIdx = i;
-      sectionIndices.push({
-        name: match[1].trim(),
-        header: lines[i],
-        lineIdx: i,
-      });
-    }
-  }
-
-  if (sectionIndices.length === 0) {
-    return { preamble: text, sections: [] };
-  }
-
-  const preamble = lines.slice(0, firstSectionLineIdx).join('\n');
-
-  for (let s = 0; s < sectionIndices.length; s++) {
-    const startLine = sectionIndices[s].lineIdx;
-    const endLine = s + 1 < sectionIndices.length ? sectionIndices[s + 1].lineIdx : lines.length;
-    const blockLines = lines.slice(startLine, endLine);
-    sections.push({
-      name: sectionIndices[s].name,
-      header: sectionIndices[s].header,
-      fullText: blockLines.join('\n').trimEnd(),
-    });
-  }
-
-  return { preamble, sections };
-}
-
-/**
- * 현재 문서의 내용과 AI가 생성한 코드를 비교하여,
- * 기존 섹션은 해당 위치에서 교체하고 새 섹션은 추가하는 스마트 섹션 교체를 수행합니다.
- */
-function applySmartSectionReplacement(currentDocText: string, aiCodeText: string): {
-  newText: string;
-  replacedCount: number;
-  addedCount: number;
-} {
-  const docParsed = parseIniSectionsFromText(currentDocText);
-  const aiParsed = parseIniSectionsFromText(aiCodeText);
-
-  // AI가 섹션을 아예 생성하지 않은 경우 (코드 한 줄, 단순 표현식 등)
-  if (aiParsed.sections.length === 0) {
-    if (!currentDocText.trim()) {
-      return { newText: aiCodeText.trim() + '\n', replacedCount: 0, addedCount: 1 };
-    }
-    const separator = currentDocText.endsWith('\n\n') ? '' : currentDocText.endsWith('\n') ? '\n' : '\n\n';
-    return {
-      newText: currentDocText + separator + aiCodeText.trim() + '\n',
-      replacedCount: 0,
-      addedCount: 1,
-    };
-  }
-
-  // 현재 문서가 비어있는 경우 AI 코드를 그대로 적용
-  if (!currentDocText.trim()) {
-    return {
-      newText: aiCodeText.trim() + '\n',
-      replacedCount: 0,
-      addedCount: aiParsed.sections.length,
-    };
-  }
-
-  // 기존 문서의 섹션 맵 (대소문자 무시)
-  const docSectionMap = new Map<string, number>();
-  docParsed.sections.forEach((sec, idx) => {
-    docSectionMap.set(sec.name.toLowerCase(), idx);
-  });
-
-  let replacedCount = 0;
-  let addedCount = 0;
-
-  const updatedSections = [...docParsed.sections];
-  const appendedSections: IniSectionBlock[] = [];
-
-  for (const aiSec of aiParsed.sections) {
-    const key = aiSec.name.toLowerCase();
-    if (docSectionMap.has(key)) {
-      const targetIdx = docSectionMap.get(key)!;
-      updatedSections[targetIdx] = aiSec;
-      replacedCount++;
-    } else {
-      appendedSections.push(aiSec);
-      addedCount++;
-    }
-  }
-
-  const parts: string[] = [];
-  if (docParsed.preamble.trim()) {
-    parts.push(docParsed.preamble.trimEnd());
-  }
-
-  for (const sec of updatedSections) {
-    parts.push(sec.fullText.trimEnd());
-  }
-
-  for (const sec of appendedSections) {
-    parts.push(sec.fullText.trimEnd());
-  }
-
-  const newText = parts.join('\n\n') + '\n';
-  return { newText, replacedCount, addedCount };
-}
-
 /**
  * AI 모딩 어시스턴트 플러그인
  * OpenAI 또는 Google Gemini, 로컬 Ollama 호환 API를 연동하여 INI 분석, 섹션 생성 및 질의응답을 수행합니다.
@@ -485,18 +358,31 @@ export default definePlugin({
         };
         document.addEventListener('click', onDocClick);
 
-        // 스마트 섹션 교체 실행 함수
+        // 스마트 섹션 교체 실행 함수 (context.ini API 활용)
         function executeSmartApply(codeContent: string, isAuto = false): boolean {
           const currentText = context.editor.getText();
-          const { newText, replacedCount, addedCount } = applySmartSectionReplacement(currentText, codeContent);
-          context.editor.setText(newText);
+          const mergeResult = context.ini.merge(currentText, codeContent);
+          context.editor.setText(mergeResult.newText);
+
           const prefix = isAuto ? '[자동 반영] ' : '';
+          const replacedCount = mergeResult.replacedSections.length;
+          const addedCount = mergeResult.addedSections.length;
+
           if (replacedCount > 0 && addedCount > 0) {
-            context.ui.showToast(`${prefix}${replacedCount}개 섹션 교체 및 ${addedCount}개 섹션이 추가되었습니다. (되돌리기: Ctrl+Z)`, 'info');
+            context.ui.showToast(
+              `${prefix}${replacedCount}개 섹션 교체 및 ${addedCount}개 섹션이 추가되었습니다. (되돌리기: Ctrl+Z)`,
+              'info',
+            );
           } else if (replacedCount > 0) {
-            context.ui.showToast(`${prefix}${replacedCount}개 섹션이 스마트 교체되었습니다. (되돌리기: Ctrl+Z)`, 'info');
+            context.ui.showToast(
+              `${prefix}${replacedCount}개 섹션이 스마트 교체되었습니다. (되돌리기: Ctrl+Z)`,
+              'info',
+            );
           } else if (addedCount > 0) {
-            context.ui.showToast(`${prefix}${addedCount}개 섹션이 파일에 추가되었습니다. (되돌리기: Ctrl+Z)`, 'info');
+            context.ui.showToast(
+              `${prefix}${addedCount}개 섹션이 파일에 추가되었습니다. (되돌리기: Ctrl+Z)`,
+              'info',
+            );
           } else {
             context.ui.showToast(`${prefix}파일 내용이 갱신되었습니다. (되돌리기: Ctrl+Z)`, 'info');
           }

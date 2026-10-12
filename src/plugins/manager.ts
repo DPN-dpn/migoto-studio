@@ -9,6 +9,7 @@ import { BUILTIN_PLUGINS } from './builtin';
 import type { ActivityBar } from '../ui/activitybar';
 import { registerAllowedResource, registerAllowedVariable } from '../core/lint';
 import { registerPluginTemplate } from '../core/templates';
+import { parseIni, classifyIniSection, mergeIniSections, formatIniSection } from '../core/ini';
 import type {
   CustomLintRule,
   CustomViewerDefinition,
@@ -911,6 +912,18 @@ export default {
           callbacks.onRegisterCleanup(cleanup);
           return cleanup;
         },
+      },
+
+      ini: {
+        parse: (text?: string) => parseIni(text !== undefined ? text : this.editor.getValue()),
+        classifySection: (name: string) => classifyIniSection(name),
+        merge: (targetText: string, sourceText: string, options?: { appendNew?: boolean }) =>
+          mergeIniSections(targetText, sourceText, options),
+        formatSection: (
+          name: string,
+          properties: Record<string, string>,
+          options?: { comments?: string[]; variables?: Record<string, string> },
+        ) => formatIniSection(name, properties, options),
       },
 
       ui: {
