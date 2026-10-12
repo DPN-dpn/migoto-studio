@@ -99,10 +99,43 @@ export default definePlugin({
 
         const modelInput = context.ui.createInput({
           label: '모델명:',
-          placeholder: 'gemini-flash-latest, gpt-4o-mini 등',
-          value: context.storage.get('model', 'gemini-flash-latest'),
-          onInput: (v) => context.storage.set('model', v.trim()),
+          placeholder: 'gemini-2.5-flash, gpt-4o-mini 등',
+          value: context.storage.get('model', 'gemini-2.5-flash'),
+          onInput: (v) => {
+            context.storage.set('model', v.trim());
+            renderChips();
+          },
         });
+
+        // 빠른 모델 선택 칩
+        const modelChipsWrap = document.createElement('div');
+        modelChipsWrap.className = 'ai-model-chips';
+
+        const availableModels = [
+          { name: 'gemini-2.5-flash', label: 'gemini-2.5-flash (추천)' },
+          { name: 'gemini-2.0-flash', label: 'gemini-2.0-flash' },
+          { name: 'gemini-2.5-pro', label: 'gemini-2.5-pro' },
+          { name: 'gemini-flash-latest', label: 'gemini-flash-latest' },
+          { name: 'gpt-4o-mini', label: 'gpt-4o-mini' },
+        ];
+
+        const renderChips = () => {
+          modelChipsWrap.replaceChildren();
+          const current = (context.storage.get('model', 'gemini-2.5-flash') as string).trim();
+          for (const m of availableModels) {
+            const chip = document.createElement('button');
+            chip.type = 'button';
+            chip.className = `ai-model-chip${current === m.name ? ' active' : ''}`;
+            chip.textContent = m.label;
+            chip.onclick = () => {
+              modelInput.setValue(m.name);
+              context.storage.set('model', m.name);
+              renderChips();
+            };
+            modelChipsWrap.append(chip);
+          }
+        };
+        renderChips();
 
         const presetCard = document.createElement('div');
         presetCard.className = 'ai-settings-card';
@@ -119,11 +152,12 @@ export default definePlugin({
           variant: 'small',
           onClick: () => {
             const u = 'https://generativelanguage.googleapis.com/v1beta/openai';
-            const m = 'gemini-flash-latest';
+            const m = 'gemini-2.5-flash';
             urlInput.setValue(u);
             modelInput.setValue(m);
             context.storage.set('api_url', u);
             context.storage.set('model', m);
+            renderChips();
             context.ui.showToast('Gemini 설정이 적용되었습니다. API Key를 입력하세요.', 'info');
           },
         });
@@ -138,6 +172,7 @@ export default definePlugin({
             modelInput.setValue(m);
             context.storage.set('api_url', u);
             context.storage.set('model', m);
+            renderChips();
             context.ui.showToast('OpenAI 설정이 적용되었습니다.', 'info');
           },
         });
@@ -152,6 +187,7 @@ export default definePlugin({
             modelInput.setValue(m);
             context.storage.set('api_url', u);
             context.storage.set('model', m);
+            renderChips();
             context.ui.showToast('Ollama 설정이 적용되었습니다. (Key는 비워둠)', 'info');
           },
         });
@@ -164,7 +200,7 @@ export default definePlugin({
         const configTitle = document.createElement('div');
         configTitle.className = 'ai-settings-card-title';
         configTitle.textContent = '연결 정보 입력';
-        configCard.append(configTitle, urlInput.row, keyRow, modelInput.row);
+        configCard.append(configTitle, urlInput.row, keyRow, modelInput.row, modelChipsWrap);
 
         const guideCard = document.createElement('div');
         guideCard.className = 'ai-settings-card';
@@ -173,7 +209,8 @@ export default definePlugin({
         guideCard.style.lineHeight = '1.5';
         guideCard.innerHTML = `
           <div style="font-weight:600;color:var(--fg);margin-bottom:4px;">안내사항</div>
-          <div>- Google Gemini: Google AI Studio 키(AQ...) 입력 시 gemini-flash-latest 모델이 무료 제공됩니다.</div>
+          <div>- Google Gemini: Google AI Studio 키(AQ...) 입력 시 gemini-2.5-flash 모델이 무료 제공됩니다.</div>
+          <div>- 일시 과부하(503) 발생 시: 트래픽 급증으로 인한 일시 현상이므로 자동 재시도되거나, 모델 칩에서 gemini-2.0-flash로 변경해 보세요.</div>
           <div>- OpenAI: platform.openai.com API 키 및 gpt-4o-mini 모델을 권장합니다.</div>
           <div>- Ollama: 로컬 PC에서 실행 중인 경우 키 없이 바로 연결할 수 있습니다.</div>
         `;
@@ -455,10 +492,47 @@ export default definePlugin({
           }
         }
 
+        // 진행 중인 요청 제어 및 지연 헬퍼
+        let activeAbortController: AbortController | null = null;
+
+        function abortActiveRequest(reason = 'USER') {
+          if (activeAbortController) {
+            activeAbortController.abort(reason);
+            activeAbortController = null;
+          }
+        }
+
+        function delayWithAbort(ms: number, signal?: AbortSignal): Promise<void> {
+          return new Promise((resolve, reject) => {
+            if (signal?.aborted) {
+              return reject(new DOMException('Aborted', 'AbortError'));
+            }
+            const timer = setTimeout(() => {
+              resolve();
+            }, ms);
+            signal?.addEventListener(
+              'abort',
+              () => {
+                clearTimeout(timer);
+                reject(new DOMException('Aborted', 'AbortError'));
+              },
+              { once: true },
+            );
+          });
+        }
+
         // 대화 메시지 턴 전송
         async function sendMessage(userPrompt: string) {
           const trimmedPrompt = userPrompt.trim();
           if (!trimmedPrompt) return;
+
+          // 진행 중인 이전 요청이 있다면 중단
+          if (activeAbortController) {
+            abortActiveRequest('NEW_REQUEST');
+          }
+
+          const abortController = new AbortController();
+          activeAbortController = abortController;
 
           // 첫 메시지 전송 시 초기 안내 상태 제거
           if (emptyState.parentElement) {
@@ -527,37 +601,157 @@ export default definePlugin({
           const assistantBubble = document.createElement('div');
           assistantBubble.className = 'ai-assistant-bubble';
 
-          const loadingNotice = document.createElement('div');
-          loadingNotice.style.color = 'var(--fg-dim)';
-          loadingNotice.style.fontSize = '11px';
-          loadingNotice.textContent = '답변을 생성하고 있습니다...';
-          assistantBubble.append(loadingNotice);
+          // 실시간 진행 상황 카드 생성
+          const statusCard = document.createElement('div');
+          statusCard.className = 'ai-status-card';
+
+          const statusHeader = document.createElement('div');
+          statusHeader.className = 'ai-status-header';
+
+          const statusHeaderLeft = document.createElement('div');
+          statusHeaderLeft.className = 'ai-status-header-left';
+
+          const spinner = document.createElement('span');
+          spinner.className = 'ai-status-spinner';
+
+          const statusTitle = document.createElement('span');
+          statusTitle.className = 'ai-status-title';
+          statusTitle.textContent = '요청 처리 준비 중...';
+
+          statusHeaderLeft.append(spinner, statusTitle);
+
+          const timerEl = document.createElement('span');
+          timerEl.className = 'ai-status-timer';
+          timerEl.textContent = '0.0s';
+
+          statusHeader.append(statusHeaderLeft, timerEl);
+
+          const stepsContainer = document.createElement('div');
+          stepsContainer.className = 'ai-status-steps';
+
+          const statusActions = document.createElement('div');
+          statusActions.className = 'ai-status-actions';
+
+          const statusInfo = document.createElement('span');
+          statusInfo.className = 'ai-status-info';
+
+          const abortBtn = document.createElement('button');
+          abortBtn.className = 'small-btn ai-status-abort-btn';
+          abortBtn.textContent = '요청 중단';
+          abortBtn.onclick = () => {
+            abortActiveRequest('USER');
+          };
+
+          statusActions.append(statusInfo, abortBtn);
+          statusCard.append(statusHeader, stepsContainer, statusActions);
+          assistantBubble.append(statusCard);
 
           turnGroup.append(assistantBubble);
           chatHistory.append(turnGroup);
           chatHistory.scrollTop = chatHistory.scrollHeight;
 
-          // 4. API 호출 준비
-          let apiUrl = (context.storage.get('api_url', 'https://generativelanguage.googleapis.com/v1beta/openai') as string).replace(/\/+$/, '');
-          const apiKey = (context.storage.get('api_key', '') as string).trim();
-          let model = (context.storage.get('model', 'gemini-flash-latest') as string).trim();
+          // 실시간 단계 정의 및 갱신 헬퍼
+          type StepStatus = 'pending' | 'active' | 'completed' | 'retry' | 'error';
+          interface StatusStep {
+            label: string;
+            detail?: string;
+            status: StepStatus;
+          }
 
-          // Google Gemini OpenAI endpoint auto-correction & model migration
+          const steps: StatusStep[] = [
+            { label: '요청 컨텍스트 분석 및 준비', status: 'pending' },
+            { label: 'AI API 서버 연결 준비', status: 'pending' },
+            { label: '서버 응답 대기 중', status: 'pending' },
+            { label: '응답 렌더링 및 완료', status: 'pending' },
+          ];
+
+          function updateStep(idx: number, status: StepStatus, label?: string, detail?: string) {
+            if (steps[idx]) {
+              steps[idx].status = status;
+              if (label) steps[idx].label = label;
+              if (detail !== undefined) steps[idx].detail = detail;
+            }
+            renderSteps();
+          }
+
+          function renderSteps() {
+            stepsContainer.replaceChildren();
+            for (const step of steps) {
+              if (step.status === 'pending') continue;
+              const row = document.createElement('div');
+              row.className = `ai-status-step ${step.status}`;
+
+              const dot = document.createElement('span');
+              dot.className = 'ai-status-step-dot';
+              dot.textContent =
+                step.status === 'completed'
+                  ? '[완료]'
+                  : step.status === 'error'
+                  ? '[오류]'
+                  : step.status === 'retry'
+                  ? '[재시도]'
+                  : '[진행]';
+
+              const textWrap = document.createElement('div');
+              textWrap.style.display = 'flex';
+              textWrap.style.flexDirection = 'column';
+
+              const labelSpan = document.createElement('span');
+              labelSpan.textContent = step.label;
+              textWrap.append(labelSpan);
+
+              if (step.detail) {
+                const detailSpan = document.createElement('span');
+                detailSpan.style.fontSize = '9.5px';
+                detailSpan.style.color = 'var(--fg-dim)';
+                detailSpan.textContent = step.detail;
+                textWrap.append(detailSpan);
+              }
+
+              row.append(dot, textWrap);
+              stepsContainer.append(row);
+            }
+          }
+
+          // 타이머 및 타임아웃(45초) 가동
+          const startTime = Date.now();
+          const timerInterval = setInterval(() => {
+            const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+            timerEl.textContent = `${elapsed}s`;
+          }, 100);
+
+          const timeoutTimer = setTimeout(() => {
+            abortController.abort('TIMEOUT');
+          }, 45000);
+
+          // 4. API 호출 준비 및 단계 진행
+          updateStep(0, 'active', '컨텍스트 분석 중...');
+
+          let apiUrl = (
+            context.storage.get('api_url', 'https://generativelanguage.googleapis.com/v1beta/openai') as string
+          ).replace(/\/+$/, '');
+          const apiKey = (context.storage.get('api_key', '') as string).trim();
+          let model = (context.storage.get('model', 'gemini-2.5-flash') as string).trim();
+
+          // Google Gemini OpenAI 엔드포인트 자동 정정 및 레거시 모델 보정
           if (apiUrl.includes('generativelanguage.googleapis.com')) {
             if (!apiUrl.endsWith('/openai')) {
               apiUrl = `${apiUrl}/openai`;
             }
-            if (
-              !model ||
-              model === 'gemini-1.5-pro' ||
-              model === 'gemini-1.5-flash' ||
-              model === 'gemini-pro' ||
-              model === 'gemini-2.5-flash' ||
-              model === 'gemini-2.5-pro'
-            ) {
-              model = 'gemini-flash-latest';
+            if (!model || model === 'gemini-1.5-pro' || model === 'gemini-pro') {
+              model = 'gemini-2.5-flash';
             }
           }
+
+          const providerName = apiUrl.includes('generativelanguage.googleapis.com')
+            ? 'Google Gemini'
+            : apiUrl.includes('api.openai.com')
+            ? 'OpenAI'
+            : apiUrl.includes('localhost:11434')
+            ? '로컬 Ollama'
+            : '사용자 지정 API';
+
+          statusInfo.textContent = `${providerName} / ${model}`;
 
           const systemPrompt = `당신은 3DMigoto 및 XXMI (.ini) 모딩 전문 개발 도우미입니다.
 사용자의 INI 코드를 분석하거나 요청에 맞는 정확한 INI 섹션([KeyToggle], [TextureOverride], [Constants], [CommandList] 등)을 작성하세요.
@@ -567,11 +761,29 @@ export default definePlugin({
           if (attachInput.checked) {
             const file = context.workspace.getCurrentFile();
             const text = context.editor.getText();
+            const lineCount = text.split('\n').length;
+            const iniDoc = context.ini.parse(text);
             promptWithContext += `\n\n[현재 열린 파일: ${file?.name || 'document.ini'}]\n\`\`\`ini\n${text}\n\`\`\``;
+            updateStep(
+              0,
+              'completed',
+              '컨텍스트 준비 완료',
+              `${file?.name || 'document.ini'} (${lineCount}줄, ${iniDoc.sections.length}개 섹션 분석 및 첨부됨)`,
+            );
+          } else {
+            updateStep(0, 'completed', '컨텍스트 준비 완료', '단독 질의 모드 (에디터 코드 제외)');
           }
 
-          sendBtn.disabled = true;
-          sendBtn.textContent = '생성 중...';
+          updateStep(1, 'completed', 'AI API 연결 준비 완료', `${providerName} (${model})`);
+
+          // 전송 버튼을 [중단] 버튼으로 전환
+          sendBtn.textContent = '중단';
+          sendBtn.classList.remove('primary');
+          sendBtn.classList.add('danger');
+          sendBtn.onclick = () => abortActiveRequest('USER');
+
+          statusTitle.textContent = '답변 생성 중...';
+          updateStep(2, 'active', '서버 응답 대기 중...', 'AI 서버에 질의를 전송하고 답변 수신을 대기하고 있습니다.');
 
           try {
             const headers: Record<string, string> = { 'Content-Type': 'application/json' };
@@ -582,29 +794,82 @@ export default definePlugin({
               }
             }
 
-            const res = await context.fetch(`${apiUrl}/chat/completions`, {
-              method: 'POST',
-              headers,
-              body: JSON.stringify({
-                model,
-                messages: [
-                  { role: 'system', content: systemPrompt },
-                  { role: 'user', content: promptWithContext },
-                ],
-                temperature: 0.3,
-              }),
-            });
+            const maxRetries = 2;
+            let attempt = 0;
+            let replyData: any = null;
 
-            if (!res.ok) {
-              const errText = await res.text();
-              throw new Error(`API 오류 (${res.status}): ${errText}`);
+            while (attempt <= maxRetries) {
+              attempt++;
+              try {
+                const res = await context.fetch(`${apiUrl}/chat/completions`, {
+                  method: 'POST',
+                  headers,
+                  signal: abortController.signal,
+                  body: JSON.stringify({
+                    model,
+                    messages: [
+                      { role: 'system', content: systemPrompt },
+                      { role: 'user', content: promptWithContext },
+                    ],
+                    temperature: 0.3,
+                  }),
+                });
+
+                if (!res.ok) {
+                  const errText = await res.text();
+                  if ((res.status === 503 || res.status === 429) && attempt <= maxRetries) {
+                    const waitSec = attempt === 1 ? 2.0 : 3.5;
+                    updateStep(
+                      2,
+                      'retry',
+                      `서버 일시 과부하 (${res.status}) 감지`,
+                      `트래픽 급증으로 인해 ${waitSec}초 후 자동으로 재시도합니다... (시도: ${attempt}/${maxRetries}회)`,
+                    );
+                    await delayWithAbort(waitSec * 1000, abortController.signal);
+                    updateStep(2, 'active', '서버 재요청 전송 중...', `재시도 (${attempt}/${maxRetries}) 응답 대기 중`);
+                    continue;
+                  }
+                  throw new Error(`API 오류 (${res.status}): ${errText}`);
+                }
+
+                replyData = await res.json();
+                break;
+              } catch (err: any) {
+                if (abortController.signal.aborted) {
+                  throw err;
+                }
+                if (attempt > maxRetries) {
+                  throw err;
+                }
+                const waitSec = 2.0;
+                updateStep(2, 'retry', '네트워크 응답 지연', `${waitSec}초 후 다시 연결을 시도합니다...`);
+                await delayWithAbort(waitSec * 1000, abortController.signal);
+              }
             }
 
-            const data = await res.json();
-            const reply = data.choices?.[0]?.message?.content || '(응답 없음)';
-            renderAssistantContent(assistantBubble, reply);
+            clearInterval(timerInterval);
+            clearTimeout(timeoutTimer);
 
-            // 자동 반영 옵션이 켜져 있는 경우 스마트 섹션 자동 교체 수행
+            const totalSec = ((Date.now() - startTime) / 1000).toFixed(1);
+            updateStep(2, 'completed', '서버 응답 수신 완료', `응답 수신 (소요: ${totalSec}s)`);
+            updateStep(3, 'active', '마크다운 렌더링 중...');
+
+            const reply = replyData.choices?.[0]?.message?.content || '(응답 없음)';
+
+            // 상태 카드를 깔끔한 메타 헤더로 대체
+            statusCard.remove();
+
+            const metaHeader = document.createElement('div');
+            metaHeader.className = 'ai-completion-meta';
+            metaHeader.innerHTML = `<span>답변 생성 완료 (${totalSec}s 소요)</span><span>${providerName} / ${model}</span>`;
+            assistantBubble.append(metaHeader);
+
+            const replyBody = document.createElement('div');
+            replyBody.className = 'ai-reply-body';
+            renderAssistantContent(replyBody, reply);
+            assistantBubble.append(replyBody);
+
+            // 자동 반영 옵션 활성화 시 스마트 병합 실행
             if (autoApplyInput.checked) {
               const codeBlocks: string[] = [];
               const regex = /```(?:[a-zA-Z0-9_-]+)?([\s\S]*?)```/g;
@@ -618,20 +883,133 @@ export default definePlugin({
               }
             }
           } catch (err: any) {
-            assistantBubble.replaceChildren();
-            const errP = document.createElement('p');
-            errP.style.color = '#ef4444';
-            errP.textContent = `[오류] ${err.message || err}`;
-            assistantBubble.append(errP);
-            context.ui.showToast('AI 응답 생성 실패', 'error');
+            clearInterval(timerInterval);
+            clearTimeout(timeoutTimer);
+
+            spinner.style.display = 'none';
+            abortBtn.style.display = 'none';
+
+            if (abortController.signal.aborted) {
+              const reason = abortController.signal.reason;
+              if (reason === 'TIMEOUT') {
+                statusTitle.textContent = '서버 응답 시간 초과 (45초)';
+                statusTitle.style.color = '#f87171';
+                updateStep(
+                  2,
+                  'error',
+                  '응답 대기 시간 초과 (45초)',
+                  'AI 서버가 지정된 시간 내에 응답하지 못했습니다. 트래픽 과부하 상태일 수 있습니다.',
+                );
+                renderErrorActions(assistantBubble, trimmedPrompt, model, 'TIMEOUT');
+              } else {
+                statusTitle.textContent = '요청이 중단되었습니다';
+                statusTitle.style.color = 'var(--fg-dim)';
+                updateStep(2, 'error', '사용자에 의해 생성이 중단됨', '취소 버튼을 클릭하여 요청을 취소했습니다.');
+              }
+            } else {
+              const errMsg = err.message || String(err);
+              statusTitle.textContent = '오류 발생';
+              statusTitle.style.color = '#ef4444';
+
+              const is503 = errMsg.includes('503');
+              const is404 = errMsg.includes('404');
+
+              if (is503) {
+                updateStep(
+                  2,
+                  'error',
+                  'Google AI 서버 일시적 과부하 (503)',
+                  '무료 티어 트래픽 집중으로 인해 현재 모델이 일시 지연되었습니다.',
+                );
+                renderErrorActions(assistantBubble, trimmedPrompt, model, '503');
+              } else if (is404) {
+                updateStep(2, 'error', '모델 또는 엔드포인트를 찾을 수 없음 (404)', errMsg);
+                renderErrorActions(assistantBubble, trimmedPrompt, model, '404');
+              } else {
+                updateStep(2, 'error', '요청 처리 실패', errMsg);
+                renderErrorActions(assistantBubble, trimmedPrompt, model, 'GENERAL');
+              }
+            }
           } finally {
-            sendBtn.disabled = false;
+            if (activeAbortController === abortController) {
+              activeAbortController = null;
+            }
             sendBtn.textContent = '전송';
+            sendBtn.classList.remove('danger');
+            sendBtn.classList.add('primary');
+            sendBtn.onclick = () => sendMessage(dockTextarea.value);
             chatHistory.scrollTop = chatHistory.scrollHeight;
           }
         }
 
+        // 에러 복구 및 대체 모델 전환 가이드 렌더러
+        function renderErrorActions(
+          container: HTMLElement,
+          prompt: string,
+          currentModel: string,
+          reason: '503' | 'TIMEOUT' | '404' | 'GENERAL',
+        ) {
+          const box = document.createElement('div');
+          box.style.marginTop = '8px';
+          box.style.padding = '8px 10px';
+          box.style.background = 'rgba(239, 68, 68, 0.08)';
+          box.style.border = '1px solid rgba(239, 68, 68, 0.25)';
+          box.style.borderRadius = '6px';
+          box.style.display = 'flex';
+          box.style.flexDirection = 'column';
+          box.style.gap = '6px';
+
+          const desc = document.createElement('div');
+          desc.style.fontSize = '11px';
+          desc.style.color = '#fca5a5';
+          desc.style.lineHeight = '1.45';
+
+          if (reason === '503') {
+            desc.textContent =
+              'Google Gemini 무료 티어 트래픽 집중으로 인해 요청이 일시 지연되었습니다. 다른 모델로 전환하시거나 잠시 후 다시 시도해 보세요.';
+          } else if (reason === 'TIMEOUT') {
+            desc.textContent =
+              '서버 응답이 45초 동안 지연되었습니다. 다른 모델로 전환하여 빠르게 응답을 받아보세요.';
+          } else if (reason === '404') {
+            desc.textContent =
+              '지정된 모델이 존재하지 않거나 지원되지 않습니다. 권장 모델(gemini-2.5-flash)로 변경해 보세요.';
+          } else {
+            desc.textContent = '요청 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해 보세요.';
+          }
+
+          const btnRow = document.createElement('div');
+          btnRow.style.display = 'flex';
+          btnRow.style.gap = '6px';
+          btnRow.style.flexWrap = 'wrap';
+
+          const altModel = currentModel.includes('2.0') ? 'gemini-2.5-flash' : 'gemini-2.0-flash';
+          const switchBtn = document.createElement('button');
+          switchBtn.className = 'small-btn';
+          switchBtn.textContent = `${altModel} 모델로 전환 후 재시도`;
+          switchBtn.onclick = () => {
+            context.storage.set('model', altModel);
+            modelInput.setValue(altModel);
+            renderChips();
+            context.ui.showToast(`모델이 ${altModel}(으)로 변경되었습니다.`, 'info');
+            sendMessage(prompt);
+          };
+
+          const retryBtn = document.createElement('button');
+          retryBtn.className = 'small-btn';
+          retryBtn.textContent = '동일 모델로 다시 시도';
+          retryBtn.onclick = () => {
+            sendMessage(prompt);
+          };
+
+          btnRow.append(switchBtn, retryBtn);
+          box.append(desc, btnRow);
+          container.append(box);
+        }
+
         return () => {
+          if (activeAbortController) {
+            activeAbortController.abort('UNMOUNT');
+          }
           document.removeEventListener('click', onDocClick);
         };
       },
