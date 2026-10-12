@@ -202,7 +202,12 @@ export default definePlugin({
 
           try {
             const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-            if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
+            if (apiKey) {
+              headers['Authorization'] = `Bearer ${apiKey}`;
+              if (apiUrl.includes('generativelanguage.googleapis.com')) {
+                headers['x-goog-api-key'] = apiKey;
+              }
+            }
 
             const res = await context.fetch(`${apiUrl}/chat/completions`, {
               method: 'POST',
