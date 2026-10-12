@@ -158,6 +158,14 @@ ${downloadGuide}`;
   // Write to release-notes.md
   writeFileSync(join(ROOT, 'release-notes.md'), cleanedNotes, 'utf8');
 
+  // If requested with --clean or --reset, automatically wipe CHANGELOG.md clean for the next version
+  const shouldClean = process.argv.includes('--clean') || process.argv.includes('--reset') || process.argv.includes('--clean-changelog');
+  if (shouldClean) {
+    const cleanTemplate = '# 릴리스 노트 (Release Notes)\n\n## [다음 버전]\n\n';
+    writeFileSync(CHANGELOG_PATH, cleanTemplate, 'utf8');
+    console.log('[changelog] CHANGELOG.md가 다음 버전을 위해 깨끗하게 초기화되었습니다.');
+  }
+
   // If in GitHub Actions, append to GITHUB_OUTPUT
   const ghOutput = process.env.GITHUB_OUTPUT;
   if (ghOutput) {

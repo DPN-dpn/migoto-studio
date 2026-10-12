@@ -108,17 +108,25 @@ async function main() {
     console.log(`  ✓ src/updater/version.ts: CURRENT_APP_VERSION -> ${newVersion}`);
   } catch {}
 
-  // 5. Update CHANGELOG.md version header
+  // 5. Update CHANGELOG.md (이전 릴리스 내역 자동 정리 및 현재 버전 헤더 적용)
   const CHANGELOG_PATH = join(ROOT, 'CHANGELOG.md');
   try {
     const changelogContent = await readFile(CHANGELOG_PATH, 'utf8');
     const today = new Date().toISOString().split('T')[0];
-    const updatedChangelog = changelogContent.replace(
-      /##\s*\[?[^\]\n]+\]?[^\n]*/,
-      `## [${newVersion}] - ${today}`
-    );
+
+    // 현재 작성 중이던 미출시 내역 또는 대상 버전 내역만 추출
+    const unreleasedMatch = /##\s*\[?(?:다음 버전|Unreleased)\]?[^\n]*\n([\s\S]*?)(?=(?:^##\s|\Z))/m.exec(changelogContent);
+    const targetMatch = new RegExp(`##\\s*\\[?${newVersion.replace(/\./g, '\\.')}\\]?[^\\n]*\\n([\\s\\S]*?)(?=(?:^##\\s|\\Z))`, 'm').exec(changelogContent);
+
+    const pendingNotes = (targetMatch && targetMatch[1].trim()) || (unreleasedMatch && unreleasedMatch[1].trim()) || '';
+
+    // 과거 누적된 이전 버전 기록을 지우고 현재 버전만 깔끔하게 유지
+    const updatedChangelog = pendingNotes
+      ? `# 릴리스 노트 (Release Notes)\n\n## [${newVersion}] - ${today}\n\n${pendingNotes}\n`
+      : `# 릴리스 노트 (Release Notes)\n\n## [${newVersion}] - ${today}\n\n`;
+
     await writeFile(CHANGELOG_PATH, updatedChangelog);
-    console.log(`  ✓ CHANGELOG.md: [${newVersion}] - ${today}`);
+    console.log(`  ✓ CHANGELOG.md: [${newVersion}] - ${today} (이전 릴리스 내역 자동 정리 완료)`);
   } catch {}
 
   console.log('\n[version] 모든 파일의 버전이 동기화되었습니다!');
