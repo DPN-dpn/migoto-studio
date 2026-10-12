@@ -2247,6 +2247,38 @@ input:checked + .slider:before {
   margin: 3px 0;
 }
 
+/* AI Dock Horizontal Resizer (Splitter) */
+.ai-dock-resizer {
+  height: 5px;
+  flex: 0 0 5px;
+  cursor: row-resize;
+  background: var(--border);
+  position: relative;
+  user-select: none;
+  transition: background 0.15s ease;
+  z-index: 10;
+}
+.ai-dock-resizer::after {
+  content: '';
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  left: 0;
+  right: 0;
+}
+.ai-dock-resizer:hover,
+.ai-dock-resizer.dragging {
+  background: var(--accent);
+}
+
+body.ai-dock-resizing {
+  user-select: none !important;
+  cursor: row-resize !important;
+}
+body.ai-dock-resizing * {
+  cursor: row-resize !important;
+}
+
 .ai-input-dock-main {
   display: flex;
   gap: 6px;
@@ -2257,7 +2289,6 @@ input:checked + .slider:before {
   flex: 1;
   height: 38px;
   min-height: 38px;
-  max-height: 120px;
   padding: 8px 10px;
   font-size: 12px;
   background: var(--bg);

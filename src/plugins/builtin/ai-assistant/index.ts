@@ -365,7 +365,25 @@ export default definePlugin({
         dockTextarea.placeholder = 'AI에게 질문이나 코드 작성을 요청하세요... (Enter로 전송, Shift+Enter 줄바꿈)';
         dockTextarea.rows = 1;
 
+        // 수평 스플릿 바 (입력창 높이 조절)
+        const dockResizer = document.createElement('div');
+        dockResizer.className = 'ai-dock-resizer';
+        dockResizer.title = '드래그하여 입력창 높이 조절 (더블 클릭: 기본 크기 복원)';
+
+        let savedDockHeight = context.storage.get('dock_textarea_height', 0);
+        let isManuallyResized = savedDockHeight >= 38;
+
+        if (isManuallyResized) {
+          dockTextarea.style.height = `${savedDockHeight}px`;
+          dockTextarea.style.overflowY = 'auto';
+        }
+
         const adjustTextareaHeight = () => {
+          if (isManuallyResized) {
+            dockTextarea.style.overflowY =
+              dockTextarea.scrollHeight > dockTextarea.clientHeight ? 'auto' : 'hidden';
+            return;
+          }
           dockTextarea.style.height = 'auto';
           const scrollH = dockTextarea.scrollHeight;
           const maxH = 120;
@@ -379,6 +397,58 @@ export default definePlugin({
         };
 
         dockTextarea.oninput = adjustTextareaHeight;
+
+        // 스플릿 리사이저 드래그 이벤트 핸들러
+        let isDraggingResizer = false;
+        let dragStartY = 0;
+        let dragStartHeight = 38;
+
+        const onResizerMouseMove = (e: MouseEvent) => {
+          if (!isDraggingResizer) return;
+          const deltaY = dragStartY - e.clientY;
+          const paneHeight = agentPane.clientHeight;
+          const maxAllowed = Math.max(120, paneHeight - 120);
+          const newH = Math.max(38, Math.min(maxAllowed, dragStartHeight + deltaY));
+
+          dockTextarea.style.height = `${newH}px`;
+          dockTextarea.style.overflowY = dockTextarea.scrollHeight > newH ? 'auto' : 'hidden';
+          isManuallyResized = true;
+          savedDockHeight = newH;
+        };
+
+        const onResizerMouseUp = () => {
+          if (!isDraggingResizer) return;
+          isDraggingResizer = false;
+          dockResizer.classList.remove('dragging');
+          document.body.classList.remove('ai-dock-resizing');
+          window.removeEventListener('mousemove', onResizerMouseMove);
+          window.removeEventListener('mouseup', onResizerMouseUp);
+
+          if (savedDockHeight >= 38) {
+            context.storage.set('dock_textarea_height', savedDockHeight);
+          }
+        };
+
+        dockResizer.onmousedown = (e: MouseEvent) => {
+          e.preventDefault();
+          isDraggingResizer = true;
+          dragStartY = e.clientY;
+          dragStartHeight = dockTextarea.clientHeight || 38;
+          dockResizer.classList.add('dragging');
+          document.body.classList.add('ai-dock-resizing');
+
+          window.addEventListener('mousemove', onResizerMouseMove);
+          window.addEventListener('mouseup', onResizerMouseUp);
+        };
+
+        dockResizer.ondblclick = () => {
+          isManuallyResized = false;
+          savedDockHeight = 0;
+          context.storage.set('dock_textarea_height', 0);
+          dockTextarea.style.height = '38px';
+          dockTextarea.style.overflowY = 'hidden';
+          context.ui.showToast('입력창 높이가 기본 크기로 초기화되었습니다.', 'info');
+        };
 
         const sendBtn = document.createElement('button');
         sendBtn.className = 'primary ai-dock-send-btn';
@@ -397,7 +467,7 @@ export default definePlugin({
         dockMain.append(dockTextarea, sendBtn);
         inputDock.append(dockTop, dockMain);
 
-        agentPane.append(chatHistory, inputDock);
+        agentPane.append(chatHistory, dockResizer, inputDock);
 
         // 컨테이너 조립
         container.append(subtabBar, agentPane, settingsPane);
@@ -694,8 +764,12 @@ export default definePlugin({
           }
 
           dockTextarea.value = '';
-          dockTextarea.style.height = '38px';
-          dockTextarea.style.overflowY = 'hidden';
+          if (!isManuallyResized) {
+            dockTextarea.style.height = '38px';
+            dockTextarea.style.overflowY = 'hidden';
+          } else {
+            dockTextarea.style.overflowY = 'hidden';
+          }
 
           // 1. 대화 턴 그룹 생성
           const turnGroup = document.createElement('div');
@@ -1157,6 +1231,8 @@ export default definePlugin({
           if (activeAbortController) {
             activeAbortController.abort('UNMOUNT');
           }
+          window.removeEventListener('mousemove', onResizerMouseMove);
+          window.removeEventListener('mouseup', onResizerMouseUp);
           document.removeEventListener('click', onDocClick);
         };
       },
