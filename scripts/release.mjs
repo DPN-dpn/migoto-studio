@@ -26,29 +26,30 @@ function main() {
 
   console.log(`[release] v${newVersion} 릴리스 작업을 시작합니다 (현재 버전: v${currentVersion})...`);
 
-  // 1. 릴리스 노트 생성 (CHANGELOG.md의 내용을 release-notes.md에 보존)
-  console.log('[release] 1. 릴리스 노트 추출 및 release-notes.md 생성...');
-  execSync(`node scripts/generate-release-notes.mjs v${newVersion}`, { cwd: ROOT, stdio: 'inherit' });
-
-  // 2. 버전 파일 일괄 동기화
-  console.log('[release] 2. package.json, tauri.conf.json, Cargo.toml 버전 동기화...');
+  // 1. 버전 파일 일괄 동기화 및 CHANGELOG.md 릴리스 버전 헤더 적용
+  console.log('[release] 1. package.json, tauri.conf.json, Cargo.toml 및 CHANGELOG 버전 동기화...');
   execSync(`node scripts/bump-version.mjs ${newVersion}`, { cwd: ROOT, stdio: 'inherit' });
 
-  // 3. CHANGELOG.md를 다음 버전을 위해 깨끗하게 초기화
-  console.log('[release] 3. CHANGELOG.md 내용 자동 정리 및 초기화...');
-  const cleanChangelog = '# 릴리스 노트 (Release Notes)\n\n## [다음 버전]\n\n';
-  writeFileSync(CHANGELOG_PATH, cleanChangelog, 'utf8');
-  console.log('  [OK] CHANGELOG.md가 다음 개발을 위해 깨끗하게 초기화되었습니다.');
+  // 2. 릴리스 노트 생성 (release-notes.md 생성)
+  console.log('[release] 2. 릴리스 노트 추출 및 release-notes.md 생성...');
+  execSync(`node scripts/generate-release-notes.mjs v${newVersion}`, { cwd: ROOT, stdio: 'inherit' });
 
-  // 4. Git 커밋 및 태그 자동 생성
-  console.log('[release] 4. Git 릴리스 커밋 및 태그 생성...');
+  // 3. Git 릴리스 커밋 및 태그 생성 (태그 시점에 완성된 릴리스 노트 보존)
+  console.log('[release] 3. Git 릴리스 커밋 및 태그 생성...');
   try {
     execSync('git add package.json package-lock.json src-tauri/tauri.conf.json src-tauri/Cargo.toml src-tauri/Cargo.lock src/updater/version.ts CHANGELOG.md', { cwd: ROOT, stdio: 'inherit' });
     execSync(`git commit -m "chore(release): v${newVersion} 버전 릴리스"`, { cwd: ROOT, stdio: 'inherit' });
     execSync(`git tag v${newVersion}`, { cwd: ROOT, stdio: 'inherit' });
 
+    // 4. CHANGELOG.md를 다음 개발 버전을 위해 깨끗하게 초기화 커밋
+    console.log('[release] 4. CHANGELOG.md 다음 개발을 위한 초기화 커밋...');
+    const cleanChangelog = '# 릴리스 노트 (Release Notes)\n\n## [다음 버전]\n\n';
+    writeFileSync(CHANGELOG_PATH, cleanChangelog, 'utf8');
+    execSync('git add CHANGELOG.md', { cwd: ROOT, stdio: 'inherit' });
+    execSync(`git commit -m "chore: prepare for next development iteration"`, { cwd: ROOT, stdio: 'inherit' });
+
     console.log(`\n[release] v${newVersion} 릴리스 커밋 및 태그(v${newVersion}) 생성이 완료되었습니다.`);
-    console.log('CHANGELOG.md는 다음 버전을 위해 깨끗하게 비워졌습니다.');
+    console.log('CHANGELOG.md는 다음 개발을 위해 깨끗하게 초기화되었습니다.');
     console.log('원격 저장소에 배포하려면 다음 명령어를 실행하세요:');
     console.log('  git push origin main');
     console.log(`  git push origin v${newVersion}`);
