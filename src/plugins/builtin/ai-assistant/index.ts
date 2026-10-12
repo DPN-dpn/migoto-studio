@@ -265,18 +265,23 @@ export default definePlugin({
 
         contextSelectWrap.append(contextSelect);
 
-        const autoApplyLabel = document.createElement('label');
-        autoApplyLabel.className = 'ai-attach-label';
-        autoApplyLabel.title = '답변 완료 시 현재 열린 파일의 해당 섹션을 스마트하게 자동 교체/반영합니다.';
-        const autoApplyInput = document.createElement('input');
-        autoApplyInput.type = 'checkbox';
-        autoApplyInput.checked = context.storage.get('auto_apply', false);
-        autoApplyInput.onchange = () => context.storage.set('auto_apply', autoApplyInput.checked);
-        const autoApplyText = document.createElement('span');
-        autoApplyText.textContent = '자동 반영';
-        autoApplyLabel.append(autoApplyInput, autoApplyText);
+        let isAutoApply = context.storage.get('auto_apply', false);
 
-        dockOptions.append(contextSelectWrap, autoApplyLabel);
+        const autoApplyToggle = document.createElement('button');
+        autoApplyToggle.type = 'button';
+        autoApplyToggle.className = 'ai-auto-apply-toggle' + (isAutoApply ? ' active' : '');
+        autoApplyToggle.title = '답변 완료 시 현재 열린 파일의 해당 섹션을 스마트하게 자동 교체/반영합니다.';
+        autoApplyToggle.textContent = isAutoApply ? '자동 반영: ON' : '자동 반영: OFF';
+
+        autoApplyToggle.onclick = () => {
+          isAutoApply = !isAutoApply;
+          context.storage.set('auto_apply', isAutoApply);
+          autoApplyToggle.classList.toggle('active', isAutoApply);
+          autoApplyToggle.textContent = isAutoApply ? '자동 반영: ON' : '자동 반영: OFF';
+          context.ui.showToast(`자동 반영이 ${isAutoApply ? '활성화' : '비활성화'}되었습니다.`, isAutoApply ? 'info' : 'warn');
+        };
+
+        dockOptions.append(contextSelectWrap, autoApplyToggle);
 
         // 템플릿 드롭다운 버튼 & 메뉴
         const templateWrap = document.createElement('div');
@@ -1091,7 +1096,7 @@ export default definePlugin({
             assistantBubble.append(replyBody);
 
             // 자동 반영 옵션 활성화 시 스마트 병합 실행
-            if (autoApplyInput.checked) {
+            if (isAutoApply) {
               const codeBlocks: string[] = [];
               const regex = /```(?:[a-zA-Z0-9_-]+)?([\s\S]*?)```/g;
               let m: RegExpExecArray | null;
