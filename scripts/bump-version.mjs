@@ -133,12 +133,12 @@ async function main() {
   // 5. Update CHANGELOG.md (이전 릴리스 내역 자동 정리 및 현재 버전 헤더 적용)
   const CHANGELOG_PATH = join(ROOT, 'CHANGELOG.md');
   try {
-    const changelogContent = await readFile(CHANGELOG_PATH, 'utf8');
+    const changelogContent = (await readFile(CHANGELOG_PATH, 'utf8')).replace(/\r\n/g, '\n');
     const today = new Date().toISOString().split('T')[0];
 
     // 현재 작성 중이던 미출시 내역 또는 대상 버전 내역만 추출
-    const unreleasedMatch = /##\s*\[?(?:다음 버전|Unreleased)\]?[^\n]*\n([\s\S]*?)(?=(?:^##\s|\Z))/m.exec(changelogContent);
-    const targetMatch = new RegExp(`##\\s*\\[?${newVersion.replace(/\./g, '\\.')}\\]?[^\\n]*\\n([\\s\\S]*?)(?=(?:^##\\s|\\Z))`, 'm').exec(changelogContent);
+    const unreleasedMatch = /(?:^|\n)##\s*\[?(?:다음 버전|Unreleased)\]?[^\n]*\n([\s\S]*?)(?=\n##\s|$)/.exec(changelogContent);
+    const targetMatch = new RegExp(`(?:^|\\n)##\\s*\\[?${newVersion.replace(/\\./g, '\\.')}\\]?[^\\n]*\\n([\\s\\S]*?)(?=\\n##\\s|$)`).exec(changelogContent);
 
     const pendingNotes = (targetMatch && targetMatch[1].trim()) || (unreleasedMatch && unreleasedMatch[1].trim()) || '';
 
