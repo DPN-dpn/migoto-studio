@@ -25,6 +25,7 @@ import { openCompareDialog } from './ui/diff-dialog';
 import { openKeyHelperModal } from './ui/key-helper';
 import { initPwa } from './pwa';
 import { checkOnStartup } from './updater/updater';
+import { CURRENT_APP_VERSION } from './updater/version';
 
 // Only the base editor worker is needed (no TS/JSON/CSS language services).
 (self as unknown as { MonacoEnvironment: monaco.Environment }).MonacoEnvironment = {
@@ -38,6 +39,13 @@ async function boot() {
   initPwa();
   const settings = await loadSettings();
   await initCustomTemplates();
+
+  const verBadge = $('app-version-badge');
+  if (verBadge) {
+    verBadge.textContent = `v${CURRENT_APP_VERSION}`;
+    verBadge.title = `Migoto Studio v${CURRENT_APP_VERSION} (클릭 시 도움말 및 정보)`;
+    verBadge.addEventListener('click', () => openHelp());
+  }
   // Drop expired safety backups (best effort; never blocks startup).
   platform().pruneBackups({ keepDays: settings.backupKeepDays, maxPerFile: settings.backupMaxPerFile }).catch(() => {});
   defineThemes();
