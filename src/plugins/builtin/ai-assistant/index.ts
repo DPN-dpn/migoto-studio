@@ -61,13 +61,41 @@ export default definePlugin({
           onInput: (v) => context.storage.set('api_url', v.trim()),
         });
 
-        const keyInput = context.ui.createInput({
-          label: 'API Key:',
-          type: 'password',
-          placeholder: 'Gemini 또는 OpenAI API 키 (Ollama는 비워둠)',
-          value: context.storage.get('api_key', ''),
-          onInput: (v) => context.storage.set('api_key', v.trim()),
-        });
+        const keyRow = document.createElement('div');
+        keyRow.className = 'form-row';
+
+        const keyLabel = document.createElement('label');
+        keyLabel.textContent = 'API Key:';
+
+        const keyWrap = document.createElement('div');
+        keyWrap.className = 'ai-key-input-wrap';
+
+        const keyInput = document.createElement('input');
+        keyInput.type = 'password';
+        keyInput.className = 'plugin-input ai-key-input';
+        keyInput.placeholder = 'Gemini 또는 OpenAI API 키 (Ollama는 비워둠)';
+        keyInput.value = context.storage.get('api_key', '');
+        keyInput.oninput = () => context.storage.set('api_key', keyInput.value.trim());
+
+        const eyeBtn = document.createElement('button');
+        eyeBtn.type = 'button';
+        eyeBtn.className = 'ai-eye-btn';
+        eyeBtn.title = 'API 키 보기/숨기기';
+        eyeBtn.setAttribute('aria-label', 'API 키 보기/숨기기');
+
+        const eyeSvg = `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>`;
+        const eyeOffSvg = `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>`;
+
+        eyeBtn.innerHTML = eyeSvg;
+        let isKeyVisible = false;
+        eyeBtn.onclick = () => {
+          isKeyVisible = !isKeyVisible;
+          keyInput.type = isKeyVisible ? 'text' : 'password';
+          eyeBtn.innerHTML = isKeyVisible ? eyeOffSvg : eyeSvg;
+        };
+
+        keyWrap.append(keyInput, eyeBtn);
+        keyRow.append(keyLabel, keyWrap);
 
         const modelInput = context.ui.createInput({
           label: '모델명:',
@@ -136,7 +164,7 @@ export default definePlugin({
         const configTitle = document.createElement('div');
         configTitle.className = 'ai-settings-card-title';
         configTitle.textContent = '연결 정보 입력';
-        configCard.append(configTitle, urlInput.row, keyInput.row, modelInput.row);
+        configCard.append(configTitle, urlInput.row, keyRow, modelInput.row);
 
         const guideCard = document.createElement('div');
         guideCard.className = 'ai-settings-card';
@@ -246,6 +274,7 @@ export default definePlugin({
             }
             if (item.text) {
               dockTextarea.value = item.text;
+              adjustTextareaHeight();
               dockTextarea.focus();
             }
           };
@@ -267,7 +296,22 @@ export default definePlugin({
         const dockTextarea = document.createElement('textarea');
         dockTextarea.className = 'ai-dock-textarea';
         dockTextarea.placeholder = 'AI에게 질문이나 코드 작성을 요청하세요... (Enter로 전송, Shift+Enter 줄바꿈)';
-        dockTextarea.rows = 2;
+        dockTextarea.rows = 1;
+
+        const adjustTextareaHeight = () => {
+          dockTextarea.style.height = 'auto';
+          const scrollH = dockTextarea.scrollHeight;
+          const maxH = 120;
+          if (scrollH > maxH) {
+            dockTextarea.style.height = `${maxH}px`;
+            dockTextarea.style.overflowY = 'auto';
+          } else {
+            dockTextarea.style.height = `${Math.max(scrollH, 38)}px`;
+            dockTextarea.style.overflowY = 'hidden';
+          }
+        };
+
+        dockTextarea.oninput = adjustTextareaHeight;
 
         const sendBtn = document.createElement('button');
         sendBtn.className = 'primary ai-dock-send-btn';
@@ -367,6 +411,8 @@ export default definePlugin({
           }
 
           dockTextarea.value = '';
+          dockTextarea.style.height = '38px';
+          dockTextarea.style.overflowY = 'hidden';
 
           // 1. 대화 턴 그룹 생성
           const turnGroup = document.createElement('div');
