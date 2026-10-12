@@ -2128,6 +2128,16 @@ input:checked + .slider:before {
   background: var(--bg-elev);
   border-top: 1px solid var(--border);
 }
+.ai-apply-btn {
+  background: rgba(139, 124, 246, 0.2) !important;
+  color: #c7d2fe !important;
+  border: 1px solid rgba(139, 124, 246, 0.35) !important;
+  font-weight: 500;
+}
+.ai-apply-btn:hover {
+  background: rgba(139, 124, 246, 0.38) !important;
+  color: #ffffff !important;
+}
 
 /* Input Dock at Bottom */
 .ai-input-dock {
@@ -2148,6 +2158,13 @@ input:checked + .slider:before {
   gap: 6px;
 }
 
+.ai-dock-options {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
 .ai-attach-label {
   display: flex;
   align-items: center;
@@ -2157,8 +2174,6 @@ input:checked + .slider:before {
   cursor: pointer;
   user-select: none;
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
 }
 .ai-attach-label input {

@@ -1,6 +1,133 @@
 import { definePlugin, type PluginContext } from '../../api.ts';
 import iconSvg from './icon.ts';
 
+interface IniSectionBlock {
+  name: string;
+  header: string;
+  fullText: string;
+}
+
+/**
+ * 텍스트에서 INI 섹션들을 파싱하여 상단 주석/변수(preamble)와 개별 섹션 블록들로 분리합니다.
+ */
+function parseIniSectionsFromText(text: string): {
+  preamble: string;
+  sections: IniSectionBlock[];
+} {
+  const lines = text.split(/\r?\n/);
+  const sectionHeaderRegex = /^\s*\[([^\]\r\n]+)\]/;
+  const sections: IniSectionBlock[] = [];
+
+  let firstSectionLineIdx = -1;
+  const sectionIndices: Array<{ name: string; header: string; lineIdx: number }> = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const match = sectionHeaderRegex.exec(lines[i]);
+    if (match) {
+      if (firstSectionLineIdx === -1) firstSectionLineIdx = i;
+      sectionIndices.push({
+        name: match[1].trim(),
+        header: lines[i],
+        lineIdx: i,
+      });
+    }
+  }
+
+  if (sectionIndices.length === 0) {
+    return { preamble: text, sections: [] };
+  }
+
+  const preamble = lines.slice(0, firstSectionLineIdx).join('\n');
+
+  for (let s = 0; s < sectionIndices.length; s++) {
+    const startLine = sectionIndices[s].lineIdx;
+    const endLine = s + 1 < sectionIndices.length ? sectionIndices[s + 1].lineIdx : lines.length;
+    const blockLines = lines.slice(startLine, endLine);
+    sections.push({
+      name: sectionIndices[s].name,
+      header: sectionIndices[s].header,
+      fullText: blockLines.join('\n').trimEnd(),
+    });
+  }
+
+  return { preamble, sections };
+}
+
+/**
+ * 현재 문서의 내용과 AI가 생성한 코드를 비교하여,
+ * 기존 섹션은 해당 위치에서 교체하고 새 섹션은 추가하는 스마트 섹션 교체를 수행합니다.
+ */
+function applySmartSectionReplacement(currentDocText: string, aiCodeText: string): {
+  newText: string;
+  replacedCount: number;
+  addedCount: number;
+} {
+  const docParsed = parseIniSectionsFromText(currentDocText);
+  const aiParsed = parseIniSectionsFromText(aiCodeText);
+
+  // AI가 섹션을 아예 생성하지 않은 경우 (코드 한 줄, 단순 표현식 등)
+  if (aiParsed.sections.length === 0) {
+    if (!currentDocText.trim()) {
+      return { newText: aiCodeText.trim() + '\n', replacedCount: 0, addedCount: 1 };
+    }
+    const separator = currentDocText.endsWith('\n\n') ? '' : currentDocText.endsWith('\n') ? '\n' : '\n\n';
+    return {
+      newText: currentDocText + separator + aiCodeText.trim() + '\n',
+      replacedCount: 0,
+      addedCount: 1,
+    };
+  }
+
+  // 현재 문서가 비어있는 경우 AI 코드를 그대로 적용
+  if (!currentDocText.trim()) {
+    return {
+      newText: aiCodeText.trim() + '\n',
+      replacedCount: 0,
+      addedCount: aiParsed.sections.length,
+    };
+  }
+
+  // 기존 문서의 섹션 맵 (대소문자 무시)
+  const docSectionMap = new Map<string, number>();
+  docParsed.sections.forEach((sec, idx) => {
+    docSectionMap.set(sec.name.toLowerCase(), idx);
+  });
+
+  let replacedCount = 0;
+  let addedCount = 0;
+
+  const updatedSections = [...docParsed.sections];
+  const appendedSections: IniSectionBlock[] = [];
+
+  for (const aiSec of aiParsed.sections) {
+    const key = aiSec.name.toLowerCase();
+    if (docSectionMap.has(key)) {
+      const targetIdx = docSectionMap.get(key)!;
+      updatedSections[targetIdx] = aiSec;
+      replacedCount++;
+    } else {
+      appendedSections.push(aiSec);
+      addedCount++;
+    }
+  }
+
+  const parts: string[] = [];
+  if (docParsed.preamble.trim()) {
+    parts.push(docParsed.preamble.trimEnd());
+  }
+
+  for (const sec of updatedSections) {
+    parts.push(sec.fullText.trimEnd());
+  }
+
+  for (const sec of appendedSections) {
+    parts.push(sec.fullText.trimEnd());
+  }
+
+  const newText = parts.join('\n\n') + '\n';
+  return { newText, replacedCount, addedCount };
+}
+
 /**
  * AI 모딩 어시스턴트 플러그인
  * OpenAI 또는 Google Gemini, 로컬 Ollama 호환 API를 연동하여 INI 분석, 섹션 생성 및 질의응답을 수행합니다.
@@ -181,11 +308,9 @@ export default definePlugin({
         settingsPane.append(presetCard, configCard, guideCard);
 
         // --- [에이전트 패널 구성] ---
-        // 대화 히스토리 컨테이너 (스크롤 뷰)
         const chatHistory = document.createElement('div');
         chatHistory.className = 'ai-chat-history';
 
-        // 대화가 비어있을 때 안내 문구
         const emptyState = document.createElement('div');
         emptyState.className = 'ai-empty-state';
         emptyState.innerHTML = `
@@ -201,15 +326,32 @@ export default definePlugin({
         const dockTop = document.createElement('div');
         dockTop.className = 'ai-input-dock-top';
 
-        // 파일 첨부 체크박스
+        // 옵션 체크박스 영역 (INI 전달 / 자동 반영)
+        const dockOptions = document.createElement('div');
+        dockOptions.className = 'ai-dock-options';
+
         const attachLabel = document.createElement('label');
         attachLabel.className = 'ai-attach-label';
+        attachLabel.title = '현재 에디터에 열려 있는 INI 파일 내용을 AI에게 함께 전달합니다.';
         const attachInput = document.createElement('input');
         attachInput.type = 'checkbox';
         attachInput.checked = true;
         const attachText = document.createElement('span');
-        attachText.textContent = '현재 열린 INI 파일 전달';
+        attachText.textContent = 'INI 전달';
         attachLabel.append(attachInput, attachText);
+
+        const autoApplyLabel = document.createElement('label');
+        autoApplyLabel.className = 'ai-attach-label';
+        autoApplyLabel.title = '답변 완료 시 현재 열린 파일의 해당 섹션을 스마트하게 자동 교체/반영합니다.';
+        const autoApplyInput = document.createElement('input');
+        autoApplyInput.type = 'checkbox';
+        autoApplyInput.checked = context.storage.get('auto_apply', false);
+        autoApplyInput.onchange = () => context.storage.set('auto_apply', autoApplyInput.checked);
+        const autoApplyText = document.createElement('span');
+        autoApplyText.textContent = '자동 반영';
+        autoApplyLabel.append(autoApplyInput, autoApplyText);
+
+        dockOptions.append(attachLabel, autoApplyLabel);
 
         // 템플릿 드롭다운 버튼 & 메뉴
         const templateWrap = document.createElement('div');
@@ -287,7 +429,7 @@ export default definePlugin({
         };
 
         templateWrap.append(templateBtn, templateMenu);
-        dockTop.append(attachLabel, templateWrap);
+        dockTop.append(dockOptions, templateWrap);
 
         // 하단 메인 입력창 및 전송 버튼
         const dockMain = document.createElement('div');
@@ -343,6 +485,24 @@ export default definePlugin({
         };
         document.addEventListener('click', onDocClick);
 
+        // 스마트 섹션 교체 실행 함수
+        function executeSmartApply(codeContent: string, isAuto = false): boolean {
+          const currentText = context.editor.getText();
+          const { newText, replacedCount, addedCount } = applySmartSectionReplacement(currentText, codeContent);
+          context.editor.setText(newText);
+          const prefix = isAuto ? '[자동 반영] ' : '';
+          if (replacedCount > 0 && addedCount > 0) {
+            context.ui.showToast(`${prefix}${replacedCount}개 섹션 교체 및 ${addedCount}개 섹션이 추가되었습니다. (되돌리기: Ctrl+Z)`, 'info');
+          } else if (replacedCount > 0) {
+            context.ui.showToast(`${prefix}${replacedCount}개 섹션이 스마트 교체되었습니다. (되돌리기: Ctrl+Z)`, 'info');
+          } else if (addedCount > 0) {
+            context.ui.showToast(`${prefix}${addedCount}개 섹션이 파일에 추가되었습니다. (되돌리기: Ctrl+Z)`, 'info');
+          } else {
+            context.ui.showToast(`${prefix}파일 내용이 갱신되었습니다. (되돌리기: Ctrl+Z)`, 'info');
+          }
+          return true;
+        }
+
         // 마크다운 응답 렌더링 헬퍼
         function renderAssistantContent(targetEl: HTMLElement, text: string) {
           targetEl.replaceChildren();
@@ -369,12 +529,21 @@ export default definePlugin({
             const btnBar = document.createElement('div');
             btnBar.className = 'ai-code-bar';
 
+            const applyBtn = document.createElement('button');
+            applyBtn.className = 'small-btn ai-apply-btn';
+            applyBtn.textContent = '스마트 적용';
+            applyBtn.title = '현재 열린 파일의 해당 섹션을 찾아 스마트하게 교체/반영합니다';
+            applyBtn.onclick = () => {
+              executeSmartApply(codeContent, false);
+            };
+
             const insertBtn = document.createElement('button');
             insertBtn.className = 'small-btn';
-            insertBtn.textContent = '에디터에 삽입';
+            insertBtn.textContent = '커서 삽입';
+            insertBtn.title = '현재 에디터 커서 위치에 코드를 삽입합니다';
             insertBtn.onclick = () => {
               context.editor.insertText(codeContent + '\n');
-              context.ui.showToast('에디터에 코드가 삽입되었습니다.', 'info');
+              context.ui.showToast('에디터 커서에 코드가 삽입되었습니다.', 'info');
             };
 
             const copyBtn = document.createElement('button');
@@ -385,7 +554,7 @@ export default definePlugin({
               context.ui.showToast('클립보드에 복사되었습니다.', 'info');
             };
 
-            btnBar.append(insertBtn, copyBtn);
+            btnBar.append(applyBtn, insertBtn, copyBtn);
             codeBox.append(btnBar);
             targetEl.append(codeBox);
 
@@ -459,7 +628,6 @@ export default definePlugin({
             };
             toggleBtn.onclick = toggleHandler;
             userBubble.onclick = (e) => {
-              // 텍스트 영역 클릭 시에도 토글
               if ((e.target as HTMLElement).tagName !== 'BUTTON') {
                 toggleHandler(e);
               }
@@ -549,6 +717,20 @@ export default definePlugin({
             const data = await res.json();
             const reply = data.choices?.[0]?.message?.content || '(응답 없음)';
             renderAssistantContent(assistantBubble, reply);
+
+            // 자동 반영 옵션이 켜져 있는 경우 스마트 섹션 자동 교체 수행
+            if (autoApplyInput.checked) {
+              const codeBlocks: string[] = [];
+              const regex = /```(?:[a-zA-Z0-9_-]+)?([\s\S]*?)```/g;
+              let m: RegExpExecArray | null;
+              while ((m = regex.exec(reply)) !== null) {
+                if (m[1].trim()) codeBlocks.push(m[1].trim());
+              }
+              if (codeBlocks.length > 0) {
+                const combinedCode = codeBlocks.join('\n\n');
+                executeSmartApply(combinedCode, true);
+              }
+            }
           } catch (err: any) {
             assistantBubble.replaceChildren();
             const errP = document.createElement('p');

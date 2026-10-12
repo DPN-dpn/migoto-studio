@@ -702,7 +702,14 @@ export default {
           return this.editor.getModel()?.getValueInRange(sel) ?? '';
         },
         setText: (text: string) => {
-          this.editor.setValue(text);
+          const model = this.editor.getModel();
+          if (model) {
+            this.editor.pushUndoStop();
+            this.editor.executeEdits('plugin', [{ range: model.getFullModelRange(), text }]);
+            this.editor.pushUndoStop();
+          } else {
+            this.editor.setValue(text);
+          }
         },
         getLine: (lineNumber: number) => {
           return this.editor.getModel()?.getLineContent(lineNumber) ?? '';
