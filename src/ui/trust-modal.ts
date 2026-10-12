@@ -122,7 +122,10 @@ export function promptFolderTrust(folder: FolderRef): Promise<boolean> {
 
     body.append(banner, infoBox, optWrap, notice, actions);
 
-    closeModal = openModal('작업자 신뢰 확인 (Workspace Trust)', body, { autoHeight: true });
+    closeModal = openModal('작업자 신뢰 확인 (Workspace Trust)', body, {
+      autoHeight: true,
+      className: 'modal-trust',
+    });
 
     // Focus primary button on display
     setTimeout(() => trustBtn.focus(), 60);

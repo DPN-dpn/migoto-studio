@@ -2918,11 +2918,18 @@ input:checked + .slider:before {
    Workspace Trust Modal (작업자 신뢰 확인)
    ============================================================================ */
 
+.modal.modal-trust {
+  width: min(520px, 92vw);
+  height: auto;
+  max-height: 85vh;
+}
+
 .trust-modal-body {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  max-width: 540px;
+  gap: 14px;
+  width: 100%;
+  box-sizing: border-box;
   user-select: none;
 }
 
