@@ -51,6 +51,7 @@ export class ImageViewer {
 
   private colorSpaceBtns: Map<ColorSpaceMode, HTMLButtonElement> = new Map();
   private channelBtns: Map<ChannelMode, HTMLButtonElement> = new Map();
+  private cleanups: Array<() => void> = [];
 
   constructor(container: HTMLElement) {
     this.container = container;
@@ -161,28 +162,20 @@ export class ImageViewer {
     const btnFit = document.createElement('button');
     btnFit.className = 'img-tool-btn';
     btnFit.textContent = '화면맞춤';
-    btnFit.title = '화면에 맞추기';
+    btnFit.title = '화면에 맞추기 (단축키: 더블클릭)';
     btnFit.addEventListener('click', () => this.fitToViewport(this.imageWidth, this.imageHeight));
 
     const btn100 = document.createElement('button');
     btn100.className = 'img-tool-btn';
     btn100.textContent = '100%';
     btn100.title = '실제 크기 (1:1)';
-    btn100.addEventListener('click', () => {
-      this.zoom = 1.0;
-      this.panX = 0;
-      this.panY = 0;
-      this.updateTransform();
-    });
+    btn100.addEventListener('click', () => this.resetTo100());
 
     const btnZoomOut = document.createElement('button');
     btnZoomOut.className = 'img-tool-btn';
     btnZoomOut.textContent = '−';
     btnZoomOut.title = '축소';
-    btnZoomOut.addEventListener('click', () => {
-      this.zoom = Math.max(0.1, this.zoom / 1.25);
-      this.updateTransform();
-    });
+    btnZoomOut.addEventListener('click', () => this.zoomBy(1 / 1.25));
 
     this.zoomLabel = document.createElement('span');
     this.zoomLabel.className = 'image-zoom-label';
@@ -192,10 +185,7 @@ export class ImageViewer {
     btnZoomIn.className = 'img-tool-btn';
     btnZoomIn.textContent = '+';
     btnZoomIn.title = '확대';
-    btnZoomIn.addEventListener('click', () => {
-      this.zoom = Math.min(20, this.zoom * 1.25);
-      this.updateTransform();
-    });
+    btnZoomIn.addEventListener('click', () => this.zoomBy(1.25));
 
     zoomControls.append(btnFit, btn100, btnZoomOut, this.zoomLabel, btnZoomIn);
     toolbarControls.append(csSection, chSection, zoomControls);
@@ -402,27 +392,62 @@ export class ImageViewer {
     ctx.putImageData(imgData, 0, 0);
   }
 
-  private fitToViewport(w: number, h: number) {
+  private getViewportRect(): DOMRect | null {
+    const vp = this.el.querySelector('.image-viewer-viewport') as HTMLElement | null;
+    return vp ? vp.getBoundingClientRect() : null;
+  }
+
+  fitToViewport(w = this.imageWidth, h = this.imageHeight) {
     if (!w || !h) return;
-    const rect = this.el.querySelector('.image-viewer-viewport')?.getBoundingClientRect();
+    const rect = this.getViewportRect();
     if (!rect || rect.width <= 0 || rect.height <= 0) {
-      this.zoom = 1.0;
-      this.panX = 0;
-      this.panY = 0;
-      this.updateTransform();
+      requestAnimationFrame(() => this.fitToViewport(w, h));
       return;
     }
 
     const pad = 40;
-    const availW = Math.max(100, rect.width - pad);
-    const availH = Math.max(100, rect.height - pad);
+    const availW = Math.max(20, rect.width - pad);
+    const availH = Math.max(20, rect.height - pad);
     const scaleX = availW / w;
     const scaleY = availH / h;
-    const fitScale = Math.min(scaleX, scaleY, 1.0);
 
-    this.zoom = Math.round(fitScale * 100) / 100;
-    this.panX = 0;
-    this.panY = 0;
+    // 뷰포트 영역에 맞게 최적 비율 계산 (작은 이미지는 확대, 큰 이미지는 축소)
+    let fitScale = Math.min(scaleX, scaleY);
+    // 극소형(1x1 등) 텍스처 과도 확대 방지(최대 32배) 및 최소 배율 보장
+    fitScale = Math.min(32, Math.max(0.01, fitScale));
+
+    this.zoom = fitScale;
+    this.panX = Math.round((rect.width - w * this.zoom) / 2);
+    this.panY = Math.round((rect.height - h * this.zoom) / 2);
+
+    this.updateTransform();
+  }
+
+  private resetTo100() {
+    this.zoom = 1.0;
+    const rect = this.getViewportRect();
+    if (rect && rect.width > 0 && rect.height > 0) {
+      this.panX = Math.round((rect.width - this.imageWidth) / 2);
+      this.panY = Math.round((rect.height - this.imageHeight) / 2);
+    } else {
+      this.panX = 0;
+      this.panY = 0;
+    }
+    this.updateTransform();
+  }
+
+  private zoomBy(factor: number) {
+    const rect = this.getViewportRect();
+    const centerX = rect ? rect.width / 2 : 0;
+    const centerY = rect ? rect.height / 2 : 0;
+
+    const imgX = (centerX - this.panX) / this.zoom;
+    const imgY = (centerY - this.panY) / this.zoom;
+
+    const newZoom = Math.min(64, Math.max(0.01, this.zoom * factor));
+    this.panX = Math.round(centerX - imgX * newZoom);
+    this.panY = Math.round(centerY - imgY * newZoom);
+    this.zoom = newZoom;
     this.updateTransform();
   }
 
@@ -439,9 +464,18 @@ export class ImageViewer {
       'wheel',
       (e) => {
         e.preventDefault();
-        const zoomFactor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
-        const newZoom = Math.min(20, Math.max(0.05, this.zoom * zoomFactor));
+        const rect = viewport.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
 
+        const imgX = (mouseX - this.panX) / this.zoom;
+        const imgY = (mouseY - this.panY) / this.zoom;
+
+        const zoomFactor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
+        const newZoom = Math.min(64, Math.max(0.01, this.zoom * zoomFactor));
+
+        this.panX = Math.round(mouseX - imgX * newZoom);
+        this.panY = Math.round(mouseY - imgY * newZoom);
         this.zoom = newZoom;
         this.updateTransform();
       },
@@ -457,25 +491,40 @@ export class ImageViewer {
       e.preventDefault();
     });
 
-    window.addEventListener('mousemove', (e) => {
+    const onMouseMove = (e: MouseEvent) => {
       if (!this.isDragging) return;
-      this.panX = e.clientX - this.dragStartX;
-      this.panY = e.clientY - this.dragStartY;
+      this.panX = Math.round(e.clientX - this.dragStartX);
+      this.panY = Math.round(e.clientY - this.dragStartY);
       this.updateTransform();
-    });
+    };
 
-    window.addEventListener('mouseup', () => {
+    const onMouseUp = () => {
       if (this.isDragging) {
         this.isDragging = false;
         viewport.style.cursor = 'grab';
       }
+    };
+
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+    this.cleanups.push(() => {
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
     });
 
     viewport.addEventListener('dblclick', () => {
-      if (this.canvasEl && this.canvasEl.width && this.canvasEl.height) {
-        this.fitToViewport(this.canvasEl.width, this.canvasEl.height);
-      }
+      this.fitToViewport(this.imageWidth, this.imageHeight);
     });
+
+    if (typeof ResizeObserver !== 'undefined') {
+      const ro = new ResizeObserver(() => {
+        if (this.imageWidth && this.imageHeight && !this.isDragging) {
+          this.fitToViewport(this.imageWidth, this.imageHeight);
+        }
+      });
+      ro.observe(viewport);
+      this.cleanups.push(() => ro.disconnect());
+    }
   }
 
   private formatSize(bytes: number): string {
@@ -485,6 +534,11 @@ export class ImageViewer {
   }
 
   dispose() {
+    this.cleanups.forEach((fn) => {
+      try { fn(); } catch {}
+    });
+    this.cleanups = [];
+
     if (this.currentBlobUrl) {
       URL.revokeObjectURL(this.currentBlobUrl);
       this.currentBlobUrl = null;
