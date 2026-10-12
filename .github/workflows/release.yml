@@ -39,6 +39,16 @@ jobs:
           workspaces: './src-tauri -> target'
           key: ${{ hashFiles('src-tauri/icons/icon.ico') }}
 
+      - name: Cache Tauri NSIS / Build Tools
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~\AppData\Local\tauri
+            ~/.cache/tauri
+          key: ${{ runner.os }}-tauri-tools-${{ hashFiles('src-tauri/tauri.conf.json') }}
+          restore-keys: |
+            ${{ runner.os }}-tauri-tools-
+
       - name: Install dependencies
         run: npm ci
 
