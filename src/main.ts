@@ -182,11 +182,13 @@ async function boot() {
   let currentMarkers: monaco.editor.IMarkerData[] = [];
   let lintTimer = 0;
 
-  const runLint = () => {
+  const runLint = async () => {
     const model = editor.getModel();
     if (!model) return;
     const s = getSettings();
-    currentMarkers = lintModel(model, optionsFromSettings(s));
+    const baseMarkers = lintModel(model, optionsFromSettings(s));
+    const customMarkers = await pluginManager.runCustomLintRules(model);
+    currentMarkers = [...baseMarkers, ...customMarkers];
     monaco.editor.setModelMarkers(model, 'migoto-lint', currentMarkers);
 
     const errors = currentMarkers.filter((m) => m.severity === monaco.MarkerSeverity.Error);
@@ -194,7 +196,7 @@ async function boot() {
     const infos = currentMarkers.filter((m) => m.severity === monaco.MarkerSeverity.Info);
 
     if (currentMarkers.length === 0) {
-      lintBtn.textContent = '✓ 문제 없음';
+      lintBtn.textContent = '문제 없음';
       lintBtn.className = 'status-btn clean';
       lintBtn.title = s.lintEnabled ? '문서에 문법 오류가 없습니다' : '실시간 오류 검사가 꺼져 있습니다 (설정에서 켤 수 있습니다)';
     } else {
@@ -203,7 +205,8 @@ async function boot() {
       if (warnings.length > 0) parts.push(`경고 ${warnings.length}개`);
       if (infos.length > 0) parts.push(`알림 ${infos.length}개`);
 
-      lintBtn.textContent = `${errors.length > 0 ? '⛔ ' : warnings.length > 0 ? '⚠ ' : 'ℹ '}${parts.join(', ')}`;
+      const prefix = errors.length > 0 ? '[오류] ' : warnings.length > 0 ? '[경고] ' : '[알림] ';
+      lintBtn.textContent = `${prefix}${parts.join(', ')}`;
       lintBtn.className = `status-btn ${errors.length > 0 ? 'has-error' : warnings.length > 0 ? 'has-warn' : 'has-info'}`;
       lintBtn.title = '클릭하여 다음 문제 위치로 이동';
     }
@@ -214,11 +217,14 @@ async function boot() {
     lintTimer = window.setTimeout(runLint, 250);
   };
 
+  pluginManager.setLintTrigger(scheduleLint);
+
   editor.onDidChangeModelContent(scheduleLint);
   editor.onDidChangeModel(() => {
     scheduleLint();
     updatePos();
   });
+  doc.onChange(scheduleLint);
   onSettingsChange(runLint);
 
   lintBtn.addEventListener('click', jumpNextLint);

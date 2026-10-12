@@ -339,7 +339,8 @@ export function lintModel(model: TextModelLike, options: LintOptions): monaco.ed
 
     // 5. Resource / CommandList references
     // Keys like: run = CommandListX, post run = ..., pre run = ..., vb0 = ResourceX, ib = ResourceIB, ps-t0 = ResourceTexture
-    const resRefMatch = /^\s*(?:(?:pre\s+|post\s+)?run|vb\d+|ib|[a-z]{2}-[tu]\d+|Resource)\s*=\s*([a-zA-Z0-9_]+)/i.exec(code);
+    // or ZZMI slot fixes: Resource\ZZMI\Diffuse = ref ResourceCustom, run = CommandList\ZZMI\SetTextures
+    const resRefMatch = /^\s*(?:(?:pre\s+|post\s+)?run|vb\d+|ib|[a-z]{2}-[tu]\d+|Resource(?:\\[a-zA-Z0-9_]+)*)\s*=\s*(?:ref\s+)?([a-zA-Z0-9_\\]+)/i.exec(code);
     if (resRefMatch) {
       const target = resRefMatch[1].trim();
       const lowerTarget = target.toLowerCase();
@@ -379,6 +380,7 @@ export function lintModel(model: TextModelLike, options: LintOptions): monaco.ed
   // 6. Missing Resources check
   if (options.missingResources) {
     for (const ref of resourceRefs) {
+      if (isAllowedResource(ref.name)) continue;
       if (!sections.has(ref.name.toLowerCase())) {
         markers.push({
           severity: MarkerSeverity.Warning,
@@ -470,3 +472,24 @@ function checkConditionComparison(
     });
   }
 }
+
+let registeredAllowedResources: (string | RegExp)[] = [];
+
+export function registerAllowedResource(pattern: string | RegExp): () => void {
+  registeredAllowedResources.push(pattern);
+  return () => {
+    registeredAllowedResources = registeredAllowedResources.filter((p) => p !== pattern);
+  };
+}
+
+export function isAllowedResource(name: string): boolean {
+  return registeredAllowedResources.some((p) => {
+    if (typeof p === 'string') return p.toLowerCase() === name.toLowerCase();
+    return p.test(name);
+  });
+}
+
+export function clearAllowedResources(): void {
+  registeredAllowedResources = [];
+}
+

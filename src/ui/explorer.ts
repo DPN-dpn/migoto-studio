@@ -100,6 +100,49 @@ export class FileExplorer {
     return this.currentFolder?.name ?? '';
   }
 
+  hasFile(relativePath: string): boolean {
+    if (!this.currentFolder) return false;
+    let clean = relativePath.trim().replace(/^["']|["']$/g, '').trim().replace(/\\/g, '/').toLowerCase();
+    if (clean.startsWith('./')) clean = clean.slice(2);
+    if (!clean) return false;
+
+    const baseName = clean.split('/').pop() || clean;
+
+    const searchTree = (list: DirEntry[], prefix = ''): boolean => {
+      for (const entry of list) {
+        const curRel = prefix ? `${prefix}/${entry.name}` : entry.name;
+        const curLower = curRel.toLowerCase().replace(/\\/g, '/');
+        if (curLower === clean) return true;
+        if (curLower.endsWith(`/${clean}`)) return true;
+        if (!entry.isDir && entry.name.toLowerCase() === baseName && !clean.includes('/')) {
+          return true;
+        }
+        if (entry.isDir && entry.children) {
+          if (searchTree(entry.children, curRel)) return true;
+        }
+      }
+      return false;
+    };
+
+    return searchTree(this.entries);
+  }
+
+  getAllFilePaths(): string[] {
+    const result: string[] = [];
+    const traverse = (list: DirEntry[], prefix = '') => {
+      for (const entry of list) {
+        const rel = prefix ? `${prefix}/${entry.name}` : entry.name;
+        if (entry.isDir && entry.children) {
+          traverse(entry.children, rel);
+        } else if (!entry.isDir) {
+          result.push(rel);
+        }
+      }
+    };
+    traverse(this.entries);
+    return result;
+  }
+
   private bindGlobalEvents() {
     document.addEventListener('click', () => this.closeMenu());
     window.addEventListener('keydown', (e) => {

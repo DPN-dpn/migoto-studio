@@ -12,6 +12,14 @@ import assetViewerPlugin from './builtin/asset-viewer/index.ts';
 import aiAssistantManifestData from './builtin/ai-assistant/plugin.json' with { type: 'json' };
 import aiAssistantPlugin from './builtin/ai-assistant/index.ts';
 
+// 4. Resource Checker
+import resourceCheckerManifestData from './builtin/resource-checker/plugin.json' with { type: 'json' };
+import resourceCheckerPlugin from './builtin/resource-checker/index.ts';
+
+// 5. ZZMI Support
+import zzmiSupportManifestData from './builtin/zzmi-support/plugin.json' with { type: 'json' };
+import zzmiSupportPlugin from './builtin/zzmi-support/index.ts';
+
 export interface BuiltinPluginDef {
   manifest: PluginManifest;
   createPlugin: () => MigotoPlugin;
@@ -30,5 +38,13 @@ export const BUILTIN_PLUGINS: BuiltinPluginDef[] = [
   {
     manifest: aiAssistantManifestData as PluginManifest,
     createPlugin: () => aiAssistantPlugin,
+  },
+  {
+    manifest: resourceCheckerManifestData as PluginManifest,
+    createPlugin: () => resourceCheckerPlugin,
+  },
+  {
+    manifest: zzmiSupportManifestData as PluginManifest,
+    createPlugin: () => zzmiSupportPlugin,
   },
 ];

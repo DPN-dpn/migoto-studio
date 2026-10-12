@@ -8,6 +8,7 @@ import {
   exportGroupTemplates,
   importTemplates,
   initCustomTemplates,
+  onTemplatesChange,
 } from '../core/templates';
 import { openModal } from './modal';
 
@@ -56,6 +57,7 @@ export class TemplatePanel {
     private root: HTMLElement,
     private editor: monaco.editor.IStandaloneCodeEditor,
   ) {
+    onTemplatesChange(() => this.render());
     this.render();
   }
 

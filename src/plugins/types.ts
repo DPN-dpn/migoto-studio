@@ -20,6 +20,38 @@ export interface SelectOption {
 import type { DirEntry } from '../platform/types.ts';
 export type { DirEntry };
 
+export interface LintDiagnostic {
+  severity: 'error' | 'warning' | 'info';
+  message: string;
+  startLineNumber: number;
+  startColumn: number;
+  endLineNumber: number;
+  endColumn: number;
+}
+
+export interface CustomLintRule {
+  id: string;
+  name: string;
+  check: (context: {
+    model: {
+      getLineCount(): number;
+      getLineContent(lineNumber: number): string;
+      getValue(): string;
+    };
+    file: { name: string; path: string; location: string } | null;
+    folder: string | null;
+    fileExists: (relativePath: string) => Promise<boolean>;
+  }) => Promise<LintDiagnostic[]> | LintDiagnostic[];
+}
+
+export interface PluginTemplate {
+  id?: string;
+  label: string;
+  description: string;
+  body: string;
+  group: string;
+}
+
 export interface PluginContext {
   manifest: PluginManifest;
 
@@ -38,6 +70,7 @@ export interface PluginContext {
     onDidChangeCursor(listener: (cursor: { lineNumber: number; column: number }) => void): () => void;
     registerContextMenuAction(options: { id: string; label: string; onClick: () => void }): () => void;
     registerCustomViewer(options: CustomViewerDefinition): void;
+    registerLintRule(rule: CustomLintRule): () => void;
   };
 
   // ---- Workspace & files ----
@@ -54,6 +87,17 @@ export interface PluginContext {
     pickFile(options?: { extensions?: string[]; title?: string }): Promise<string | null>;
     showInFolder(path: string): Promise<void>;
     onDidChangeActiveFile(listener: (file: { name: string; path: string; location: string } | null) => void): () => void;
+  };
+
+  // ---- Linter & Diagnostics ----
+  linter: {
+    registerRule(rule: CustomLintRule): () => void;
+    registerAllowedResource(resourceOrPattern: string | RegExp): () => void;
+  };
+
+  // ---- Templates ----
+  templates: {
+    registerTemplate(template: PluginTemplate): () => void;
   };
 
   // ---- UI integration ----

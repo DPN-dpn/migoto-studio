@@ -2212,9 +2212,32 @@ input:checked + .slider:before {
   border-color: var(--accent);
 }
 
+.plugin-stats-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
 .plugin-stats-hint {
   font-size: 11px;
   color: var(--fg-dim);
+}
+
+.plugin-toggle-all-btn {
+  font-size: 11px;
+  padding: 2px 8px;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--fg-dim);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.plugin-toggle-all-btn:hover {
+  color: var(--fg);
+  border-color: var(--accent);
 }
 
 .plugin-section-header {
@@ -2240,11 +2263,58 @@ input:checked + .slider:before {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  transition: border-color 0.15s;
+  transition: border-color 0.15s, padding 0.15s;
 }
 
 .plugin-card.is-enabled {
   border-color: rgba(99, 102, 241, 0.35);
+}
+
+.plugin-card.is-collapsed {
+  padding: 7px 10px;
+  gap: 0;
+}
+
+.plugin-card.is-collapsed .plugin-card-body {
+  display: none;
+}
+
+.plugin-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.plugin-collapse-btn {
+  background: transparent;
+  border: none;
+  color: var(--fg-dim);
+  cursor: pointer;
+  padding: 2px 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 3px;
+  margin-right: 2px;
+  transition: color 0.15s, background-color 0.15s;
+}
+
+.plugin-collapse-btn:hover {
+  color: var(--fg);
+  background: var(--bg-hover);
+}
+
+.plugin-collapse-btn svg {
+  display: block;
+}
+
+.plugin-title-content {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+  user-select: none;
 }
 
 .plugin-card-top {

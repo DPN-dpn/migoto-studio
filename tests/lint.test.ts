@@ -1,6 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { lintModel, stripComments, MarkerSeverity, type TextModelLike, type LintOptions } from '../src/core/lint.ts';
+import {
+  lintModel,
+  stripComments,
+  MarkerSeverity,
+  registerAllowedResource,
+  clearAllowedResources,
+  type TextModelLike,
+  type LintOptions,
+} from '../src/core/lint.ts';
 
 function createMockModel(content: string): TextModelLike {
   const lines = content.split(/\r?\n/);
@@ -124,3 +132,57 @@ filename = Meshes/Body.ib
   assert.equal(errors.length, 0, 'No errors in valid sample');
   assert.equal(warnings.length, 0, 'No warnings in valid sample');
 });
+
+test('ZZMI CommandList and SlotFix is recognized as valid when allowed', () => {
+  clearAllowedResources();
+  const unregister1 = registerAllowedResource(/^commandlist\\zzmi\\/i);
+  const unregister2 = registerAllowedResource(/^resource\\zzmi\\/i);
+
+  const zzmiIni = `
+[TextureOverrideEllen]
+hash = 12345678
+Resource\\ZZMI\\Diffuse = ref ResourceCustomDiffuse
+Resource\\ZZMI\\NormalMap = ref ResourceCustomNormalMap
+Resource\\ZZMI\\LightMap = ref ResourceCustomLightMap
+Resource\\ZZMI\\MaterialMap = ref ResourceCustomMaterialMap
+Resource\\ZZMI\\WEngineFX = ref ResourceCustomWEngineFX
+run = CommandList\\ZZMI\\SetTextures
+
+[ResourceCustomDiffuse]
+filename = Textures/Diffuse.dds
+
+[ResourceCustomNormalMap]
+filename = Textures/NormalMap.dds
+
+[ResourceCustomLightMap]
+filename = Textures/LightMap.dds
+
+[ResourceCustomMaterialMap]
+filename = Textures/MaterialMap.dds
+
+[ResourceCustomWEngineFX]
+filename = Textures/WEngineFX.dds
+`;
+
+  const model = createMockModel(zzmiIni);
+  const markers = lintModel(model, {
+    ...defaultOptions,
+    unusedItems: false,
+  });
+
+  const errors = markers.filter((m) => m.severity === MarkerSeverity.Error);
+  const warnings = markers.filter((m) => m.severity === MarkerSeverity.Warning);
+  assert.equal(errors.length, 0, 'No errors in valid ZZMI snippet');
+  assert.equal(warnings.length, 0, 'No warnings in valid ZZMI snippet');
+
+  unregister1();
+  unregister2();
+
+  // Once unregistered, CommandList\ZZMI\SetTextures should report missing section
+  const markersWithoutZZMI = lintModel(model, {
+    ...defaultOptions,
+    unusedItems: false,
+  });
+  assert.ok(markersWithoutZZMI.some((m) => m.message.includes('CommandList\\ZZMI\\SetTextures')));
+});
+

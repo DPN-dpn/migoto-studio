@@ -4,13 +4,50 @@ import type { PluginManager, PluginInstance } from '../plugins';
 export class PluginPanel {
   private searchQuery: string = '';
   private showCreateForm: boolean = false;
+  private collapsedPlugins: Set<string> = new Set();
 
   constructor(
     private root: HTMLElement,
     private manager: PluginManager,
   ) {
+    try {
+      const stored = localStorage.getItem('migoto_plugins_collapsed');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed)) {
+          this.collapsedPlugins = new Set(parsed);
+        }
+      }
+    } catch {}
+
     this.manager.onChange(() => this.render());
     this.render();
+  }
+
+  private toggleCollapse(id: string) {
+    if (this.collapsedPlugins.has(id)) {
+      this.collapsedPlugins.delete(id);
+    } else {
+      this.collapsedPlugins.add(id);
+    }
+    this.saveCollapsedState();
+    this.render();
+  }
+
+  private toggleAllCollapse(plugins: PluginInstance[]) {
+    if (this.collapsedPlugins.size >= plugins.length) {
+      this.collapsedPlugins.clear();
+    } else {
+      this.collapsedPlugins = new Set(plugins.map((p) => p.manifest.id));
+    }
+    this.saveCollapsedState();
+    this.render();
+  }
+
+  private saveCollapsedState() {
+    try {
+      localStorage.setItem('migoto_plugins_collapsed', JSON.stringify(Array.from(this.collapsedPlugins)));
+    } catch {}
   }
 
   private render() {
@@ -140,8 +177,8 @@ export class PluginPanel {
       const iconInput = document.createElement('input');
       iconInput.type = 'text';
       iconInput.className = 'plugin-input';
-      iconInput.value = '🧩';
-      iconInput.placeholder = '아이콘 이모지 (기본값: 🧩)';
+      iconInput.value = 'PLG';
+      iconInput.placeholder = '아이콘 약어 (기본값: PLG)';
       iconRow.append(iconLabel, iconInput);
 
       const authorRow = document.createElement('div');
@@ -180,7 +217,7 @@ export class PluginPanel {
       submitBtn.onclick = async () => {
         const id = idInput.value.trim();
         const name = nameInput.value.trim();
-        const icon = iconInput.value.trim() || '🧩';
+        const icon = iconInput.value.trim() || 'PLG';
         const author = authorInput.value.trim() || '사용자';
         const location = locInput.value.trim() || '좌측 사이드바 탭';
         const description = descInput.value.trim();
@@ -228,7 +265,7 @@ export class PluginPanel {
       container.append(createBox);
     }
 
-    // 2.3 Search bar & Stats
+    // 2.3 Search bar & Stats Row
     const searchWrap = document.createElement('div');
     searchWrap.className = 'plugin-search-wrap';
 
@@ -243,11 +280,22 @@ export class PluginPanel {
     };
 
     const activeCount = plugins.filter((p) => p.enabled).length;
+    const statsRow = document.createElement('div');
+    statsRow.className = 'plugin-stats-row';
+
     const statsHint = document.createElement('div');
     statsHint.className = 'plugin-stats-hint';
     statsHint.textContent = `전체 ${plugins.length}개 중 ${activeCount}개 활성화`;
 
-    searchWrap.append(searchInput, statsHint);
+    const isAllCollapsed = plugins.length > 0 && this.collapsedPlugins.size >= plugins.length;
+    const toggleAllBtn = document.createElement('button');
+    toggleAllBtn.className = 'plugin-toggle-all-btn';
+    toggleAllBtn.textContent = isAllCollapsed ? '모두 펼치기' : '모두 접기';
+    toggleAllBtn.title = isAllCollapsed ? '모든 플러그인 상세 내용 표시' : '모든 플러그인을 한 줄로 간략히 보기';
+    toggleAllBtn.onclick = () => this.toggleAllCollapse(plugins);
+
+    statsRow.append(statsHint, toggleAllBtn);
+    searchWrap.append(searchInput, statsRow);
     container.append(searchWrap);
 
     // 2.4 Plugin Cards List
@@ -286,20 +334,42 @@ export class PluginPanel {
   }
 
   private createPluginCard(p: PluginInstance, index: number, total: number): HTMLElement {
+    const isCollapsed = this.collapsedPlugins.has(p.manifest.id);
     const card = document.createElement('div');
-    card.className = `plugin-card${p.enabled ? ' is-enabled' : ''}`;
+    card.className = `plugin-card${p.enabled ? ' is-enabled' : ''}${isCollapsed ? ' is-collapsed' : ''}`;
 
     const topRow = document.createElement('div');
     topRow.className = 'plugin-card-top';
 
     const iconName = document.createElement('div');
     iconName.className = 'plugin-card-title';
-    iconName.innerHTML = `
+
+    // Collapse toggle chevron button
+    const chevronBtn = document.createElement('button');
+    chevronBtn.className = 'plugin-collapse-btn';
+    chevronBtn.title = isCollapsed ? '상세 정보 펼치기' : '간략히 접기';
+    chevronBtn.setAttribute('aria-label', isCollapsed ? '펼치기' : '접기');
+    chevronBtn.innerHTML = isCollapsed
+      ? `<svg viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 4 10 8 6 12"></polyline></svg>`
+      : `<svg viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 6 8 10 12 6"></polyline></svg>`;
+    chevronBtn.onclick = (e) => {
+      e.stopPropagation();
+      this.toggleCollapse(p.manifest.id);
+    };
+    iconName.append(chevronBtn);
+
+    const titleClickArea = document.createElement('span');
+    titleClickArea.className = 'plugin-title-content';
+    titleClickArea.style.cursor = 'pointer';
+    titleClickArea.title = isCollapsed ? '클릭하여 상세 정보 펼치기' : '클릭하여 간략히 접기';
+    titleClickArea.innerHTML = `
       <span class="plugin-order-num">${index + 1}.</span>
-      <span class="plugin-icon">${p.manifest.icon || '🧩'}</span>
+      <span class="plugin-icon">${p.manifest.icon || 'PLG'}</span>
       <strong class="plugin-name">${p.manifest.name}</strong>
       <span class="plugin-version">v${p.manifest.version}</span>
     `;
+    titleClickArea.onclick = () => this.toggleCollapse(p.manifest.id);
+    iconName.append(titleClickArea);
 
     // Right controls: order buttons + toggle switch + (delete button if not builtin)
     const rightControls = document.createElement('div');
@@ -377,6 +447,10 @@ export class PluginPanel {
 
     topRow.append(iconName, rightControls);
 
+    // Card Body (hidden when collapsed)
+    const cardBody = document.createElement('div');
+    cardBody.className = 'plugin-card-body';
+
     const desc = document.createElement('p');
     desc.className = 'plugin-desc';
     desc.textContent = p.manifest.description || '설명이 없습니다.';
@@ -396,14 +470,16 @@ export class PluginPanel {
       ${p.enabled ? '<span class="plugin-status-badge enabled">활성</span>' : '<span class="plugin-status-badge disabled">비활성</span>'}
     `;
 
-    card.append(topRow, desc, locRow, metaRow);
+    cardBody.append(desc, locRow, metaRow);
 
     if (p.error) {
       const errEl = document.createElement('div');
       errEl.className = 'plugin-error-notice';
       errEl.textContent = `오류: ${p.error}`;
-      card.append(errEl);
+      cardBody.append(errEl);
     }
+
+    card.append(topRow, cardBody);
 
     return card;
   }

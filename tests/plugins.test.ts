@@ -58,10 +58,10 @@ test('PluginContext contract supports extended editor and workspace capabilities
   assert.ok(invoked);
 });
 
-test('BUILTIN_PLUGINS registers 3 default plugins with unique IDs', () => {
-  assert.equal(BUILTIN_PLUGINS.length, 3);
+test('BUILTIN_PLUGINS registers 5 default plugins with unique IDs', () => {
+  assert.equal(BUILTIN_PLUGINS.length, 5);
   const ids = BUILTIN_PLUGINS.map((p) => p.manifest.id);
-  assert.deepEqual(ids, ['python-runner', 'asset-viewer', 'ai-assistant']);
+  assert.deepEqual(ids, ['python-runner', 'asset-viewer', 'ai-assistant', 'resource-checker', 'zzmi-support']);
 
   for (const p of BUILTIN_PLUGINS) {
     assert.ok(p.manifest.name);
@@ -258,4 +258,107 @@ test('validatePluginZip throws when script is missing', () => {
   });
   assert.throws(() => validatePluginZip(zip), /실행 스크립트.*없습니다/);
 });
+
+test('resource-checker plugin activates and registers lint rule and sidebar view', async () => {
+  const def = BUILTIN_PLUGINS.find((p) => p.manifest.id === 'resource-checker')!;
+  assert.ok(def);
+  const plugin = def.createPlugin();
+
+  let registeredRule: any = null;
+  let registeredView: any = null;
+
+  const mockContext: any = {
+    manifest: def.manifest,
+    linter: {
+      registerRule: (rule: any) => {
+        registeredRule = rule;
+      },
+    },
+    ui: {
+      registerSidebarView: (view: any) => {
+        registeredView = view;
+      },
+    },
+    workspace: {
+      getCurrentFolder: () => 'D:/Mods/Test',
+      getCurrentFile: () => ({ name: 'test.ini', path: 'D:/Mods/Test/test.ini', location: 'disk' }),
+      readDirectory: async () => [],
+    },
+    editor: {
+      getText: () => 'filename = Meshes/NotExist.buf\n',
+      setCursor: () => {},
+    },
+  };
+
+  plugin.activate(mockContext);
+  assert.ok(registeredRule);
+  assert.equal(registeredRule.id, 'missing-resource-files');
+  assert.ok(registeredView);
+  assert.equal(registeredView.id, 'resource-checker-view');
+
+  // Test rule check execution
+  const diags = await registeredRule.check({
+    model: {
+      getLineCount: () => 1,
+      getLineContent: () => 'filename = Meshes/NotExist.buf',
+    },
+    folder: 'D:/Mods/Test',
+    fileExists: async () => false,
+  });
+  assert.equal(diags.length, 1);
+  assert.equal(diags[0].severity, 'warning');
+  assert.ok(diags[0].message.includes('Meshes/NotExist.buf'));
+
+  // Test when file exists
+  const diagsOk = await registeredRule.check({
+    model: {
+      getLineCount: () => 1,
+      getLineContent: () => 'filename = Meshes/Exists.buf',
+    },
+    folder: 'D:/Mods/Test',
+    fileExists: async () => true,
+  });
+  assert.equal(diagsOk.length, 0);
+});
+
+test('zzmi-support plugin activates and registers allowed resource and code template', () => {
+  const def = BUILTIN_PLUGINS.find((p) => p.manifest.id === 'zzmi-support')!;
+  assert.ok(def);
+  const plugin = def.createPlugin();
+
+  const allowedResources: any[] = [];
+  let registeredTemplate: any = null;
+  let registeredView: any = null;
+
+  const mockContext: any = {
+    manifest: def.manifest,
+    linter: {
+      registerAllowedResource: (pattern: any) => {
+        allowedResources.push(pattern);
+      },
+    },
+    templates: {
+      registerTemplate: (template: any) => {
+        registeredTemplate = template;
+      },
+    },
+    ui: {
+      registerSidebarView: (view: any) => {
+        registeredView = view;
+      },
+    },
+    editor: {
+      insertText: () => {},
+    },
+  };
+
+  plugin.activate(mockContext);
+  assert.ok(allowedResources.length >= 2);
+  assert.ok(registeredTemplate);
+  assert.equal(registeredTemplate.id, 'zzmi_slot_fix');
+  assert.ok(registeredTemplate.body.includes('CommandList\\ZZMI\\SetTextures'));
+  assert.ok(registeredTemplate.body.includes('Resource\\ZZMI\\WEngineFX'));
+  assert.ok(registeredView);
+});
+
 

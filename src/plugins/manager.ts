@@ -7,12 +7,16 @@ import { openModal } from '../ui/modal';
 import { showToast } from '../ui/toast';
 import { BUILTIN_PLUGINS } from './builtin';
 import type { ActivityBar } from '../ui/activitybar';
+import { registerAllowedResource } from '../core/lint';
+import { registerPluginTemplate } from '../core/templates';
 import type {
+  CustomLintRule,
   CustomViewerDefinition,
   MigotoPlugin,
   PluginContext,
   PluginInstance,
   PluginManifest,
+  PluginTemplate,
   RegisteredSidebarView,
 } from './types';
 import { createUIBuilder } from './ui-builder';
@@ -38,6 +42,8 @@ export class PluginManager {
   private listeners: Set<() => void> = new Set();
   private statusBarEl: HTMLElement | null = null;
   private pluginStatusBarItems: Map<string, HTMLElement> = new Map();
+  private customLintRules: Map<string, CustomLintRule> = new Map();
+  private lintTrigger?: () => void;
 
   private doc: DocumentManager;
   private editor: monaco.editor.IStandaloneCodeEditor;
@@ -56,6 +62,14 @@ export class PluginManager {
     this.activityBar = activityBar;
     this.statusBarEl = document.getElementById('statusbar');
     this.doc.setViewerProvider(this);
+  }
+
+  setLintTrigger(fn: () => void): void {
+    this.lintTrigger = fn;
+  }
+
+  triggerLint(): void {
+    this.lintTrigger?.();
   }
 
   getCustomViewer(ext: string): CustomViewerDefinition | undefined {
@@ -126,6 +140,92 @@ export class PluginManager {
     this.saveStoredPluginOrder(order);
     this.activityBar?.reorderDynamicTabs(order);
     this.notify();
+  }
+
+  async checkFileExists(relPath: string): Promise<boolean> {
+    if (this.explorer && this.explorer.hasFolder) {
+      if (this.explorer.hasFile(relPath)) return true;
+    }
+
+    let clean = relPath.trim().replace(/^["']|["']$/g, '').trim().replace(/\\/g, '/');
+    if (clean.startsWith('./')) clean = clean.slice(2);
+    if (!clean) return false;
+
+    const curFolder = this.explorer && this.explorer.hasFolder ? (this.explorer as any).currentFolder?.id ?? null : null;
+    if (curFolder && platform().readBinaryFile) {
+      try {
+        const full = `${curFolder.replace(/\\/g, '/')}/${clean}`;
+        const buf = await platform().readBinaryFile!(full);
+        if (buf && buf.length >= 0) return true;
+      } catch {}
+    }
+
+    const curFile = this.doc.file?.id;
+    if (curFile && platform().readBinaryFile) {
+      const lastSlash = Math.max(curFile.lastIndexOf('/'), curFile.lastIndexOf('\\'));
+      if (lastSlash > 0) {
+        const iniDir = curFile.substring(0, lastSlash);
+        try {
+          const full2 = `${iniDir.replace(/\\/g, '/')}/${clean}`;
+          const buf2 = await platform().readBinaryFile!(full2);
+          if (buf2 && buf2.length >= 0) return true;
+        } catch {}
+      }
+    }
+
+    return false;
+  }
+
+  async runCustomLintRules(model: monaco.editor.ITextModel): Promise<monaco.editor.IMarkerData[]> {
+    if (this.customLintRules.size === 0) return [];
+    const markers: monaco.editor.IMarkerData[] = [];
+    const curFile = this.doc.file ? {
+      name: this.doc.fileName,
+      path: this.doc.file.id,
+      location: this.doc.file.location,
+    } : null;
+    const curFolder = this.explorer && this.explorer.hasFolder ? (this.explorer as any).currentFolder?.id ?? null : null;
+
+    const fileExistsHelper = async (relPath: string): Promise<boolean> => {
+      return this.checkFileExists(relPath);
+    };
+
+    const ctx = {
+      model: {
+        getLineCount: () => model.getLineCount(),
+        getLineContent: (n: number) => model.getLineContent(n),
+        getValue: () => model.getValue(),
+      },
+      file: curFile,
+      folder: curFolder,
+      fileExists: fileExistsHelper,
+    };
+
+    for (const rule of this.customLintRules.values()) {
+      try {
+        const diags = await rule.check(ctx);
+        for (const d of diags) {
+          const sev = d.severity === 'error'
+            ? monaco.MarkerSeverity.Error
+            : d.severity === 'info'
+            ? monaco.MarkerSeverity.Info
+            : monaco.MarkerSeverity.Warning;
+
+          markers.push({
+            severity: sev,
+            message: d.message,
+            startLineNumber: d.startLineNumber,
+            startColumn: d.startColumn,
+            endLineNumber: d.endLineNumber,
+            endColumn: d.endColumn,
+          });
+        }
+      } catch (err) {
+        console.warn(`[PluginManager] Custom lint rule "${rule.name}" failed:`, err);
+      }
+    }
+
+    return markers;
   }
 
   getSidebarViews(): RegisteredSidebarView[] {
@@ -357,6 +457,7 @@ export class PluginManager {
     }
 
     this.notify();
+    this.triggerLint();
   }
 
   isEnabled(pluginId: string): boolean {
@@ -656,6 +757,17 @@ export default {
         registerCustomViewer: (viewer: CustomViewerDefinition) => {
           callbacks.onRegisterCustomViewer(viewer);
         },
+        registerLintRule: (rule: CustomLintRule) => {
+          const ruleKey = `${manifest.id}:${rule.id}`;
+          this.customLintRules.set(ruleKey, rule);
+          this.triggerLint();
+          const cleanup = () => {
+            this.customLintRules.delete(ruleKey);
+            this.triggerLint();
+          };
+          callbacks.onRegisterCleanup(cleanup);
+          return cleanup;
+        },
       },
 
       workspace: {
@@ -734,6 +846,41 @@ export default {
           });
           callbacks.onRegisterCleanup(unlisten);
           return unlisten;
+        },
+      },
+
+      linter: {
+        registerRule: (rule: CustomLintRule) => {
+          const ruleKey = `${manifest.id}:${rule.id}`;
+          this.customLintRules.set(ruleKey, rule);
+          this.triggerLint();
+          const cleanup = () => {
+            this.customLintRules.delete(ruleKey);
+            this.triggerLint();
+          };
+          callbacks.onRegisterCleanup(cleanup);
+          return cleanup;
+        },
+        registerAllowedResource: (pattern: string | RegExp) => {
+          const unregister = registerAllowedResource(pattern);
+          this.triggerLint();
+          const cleanup = () => {
+            unregister();
+            this.triggerLint();
+          };
+          callbacks.onRegisterCleanup(cleanup);
+          return cleanup;
+        },
+      },
+
+      templates: {
+        registerTemplate: (template: PluginTemplate) => {
+          const unregister = registerPluginTemplate(template);
+          const cleanup = () => {
+            unregister();
+          };
+          callbacks.onRegisterCleanup(cleanup);
+          return cleanup;
         },
       },
 

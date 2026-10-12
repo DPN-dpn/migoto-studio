@@ -116,6 +116,34 @@ export async function initCustomTemplates(): Promise<Template[]> {
   return getCustomTemplates();
 }
 
+const templateListeners = new Set<() => void>();
+export function onTemplatesChange(listener: () => void): () => void {
+  templateListeners.add(listener);
+  return () => templateListeners.delete(listener);
+}
+function notifyTemplatesChange() {
+  for (const fn of templateListeners) {
+    try { fn(); } catch {}
+  }
+}
+
+let pluginTemplatesCache: Template[] = [];
+
+export function registerPluginTemplate(t: Template): () => void {
+  const id = t.id || `plugin_t_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+  const templateWithId = { ...t, id };
+  pluginTemplatesCache.push(templateWithId);
+  notifyTemplatesChange();
+  return () => {
+    pluginTemplatesCache = pluginTemplatesCache.filter((item) => item !== templateWithId && item.id !== id);
+    notifyTemplatesChange();
+  };
+}
+
+export function getPluginTemplates(): Template[] {
+  return [...pluginTemplatesCache];
+}
+
 /** Persist custom templates to both localStorage and AppData (templates.json) */
 function persistCustomTemplates(list: Template[]): void {
   customTemplatesCache = list.map((t) => ({ ...t, isCustom: true }));
@@ -129,6 +157,7 @@ function persistCustomTemplates(list: Template[]): void {
       console.warn('Failed to save templates to AppData:', err);
     });
   }
+  notifyTemplatesChange();
 }
 
 /** Retrieve user-created custom templates from memory / AppData / localStorage */
@@ -176,9 +205,9 @@ export function deleteCustomTemplate(id: string): void {
   persistCustomTemplates(list);
 }
 
-/** Returns all templates: user custom templates first, then built-in, then upstream */
+/** Returns all templates: user custom templates first, then plugin templates, then built-in, then upstream */
 export function getAllTemplates(): Template[] {
-  return [...getCustomTemplates(), ...OWN_TEMPLATES, ...upstreamTemplates()];
+  return [...getCustomTemplates(), ...pluginTemplatesCache, ...OWN_TEMPLATES, ...upstreamTemplates()];
 }
 
 /** Export ONLY custom/user-added templates belonging to a specific group as JSON string */
