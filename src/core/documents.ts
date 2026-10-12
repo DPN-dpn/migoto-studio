@@ -251,7 +251,13 @@ export class DocumentManager {
           const placeholder = document.createElement('div');
           placeholder.className = 'binary-file-placeholder';
           placeholder.innerHTML = `
-            <div class="binary-placeholder-icon">📦</div>
+            <div class="binary-placeholder-icon">
+              <svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+                <line x1="12" y1="22.08" x2="12" y2="12"></line>
+              </svg>
+            </div>
             <div class="binary-placeholder-title">${target.title}</div>
             <div class="binary-placeholder-desc">바이너리 파일이거나 열 수 있는 전용 뷰어가 없습니다.</div>
           `;

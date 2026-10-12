@@ -759,6 +759,10 @@ button.primary:hover { filter: brightness(1.1); background: var(--accent); }
   flex-shrink: 0;
   color: var(--fg-dim);
   transition: transform 0.15s ease;
+  transform: rotate(0deg);
+}
+
+.tree-chevron.expanded {
   transform: rotate(90deg);
 }
 
@@ -773,9 +777,42 @@ button.primary:hover { filter: brightness(1.1); background: var(--accent); }
 }
 
 .tree-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
   font-size: 12px;
   line-height: 1;
   flex-shrink: 0;
+}
+
+.tree-icon.dir-icon {
+  color: #eab308;
+}
+
+.tree-icon.dir-icon.is-open {
+  color: #facc15;
+}
+
+.tree-icon.file-icon.is-ini {
+  color: var(--accent);
+}
+
+.tree-icon.file-icon.is-img {
+  color: #38bdf8;
+}
+
+.tree-label.dir-label {
+  font-weight: 500;
+  color: var(--fg);
+}
+
+.tree-empty-hint {
+  font-size: 11px;
+  color: var(--fg-dim);
+  font-style: italic;
+  pointer-events: none;
 }
 
 .tree-label {
@@ -2813,6 +2850,124 @@ input:checked + .slider:before {
   font-weight: 500;
 }
 
+/* ============================================================================
+   Workspace Trust Modal (작업자 신뢰 확인)
+   ============================================================================ */
 
+.trust-modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 540px;
+  user-select: none;
+}
 
+.trust-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 12px 14px;
+  background: rgba(234, 179, 8, 0.08);
+  border: 1px solid rgba(234, 179, 8, 0.25);
+  border-radius: 8px;
+}
 
+.trust-shield-icon {
+  color: #eab308;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.trust-title-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.trust-main-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--fg);
+}
+
+.trust-sub-title {
+  font-size: 12px;
+  color: var(--fg-dim);
+  line-height: 1.45;
+}
+
+.trust-info-box {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.trust-info-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.trust-info-label {
+  color: var(--fg-dim);
+  width: 65px;
+  flex-shrink: 0;
+}
+
+.trust-info-val {
+  color: var(--fg);
+  word-break: break-all;
+}
+
+.trust-info-path {
+  font-family: 'Cascadia Code', Consolas, monospace;
+  font-size: 11px;
+  color: var(--accent);
+  background: var(--bg);
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  word-break: break-all;
+}
+
+.trust-opt-wrap {
+  display: flex;
+  align-items: center;
+}
+
+.trust-opt-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--fg);
+  cursor: pointer;
+}
+
+.trust-opt-label input[type='checkbox'] {
+  cursor: pointer;
+}
+
+.trust-notice {
+  font-size: 11px;
+  color: var(--fg-dim);
+  line-height: 1.4;
+}
+
+.trust-actions-row {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.trust-btn {
+  padding: 7px 16px;
+  font-size: 12px;
+  font-weight: 500;
+}

@@ -42,7 +42,16 @@ export const desktop: Platform = {
   },
 
   async readDirectory(id: string): Promise<DirEntry[]> {
-    return invoke<DirEntry[]>('read_directory', { path: id, maxDepth: 5 });
+    const raw = await invoke<any[]>('read_directory', { path: id, maxDepth: 8 });
+    const mapEntry = (e: any): DirEntry => ({
+      name: e.name,
+      path: e.path,
+      id: e.id || e.path,
+      isDir: Boolean(e.isDir ?? e.is_dir),
+      size: typeof e.size === 'number' ? e.size : 0,
+      children: Array.isArray(e.children) ? e.children.map(mapEntry) : undefined,
+    });
+    return Array.isArray(raw) ? raw.map(mapEntry) : [];
   },
 
   async showInFolder(path: string) {
@@ -60,6 +69,8 @@ export const desktop: Platform = {
   async deleteEntry(path: string) {
     await invoke('delete_entry', { path });
   },
+
+  isPathDir: (path: string) => invoke<boolean>('is_directory', { path }),
 
   refFromId: refFromPath,
 

@@ -1,6 +1,8 @@
 import { platform, type DirEntry, type FileRef } from '../platform';
 import type { DocumentManager } from '../core/documents';
 import { showToast } from './toast';
+import { promptFolderTrust } from './trust-modal';
+import { isFolderTrusted } from '../core/trust';
 
 const STORAGE_LAST_FOLDER = 'migoto_last_folder';
 
@@ -8,6 +10,49 @@ export interface FolderRef {
   name: string;
   id: string;
 }
+
+const CHEVRON_SVG = `
+  <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <polyline points="6 4 10 8 6 12"></polyline>
+  </svg>
+`;
+
+const DIR_CLOSED_SVG = `
+  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+  </svg>
+`;
+
+const DIR_OPEN_SVG = `
+  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7l-2-2H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2z"></path>
+    <path d="M2 14l2.5-6h15l-2.5 6H2z"></path>
+  </svg>
+`;
+
+const FILE_INI_SVG = `
+  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+    <polyline points="14 2 14 8 20 8"></polyline>
+    <line x1="16" y1="13" x2="8" y2="13"></line>
+    <line x1="16" y1="17" x2="8" y2="17"></line>
+  </svg>
+`;
+
+const FILE_IMAGE_SVG = `
+  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+    <circle cx="8.5" cy="8.5" r="1.5"></circle>
+    <polyline points="21 15 16 10 5 21"></polyline>
+  </svg>
+`;
+
+const FILE_GENERIC_SVG = `
+  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+    <polyline points="14 2 14 8 20 8"></polyline>
+  </svg>
+`;
 
 /**
  * File tree explorer for XXMI / 3DMigoto mod folders.
@@ -18,7 +63,7 @@ export interface FolderRef {
 export class FileExplorer {
   private currentFolder: FolderRef | null = null;
   private entries: DirEntry[] = [];
-  private collapsedDirs = new Set<string>();
+  private expandedDirs = new Set<string>();
   private filter = '';
   private activeFilePath: string | null = null;
   private isLoading = false;
@@ -72,7 +117,10 @@ export class FileExplorer {
       const saved = localStorage.getItem(STORAGE_LAST_FOLDER);
       if (saved) {
         const name = saved.split(/[\\/]/).filter(Boolean).pop() ?? saved;
-        await this.openFolder({ id: saved, name });
+        const folder = { id: saved, name };
+        if (isFolderTrusted(folder.id)) {
+          await this.openFolder(folder, true);
+        }
       }
     } catch {}
   }
@@ -81,28 +129,64 @@ export class FileExplorer {
     try {
       const picked = await platform().pickDirectory();
       if (picked) {
-        await this.openFolder(picked);
+        const trusted = await promptFolderTrust(picked);
+        if (trusted) {
+          await this.openFolder(picked, true);
+        }
       }
     } catch (e) {
       await platform().showError('폴더 열기 실패', String(e));
     }
   }
 
-  async openFolder(folder: FolderRef): Promise<void> {
+  async openFolder(folder: FolderRef, skipTrustCheck = false): Promise<void> {
+    if (!skipTrustCheck && !isFolderTrusted(folder.id)) {
+      const trusted = await promptFolderTrust(folder);
+      if (!trusted) return;
+    }
     this.currentFolder = folder;
-    this.collapsedDirs.clear();
+    this.expandedDirs.clear();
     this.filter = '';
     try {
       localStorage.setItem(STORAGE_LAST_FOLDER, folder.id);
     } catch {}
     this.onFolderChange?.(folder);
     await this.reload();
+
+    // Auto-expand if the root has only 1 or 2 subdirectories
+    const dirCount = this.entries.filter((e) => Boolean(e.isDir || (e as any).is_dir)).length;
+    if (dirCount <= 2) {
+      for (const e of this.entries) {
+        if (e.isDir || (e as any).is_dir) {
+          this.expandedDirs.add(e.id || e.path);
+        }
+      }
+      this.renderTreeContainer();
+    }
+  }
+
+  collapseAll(): void {
+    this.expandedDirs.clear();
+    this.renderTreeContainer();
+  }
+
+  expandAll(): void {
+    const collect = (items: DirEntry[]) => {
+      for (const it of items) {
+        if (it.isDir || (it as any).is_dir) {
+          this.expandedDirs.add(it.id || it.path);
+          if (it.children) collect(it.children);
+        }
+      }
+    };
+    collect(this.entries);
+    this.renderTreeContainer();
   }
 
   closeFolder(): void {
     this.currentFolder = null;
     this.entries = [];
-    this.collapsedDirs.clear();
+    this.expandedDirs.clear();
     this.filter = '';
     try {
       localStorage.removeItem(STORAGE_LAST_FOLDER);
@@ -204,18 +288,47 @@ export class FileExplorer {
     const actions = document.createElement('div');
     actions.className = 'explorer-actions';
 
+    // Expand all button
+    const expandAllBtn = document.createElement('button');
+    expandAllBtn.className = 'icon-btn';
+    expandAllBtn.title = '모든 폴더 펼치기';
+    expandAllBtn.setAttribute('aria-label', '모두 펼치기');
+    expandAllBtn.innerHTML = `
+      <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="15 3 21 3 21 9"></polyline>
+        <polyline points="9 21 3 21 3 15"></polyline>
+        <line x1="21" y1="3" x2="14" y2="10"></line>
+        <line x1="3" y1="21" x2="10" y2="14"></line>
+      </svg>
+    `;
+    expandAllBtn.addEventListener('click', () => this.expandAll());
+
+    // Collapse all button
+    const collapseAllBtn = document.createElement('button');
+    collapseAllBtn.className = 'icon-btn';
+    collapseAllBtn.title = '모든 폴더 접기';
+    collapseAllBtn.setAttribute('aria-label', '모두 접기');
+    collapseAllBtn.innerHTML = `
+      <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="4 14 10 14 10 20"></polyline>
+        <polyline points="20 10 14 10 14 4"></polyline>
+        <line x1="14" y1="10" x2="21" y2="3"></line>
+        <line x1="3" y1="21" x2="10" y2="14"></line>
+      </svg>
+    `;
+    collapseAllBtn.addEventListener('click', () => this.collapseAll());
+
     // Refresh button
     const refreshBtn = document.createElement('button');
     refreshBtn.className = 'icon-btn';
     refreshBtn.title = '폴더 새로고침';
     refreshBtn.setAttribute('aria-label', '새로고침');
     refreshBtn.innerHTML = `
-      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.19"></path>
       </svg>
     `;
     refreshBtn.addEventListener('click', () => this.reload());
-    actions.append(refreshBtn);
 
     // Close folder button
     const closeBtn = document.createElement('button');
@@ -223,14 +336,14 @@ export class FileExplorer {
     closeBtn.title = '폴더 닫기';
     closeBtn.setAttribute('aria-label', '폴더 닫기');
     closeBtn.innerHTML = `
-      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <line x1="18" y1="6" x2="6" y2="18"></line>
         <line x1="6" y1="6" x2="18" y2="18"></line>
       </svg>
     `;
     closeBtn.addEventListener('click', () => this.closeFolder());
-    actions.append(closeBtn);
 
+    actions.append(expandAllBtn, collapseAllBtn, refreshBtn, closeBtn);
     titleRow.append(actions);
     header.append(titleRow);
 
@@ -292,38 +405,44 @@ export class FileExplorer {
   private appendTreeNodes(parent: Element, entries: DirEntry[], depth: number) {
     for (const entry of entries) {
       const entryKey = entry.id || entry.path;
+      const isDir = Boolean(entry.isDir || (entry as any).is_dir);
       const node = document.createElement('div');
-      node.className = `tree-node${entry.isDir ? ' is-dir' : ' is-file'}`;
+      node.className = `tree-node${isDir ? ' is-dir' : ' is-file'}`;
       node.setAttribute('data-path', entryKey);
       node.style.paddingLeft = `${depth * 14 + 10}px`;
 
-      if (entry.isDir) {
-        const isCollapsed = this.collapsedDirs.has(entryKey) && !this.filter;
+      if (isDir) {
+        const isExpanded = this.filter ? true : this.expandedDirs.has(entryKey);
 
         const chevron = document.createElement('span');
-        chevron.className = `tree-chevron${isCollapsed ? ' collapsed' : ''}`;
-        chevron.innerHTML = `
-          <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="6 4 10 8 6 12"></polyline>
-          </svg>
-        `;
+        chevron.className = `tree-chevron${isExpanded ? ' expanded' : ' collapsed'}`;
+        chevron.innerHTML = CHEVRON_SVG;
         node.append(chevron);
 
         const icon = document.createElement('span');
-        icon.className = 'tree-icon dir-icon';
-        icon.innerHTML = isCollapsed ? '📁' : '📂';
+        icon.className = `tree-icon dir-icon${isExpanded ? ' is-open' : ''}`;
+        icon.innerHTML = isExpanded ? DIR_OPEN_SVG : DIR_CLOSED_SVG;
         node.append(icon);
 
         const label = document.createElement('span');
-        label.className = 'tree-label';
+        label.className = 'tree-label dir-label';
         label.textContent = entry.name;
         node.append(label);
 
-        node.addEventListener('click', () => {
-          if (this.collapsedDirs.has(entryKey)) {
-            this.collapsedDirs.delete(entryKey);
+        node.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          if (this.expandedDirs.has(entryKey)) {
+            this.expandedDirs.delete(entryKey);
           } else {
-            this.collapsedDirs.add(entryKey);
+            this.expandedDirs.add(entryKey);
+            if (!entry.children || entry.children.length === 0) {
+              try {
+                const sub = await platform().readDirectory(entry.path || entryKey);
+                if (sub && sub.length > 0) {
+                  entry.children = sub;
+                }
+              } catch {}
+            }
           }
           this.renderTreeContainer();
         });
@@ -337,8 +456,16 @@ export class FileExplorer {
 
         parent.append(node);
 
-        if (!isCollapsed && entry.children && entry.children.length > 0) {
-          this.appendTreeNodes(parent, entry.children, depth + 1);
+        if (isExpanded) {
+          if (entry.children && entry.children.length > 0) {
+            this.appendTreeNodes(parent, entry.children, depth + 1);
+          } else if (entry.children && entry.children.length === 0) {
+            const emptyNode = document.createElement('div');
+            emptyNode.className = 'tree-node tree-empty-hint';
+            emptyNode.style.paddingLeft = `${(depth + 1) * 14 + 10}px`;
+            emptyNode.textContent = '(빈 폴더)';
+            parent.append(emptyNode);
+          }
         }
       } else {
         const isIni = /\.(ini|3dm|migoto)$/i.test(entry.name);
@@ -354,7 +481,7 @@ export class FileExplorer {
 
         const icon = document.createElement('span');
         icon.className = `tree-icon file-icon${isIni ? ' is-ini' : isImage ? ' is-img' : ''}`;
-        icon.innerHTML = isIni ? '📄' : isImage ? '🖼️' : '📝';
+        icon.innerHTML = isIni ? FILE_INI_SVG : isImage ? FILE_IMAGE_SVG : FILE_GENERIC_SVG;
         node.append(icon);
 
         const label = document.createElement('span');
@@ -425,8 +552,9 @@ export class FileExplorer {
 
     if (entry) {
       const entryKey = entry.id || entry.path;
+      const isDir = Boolean(entry.isDir || (entry as any).is_dir);
 
-      if (!entry.isDir) {
+      if (!isDir) {
         addItem('열기', () => {
           const ref: FileRef = platform().refFromId(entryKey);
           this.doc.openFile(ref);
@@ -490,6 +618,25 @@ export class FileExplorer {
             await platform().showError('파일 생성 실패', String(err));
           }
         });
+
+        const isExpanded = this.expandedDirs.has(entryKey);
+        if (isExpanded) {
+          addItem('폴더 접기', () => {
+            this.expandedDirs.delete(entryKey);
+            this.renderTreeContainer();
+          });
+        } else {
+          addItem('폴더 펼치기', async () => {
+            this.expandedDirs.add(entryKey);
+            if (!entry.children || entry.children.length === 0) {
+              try {
+                const sub = await platform().readDirectory(entry.path || entryKey);
+                if (sub && sub.length > 0) entry.children = sub;
+              } catch {}
+            }
+            this.renderTreeContainer();
+          });
+        }
 
         addItem('폴더 경로 복사', () => {
           navigator.clipboard.writeText(entry.path || entry.name).catch(() => {});

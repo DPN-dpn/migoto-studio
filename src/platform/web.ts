@@ -399,6 +399,10 @@ export const web: Platform = {
 
   async showInFolder(_path: string): Promise<void> {},
 
+  async isPathDir(path: string): Promise<boolean> {
+    return directoryHandles.has(path) || virtualDirectoryEntries.has(path);
+  },
+
   refFromId(id: string): FileRef {
     const handle = fileHandles.get(id);
     const name = handle ? (handle as any).name || 'document.ini' : 'document.ini';

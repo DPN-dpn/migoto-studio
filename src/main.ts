@@ -241,7 +241,15 @@ async function boot() {
   hint.id = 'drop-hint';
   hint.textContent = '여기에 놓아서 열기';
   document.body.append(hint);
-  await platform().onFileDrop((ref) => doc.openFile(ref), (hovering) => hint.classList.toggle('show', hovering));
+  await platform().onFileDrop(async (ref) => {
+    const isDir = await platform().isPathDir?.(ref.id);
+    if (isDir) {
+      activityBar.switchTo('explorer');
+      await explorer.openFolder({ id: ref.id, name: ref.name });
+    } else {
+      await doc.openFile(ref);
+    }
+  }, (hovering) => hint.classList.toggle('show', hovering));
 
   // ---- ask before closing with unsaved changes ----
   await platform().onCloseRequest(() => doc.confirmDiscard());

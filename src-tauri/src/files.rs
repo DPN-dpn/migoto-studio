@@ -73,9 +73,18 @@ fn encode(text: &str, encoding: &str) -> Result<Vec<u8>, String> {
 
 #[tauri::command]
 pub fn open_file(path: String) -> Result<OpenedFile, String> {
-  let bytes = fs::read(&path).map_err(|e| format!("파일을 읽을 수 없습니다: {e}"))?;
+  let p = PathBuf::from(&path);
+  if p.is_dir() {
+    return Err("선택한 항목은 파일이 아니라 폴더입니다.".to_string());
+  }
+  let bytes = fs::read(&p).map_err(|e| format!("파일을 읽을 수 없습니다: {e}"))?;
   let (text, encoding) = decode(&bytes)?;
   Ok(OpenedFile { text, encoding: encoding.to_string() })
+}
+
+#[tauri::command]
+pub fn is_directory(path: String) -> bool {
+  PathBuf::from(&path).is_dir()
 }
 
 /// Writes atomically (temp file + rename). When `backup` is set and the target exists,
@@ -108,6 +117,7 @@ pub fn save_file(
 }
 
 #[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct DirEntry {
   pub name: String,
   pub path: String,
@@ -122,7 +132,7 @@ pub fn read_directory(path: String, max_depth: Option<u32>) -> Result<Vec<DirEnt
   if !root.is_dir() {
     return Err(format!("폴더를 찾을 수 없습니다: {path}"));
   }
-  let depth = max_depth.unwrap_or(4);
+  let depth = max_depth.unwrap_or(8);
   scan_dir(&root, depth)
 }
 

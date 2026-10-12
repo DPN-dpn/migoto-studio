@@ -66,6 +66,7 @@ export interface Platform {
   showInFolder?(path: string): Promise<void>;
   createFile?(dirPath: string, fileName: string): Promise<FileRef | null>;
   deleteEntry?(path: string): Promise<void>;
+  isPathDir?(path: string): Promise<boolean>;
 
   // ---- backups ----
   listBackups(ref: FileRef): Promise<BackupEntry[]>;

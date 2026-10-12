@@ -38,6 +38,7 @@ pub fn run() {
     .plugin(tauri_plugin_updater::Builder::new().build())
     .invoke_handler(tauri::generate_handler![
       files::open_file,
+      files::is_directory,
       files::save_file,
       files::read_directory,
       files::show_in_folder,
