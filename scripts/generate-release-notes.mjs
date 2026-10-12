@@ -57,8 +57,11 @@ function getChangelogSection(targetVersion) {
   const rawSection = result.join('\n').trim();
   if (rawSection.length > 0) return rawSection;
 
-  // Fallback: If only the current release section is in CHANGELOG.md, use it
-  const firstHeaderIdx = lines.findIndex((l) => l.trim().startsWith('## '));
+  // Fallback: If only the current release section is in CHANGELOG.md, use it (ignore [다음 버전])
+  const firstHeaderIdx = lines.findIndex((l) => {
+    const t = l.trim();
+    return t.startsWith('## ') && !t.includes('다음 버전') && !t.includes('Unreleased');
+  });
   if (firstHeaderIdx >= 0) {
     const subLines = lines.slice(firstHeaderIdx + 1);
     const endIdx = subLines.findIndex((l) => l.trim().startsWith('## ') || l.trim() === '---');
