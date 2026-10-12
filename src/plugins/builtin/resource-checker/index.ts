@@ -58,7 +58,7 @@ export default definePlugin({
     context.ui.registerSidebarView({
       id: 'resource-checker-view',
       title: '리소스 검사기',
-      icon: 'CHK',
+      icon: 'file-check',
       render: (container) => {
         const renderPanel = async () => {
           container.replaceChildren();

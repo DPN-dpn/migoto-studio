@@ -1,5 +1,6 @@
 import { getSettings, updateSettings, onSettingsChange } from '../core/settings';
 import type { OutlinePanel } from './outline';
+import { resolvePluginIcon } from '../plugins/icons';
 
 export type ActivityPanel = 'explorer' | 'outline' | 'templates' | 'plugins' | string;
 
@@ -51,7 +52,7 @@ export class ActivityBar {
     btn.id = `act-${tab.id}`;
     btn.title = tab.title;
     btn.setAttribute('aria-label', tab.title);
-    btn.innerHTML = `<span>${tab.icon}</span>`;
+    btn.innerHTML = `<span>${resolvePluginIcon(tab.icon)}</span>`;
     btn.addEventListener('click', () => this.handlePanelClick(tab.id));
 
     // Place into custom plugins container in activity-bar-top (below explorer/plugins with separator)

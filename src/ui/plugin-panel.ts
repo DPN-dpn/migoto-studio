@@ -1,5 +1,6 @@
 import { platform } from '../platform';
 import type { PluginManager, PluginInstance } from '../plugins';
+import { resolvePluginIcon } from '../plugins/icons';
 
 export class PluginPanel {
   private searchQuery: string = '';
@@ -177,8 +178,8 @@ export class PluginPanel {
       const iconInput = document.createElement('input');
       iconInput.type = 'text';
       iconInput.className = 'plugin-input';
-      iconInput.value = 'PLG';
-      iconInput.placeholder = '아이콘 약어 (기본값: PLG)';
+      iconInput.value = 'puzzle';
+      iconInput.placeholder = '이모지, SVG 또는 프리셋(sparkles, python, image 등)';
       iconRow.append(iconLabel, iconInput);
 
       const authorRow = document.createElement('div');
@@ -364,7 +365,7 @@ export class PluginPanel {
     titleClickArea.title = isCollapsed ? '클릭하여 상세 정보 펼치기' : '클릭하여 간략히 접기';
     titleClickArea.innerHTML = `
       <span class="plugin-order-num">${index + 1}.</span>
-      <span class="plugin-icon">${p.manifest.icon || 'PLG'}</span>
+      <span class="plugin-icon">${resolvePluginIcon(p.manifest.icon)}</span>
       <strong class="plugin-name">${p.manifest.name}</strong>
       <span class="plugin-version">v${p.manifest.version}</span>
     `;

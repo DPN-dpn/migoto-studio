@@ -28,7 +28,7 @@ export default definePlugin({
     context.ui.registerSidebarView({
       id: 'zzmi-tools-view',
       title: 'ZZMI 도구',
-      icon: 'ZZMI',
+      icon: 'gamepad',
       render: (container) => {
         container.replaceChildren();
 

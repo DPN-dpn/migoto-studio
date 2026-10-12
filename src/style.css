@@ -611,6 +611,12 @@ button.primary:hover { filter: brightness(1.1); background: var(--accent); }
   justify-content: center;
 }
 
+.activity-bar-btn span svg {
+  width: 20px;
+  height: 20px;
+  display: block;
+}
+
 #sidebar {
   width: 250px;
   min-width: 160px;
@@ -2335,6 +2341,18 @@ input:checked + .slider:before {
 .plugin-card-title .plugin-icon {
   font-size: 14px;
   flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  color: var(--accent);
+}
+
+.plugin-card-title .plugin-icon svg {
+  width: 15px;
+  height: 15px;
+  display: block;
 }
 
 .plugin-card-title .plugin-name {

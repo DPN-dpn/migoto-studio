@@ -4,6 +4,7 @@ import { decodeDDS } from '../src/plugins/builtin/asset-viewer/dds-decoder.ts';
 import { BUILTIN_PLUGINS } from '../src/plugins/builtin.ts';
 import { validatePluginZip } from '../src/plugins/zip.ts';
 import { definePlugin } from '../src/plugins/api.ts';
+import { resolvePluginIcon } from '../src/plugins/icons.ts';
 import { zipSync, strToU8 } from 'fflate';
 
 test('definePlugin returns identical plugin definition with type inference', () => {
@@ -199,14 +200,14 @@ test('builtin plugins activate with expected behavior', () => {
   py.createPlugin().activate(mockContext);
   assert.equal(registeredViews.length, 1);
   assert.equal(registeredViews[0].id, 'python-runner');
-  assert.equal(registeredViews[0].icon, 'PY');
+  assert.equal(registeredViews[0].icon, 'python');
 
   registeredViews.length = 0;
   const ai = BUILTIN_PLUGINS.find((p) => p.manifest.id === 'ai-assistant')!;
   ai.createPlugin().activate(mockContext);
   assert.equal(registeredViews.length, 1);
   assert.equal(registeredViews[0].id, 'ai-assistant');
-  assert.equal(registeredViews[0].icon, 'AI');
+  assert.equal(registeredViews[0].icon, 'sparkles');
 
   registeredViews.length = 0;
   const asset = BUILTIN_PLUGINS.find((p) => p.manifest.id === 'asset-viewer')!;
@@ -215,6 +216,35 @@ test('builtin plugins activate with expected behavior', () => {
   assert.equal(registeredViews.length, 0);
   assert.equal(registeredCustomViewers.length, 1);
   assert.deepEqual(registeredCustomViewers[0].extensions, ['dds', 'png', 'jpg', 'jpeg', 'bmp', 'webp', 'gif']);
+});
+
+test('resolvePluginIcon resolves SVG presets, custom SVGs, emojis and fallbacks', () => {
+  // Preset names
+  assert.ok(resolvePluginIcon('sparkles').startsWith('<svg'));
+  assert.ok(resolvePluginIcon('python').startsWith('<svg'));
+  assert.ok(resolvePluginIcon('image').startsWith('<svg'));
+  assert.ok(resolvePluginIcon('file-check').startsWith('<svg'));
+  assert.ok(resolvePluginIcon('gamepad').startsWith('<svg'));
+
+  // Case-insensitive legacy codes
+  assert.ok(resolvePluginIcon('AI').startsWith('<svg'));
+  assert.ok(resolvePluginIcon('PY').startsWith('<svg'));
+  assert.ok(resolvePluginIcon('IMG').startsWith('<svg'));
+  assert.ok(resolvePluginIcon('CHK').startsWith('<svg'));
+  assert.ok(resolvePluginIcon('ZZMI').startsWith('<svg'));
+
+  // Custom raw SVG
+  const customSvg = '<svg viewBox="0 0 10 10"><circle cx="5" cy="5" r="5"/></svg>';
+  assert.equal(resolvePluginIcon(customSvg), customSvg);
+
+  // Custom emoji
+  assert.equal(resolvePluginIcon('🤖'), '🤖');
+  assert.equal(resolvePluginIcon('🐍'), '🐍');
+
+  // Fallbacks
+  assert.equal(resolvePluginIcon(''), 'PLG');
+  assert.equal(resolvePluginIcon(undefined), 'PLG');
+  assert.equal(resolvePluginIcon('custom-text'), 'custom-text');
 });
 
 test('validatePluginZip successfully extracts valid plugin zip', () => {

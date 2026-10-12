@@ -9,7 +9,7 @@ export default definePlugin({
     context.ui.registerSidebarView({
       id: 'python-runner',
       title: 'Python 실행기',
-      icon: 'PY',
+      icon: 'python',
       render(container) {
         container.className = 'sidebar-panel dynamic-plugin-panel plugin-subview python-runner-panel';
         container.replaceChildren();

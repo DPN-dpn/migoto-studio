@@ -9,7 +9,7 @@ export default definePlugin({
     context.ui.registerSidebarView({
       id: 'ai-assistant',
       title: 'AI 에이전트',
-      icon: 'AI',
+      icon: 'sparkles',
       render(container) {
         container.className = 'sidebar-panel dynamic-plugin-panel plugin-subview ai-assistant-panel';
         container.replaceChildren();

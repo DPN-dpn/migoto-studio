@@ -583,14 +583,14 @@ export class PluginManager {
     if (typeof optionsOrId === 'object') {
       rawId = optionsOrId.id;
       name = optionsOrId.name;
-      icon = optionsOrId.icon?.trim() || 'PLG';
+      icon = optionsOrId.icon?.trim() || 'puzzle';
       author = optionsOrId.author?.trim() || '사용자';
       location = optionsOrId.location?.trim() || '좌측 사이드바 탭';
       description = optionsOrId.description?.trim() || '사용자 정의 플러그인입니다.';
     } else {
       rawId = optionsOrId;
       name = nameArg;
-      icon = 'PLG';
+      icon = 'puzzle';
       author = '사용자';
       location = '좌측 사이드바 탭';
       description = descArg || '사용자 정의 플러그인입니다.';
