@@ -339,7 +339,7 @@ export function lintModel(model: TextModelLike, options: LintOptions): monaco.ed
 
     // 5. Resource / CommandList references
     // Keys like: run = CommandListX, post run = ..., pre run = ..., vb0 = ResourceX, ib = ResourceIB, ps-t0 = ResourceTexture
-    // or ZZMI slot fixes: Resource\ZZMI\Diffuse = ref ResourceCustom, run = CommandList\ZZMI\SetTextures
+    // or path/namespace references: Resource\Sub\Key = ref Target, run = CommandList\Sub\Action
     const resRefMatch = /^\s*(?:(?:pre\s+|post\s+)?run|vb\d+|ib|[a-z]{2}-[tu]\d+|Resource(?:\\[a-zA-Z0-9_]+)*)\s*=\s*(?:ref\s+)?([a-zA-Z0-9_\\]+)/i.exec(code);
     if (resRefMatch) {
       const target = resRefMatch[1].trim();
