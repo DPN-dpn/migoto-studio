@@ -2,10 +2,13 @@
 
 ## [다음 버전]
 
-### 플러그인 공식 API 및 UI 빌더 구현
+### 플러그인 공식 API 및 UI 빌더 고도화
 - 플러그인 전용 공식 API 및 TypeScript 개발 진입점 제공
   - 단일 진입점 `src/plugins/api.ts` 및 자동 완성을 위한 `definePlugin` 헬퍼 제공
-  - `context.ui` 고수준 UI 빌더 API 구현 (헤더, 셀렉트, 인풋, 체크박스, 버튼, 에디터, 실시간 콘솔, AI 대화 버블 등)
+  - 에디터 심층 제어 및 실시간 반응 API 추가: `setText`, `getLine`, `getLineCount`, `onDidChangeText`, `onDidChangeCursor`, `registerContextMenuAction`
+  - 작업영역 파일 입출력 및 탐색 API 추가: `writeTextFile`, `writeBinaryFile`, `readDirectory`, `pickFile`, `showInFolder`, `onDidChangeActiveFile`
+  - `context.ui` 고수준 UI 빌더 컴포넌트 확장: 배지(`createBadge`), 진행률 바(`createProgressBar`), 구분선(`createDivider`), 데이터 테이블(`createTable`)
+  - 플러그인 비활성화 시 등록된 모든 이벤트 리스너와 액션이 100% 자동 해제되는 라이프사이클 파이프라인 연동
   - 기존 원시 문자열 배열 방식(standalone.ts, 821줄) 전면 폐지 및 순수 TypeScript 선언적 코드로 전환
 
 ### 내장 플러그인 모듈화 및 뷰어 고도화
