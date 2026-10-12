@@ -21,7 +21,7 @@ export default definePlugin({
         // 2. 설정 영역 API
         const urlInput = context.ui.createInput({
           label: 'API URL:',
-          placeholder: 'https://api.openai.com/v1',
+          placeholder: 'https://generativelanguage.googleapis.com/v1beta/openai 또는 https://api.openai.com/v1',
           value: context.storage.get('api_url', 'https://api.openai.com/v1'),
           onInput: (v) => context.storage.set('api_url', v.trim()),
         });
@@ -29,21 +29,69 @@ export default definePlugin({
         const keyInput = context.ui.createInput({
           label: 'API Key:',
           type: 'password',
-          placeholder: 'sk-... (Ollama는 비워둠)',
+          placeholder: 'Gemini 또는 OpenAI API 키 (Ollama는 비워둠)',
           value: context.storage.get('api_key', ''),
           onInput: (v) => context.storage.set('api_key', v.trim()),
         });
 
         const modelInput = context.ui.createInput({
           label: '모델명:',
-          placeholder: 'gpt-4o-mini 또는 llama3',
+          placeholder: 'gemini-1.5-pro, gemini-1.5-flash, gpt-4o-mini 등',
           value: context.storage.get('model', 'gpt-4o-mini'),
           onInput: (v) => context.storage.set('model', v.trim()),
         });
 
+        const presetRow = document.createElement('div');
+        presetRow.className = 'ai-quick-actions';
+        presetRow.style.marginBottom = '6px';
+
+        const btnPresetGemini = context.ui.createButton({
+          text: 'Google Gemini',
+          variant: 'small',
+          onClick: () => {
+            const u = 'https://generativelanguage.googleapis.com/v1beta/openai';
+            const m = 'gemini-1.5-pro';
+            urlInput.setValue(u);
+            modelInput.setValue(m);
+            context.storage.set('api_url', u);
+            context.storage.set('model', m);
+            context.ui.showToast('Gemini 설정이 적용되었습니다. API Key를 입력하세요.', 'info');
+          },
+        });
+
+        const btnPresetOpenAI = context.ui.createButton({
+          text: 'OpenAI (ChatGPT)',
+          variant: 'small',
+          onClick: () => {
+            const u = 'https://api.openai.com/v1';
+            const m = 'gpt-4o-mini';
+            urlInput.setValue(u);
+            modelInput.setValue(m);
+            context.storage.set('api_url', u);
+            context.storage.set('model', m);
+            context.ui.showToast('OpenAI 설정이 적용되었습니다.', 'info');
+          },
+        });
+
+        const btnPresetOllama = context.ui.createButton({
+          text: '로컬 Ollama',
+          variant: 'small',
+          onClick: () => {
+            const u = 'http://localhost:11434/v1';
+            const m = 'qwen2.5-coder';
+            urlInput.setValue(u);
+            modelInput.setValue(m);
+            context.storage.set('api_url', u);
+            context.storage.set('model', m);
+            context.ui.showToast('Ollama 설정이 적용되었습니다. (Key는 비워둠)', 'info');
+          },
+        });
+
+        presetRow.append(btnPresetGemini, btnPresetOpenAI, btnPresetOllama);
+
         const configDetails = context.ui.createDetails({
-          summary: 'API 연결 설정 (OpenAI / Ollama)',
-          children: [urlInput.row, keyInput.row, modelInput.row],
+          summary: 'API 연결 설정 (Gemini / OpenAI / Ollama)',
+          children: [presetRow, urlInput.row, keyInput.row, modelInput.row],
         });
 
         // 3. 퀵 액션 프롬프트 툴바 API
@@ -126,9 +174,14 @@ export default definePlugin({
 
         async function sendMessage(userPrompt: string) {
           if (!userPrompt.trim()) return;
-          const apiUrl = (context.storage.get('api_url', 'https://api.openai.com/v1') as string).replace(/\/+$/, '');
-          const apiKey = context.storage.get('api_key', '') as string;
-          const model = context.storage.get('model', 'gpt-4o-mini') as string;
+          let apiUrl = (context.storage.get('api_url', 'https://api.openai.com/v1') as string).replace(/\/+$/, '');
+          const apiKey = (context.storage.get('api_key', '') as string).trim();
+          const model = (context.storage.get('model', 'gpt-4o-mini') as string).trim();
+
+          // Google Gemini OpenAI endpoint auto-correction
+          if (apiUrl.includes('generativelanguage.googleapis.com') && !apiUrl.endsWith('/openai')) {
+            apiUrl = `${apiUrl}/openai`;
+          }
 
           appendMessage('user', userPrompt);
           promptTextarea.value = '';
