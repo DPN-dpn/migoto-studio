@@ -6,6 +6,6 @@
   "author": "Migoto Studio",
   "icon": "gamepad",
   "category": "tools",
-  "location": "에디터 린터 / 템플릿 패널 / 사이드바",
+  "location": "에디터 린터 & 템플릿 패널",
   "main": "index.ts"
 }

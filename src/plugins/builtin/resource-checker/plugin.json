@@ -6,6 +6,6 @@
   "author": "Migoto Studio",
   "icon": "file-check",
   "category": "tools",
-  "location": "에디터 린터 / 좌측 사이드바 탭",
+  "location": "에디터 린터",
   "main": "index.ts"
 }

@@ -289,7 +289,7 @@ test('validatePluginZip throws when script is missing', () => {
   assert.throws(() => validatePluginZip(zip), /실행 스크립트.*없습니다/);
 });
 
-test('resource-checker plugin activates and registers lint rule and sidebar view', async () => {
+test('resource-checker plugin activates and registers lint rule without sidebar view', async () => {
   const def = BUILTIN_PLUGINS.find((p) => p.manifest.id === 'resource-checker')!;
   assert.ok(def);
   const plugin = def.createPlugin();
@@ -323,8 +323,7 @@ test('resource-checker plugin activates and registers lint rule and sidebar view
   plugin.activate(mockContext);
   assert.ok(registeredRule);
   assert.equal(registeredRule.id, 'missing-resource-files');
-  assert.ok(registeredView);
-  assert.equal(registeredView.id, 'resource-checker-view');
+  assert.equal(registeredView, null);
 
   // Test rule check execution
   const diags = await registeredRule.check({
@@ -351,7 +350,7 @@ test('resource-checker plugin activates and registers lint rule and sidebar view
   assert.equal(diagsOk.length, 0);
 });
 
-test('zzmi-support plugin activates and registers allowed resource and code template', () => {
+test('zzmi-support plugin activates and registers allowed resource and code template without sidebar view', () => {
   const def = BUILTIN_PLUGINS.find((p) => p.manifest.id === 'zzmi-support')!;
   assert.ok(def);
   const plugin = def.createPlugin();
@@ -388,7 +387,7 @@ test('zzmi-support plugin activates and registers allowed resource and code temp
   assert.equal(registeredTemplate.id, 'zzmi_slot_fix');
   assert.ok(registeredTemplate.body.includes('CommandList\\ZZMI\\SetTextures'));
   assert.ok(registeredTemplate.body.includes('Resource\\ZZMI\\WEngineFX'));
-  assert.ok(registeredView);
+  assert.equal(registeredView, null);
 });
 
 
