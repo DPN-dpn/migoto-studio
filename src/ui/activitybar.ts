@@ -32,7 +32,6 @@ export class ActivityBar {
     private panelPlugins: HTMLElement,
     private outline: OutlinePanel,
     private onOpenSettings: () => void,
-    private onOpenHelp: () => void,
   ) {
     this.bindEvents();
     this.updateActiveUi();
@@ -137,9 +136,6 @@ export class ActivityBar {
 
     const settingsBtn = this.barEl.querySelector('#act-settings');
     settingsBtn?.addEventListener('click', () => this.onOpenSettings());
-
-    const helpBtn = this.barEl.querySelector('#act-help');
-    helpBtn?.addEventListener('click', () => this.onOpenHelp());
   }
 
   handlePanelClick(panel: ActivityPanel) {

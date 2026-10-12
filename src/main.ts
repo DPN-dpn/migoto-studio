@@ -127,7 +127,6 @@ async function boot() {
     $('sidebar-panel-plugins'),
     outline,
     () => openSettings(),
-    () => openHelp(),
   );
 
   pluginManager.setActivityBar(activityBar);
