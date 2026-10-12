@@ -1,4 +1,5 @@
 import { isDesktop } from './platform';
+import { showToast } from './ui/toast';
 
 const PWA_INSTALLED_STORAGE_KEY = 'migoto_pwa_installed';
 
@@ -54,9 +55,6 @@ export function isStandaloneSession(): boolean {
 export async function checkIsAppInstalled(): Promise<boolean> {
   // If already running inside standalone app, it is 100% installed
   if (isStandaloneSession()) {
-    try {
-      localStorage.setItem(PWA_INSTALLED_STORAGE_KEY, 'true');
-    } catch {}
     return true;
   }
 
@@ -66,31 +64,14 @@ export async function checkIsAppInstalled(): Promise<boolean> {
       const getApps = (navigator as unknown as { getInstalledRelatedApps?: () => Promise<unknown[]> }).getInstalledRelatedApps;
       if (typeof getApps === 'function') {
         const related = await getApps.call(navigator);
-        if (Array.isArray(related)) {
-          if (related.length > 0) {
-            try {
-              localStorage.setItem(PWA_INSTALLED_STORAGE_KEY, 'true');
-            } catch {}
-            return true;
-          } else {
-            // Browser explicitly confirmed 0 installed related apps
-            try {
-              localStorage.removeItem(PWA_INSTALLED_STORAGE_KEY);
-            } catch {}
-            return false;
-          }
+        if (Array.isArray(related) && related.length > 0) {
+          return true;
         }
       }
-    } catch {
-      // Fallback to localStorage check below
-    }
+    } catch {}
   }
 
-  try {
-    return localStorage.getItem(PWA_INSTALLED_STORAGE_KEY) === 'true';
-  } catch {
-    return false;
-  }
+  return false;
 }
 
 /**
@@ -98,7 +79,13 @@ export async function checkIsAppInstalled(): Promise<boolean> {
  * Only active in web browser environments (disabled in native Tauri desktop).
  */
 export function initPwa() {
+  const installBtn = document.getElementById('btn-pwa-install') as HTMLButtonElement | null;
+
   if (isDesktop) {
+    if (installBtn) {
+      installBtn.hidden = true;
+      installBtn.style.display = 'none';
+    }
     return;
   }
 
@@ -125,83 +112,70 @@ export function initPwa() {
     });
   }
 
-  // 2. Setup install prompt button
-  const installBtn = document.getElementById('btn-pwa-install') as HTMLButtonElement | null;
   if (!installBtn) return;
 
-  // Initial check: if already in standalone app or already installed, keep hidden
   const hideBtn = () => {
     installBtn.hidden = true;
     installBtn.style.display = 'none';
   };
 
+  const showBtn = () => {
+    installBtn.hidden = false;
+    installBtn.style.display = 'inline-flex';
+  };
+
+  // If already running inside standalone PWA window, hide button
   if (isStandaloneSession()) {
     hideBtn();
-    try {
-      localStorage.setItem(PWA_INSTALLED_STORAGE_KEY, 'true');
-    } catch {}
     return;
   }
 
-  // Proactively check if already installed on page load
-  checkIsAppInstalled().then((alreadyInstalled) => {
-    if (alreadyInstalled) {
-      hideBtn();
-    }
-  });
+  // On standard web browser tab, show the install button by default
+  showBtn();
 
   // Listen to media query changes (e.g. if launched or resized into standalone)
   const standaloneQuery = window.matchMedia('(display-mode: standalone)');
   standaloneQuery.addEventListener('change', (e) => {
     if (e.matches) {
       hideBtn();
-      try {
-        localStorage.setItem(PWA_INSTALLED_STORAGE_KEY, 'true');
-      } catch {}
+    } else {
+      showBtn();
     }
   });
 
   let deferredPrompt: BeforeInstallPromptEvent | null = null;
 
-  window.addEventListener('beforeinstallprompt', async (e) => {
+  window.addEventListener('beforeinstallprompt', (e) => {
     e.preventDefault();
     deferredPrompt = e as BeforeInstallPromptEvent;
 
-    // Do NOT show if already running standalone or already installed!
-    if (isStandaloneSession() || (await checkIsAppInstalled())) {
-      hideBtn();
-      return;
+    if (!isStandaloneSession()) {
+      showBtn();
     }
-
-    // Only show if definitely not installed
-    installBtn.hidden = false;
-    installBtn.style.removeProperty('display');
   });
 
   installBtn.addEventListener('click', async () => {
-    if (!deferredPrompt) return;
-    installBtn.disabled = true;
-    try {
-      await deferredPrompt.prompt();
-      const { outcome } = await deferredPrompt.userChoice;
-      if (outcome === 'accepted') {
-        hideBtn();
-        try {
-          localStorage.setItem(PWA_INSTALLED_STORAGE_KEY, 'true');
-        } catch {}
+    if (deferredPrompt) {
+      installBtn.disabled = true;
+      try {
+        await deferredPrompt.prompt();
+        const { outcome } = await deferredPrompt.userChoice;
+        if (outcome === 'accepted') {
+          hideBtn();
+        }
+      } finally {
+        installBtn.disabled = false;
+        deferredPrompt = null;
       }
-    } finally {
-      installBtn.disabled = false;
-      deferredPrompt = null;
+    } else {
+      showToast('브라우저 주소창 우측의 [설치] 아이콘을 클릭하거나 브라우저 메뉴에서 [앱으로 설치]를 선택하세요.', 'info');
     }
   });
 
   window.addEventListener('appinstalled', () => {
     hideBtn();
     deferredPrompt = null;
-    try {
-      localStorage.setItem(PWA_INSTALLED_STORAGE_KEY, 'true');
-    } catch {}
     console.log('[PWA] Migoto Studio가 기기에 성공적으로 설치되었습니다.');
   });
 }
+
