@@ -36,7 +36,7 @@ export default definePlugin({
 
         const modelInput = context.ui.createInput({
           label: '모델명:',
-          placeholder: 'gemini-1.5-pro, gemini-1.5-flash, gpt-4o-mini 등',
+          placeholder: 'gemini-flash-latest, gpt-4o-mini 등',
           value: context.storage.get('model', 'gpt-4o-mini'),
           onInput: (v) => context.storage.set('model', v.trim()),
         });
@@ -50,7 +50,7 @@ export default definePlugin({
           variant: 'small',
           onClick: () => {
             const u = 'https://generativelanguage.googleapis.com/v1beta/openai';
-            const m = 'gemini-1.5-pro';
+            const m = 'gemini-flash-latest';
             urlInput.setValue(u);
             modelInput.setValue(m);
             context.storage.set('api_url', u);
@@ -176,11 +176,23 @@ export default definePlugin({
           if (!userPrompt.trim()) return;
           let apiUrl = (context.storage.get('api_url', 'https://api.openai.com/v1') as string).replace(/\/+$/, '');
           const apiKey = (context.storage.get('api_key', '') as string).trim();
-          const model = (context.storage.get('model', 'gpt-4o-mini') as string).trim();
+          let model = (context.storage.get('model', 'gpt-4o-mini') as string).trim();
 
-          // Google Gemini OpenAI endpoint auto-correction
-          if (apiUrl.includes('generativelanguage.googleapis.com') && !apiUrl.endsWith('/openai')) {
-            apiUrl = `${apiUrl}/openai`;
+          // Google Gemini OpenAI endpoint auto-correction & model migration
+          if (apiUrl.includes('generativelanguage.googleapis.com')) {
+            if (!apiUrl.endsWith('/openai')) {
+              apiUrl = `${apiUrl}/openai`;
+            }
+            if (
+              !model ||
+              model === 'gemini-1.5-pro' ||
+              model === 'gemini-1.5-flash' ||
+              model === 'gemini-pro' ||
+              model === 'gemini-2.5-flash' ||
+              model === 'gemini-2.5-pro'
+            ) {
+              model = 'gemini-flash-latest';
+            }
           }
 
           appendMessage('user', userPrompt);
