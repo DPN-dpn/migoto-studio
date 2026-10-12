@@ -43,7 +43,7 @@ function main() {
 
     // 4. CHANGELOG.md를 다음 개발 버전을 위해 깨끗하게 초기화 커밋
     console.log('[release] 4. CHANGELOG.md 다음 개발을 위한 초기화 커밋...');
-    const cleanChangelog = '# 릴리스 노트 (Release Notes)\n\n## [다음 버전]\n\n';
+    const cleanChangelog = '# 릴리스 노트 (Release Notes)\n\n## [다음 버전]\n\n### 신규 기능\n\n### 기능 개선\n\n### 버그 수정\n\n';
     writeFileSync(CHANGELOG_PATH, cleanChangelog, 'utf8');
     execSync('git add CHANGELOG.md', { cwd: ROOT, stdio: 'inherit' });
     execSync(`git commit -m "chore: prepare for next development iteration"`, { cwd: ROOT, stdio: 'inherit' });

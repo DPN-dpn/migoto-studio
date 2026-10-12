@@ -121,7 +121,7 @@ function getNotesFromGit(targetVersion) {
     sections.push(`### 신규 기능\n${features.join('\n')}`);
   }
   if (improvements.length > 0) {
-    sections.push(`### 개선 사항\n${improvements.join('\n')}`);
+    sections.push(`### 기능 개선\n${improvements.join('\n')}`);
   }
   if (fixes.length > 0) {
     sections.push(`### 버그 수정\n${fixes.join('\n')}`);
@@ -161,7 +161,7 @@ ${downloadGuide}`;
   // If requested with --clean or --reset, automatically wipe CHANGELOG.md clean for the next version
   const shouldClean = process.argv.includes('--clean') || process.argv.includes('--reset') || process.argv.includes('--clean-changelog');
   if (shouldClean) {
-    const cleanTemplate = '# 릴리스 노트 (Release Notes)\n\n## [다음 버전]\n\n';
+    const cleanTemplate = '# 릴리스 노트 (Release Notes)\n\n## [다음 버전]\n\n### 신규 기능\n\n### 기능 개선\n\n### 버그 수정\n\n';
     writeFileSync(CHANGELOG_PATH, cleanTemplate, 'utf8');
     console.log('[changelog] CHANGELOG.md가 다음 버전을 위해 깨끗하게 초기화되었습니다.');
   }
