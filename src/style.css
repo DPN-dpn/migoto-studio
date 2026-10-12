@@ -901,6 +901,26 @@ body.resizing * {
   pointer-events: none !important;
 }
 #sidebar h2 { margin: 0; padding: 10px 14px 6px; font-size: 11px; letter-spacing: 0.08em; color: var(--fg-dim); }
+.outline-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px 6px;
+}
+.outline-header h2 {
+  margin: 0 !important;
+  padding: 0 !important;
+}
+.outline-doc-info {
+  font-size: 10.5px;
+  color: var(--accent);
+  max-width: 130px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 600;
+  opacity: 0.9;
+}
 #sidebar input[type='search'] {
   margin: 0 10px 8px;
   padding: 5px 8px;

@@ -1,4 +1,5 @@
-import { monaco } from '../core/monaco';
+import type { monaco } from '../core/monaco.ts';
+import type { DocumentManager } from '../core/documents.ts';
 
 interface Section { name: string; line: number; group: string }
 
@@ -42,25 +43,72 @@ export class OutlinePanel {
   private timer = 0;
   private currentWidth = DEFAULT_WIDTH;
   private readonly list: HTMLElement;
+  private readonly searchInput: HTMLInputElement;
+  private readonly docTitle: HTMLElement;
   private readonly closedGroups = new Set<string>();
+  private readonly editor: monaco.editor.IStandaloneCodeEditor;
+  private readonly doc?: DocumentManager;
+  private readonly root: HTMLElement;
+  private readonly contentRoot: HTMLElement;
+  private readonly resizer?: HTMLElement | null;
 
   constructor(
-    private editor: monaco.editor.IStandaloneCodeEditor,
-    private root: HTMLElement,
-    private contentRoot: HTMLElement = root,
-    private resizer?: HTMLElement | null,
+    editor: monaco.editor.IStandaloneCodeEditor,
+    doc: DocumentManager,
+    root: HTMLElement,
+    contentRoot?: HTMLElement,
+    resizer?: HTMLElement | null,
+  );
+  constructor(
+    editor: monaco.editor.IStandaloneCodeEditor,
+    root: HTMLElement,
+    contentRoot?: HTMLElement,
+    resizer?: HTMLElement | null,
+  );
+  constructor(
+    editor: monaco.editor.IStandaloneCodeEditor,
+    docOrRoot: DocumentManager | HTMLElement,
+    rootOrContent?: HTMLElement,
+    contentOrResizer?: HTMLElement | null,
+    resizer?: HTMLElement | null,
   ) {
-    contentRoot.innerHTML = '';
+    this.editor = editor;
+    if ('activeTab' in (docOrRoot as any) || 'allTabs' in (docOrRoot as any)) {
+      this.doc = docOrRoot as DocumentManager;
+      this.root = rootOrContent!;
+      this.contentRoot = (contentOrResizer as HTMLElement) || this.root;
+      this.resizer = resizer;
+    } else {
+      this.root = docOrRoot as HTMLElement;
+      this.contentRoot = rootOrContent || this.root;
+      this.resizer = contentOrResizer;
+    }
+
+    this.contentRoot.innerHTML = '';
+
+    const header = document.createElement('div');
+    header.className = 'outline-header';
+
     const title = document.createElement('h2');
     title.textContent = '섹션 목록';
-    const search = document.createElement('input');
-    search.type = 'search';
-    search.placeholder = '섹션 검색…';
-    search.setAttribute('aria-label', '섹션 검색');
-    search.addEventListener('input', () => { this.filter = search.value.trim().toLowerCase(); this.render(); });
+
+    this.docTitle = document.createElement('span');
+    this.docTitle.className = 'outline-doc-info';
+
+    header.append(title, this.docTitle);
+
+    this.searchInput = document.createElement('input');
+    this.searchInput.type = 'search';
+    this.searchInput.placeholder = '섹션 검색…';
+    this.searchInput.setAttribute('aria-label', '섹션 검색');
+    this.searchInput.addEventListener('input', () => {
+      this.filter = this.searchInput.value.trim().toLowerCase();
+      this.render();
+    });
+
     this.list = document.createElement('div');
     this.list.className = 'outline-list';
-    contentRoot.append(title, search, this.list);
+    this.contentRoot.append(header, this.searchInput, this.list);
 
     // Restore saved width
     const savedWidth = Number(localStorage.getItem(STORAGE_KEY)) || DEFAULT_WIDTH;
@@ -71,19 +119,56 @@ export class OutlinePanel {
       this.setupResizer(this.resizer);
     }
 
-    const model = () => editor.getModel()!;
-    const refresh = () => { this.sections = parseSections(model()); this.render(); };
+    const refresh = () => {
+      if (this.doc) {
+        const activeTab = this.doc.activeTab;
+        if (!activeTab || activeTab.kind !== 'text') {
+          this.sections = [];
+        } else {
+          this.sections = parseSections(activeTab.model);
+        }
+      } else {
+        const model = this.editor.getModel();
+        this.sections = model ? parseSections(model) : [];
+      }
+      this.render();
+    };
+
+    // 1. 활성 탭 전환 및 문서 상태 변경 시
+    if (this.doc) {
+      this.doc.onChange(() => {
+        refresh();
+        if (this.doc?.activeTab?.kind === 'text') {
+          this.setActive(this.editor.getPosition()?.lineNumber ?? 1);
+        }
+      });
+    }
+
+    // 2. 현재 활성 텍스트 모델 편집 시
     editor.onDidChangeModelContent(() => {
+      if (this.doc && this.doc.activeTab?.kind !== 'text') return;
       window.clearTimeout(this.timer);
       this.timer = window.setTimeout(refresh, 250);
     });
+
+    // 3. 에디터 모델 변경 시 (doc 없을 때의 fallback 호환)
     editor.onDidChangeModel(() => {
-      refresh();
-      this.setActive(editor.getPosition()?.lineNumber ?? 1);
+      if (!this.doc) {
+        refresh();
+        this.setActive(editor.getPosition()?.lineNumber ?? 1);
+      }
     });
-    editor.onDidChangeCursorPosition((e) => this.setActive(e.position.lineNumber));
+
+    // 4. 에디터 커서 이동 시
+    editor.onDidChangeCursorPosition((e) => {
+      if (this.doc && this.doc.activeTab?.kind !== 'text') return;
+      this.setActive(e.position.lineNumber);
+    });
+
     refresh();
-    this.setActive(editor.getPosition()?.lineNumber ?? 1);
+    if (!this.doc || this.doc.activeTab?.kind === 'text') {
+      this.setActive(editor.getPosition()?.lineNumber ?? 1);
+    }
   }
 
   setVisible(visible: boolean) {
@@ -177,6 +262,10 @@ export class OutlinePanel {
   }
 
   private setActive(cursorLine: number) {
+    if (this.doc && this.doc.activeTab?.kind !== 'text') {
+      this.activeLine = 0;
+      return;
+    }
     let active = 0;
     for (const s of this.sections) if (s.line <= cursorLine) active = s.line;
     if (active === this.activeLine) return;
@@ -189,6 +278,7 @@ export class OutlinePanel {
   }
 
   private jump(line: number) {
+    if (this.doc && this.doc.activeTab?.kind !== 'text') return;
     this.editor.revealLineNearTop(line);
     this.editor.setPosition({ lineNumber: line, column: 1 });
     this.editor.focus();
@@ -196,6 +286,52 @@ export class OutlinePanel {
 
   private render() {
     this.list.replaceChildren();
+
+    if (this.doc) {
+      const activeTab = this.doc.activeTab;
+      if (!activeTab) {
+        this.docTitle.textContent = '';
+        this.docTitle.hidden = true;
+        this.searchInput.disabled = true;
+        const p = document.createElement('p');
+        p.className = 'hint';
+        p.textContent = '열린 문서가 없습니다.';
+        this.list.append(p);
+        return;
+      }
+
+      this.docTitle.textContent = activeTab.title;
+      this.docTitle.hidden = false;
+
+      if (activeTab.kind === 'custom') {
+        this.searchInput.disabled = true;
+        this.searchInput.value = '';
+        this.filter = '';
+        const p = document.createElement('p');
+        p.className = 'hint outline-notice';
+        p.textContent = `현재 보고 있는 탭('${activeTab.title}')은 에셋 뷰어입니다. (섹션 목록 없음)`;
+        this.list.append(p);
+        return;
+      }
+
+      if (activeTab.kind === 'diff') {
+        this.searchInput.disabled = true;
+        this.searchInput.value = '';
+        this.filter = '';
+        const p = document.createElement('p');
+        p.className = 'hint outline-notice';
+        p.textContent = '현재 보고 있는 탭은 파일 비교(Diff) 뷰어입니다.';
+        this.list.append(p);
+        return;
+      }
+
+      this.searchInput.disabled = false;
+    } else {
+      this.docTitle.textContent = '';
+      this.docTitle.hidden = true;
+      this.searchInput.disabled = false;
+    }
+
     const visible = this.sections.filter((s) => s.name.toLowerCase().includes(this.filter));
     if (visible.length === 0) {
       const p = document.createElement('p');

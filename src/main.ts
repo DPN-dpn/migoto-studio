@@ -107,7 +107,7 @@ async function boot() {
   const doc = new DocumentManager(editor, $('custom-viewer-container'));
   const diffViewer = new DiffViewer($('diff-container'), doc);
   doc.setDiffViewer(diffViewer);
-  const outline = new OutlinePanel(editor, $('sidebar'), $('sidebar-panel-outline'), $('sidebar-resizer'));
+  const outline = new OutlinePanel(editor, doc, $('sidebar'), $('sidebar-panel-outline'), $('sidebar-resizer'));
   const explorer = new FileExplorer($('sidebar-panel-explorer'), doc);
   new TemplatePanel($('sidebar-panel-templates'), editor);
   const pluginManager = new PluginManager(doc, editor, explorer);
