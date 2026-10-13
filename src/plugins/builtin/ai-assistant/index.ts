@@ -124,8 +124,8 @@ export default definePlugin({
         modelChipsWrap.className = 'ai-model-chips';
 
         const availableModels = [
-          { name: 'gemini-flash-latest', label: 'gemini-flash-latest (기본/추천)' },
-          { name: 'gemini-pro-latest', label: 'gemini-pro-latest (고성능)' },
+          { name: 'gemini-flash-latest', label: 'gemini-flash-latest' },
+          { name: 'gemini-pro-latest', label: 'gemini-pro-latest' },
           { name: 'gpt-4o-mini', label: 'gpt-4o-mini' },
           { name: 'gpt-4o', label: 'gpt-4o' },
         ];
@@ -543,7 +543,7 @@ export default definePlugin({
           const tokenized = safe.replace(/`([^`]+)`/g, (_match, codeContent) => {
             const idx = codeTokens.length;
             codeTokens.push(`<code class="ai-inline-code">${codeContent}</code>`);
-            return `__AICODE_${idx}__`;
+            return `\uFFF0CODE_${idx}\uFFF1`;
           });
           let formatted = tokenized.replace(/(\*\*\*|___)(.*?)\1/g, '<strong><em>$2</em></strong>');
           formatted = formatted.replace(/(\*\*|__)(.*?)\1/g, '<strong>$2</strong>');
@@ -552,7 +552,7 @@ export default definePlugin({
             /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,
             '<a href="$2" target="_blank" rel="noopener noreferrer" class="ai-link">$1</a>',
           );
-          formatted = formatted.replace(/__AICODE_(\d+)__/g, (_m, idxStr) => {
+          formatted = formatted.replace(/\uFFF0CODE_(\d+)\uFFF1/g, (_m, idxStr) => {
             const idx = parseInt(idxStr, 10);
             return codeTokens[idx] || '';
           });
@@ -919,10 +919,10 @@ export default definePlugin({
             const keyProp = s.properties['hash']
               ? `hash=${s.properties['hash']}`
               : s.properties['key']
-              ? `key=${s.properties['key']}`
-              : s.properties['type']
-              ? `type=${s.properties['type']}`
-              : '';
+                ? `key=${s.properties['key']}`
+                : s.properties['type']
+                  ? `type=${s.properties['type']}`
+                  : '';
             outlineLines.push(`- [${s.name}] (${grp}${keyProp ? `, ${keyProp}` : ''}, 라인 ${s.startLine}~${s.endLine})`);
           }
 
@@ -1141,10 +1141,10 @@ export default definePlugin({
                 step.status === 'completed'
                   ? '[완료]'
                   : step.status === 'error'
-                  ? '[오류]'
-                  : step.status === 'retry'
-                  ? '[재시도]'
-                  : '[진행]';
+                    ? '[오류]'
+                    : step.status === 'retry'
+                      ? '[재시도]'
+                      : '[진행]';
 
               const textWrap = document.createElement('div');
               textWrap.style.display = 'flex';
@@ -1208,15 +1208,30 @@ export default definePlugin({
           const providerName = apiUrl.includes('generativelanguage.googleapis.com')
             ? 'Google Gemini'
             : apiUrl.includes('api.openai.com')
-            ? 'OpenAI'
-            : apiUrl.includes('localhost:11434')
-            ? '로컬 Ollama'
-            : '사용자 지정 API';
+              ? 'OpenAI'
+              : apiUrl.includes('localhost:11434')
+                ? '로컬 Ollama'
+                : '사용자 지정 API';
 
           statusInfo.textContent = `${providerName} / ${model}`;
 
           const systemPrompt = `당신은 3DMigoto 및 XXMI (.ini) 모딩 전문 개발 도우미입니다.
 사용자가 제공한 [문서 구조 요약] 및 [관련 섹션 본문]을 바탕으로 질문의 의도를 분석하고 정확한 INI 코드를 작성하세요.
+
+[3DMigoto / XXMI 문법 및 시스템 키워드 규칙]
+1. 빌트인 시스템 변수 (중요):
+   - 3DMigoto 및 XXMI 엔진에서 자체 제공하는 시스템 변수 및 상수들은 '$' 접두사를 붙이지 않는 정식 내장 키워드입니다:
+     * 드로우 및 파이프라인: draw_type (또는 DRAW_TYPE), vertex_count, index_count, instance_count, first_vertex, first_index, first_instance, indirect_offset
+     * 화면 및 해상도: rt_width, rt_height, res_width, res_height, window_width, window_height, scissor_left, scissor_top, scissor_right, scissor_bottom
+     * 상태 및 시간: time, frame_time, fps, frame_number, draw_number, dispatch_number, hunting, sli, frame_analysis, cursor_showing, cursor_x, cursor_y, separation, convergence
+   - 예시: 'if draw_type == 1' 또는 'if DRAW_TYPE == 1'은 3DMigoto/XXMI의 완전한 표준 정식 문법입니다.
+   - 절대 이 키워드들을 사용자 변수로 오인하여 '$'를 붙이도록 하거나 [Constants]에 'global $DRAW_TYPE = 0' 등으로 선언하라고 잘못 지적하지 마십시오.
+2. 사용자 정의 변수:
+   - 모더가 정의하는 상태 변수나 토글 변수는 '$'로 시작합니다 (예: '$toggle', '$active', 'global $costume = 0').
+   - 사용자 변수는 [Constants] 섹션에 선언되거나 [KeyToggle] 등에서 정의됩니다.
+3. 조건문 문법:
+   - 조건 비교는 '==' 연산자를 사용합니다 (예: 'if $toggle == 1', 'if DRAW_TYPE == 1').
+   - 'if' 블록은 반드시 'endif'로 닫혀야 합니다.
 
 [중요 작성 규칙]
 1. 파일 전체 코드를 처음부터 끝까지 다시 작성하지 마십시오.
@@ -1472,5 +1487,5 @@ export default definePlugin({
       },
     });
   },
-  deactivate() {},
+  deactivate() { },
 });
