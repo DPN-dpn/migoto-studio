@@ -15,7 +15,7 @@ async function buildDefaultPlugins() {
   const rootDir = process.cwd();
 
   for (const id of plugins) {
-    const srcDir = resolve(rootDir, 'src/plugins/builtin', id);
+    const srcDir = resolve(rootDir, 'default-plugins', id);
     const entryFile = resolve(srcDir, 'index.ts');
     const manifestFile = resolve(srcDir, 'plugin.json');
     const iconFile = resolve(srcDir, 'icon.svg');

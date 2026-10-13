@@ -2752,7 +2752,7 @@ function j(e, t) {
 	return n[0] = e, n[1] = t, e > t ? (n[2] = Math.round((6 * e + 1 * t) / 7), n[3] = Math.round((5 * e + 2 * t) / 7), n[4] = Math.round((4 * e + 3 * t) / 7), n[5] = Math.round((3 * e + 4 * t) / 7), n[6] = Math.round((2 * e + 5 * t) / 7), n[7] = Math.round((1 * e + 6 * t) / 7)) : (n[2] = Math.round((4 * e + 1 * t) / 5), n[3] = Math.round((3 * e + 2 * t) / 5), n[4] = Math.round((2 * e + 3 * t) / 5), n[5] = Math.round((1 * e + 4 * t) / 5), n[6] = 0, n[7] = 255), n;
 }
 //#endregion
-//#region src/plugins/builtin/asset-viewer/image-viewer.ts
+//#region default-plugins/asset-viewer/image-viewer.ts
 var M = /* @__PURE__ */ new Uint8Array(256), N = /* @__PURE__ */ new Uint8Array(256);
 for (let e = 0; e < 256; e++) {
 	let t = e / 255, n = t <= .04045 ? t / 12.92 : ((t + .055) / 1.055) ** 2.4;

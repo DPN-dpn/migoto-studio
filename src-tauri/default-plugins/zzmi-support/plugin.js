@@ -3,7 +3,7 @@ function e(e) {
 	return e;
 }
 //#endregion
-//#region src/plugins/builtin/zzmi-support/index.ts
+//#region default-plugins/zzmi-support/index.ts
 var t = e({ activate(e) {
 	e.linter.registerAllowedResource(/^commandlist\\zzmi\\/i), e.linter.registerAllowedResource(/^resource\\zzmi\\/i), e.linter.registerAllowedResource("CommandList\\ZZMI\\SetTextures"), e.templates.registerTemplate({
 		id: "zzmi_slot_fix",

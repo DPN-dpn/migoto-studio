@@ -1,4 +1,4 @@
-import { definePlugin } from '../../api.ts';
+import { definePlugin } from '../../src/plugins/api.ts';
 
 export default definePlugin({
   activate(context) {

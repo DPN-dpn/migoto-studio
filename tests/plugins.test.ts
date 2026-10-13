@@ -1,7 +1,21 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { decodeDDS } from '../src/plugins/builtin/asset-viewer/dds-decoder.ts';
-import { BUILTIN_PLUGINS } from '../src/plugins/builtin.ts';
+import { decodeDDS } from '../default-plugins/asset-viewer/dds-decoder.ts';
+import pythonRunnerPlugin from '../default-plugins/python-runner/index.ts';
+import assetViewerPlugin from '../default-plugins/asset-viewer/index.ts';
+import aiAssistantPlugin from '../default-plugins/ai-assistant/index.ts';
+import resourceCheckerPlugin from '../default-plugins/resource-checker/index.ts';
+import zzmiSupportPlugin from '../default-plugins/zzmi-support/index.ts';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+
+const BUILTIN_PLUGINS = [
+  { manifest: JSON.parse(readFileSync(resolve(process.cwd(), 'default-plugins/python-runner/plugin.json'), 'utf8')), createPlugin: () => pythonRunnerPlugin },
+  { manifest: JSON.parse(readFileSync(resolve(process.cwd(), 'default-plugins/asset-viewer/plugin.json'), 'utf8')), createPlugin: () => assetViewerPlugin },
+  { manifest: JSON.parse(readFileSync(resolve(process.cwd(), 'default-plugins/ai-assistant/plugin.json'), 'utf8')), createPlugin: () => aiAssistantPlugin },
+  { manifest: JSON.parse(readFileSync(resolve(process.cwd(), 'default-plugins/resource-checker/plugin.json'), 'utf8')), createPlugin: () => resourceCheckerPlugin },
+  { manifest: JSON.parse(readFileSync(resolve(process.cwd(), 'default-plugins/zzmi-support/plugin.json'), 'utf8')), createPlugin: () => zzmiSupportPlugin },
+];
 import { validatePluginZip } from '../src/plugins/zip.ts';
 import { definePlugin } from '../src/plugins/api.ts';
 import { renderPluginIcon } from '../src/plugins/types.ts';

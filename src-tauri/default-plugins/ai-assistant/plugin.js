@@ -3,7 +3,7 @@ function e(e) {
 	return e;
 }
 //#endregion
-//#region src/plugins/builtin/ai-assistant/icon.ts
+//#region default-plugins/ai-assistant/icon.ts
 var t = e({
 	activate(e) {
 		e.ui.registerSidebarView({

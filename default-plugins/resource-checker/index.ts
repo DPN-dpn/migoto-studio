@@ -1,6 +1,6 @@
-import { definePlugin } from '../../api.ts';
-import { stripComments } from '../../../core/lint.ts';
-import type { DirEntry, LintDiagnostic } from '../../types.ts';
+import { definePlugin } from '../../src/plugins/api.ts';
+import { stripComments } from '../../src/core/lint.ts';
+import type { DirEntry, LintDiagnostic } from '../../src/plugins/types.ts';
 
 interface NamespaceExport {
   namespace: string;

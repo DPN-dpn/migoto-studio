@@ -21,7 +21,7 @@ function t(e) {
 	};
 }
 //#endregion
-//#region src/plugins/builtin/resource-checker/index.ts
+//#region default-plugins/resource-checker/index.ts
 function n(e, n) {
 	let r = e.split(/\r?\n/), i = "", a = "", o = /* @__PURE__ */ new Set(), s = /* @__PURE__ */ new Set();
 	for (let e = 0; e < r.length; e++) {

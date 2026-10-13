@@ -1,4 +1,4 @@
-import { definePlugin, type PluginContext } from '../../api.ts';
+import { definePlugin, type PluginContext } from '../../src/plugins/api.ts';
 import { ImageViewer } from './image-viewer.ts';
 
 /**

@@ -3,7 +3,7 @@ function e(e) {
 	return e;
 }
 //#endregion
-//#region src/plugins/builtin/python-runner/icon.ts
+//#region default-plugins/python-runner/icon.ts
 var t = e({
 	activate(e) {
 		e.ui.registerSidebarView({
