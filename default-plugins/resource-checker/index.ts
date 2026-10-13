@@ -327,9 +327,9 @@ export default definePlugin({
               const parts = target.split('\\').filter(Boolean);
               const prefix = parts[0];
               const isBuiltIn = prefix.toLowerCase().startsWith('builtin');
-              const isZZMI = prefix.toLowerCase() === 'commandlist' && parts[1]?.toLowerCase() === 'zzmi';
+              const isAllowed = ctx.isAllowedResource ? ctx.isAllowedResource(target) : false;
 
-              if (!isBuiltIn && !isZZMI && parts.length >= 3) {
+              if (!isBuiltIn && !isAllowed && parts.length >= 3) {
                 const nsName = parts.slice(1, -1).join('\\');
                 const actionName = parts[parts.length - 1];
                 const nsData = namespaceMap.get(nsName.toLowerCase());

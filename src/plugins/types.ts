@@ -60,6 +60,8 @@ export interface CustomLintRule {
     fileExists: (relativePath: string) => Promise<boolean>;
     readTextFile?: (relativePath: string) => Promise<string>;
     getAllFiles?: () => string[];
+    isAllowedResource?: (name: string) => boolean;
+    isAllowedVariable?: (name: string) => boolean;
   }) => Promise<LintDiagnostic[]> | LintDiagnostic[];
 }
 

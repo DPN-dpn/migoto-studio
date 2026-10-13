@@ -191,8 +191,8 @@ var r = e({ activate(e) {
 				if (u) {
 					let t = u[1].trim();
 					if (t.includes("\\")) {
-						let r = t.split("\\").filter(Boolean), i = r[0], a = i.toLowerCase().startsWith("builtin"), o = i.toLowerCase() === "commandlist" && r[1]?.toLowerCase() === "zzmi";
-						if (!a && !o && r.length >= 3) {
+						let r = t.split("\\").filter(Boolean), i = r[0], a = i.toLowerCase().startsWith("builtin"), c = o.isAllowedResource ? o.isAllowedResource(t) : !1;
+						if (!a && !c && r.length >= 3) {
 							let a = r.slice(1, -1).join("\\"), o = r[r.length - 1], c = l.get(a.toLowerCase()), d = n.indexOf(u[1]), f = d === -1 ? 1 : d + 1, p = f + u[1].length;
 							c ? [
 								`${i}${o}`.toLowerCase(),

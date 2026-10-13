@@ -6,7 +6,7 @@ import type { FileExplorer } from '../ui/explorer';
 import { openModal } from '../ui/modal';
 import { showToast } from '../ui/toast';
 import type { ActivityBar } from '../ui/activitybar';
-import { registerAllowedResource, registerAllowedVariable } from '../core/lint';
+import { registerAllowedResource, registerAllowedVariable, isAllowedResource, isAllowedVariable } from '../core/lint';
 import { registerPluginTemplate } from '../core/templates';
 import { parseIni, classifyIniSection, mergeIniSections, formatIniSection } from '../core/ini';
 import type {
@@ -64,11 +64,14 @@ export class PluginManager {
     this.doc.setViewerProvider(this);
   }
 
+  private isLinting = false;
+
   setLintTrigger(fn: () => void): void {
     this.lintTrigger = fn;
   }
 
   triggerLint(): void {
+    if (this.isLinting) return;
     this.lintTrigger?.();
   }
 
@@ -178,66 +181,73 @@ export class PluginManager {
 
   async runCustomLintRules(model: monaco.editor.ITextModel): Promise<monaco.editor.IMarkerData[]> {
     if (this.customLintRules.size === 0) return [];
-    const markers: monaco.editor.IMarkerData[] = [];
-    const curFile = this.doc.file ? {
-      name: this.doc.fileName,
-      path: this.doc.file.id,
-      location: this.doc.file.location,
-    } : null;
-    const curFolder = this.explorer && this.explorer.hasFolder ? (this.explorer as any).currentFolder?.id ?? null : null;
+    this.isLinting = true;
+    try {
+      const markers: monaco.editor.IMarkerData[] = [];
+      const curFile = this.doc.file ? {
+        name: this.doc.fileName,
+        path: this.doc.file.id,
+        location: this.doc.file.location,
+      } : null;
+      const curFolder = this.explorer && this.explorer.hasFolder ? (this.explorer as any).currentFolder?.id ?? null : null;
 
-    const fileExistsHelper = async (relPath: string): Promise<boolean> => {
-      return this.checkFileExists(relPath);
-    };
+      const fileExistsHelper = async (relPath: string): Promise<boolean> => {
+        return this.checkFileExists(relPath);
+      };
 
-    const ctx = {
-      model: {
-        getLineCount: () => model.getLineCount(),
-        getLineContent: (n: number) => model.getLineContent(n),
-        getValue: () => model.getValue(),
-      },
-      file: curFile,
-      folder: curFolder,
-      fileExists: fileExistsHelper,
-      readTextFile: async (relOrAbsPath: string): Promise<string> => {
-        let clean = relOrAbsPath.trim().replace(/^["']|["']$/g, '').trim();
-        if (curFolder && !clean.includes(':') && !clean.startsWith('/') && !clean.startsWith('\\')) {
-          clean = `${curFolder.replace(/\\/g, '/')}/${clean.replace(/\\/g, '/')}`;
+      const ctx = {
+        model: {
+          getLineCount: () => model.getLineCount(),
+          getLineContent: (n: number) => model.getLineContent(n),
+          getValue: () => model.getValue(),
+        },
+        file: curFile,
+        folder: curFolder,
+        fileExists: fileExistsHelper,
+        readTextFile: async (relOrAbsPath: string): Promise<string> => {
+          let clean = relOrAbsPath.trim().replace(/^["']|["']$/g, '').trim();
+          if (curFolder && !clean.includes(':') && !clean.startsWith('/') && !clean.startsWith('\\')) {
+            clean = `${curFolder.replace(/\\/g, '/')}/${clean.replace(/\\/g, '/')}`;
+          }
+          const ref = platform().refFromId(clean);
+          const loaded = await platform().readFile(ref);
+          return loaded.text;
+        },
+        getAllFiles: (): string[] => {
+          return this.explorer && this.explorer.hasFolder ? this.explorer.getAllFilePaths() : [];
+        },
+        isAllowedResource: (name: string) => isAllowedResource(name),
+        isAllowedVariable: (name: string) => isAllowedVariable(name),
+      };
+
+      for (const rule of this.customLintRules.values()) {
+        try {
+          const diags = await rule.check(ctx);
+          for (const d of diags) {
+            const sev = d.severity === 'error'
+              ? monaco.MarkerSeverity.Error
+              : d.severity === 'info'
+              ? monaco.MarkerSeverity.Info
+              : monaco.MarkerSeverity.Warning;
+
+            markers.push({
+              severity: sev,
+              message: d.message,
+              startLineNumber: d.startLineNumber,
+              startColumn: d.startColumn,
+              endLineNumber: d.endLineNumber,
+              endColumn: d.endColumn,
+            });
+          }
+        } catch (err) {
+          console.warn(`[PluginManager] Custom lint rule "${rule.name}" failed:`, err);
         }
-        const ref = platform().refFromId(clean);
-        const loaded = await platform().readFile(ref);
-        return loaded.text;
-      },
-      getAllFiles: (): string[] => {
-        return this.explorer && this.explorer.hasFolder ? this.explorer.getAllFilePaths() : [];
-      },
-    };
-
-    for (const rule of this.customLintRules.values()) {
-      try {
-        const diags = await rule.check(ctx);
-        for (const d of diags) {
-          const sev = d.severity === 'error'
-            ? monaco.MarkerSeverity.Error
-            : d.severity === 'info'
-            ? monaco.MarkerSeverity.Info
-            : monaco.MarkerSeverity.Warning;
-
-          markers.push({
-            severity: sev,
-            message: d.message,
-            startLineNumber: d.startLineNumber,
-            startColumn: d.startColumn,
-            endLineNumber: d.endLineNumber,
-            endColumn: d.endColumn,
-          });
-        }
-      } catch (err) {
-        console.warn(`[PluginManager] Custom lint rule "${rule.name}" failed:`, err);
       }
-    }
 
-    return markers;
+      return markers;
+    } finally {
+      this.isLinting = false;
+    }
   }
 
   getSidebarViews(): RegisteredSidebarView[] {

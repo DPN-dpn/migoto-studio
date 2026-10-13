@@ -210,3 +210,42 @@ test('folder mode delegates namespaced variables to custom lint rule', () => {
   assert.equal(markers.some((m) => m.message.includes('costume')), false);
 });
 
+test('this = syntax marks declared resource as used and detects undeclared resource', () => {
+  const validIni = `
+[TextureOverrideBody]
+hash = 12345678
+this = ResourceBodyDiffuse
+
+[ResourceBodyDiffuse]
+filename = Textures/Body.dds
+`;
+  const validModel = createMockModel(validIni);
+  const validMarkers = lintModel(validModel, {
+    ...defaultOptions,
+    unusedItems: true,
+  });
+  // Should have NO warnings or info markers about unused resources
+  const unusedMarkers = validMarkers.filter((m) => m.message.includes('사용되지 않는'));
+  const missingMarkers = validMarkers.filter((m) => m.severity === MarkerSeverity.Warning);
+  assert.equal(unusedMarkers.length, 0, 'ResourceBodyDiffuse should be marked as used');
+  assert.equal(missingMarkers.length, 0, 'No missing resource warnings');
+
+  // Now test undeclared resource in this =
+  const invalidIni = `
+[TextureOverrideBody]
+hash = 12345678
+this = ResourceNotExist
+`;
+  const invalidModel = createMockModel(invalidIni);
+  const invalidMarkers = lintModel(invalidModel, {
+    ...defaultOptions,
+    unusedItems: true,
+  });
+  assert.ok(
+    invalidMarkers.some(
+      (m) => m.severity === MarkerSeverity.Warning && m.message.includes('ResourceNotExist')
+    ),
+    'Should report warning for missing resource in this ='
+  );
+});
+

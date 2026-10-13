@@ -340,17 +340,21 @@ export function lintModel(model: TextModelLike, options: LintOptions): monaco.ed
     }
 
     // 5. Resource / CommandList references
-    // Keys like: run = CommandListX, post run = ..., pre run = ..., vb0 = ResourceX, ib = ResourceIB, ps-t0 = ResourceTexture
+    // Keys like: run = CommandListX, post run = ..., pre run = ..., this = ResourceX, vb0 = ResourceX, ib = ResourceIB, ps-t0 = ResourceTexture
     // or path/namespace references: Resource\Sub\Key = ref Target, run = CommandList\Sub\Action
-    const resRefMatch = /^\s*(?:(?:pre\s+|post\s+)?run|vb\d+|ib|[a-z]{2}-[tu]\d+|Resource(?:\\[a-zA-Z0-9_]+)*)\s*=\s*(?:ref\s+)?([a-zA-Z0-9_\\]+)/i.exec(code);
+    const resRefMatch = /^\s*(?:(?:pre\s+|post\s+)?run|this|vb\d+|ib|[a-z]{2}-(?:[tu]|cb)\d+|Resource(?:\\[a-zA-Z0-9_]+)*)\s*=\s*(?:ref\s+|copy\s+)?([a-zA-Z0-9_\\]+)/i.exec(code);
     if (resRefMatch) {
       const target = resRefMatch[1].trim();
       const lowerTarget = target.toLowerCase();
       // Skip keywords like 'null', 'skip', 'auto', 'default'
       if (!['null', 'skip', 'auto', 'default'].includes(lowerTarget)) {
-        // If it starts with Resource/CommandList/CustomShader or is a 'run' command
-        if (/^(?:resource|commandlist|customshader)/i.test(target) || /run\s*=/i.test(code)) {
-          const valIdx = code.lastIndexOf(target);
+        // If it starts with Resource/CommandList/CustomShader or is a 'run'/'this'/slot assignment
+        if (
+          /^(?:resource|commandlist|customshader)/i.test(target) ||
+          /(?:run|this|vb\d+|ib|[a-z]{2}-(?:[tu]|cb)\d+)\s*=/i.test(code)
+        ) {
+          const eqIdx = code.indexOf('=');
+          const valIdx = eqIdx !== -1 ? code.indexOf(target, eqIdx) : code.lastIndexOf(target);
           if (valIdx !== -1) {
             resourceRefs.push({
               name: target,
@@ -360,6 +364,21 @@ export function lintModel(model: TextModelLike, options: LintOptions): monaco.ed
             });
           }
         }
+      }
+    }
+
+    // Left-side namespaced Resource binding (e.g. Resource\ZZMI\Diffuse = ref ResourceDiffuse)
+    const leftResMatch = /^\s*(Resource\\[a-zA-Z0-9_\\]+)\s*=/i.exec(code);
+    if (leftResMatch) {
+      const leftTarget = leftResMatch[1].trim();
+      const valIdx = code.indexOf(leftTarget);
+      if (valIdx !== -1) {
+        resourceRefs.push({
+          name: leftTarget,
+          line,
+          col: valIdx + 1,
+          endCol: valIdx + leftTarget.length + 1,
+        });
       }
     }
   }

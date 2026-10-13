@@ -49,7 +49,7 @@ export const DEFAULT_SETTINGS: Settings = {
   lintComparisonInCondition: true,
   lintMissingResources: true,
   lintUndeclaredVars: true,
-  lintUnusedItems: false,
+  lintUnusedItems: true,
 };
 
 /**

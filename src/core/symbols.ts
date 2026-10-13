@@ -157,8 +157,8 @@ export function computeSuggestions(
     }
   }
 
-  // 2. Resource slots assignment: vb0 = , ib = , ps-t0 = , Resource =
-  const resSlotMatch = /^\s*(?:vb\d+|ib|[a-z]{2}-[tu]\d+|Resource)\s*=\s*([a-zA-Z0-9_]*)$/i.exec(linePrefix);
+  // 2. Resource slots assignment: this = , vb0 = , ib = , ps-t0 = , Resource =
+  const resSlotMatch = /^\s*(?:this|vb\d+|ib|[a-z]{2}-(?:[tu]|cb)\d+|Resource)\s*=\s*([a-zA-Z0-9_]*)$/i.exec(linePrefix);
   if (resSlotMatch) {
     const typedWord = resSlotMatch[1];
     const startCol = column - typedWord.length;
