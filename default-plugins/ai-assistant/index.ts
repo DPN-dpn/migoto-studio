@@ -221,7 +221,6 @@ export default definePlugin({
         guideCard.innerHTML = `
           <div style="font-weight:600;color:var(--fg);margin-bottom:4px;">안내사항</div>
           <div>- Google Gemini: Google AI Studio 키(AQ...) 입력 시 gemini-flash-latest 모델이 기본 제공됩니다.</div>
-          <div>- 404 오류 발생 시: 모델명을 gemini-flash-latest 또는 gemini-pro-latest로 지정하세요.</div>
           <div>- OpenAI: platform.openai.com API 키 및 gpt-4o-mini 모델을 권장합니다.</div>
           <div>- Ollama: 로컬 PC에서 실행 중인 경우 키 없이 바로 연결할 수 있습니다.</div>
         `;
