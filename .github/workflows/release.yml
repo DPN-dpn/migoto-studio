@@ -80,6 +80,7 @@ jobs:
           releaseBody: ${{ steps.notes.outputs.body }}
           releaseDraft: false
           prerelease: false
+          uploadUpdaterJson: true
 
       - name: Create Portable Package
         shell: pwsh

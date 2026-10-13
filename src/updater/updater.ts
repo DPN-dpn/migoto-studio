@@ -97,8 +97,8 @@ export async function checkUpdate(): Promise<UpdateInfo> {
   const currentVersion = CURRENT_APP_VERSION;
   const isPortable = await checkIsPortable();
 
-  // 1. Desktop: try official Tauri Updater plugin
-  if (platform().kind === 'desktop') {
+  // 1. Desktop: try official Tauri Updater plugin (production desktop builds only)
+  if (platform().kind === 'desktop' && !import.meta.env.DEV) {
     try {
       const { check } = await import('@tauri-apps/plugin-updater');
       const update = await check();
@@ -410,6 +410,9 @@ export async function runUpdateCheck(silent = false) {
  * Automatically check on startup if enabled in settings.
  */
 export function checkOnStartup() {
+  if (import.meta.env.DEV) {
+    return;
+  }
   const s = getSettings();
   if (s.checkForUpdatesOnStartup !== false) {
     setTimeout(() => {
@@ -417,3 +420,4 @@ export function checkOnStartup() {
     }, 2500);
   }
 }
+
