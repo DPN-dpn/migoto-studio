@@ -1,12 +1,17 @@
 # 릴리스 노트 (Release Notes)
 
-## [다음 버전]
+## [0.10.1] - 2026-10-13
 
 ### 신규 기능
+- 웹 버전 기본 플러그인 정적 서빙 지원: 웹 환경에서도 DDS/텍스처 뷰어, AI 어시스턴트, 리소스 무결성 검사기, ZZMI 문법 지원 등 4종의 웹 호환 플러그인을 기본으로 사용할 수 있도록 정적 배포 구조 구축
 
 ### 기능 개선
+- 플러그인 빌드 파이프라인 확장: npm run build:plugins 실행 시 웹 호환 플러그인 4종을 public/default-plugins에 자동 배치하고 매니페스트 인덱스(index.json)를 생성하여 배포 자동화
+- GitHub Pages 배포 워크플로 트리거 보강: default-plugins 및 빌드 스크립트 수정 시 웹 앱이 자동 재배포되도록 경로 감지 추가
 
 ### 버그 수정
+- 이전 버전 로컬 스토리지 잔여 데이터로 인한 유령 플러그인 표시 오류 수정: localStorage 내 구버전 기본 플러그인, 지원되지 않는 데스크톱 전용 플러그인(python-runner), 손상되거나 비어 있는 플러그인 항목을 자동으로 정제(Purge)
+- 존재하지 않거나 삭제된 플러그인 ID가 migoto_plugins_enabled, migoto_plugin_order, migoto_plugins_collapsed에 잔존하던 동기화 버그 해결
 
 ---
 
