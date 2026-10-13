@@ -97,10 +97,22 @@ export default definePlugin({
         keyWrap.append(keyInput, eyeBtn);
         keyRow.append(keyLabel, keyWrap);
 
+        // 저장된 모델이 404를 유발하는 레거시 모델명이면 최신 gemini-flash-latest로 자동 마이그레이션
+        let initialModel = (context.storage.get('model', 'gemini-flash-latest') as string).trim();
+        if (
+          !initialModel ||
+          initialModel.startsWith('gemini-2.') ||
+          initialModel.startsWith('gemini-1.') ||
+          initialModel === 'gemini-pro'
+        ) {
+          initialModel = 'gemini-flash-latest';
+          context.storage.set('model', initialModel);
+        }
+
         const modelInput = context.ui.createInput({
           label: '모델명:',
-          placeholder: 'gemini-2.5-flash, gpt-4o-mini 등',
-          value: context.storage.get('model', 'gemini-2.5-flash'),
+          placeholder: 'gemini-flash-latest, gpt-4o-mini 등',
+          value: initialModel,
           onInput: (v) => {
             context.storage.set('model', v.trim());
             renderChips();
@@ -112,16 +124,15 @@ export default definePlugin({
         modelChipsWrap.className = 'ai-model-chips';
 
         const availableModels = [
-          { name: 'gemini-2.5-flash', label: 'gemini-2.5-flash (추천)' },
-          { name: 'gemini-2.0-flash', label: 'gemini-2.0-flash' },
-          { name: 'gemini-2.5-pro', label: 'gemini-2.5-pro' },
-          { name: 'gemini-flash-latest', label: 'gemini-flash-latest' },
+          { name: 'gemini-flash-latest', label: 'gemini-flash-latest (기본/추천)' },
+          { name: 'gemini-pro-latest', label: 'gemini-pro-latest (고성능)' },
           { name: 'gpt-4o-mini', label: 'gpt-4o-mini' },
+          { name: 'gpt-4o', label: 'gpt-4o' },
         ];
 
         const renderChips = () => {
           modelChipsWrap.replaceChildren();
-          const current = (context.storage.get('model', 'gemini-2.5-flash') as string).trim();
+          const current = (context.storage.get('model', 'gemini-flash-latest') as string).trim();
           for (const m of availableModels) {
             const chip = document.createElement('button');
             chip.type = 'button';
@@ -152,7 +163,7 @@ export default definePlugin({
           variant: 'small',
           onClick: () => {
             const u = 'https://generativelanguage.googleapis.com/v1beta/openai';
-            const m = 'gemini-2.5-flash';
+            const m = 'gemini-flash-latest';
             urlInput.setValue(u);
             modelInput.setValue(m);
             context.storage.set('api_url', u);
@@ -209,8 +220,8 @@ export default definePlugin({
         guideCard.style.lineHeight = '1.5';
         guideCard.innerHTML = `
           <div style="font-weight:600;color:var(--fg);margin-bottom:4px;">안내사항</div>
-          <div>- Google Gemini: Google AI Studio 키(AQ...) 입력 시 gemini-2.5-flash 모델이 무료 제공됩니다.</div>
-          <div>- 일시 과부하(503) 발생 시: 트래픽 급증으로 인한 일시 현상이므로 자동 재시도되거나, 모델 칩에서 gemini-2.0-flash로 변경해 보세요.</div>
+          <div>- Google Gemini: Google AI Studio 키(AQ...) 입력 시 gemini-flash-latest 모델이 기본 제공됩니다.</div>
+          <div>- 404 오류 발생 시: 모델명을 gemini-flash-latest 또는 gemini-pro-latest로 지정하세요.</div>
           <div>- OpenAI: platform.openai.com API 키 및 gpt-4o-mini 모델을 권장합니다.</div>
           <div>- Ollama: 로컬 PC에서 실행 중인 경우 키 없이 바로 연결할 수 있습니다.</div>
         `;
@@ -515,6 +526,215 @@ export default definePlugin({
           return true;
         }
 
+        // HTML 안전 이스케이프 함수
+        function escapeHtml(str: string): string {
+          return str
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+        }
+
+        // 인라인 마크다운 변환 함수 (인라인 코드, 볼드, 이탤릭, 링크)
+        function formatInlineMarkdown(text: string): string {
+          const safe = escapeHtml(text);
+          const codeTokens: string[] = [];
+          const tokenized = safe.replace(/`([^`]+)`/g, (_match, codeContent) => {
+            const idx = codeTokens.length;
+            codeTokens.push(`<code class="ai-inline-code">${codeContent}</code>`);
+            return `__AICODE_${idx}__`;
+          });
+          let formatted = tokenized.replace(/(\*\*\*|___)(.*?)\1/g, '<strong><em>$2</em></strong>');
+          formatted = formatted.replace(/(\*\*|__)(.*?)\1/g, '<strong>$2</strong>');
+          formatted = formatted.replace(/(?<!\w)(\*|_)(.*?)\1(?!\w)/g, '<em>$2</em>');
+          formatted = formatted.replace(
+            /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,
+            '<a href="$2" target="_blank" rel="noopener noreferrer" class="ai-link">$1</a>',
+          );
+          formatted = formatted.replace(/__AICODE_(\d+)__/g, (_m, idxStr) => {
+            const idx = parseInt(idxStr, 10);
+            return codeTokens[idx] || '';
+          });
+          return formatted;
+        }
+
+        // 블록 마크다운 파서 (제목, 목록, 인용문, 테이블, 단락, 가로선)
+        function parseMarkdownToHtml(mdText: string): string {
+          const lines = mdText.split(/\r?\n/);
+          const out: string[] = [];
+          let inUl = false;
+          let inOl = false;
+          let inBlockquote = false;
+          let inTable = false;
+          let tableHeaders: string[] = [];
+          let tableRows: string[][] = [];
+          let paraLines: string[] = [];
+
+          const flushPara = () => {
+            if (paraLines.length > 0) {
+              const content = paraLines.map((l) => formatInlineMarkdown(l)).join('<br>');
+              out.push(`<p class="ai-md-p">${content}</p>`);
+              paraLines = [];
+            }
+          };
+
+          const flushTable = () => {
+            if (!inTable) return;
+            let html = '<table class="ai-md-table">';
+            if (tableHeaders.length > 0) {
+              html += '<thead><tr>';
+              for (const th of tableHeaders) {
+                html += `<th>${formatInlineMarkdown(th)}</th>`;
+              }
+              html += '</tr></thead>';
+            }
+            if (tableRows.length > 0) {
+              html += '<tbody>';
+              for (const row of tableRows) {
+                html += '<tr>';
+                for (const cell of row) {
+                  html += `<td>${formatInlineMarkdown(cell)}</td>`;
+                }
+                html += '</tr>';
+              }
+              html += '</tbody>';
+            }
+            html += '</table>';
+            out.push(html);
+            inTable = false;
+            tableHeaders = [];
+            tableRows = [];
+          };
+
+          const closeBlocks = () => {
+            flushPara();
+            flushTable();
+            if (inUl) {
+              out.push('</ul>');
+              inUl = false;
+            }
+            if (inOl) {
+              out.push('</ol>');
+              inOl = false;
+            }
+            if (inBlockquote) {
+              out.push('</blockquote>');
+              inBlockquote = false;
+            }
+          };
+
+          for (let i = 0; i < lines.length; i++) {
+            const rawLine = lines[i];
+            const trimmed = rawLine.trim();
+
+            if (!trimmed) {
+              closeBlocks();
+              continue;
+            }
+
+            // 테이블 감지: | 컬럼 | 컬럼 |
+            if (trimmed.startsWith('|') && trimmed.endsWith('|') && trimmed.length > 2) {
+              flushPara();
+              if (inUl) { out.push('</ul>'); inUl = false; }
+              if (inOl) { out.push('</ol>'); inOl = false; }
+              if (inBlockquote) { out.push('</blockquote>'); inBlockquote = false; }
+
+              const isDivider = /^\|?(\s*:?-{2,}:?\s*\|)+\s*$/.test(trimmed);
+              if (isDivider) {
+                continue;
+              }
+
+              const cells = trimmed
+                .slice(1, -1)
+                .split('|')
+                .map((c) => c.trim());
+
+              if (!inTable) {
+                inTable = true;
+                tableHeaders = cells;
+              } else {
+                tableRows.push(cells);
+              }
+              continue;
+            } else if (inTable) {
+              flushTable();
+            }
+
+            // 가로선: ---, ***, ___
+            if (/^(\-{3,}|\*{3,}|_{3,})$/.test(trimmed)) {
+              closeBlocks();
+              out.push('<hr class="ai-md-hr">');
+              continue;
+            }
+
+            // 제목: # ~ ####
+            const headerMatch = trimmed.match(/^(#{1,6})\s+(.+)$/);
+            if (headerMatch) {
+              closeBlocks();
+              const level = Math.min(headerMatch[1].length + 2, 6);
+              out.push(
+                `<h${level} class="ai-md-h ai-md-h${level}">${formatInlineMarkdown(headerMatch[2])}</h${level}>`,
+              );
+              continue;
+            }
+
+            // 인용문: > 본문
+            const quoteMatch = trimmed.match(/^>\s?(.*)$/);
+            if (quoteMatch) {
+              flushPara();
+              if (inUl) { out.push('</ul>'); inUl = false; }
+              if (inOl) { out.push('</ol>'); inOl = false; }
+              if (!inBlockquote) {
+                out.push('<blockquote class="ai-md-quote">');
+                inBlockquote = true;
+              }
+              out.push(`<p>${formatInlineMarkdown(quoteMatch[1])}</p>`);
+              continue;
+            } else if (inBlockquote) {
+              out.push('</blockquote>');
+              inBlockquote = false;
+            }
+
+            // 비순서 목록: - 항목, * 항목
+            const ulMatch = trimmed.match(/^[-*+]\s+(.+)$/);
+            if (ulMatch) {
+              flushPara();
+              if (inOl) { out.push('</ol>'); inOl = false; }
+              if (!inUl) {
+                out.push('<ul class="ai-md-ul">');
+                inUl = true;
+              }
+              out.push(`<li>${formatInlineMarkdown(ulMatch[1])}</li>`);
+              continue;
+            } else if (inUl && !rawLine.startsWith('  ') && !rawLine.startsWith('\t')) {
+              out.push('</ul>');
+              inUl = false;
+            }
+
+            // 순서 목록: 1. 항목
+            const olMatch = trimmed.match(/^\d+\.\s+(.+)$/);
+            if (olMatch) {
+              flushPara();
+              if (inUl) { out.push('</ul>'); inUl = false; }
+              if (!inOl) {
+                out.push('<ol class="ai-md-ol">');
+                inOl = true;
+              }
+              out.push(`<li>${formatInlineMarkdown(olMatch[1])}</li>`);
+              continue;
+            } else if (inOl && !rawLine.startsWith('  ') && !rawLine.startsWith('\t')) {
+              out.push('</ol>');
+              inOl = false;
+            }
+
+            paraLines.push(rawLine);
+          }
+
+          closeBlocks();
+          return out.join('');
+        }
+
         // 마크다운 응답 렌더링 헬퍼
         function renderAssistantContent(targetEl: HTMLElement, text: string) {
           targetEl.replaceChildren();
@@ -525,9 +745,10 @@ export default definePlugin({
           while ((match = codeBlockRegex.exec(text)) !== null) {
             const textBefore = text.slice(lastIdx, match.index);
             if (textBefore.trim()) {
-              const p = document.createElement('p');
-              p.textContent = textBefore.trim();
-              targetEl.append(p);
+              const mdDiv = document.createElement('div');
+              mdDiv.className = 'ai-md-content';
+              mdDiv.innerHTML = parseMarkdownToHtml(textBefore.trim());
+              targetEl.append(mdDiv);
             }
 
             const codeContent = match[1].trim();
@@ -575,9 +796,10 @@ export default definePlugin({
 
           const remaining = text.slice(lastIdx);
           if (remaining.trim()) {
-            const p = document.createElement('p');
-            p.textContent = remaining.trim();
-            targetEl.append(p);
+            const mdDiv = document.createElement('div');
+            mdDiv.className = 'ai-md-content';
+            mdDiv.innerHTML = parseMarkdownToHtml(remaining.trim());
+            targetEl.append(mdDiv);
           }
         }
 
@@ -963,15 +1185,23 @@ export default definePlugin({
             context.storage.get('api_url', 'https://generativelanguage.googleapis.com/v1beta/openai') as string
           ).replace(/\/+$/, '');
           const apiKey = (context.storage.get('api_key', '') as string).trim();
-          let model = (context.storage.get('model', 'gemini-2.5-flash') as string).trim();
+          let model = (context.storage.get('model', 'gemini-flash-latest') as string).trim();
 
           // Google Gemini OpenAI 엔드포인트 자동 정정 및 레거시 모델 보정
           if (apiUrl.includes('generativelanguage.googleapis.com')) {
             if (!apiUrl.endsWith('/openai')) {
               apiUrl = `${apiUrl}/openai`;
             }
-            if (!model || model === 'gemini-1.5-pro' || model === 'gemini-pro') {
-              model = 'gemini-2.5-flash';
+            if (
+              !model ||
+              model.startsWith('gemini-2.') ||
+              model.startsWith('gemini-1.') ||
+              model === 'gemini-pro'
+            ) {
+              model = 'gemini-flash-latest';
+              context.storage.set('model', 'gemini-flash-latest');
+              modelInput.setValue('gemini-flash-latest');
+              renderChips();
             }
           }
 
@@ -1191,13 +1421,13 @@ export default definePlugin({
 
           if (reason === '503') {
             desc.textContent =
-              'Google Gemini 무료 티어 트래픽 집중으로 인해 요청이 일시 지연되었습니다. 다른 모델로 전환하시거나 잠시 후 다시 시도해 보세요.';
+              'Google Gemini 무료 티어 트래픽 집중으로 인해 요청이 일시 지연되었습니다. 잠시 후 다시 시도하시거나 다른 모델로 변경해 보세요.';
           } else if (reason === 'TIMEOUT') {
             desc.textContent =
-              '서버 응답이 45초 동안 지연되었습니다. 다른 모델로 전환하여 빠르게 응답을 받아보세요.';
+              '서버 응답이 45초 동안 지연되었습니다. 네트워크 상태를 확인하시거나 다시 시도해 보세요.';
           } else if (reason === '404') {
             desc.textContent =
-              '지정된 모델이 존재하지 않거나 지원되지 않습니다. 권장 모델(gemini-2.5-flash)로 변경해 보세요.';
+              '지정된 모델 또는 엔드포인트를 찾을 수 없습니다 (404). Google Gemini 공식 별칭인 gemini-flash-latest 또는 gemini-pro-latest를 사용하세요.';
           } else {
             desc.textContent = '요청 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해 보세요.';
           }
@@ -1207,7 +1437,7 @@ export default definePlugin({
           btnRow.style.gap = '6px';
           btnRow.style.flexWrap = 'wrap';
 
-          const altModel = currentModel.includes('2.0') ? 'gemini-2.5-flash' : 'gemini-2.0-flash';
+          const altModel = currentModel === 'gemini-flash-latest' ? 'gemini-pro-latest' : 'gemini-flash-latest';
           const switchBtn = document.createElement('button');
           switchBtn.className = 'small-btn';
           switchBtn.textContent = `${altModel} 모델로 전환 후 재시도`;
