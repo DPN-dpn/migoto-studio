@@ -344,29 +344,13 @@ export class PluginPanel {
     const iconName = document.createElement('div');
     iconName.className = 'plugin-card-title';
 
-    // Collapse toggle chevron button
-    const chevronBtn = document.createElement('button');
-    chevronBtn.className = 'plugin-collapse-btn';
-    chevronBtn.title = isCollapsed ? '상세 정보 펼치기' : '간략히 접기';
-    chevronBtn.setAttribute('aria-label', isCollapsed ? '펼치기' : '접기');
-    chevronBtn.innerHTML = isCollapsed
-      ? `<svg viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 4 10 8 6 12"></polyline></svg>`
-      : `<svg viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 6 8 10 12 6"></polyline></svg>`;
-    chevronBtn.onclick = (e) => {
-      e.stopPropagation();
-      this.toggleCollapse(p.manifest.id);
-    };
-    iconName.append(chevronBtn);
-
     const titleClickArea = document.createElement('span');
     titleClickArea.className = 'plugin-title-content';
     titleClickArea.style.cursor = 'pointer';
     titleClickArea.title = isCollapsed ? '클릭하여 상세 정보 펼치기' : '클릭하여 간략히 접기';
     titleClickArea.innerHTML = `
-      <span class="plugin-order-num">${index + 1}.</span>
       <span class="plugin-icon">${renderPluginIcon(p.manifest.icon)}</span>
       <strong class="plugin-name">${p.manifest.name}</strong>
-      <span class="plugin-version">v${p.manifest.version}</span>
     `;
     titleClickArea.onclick = () => this.toggleCollapse(p.manifest.id);
     iconName.append(titleClickArea);

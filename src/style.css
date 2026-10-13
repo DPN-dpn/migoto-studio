@@ -3226,6 +3226,16 @@ body.ai-dock-resizing * {
   gap: 6px;
   overflow: hidden;
   user-select: none;
+  flex: 1;
+  min-width: 0;
+  border-radius: 4px;
+  padding: 2px 4px;
+  margin-left: -4px;
+  transition: background-color 0.15s;
+}
+
+.plugin-title-content:hover {
+  background-color: var(--bg-hover);
 }
 
 .plugin-card-top {
@@ -3241,6 +3251,8 @@ body.ai-dock-resizing * {
   gap: 6px;
   font-size: 12px;
   overflow: hidden;
+  flex: 1;
+  min-width: 0;
 }
 
 .plugin-card-title .plugin-icon {
