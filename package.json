@@ -5,11 +5,11 @@
   "type": "module",
   "license": "GPL-3.0-or-later",
   "scripts": {
-    "dev": "vite",
+    "dev": "npm run build:plugins && vite",
     "build:plugins": "node scripts/build-default-plugins.mjs",
     "build": "npm run build:plugins && tsc --noEmit && vite build",
     "preview": "vite preview",
-    "test": "node --test tests/*.test.ts",
+    "test": "npm run build:plugins && node --test tests/*.test.ts",
     "tauri": "tauri",
     "bump": "node scripts/bump-version.mjs",
     "bump:patch": "node scripts/bump-version.mjs patch",

@@ -20,7 +20,13 @@ if (-not (Get-Command link.exe -ErrorAction SilentlyContinue)) {
 if ($args.Count -gt 0) {
     $cmd = $args[0]
     $rest = @($args | Select-Object -Skip 1)
-    & $cmd @rest
+    if ($cmd -eq 'test') {
+        npm test @rest
+    } elseif ($cmd -eq 'build') {
+        npm run build @rest
+    } else {
+        & $cmd @rest
+    }
 } else {
     npm run tauri dev
 }
