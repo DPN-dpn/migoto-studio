@@ -1147,17 +1147,16 @@ export default definePlugin({
                       : '[진행]';
 
               const textWrap = document.createElement('div');
-              textWrap.style.display = 'flex';
-              textWrap.style.flexDirection = 'column';
+              textWrap.className = 'ai-status-step-text-wrap';
 
               const labelSpan = document.createElement('span');
+              labelSpan.className = 'ai-status-step-label';
               labelSpan.textContent = step.label;
               textWrap.append(labelSpan);
 
               if (step.detail) {
                 const detailSpan = document.createElement('span');
-                detailSpan.style.fontSize = '9.5px';
-                detailSpan.style.color = 'var(--fg-dim)';
+                detailSpan.className = 'ai-status-step-detail';
                 detailSpan.textContent = step.detail;
                 textWrap.append(detailSpan);
               }
@@ -1299,6 +1298,17 @@ export default definePlugin({
 
                 if (!res.ok) {
                   const errText = await res.text();
+                  let cleanErr = errText;
+                  try {
+                    const parsed = JSON.parse(errText);
+                    if (Array.isArray(parsed) && parsed[0]?.error?.message) {
+                      cleanErr = parsed[0].error.message;
+                    } else if (parsed?.error?.message) {
+                      cleanErr = parsed.error.message;
+                    }
+                  } catch {
+                    // Not JSON, use errText as-is
+                  }
                   if ((res.status === 503 || res.status === 429) && attempt <= maxRetries) {
                     const waitSec = attempt === 1 ? 2.0 : 3.5;
                     updateStep(
@@ -1311,7 +1321,7 @@ export default definePlugin({
                     updateStep(2, 'active', '서버 재요청 전송 중...', `재시도 (${attempt}/${maxRetries}) 응답 대기 중`);
                     continue;
                   }
-                  throw new Error(`API 오류 (${res.status}): ${errText}`);
+                  throw new Error(`API 오류 (${res.status}): ${cleanErr}`);
                 }
 
                 replyData = await res.json();
@@ -1432,19 +1442,10 @@ export default definePlugin({
           reason: '503' | 'TIMEOUT' | '404' | 'GENERAL',
         ) {
           const box = document.createElement('div');
-          box.style.marginTop = '8px';
-          box.style.padding = '8px 10px';
-          box.style.background = 'rgba(239, 68, 68, 0.08)';
-          box.style.border = '1px solid rgba(239, 68, 68, 0.25)';
-          box.style.borderRadius = '6px';
-          box.style.display = 'flex';
-          box.style.flexDirection = 'column';
-          box.style.gap = '6px';
+          box.className = 'ai-error-actions-box';
 
           const desc = document.createElement('div');
-          desc.style.fontSize = '11px';
-          desc.style.color = '#fca5a5';
-          desc.style.lineHeight = '1.45';
+          desc.className = 'ai-error-actions-desc';
 
           if (reason === '503') {
             desc.textContent =
@@ -1460,9 +1461,7 @@ export default definePlugin({
           }
 
           const btnRow = document.createElement('div');
-          btnRow.style.display = 'flex';
-          btnRow.style.gap = '6px';
-          btnRow.style.flexWrap = 'wrap';
+          btnRow.className = 'ai-error-actions-btn-row';
 
           const altModel = currentModel === 'gemini-flash-latest' ? 'gemini-pro-latest' : 'gemini-flash-latest';
           const switchBtn = document.createElement('button');

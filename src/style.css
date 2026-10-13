@@ -2097,6 +2097,10 @@ input:checked + .slider:before {
   border-left: 2px solid var(--accent);
   background: rgba(255, 255, 255, 0.015);
   border-radius: 0 6px 6px 0;
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  word-break: break-word;
 }
 
 /* AI Markdown Content */
@@ -2503,6 +2507,10 @@ body.ai-dock-resizing * {
   flex-direction: column;
   gap: 6px;
   font-size: 11px;
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  box-sizing: border-box;
 }
 
 .ai-status-header {
@@ -2510,6 +2518,7 @@ body.ai-dock-resizing * {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  min-width: 0;
 }
 
 .ai-status-header-left {
@@ -2517,6 +2526,8 @@ body.ai-dock-resizing * {
   align-items: center;
   gap: 6px;
   min-width: 0;
+  flex: 1;
+  overflow: hidden;
 }
 
 .ai-status-spinner {
@@ -2539,6 +2550,8 @@ body.ai-dock-resizing * {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  min-width: 0;
+  flex: 1;
 }
 
 .ai-status-timer {
@@ -2556,6 +2569,9 @@ body.ai-dock-resizing * {
   flex-direction: column;
   gap: 3px;
   padding-left: 2px;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
 }
 
 .ai-status-step {
@@ -2565,6 +2581,9 @@ body.ai-dock-resizing * {
   color: var(--fg-dim);
   line-height: 1.4;
   font-size: 10.5px;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
 }
 
 .ai-status-step.completed {
@@ -2589,6 +2608,31 @@ body.ai-dock-resizing * {
   font-size: 9px;
   margin-top: 1px;
   flex-shrink: 0;
+}
+
+.ai-status-step-text-wrap {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+}
+
+.ai-status-step-label {
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+.ai-status-step-detail {
+  font-size: 9.5px;
+  color: var(--fg-dim);
+  word-break: break-all;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  margin-top: 1px;
+  line-height: 1.35;
+  max-height: 140px;
+  overflow-y: auto;
 }
 
 .ai-status-actions {
@@ -2636,6 +2680,36 @@ body.ai-dock-resizing * {
   background: rgba(239, 68, 68, 0.28) !important;
   border-color: rgba(239, 68, 68, 0.7) !important;
   color: #ffffff !important;
+}
+
+/* Error recovery card */
+.ai-error-actions-box {
+  margin-top: 8px;
+  padding: 8px 10px;
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.ai-error-actions-desc {
+  font-size: 11px;
+  color: #fca5a5;
+  line-height: 1.45;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+.ai-error-actions-btn-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  min-width: 0;
 }
 
 .ai-completion-meta {
