@@ -355,6 +355,10 @@ FunctionEnd
 !define MUI_PAGE_CUSTOMFUNCTION_PRE SkipIfPassive
 !insertmacro MUI_PAGE_DIRECTORY
 
+; 6. Choose components page
+!define MUI_PAGE_CUSTOMFUNCTION_PRE SkipIfPassive
+!insertmacro MUI_PAGE_COMPONENTS
+
 ; 6. Start menu shortcut page
 Var AppStartMenuFolder
 !if "${STARTMENUFOLDER}" != ""
@@ -456,6 +460,48 @@ LangString chooseMaintenanceSubHeader ${LANG_ENGLISH} "Choose an option to conti
 LangString alreadyInstalledDesc ${LANG_KOREAN} "시스템에 ${PRODUCTNAME}이(가) 이미 설치되어 있습니다.$\r$\n수행할 작업을 선택하고 '다음'을 클릭하세요:"
 LangString alreadyInstalledDesc ${LANG_ENGLISH} "${PRODUCTNAME} is already installed on your system.$\r$\nChoose what you want to do and click 'Next':"
 
+LangString secMain ${LANG_KOREAN} "${PRODUCTNAME} (필수)"
+LangString secMain ${LANG_ENGLISH} "${PRODUCTNAME} (Required)"
+
+LangString secMainDesc ${LANG_KOREAN} "${PRODUCTNAME} 프로그램 본체 및 핵심 기능입니다."
+LangString secMainDesc ${LANG_ENGLISH} "${PRODUCTNAME} core application and essential components."
+
+LangString secDefaultPlugins ${LANG_KOREAN} "기본 플러그인"
+LangString secDefaultPlugins ${LANG_ENGLISH} "Default Plugins"
+
+LangString secDefaultPluginsDesc ${LANG_KOREAN} "AI 어시스턴트, 텍스처 뷰어, 린터 등 기본 플러그인을 %APPDATA%\MigotoStudio\plugins 경로에 설치합니다."
+LangString secDefaultPluginsDesc ${LANG_ENGLISH} "Installs default plugins (AI Assistant, Texture Viewer, Linters) into %APPDATA%\MigotoStudio\plugins."
+
+LangString secPluginAI ${LANG_KOREAN} "AI 모딩 에이전트"
+LangString secPluginAI ${LANG_ENGLISH} "AI Modding Agent"
+
+LangString secPluginAIDesc ${LANG_KOREAN} "LLM API(OpenAI, Gemini, Ollama)를 연동하여 INI 분석 및 코드 작성을 돕습니다."
+LangString secPluginAIDesc ${LANG_ENGLISH} "AI assistant supporting OpenAI, Gemini, and Ollama APIs for INI analysis and generation."
+
+LangString secPluginViewer ${LANG_KOREAN} "DDS / 텍스처 뷰어"
+LangString secPluginViewer ${LANG_ENGLISH} "DDS / Texture Viewer"
+
+LangString secPluginViewerDesc ${LANG_KOREAN} "DDS 및 이미지 파일을 에디터 탭 내에서 인터랙티브하게 검사하고 미리봅니다."
+LangString secPluginViewerDesc ${LANG_ENGLISH} "Interactive in-editor viewer for DDS and image texture assets."
+
+LangString secPluginPython ${LANG_KOREAN} "Python 실행기"
+LangString secPluginPython ${LANG_ENGLISH} "Python Runner"
+
+LangString secPluginPythonDesc ${LANG_KOREAN} "Python 코드를 에디터에서 직접 실행하고 결과를 확인합니다."
+LangString secPluginPythonDesc ${LANG_ENGLISH} "Run Python scripts within the editor and inspect execution outputs."
+
+LangString secPluginLint ${LANG_KOREAN} "커스텀 린트"
+LangString secPluginLint ${LANG_ENGLISH} "Custom Linter"
+
+LangString secPluginLintDesc ${LANG_KOREAN} "리소스 파일 실재성 및 XXMI 네임스페이스 유효성을 실시간으로 검사합니다."
+LangString secPluginLintDesc ${LANG_ENGLISH} "Real-time verification for resource file existence and XXMI namespace validity."
+
+LangString secPluginZZMI ${LANG_KOREAN} "ZZMI 지원 (젠레스 존 제로)"
+LangString secPluginZZMI ${LANG_ENGLISH} "ZZMI Support (Zenless Zone Zero)"
+
+LangString secPluginZZMIDesc ${LANG_KOREAN} "ZZMI 슬롯픽스 템플릿 및 전용 네임스페이스 인식을 지원합니다."
+LangString secPluginZZMIDesc ${LANG_ENGLISH} "ZZMI texture slotfix templates and dedicated namespace linting support."
+
 Function .onInit
   ${GetOptions} $CMDLINE "/P" $PassiveMode
   ${IfNot} ${Errors}
@@ -531,7 +577,7 @@ Function .onInit
   !endif
 FunctionEnd
 
-Section WebView2
+Section "-WebView2"
   ; Check if Webview2 is already installed and skip this section
   ${If} ${RunningX64}
     ReadRegStr $4 HKLM "SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\${WEBVIEW2APPGUID}" "pv"
@@ -623,7 +669,8 @@ Section WebView2
   ${EndIf}
 SectionEnd
 
-Section Install
+Section "!$(secMain)" SecMain
+  SectionIn RO
   SetOutPath $INSTDIR
 
   !ifmacrodef NSIS_HOOK_PREINSTALL
@@ -727,6 +774,53 @@ Section Install
     SetAutoClose true
   ${EndIf}
 SectionEnd
+
+SectionGroup "$(secDefaultPlugins)" SecGroupPlugins
+  Section "$(secPluginAI)" SecPluginAI
+    SetShellVarContext current
+    CreateDirectory "$APPDATA\MigotoStudio\plugins\ai-assistant"
+    SetOutPath "$APPDATA\MigotoStudio\plugins\ai-assistant"
+    File /r "default-plugins\ai-assistant\*.*"
+  SectionEnd
+
+  Section "$(secPluginViewer)" SecPluginViewer
+    SetShellVarContext current
+    CreateDirectory "$APPDATA\MigotoStudio\plugins\asset-viewer"
+    SetOutPath "$APPDATA\MigotoStudio\plugins\asset-viewer"
+    File /r "default-plugins\asset-viewer\*.*"
+  SectionEnd
+
+  Section "$(secPluginPython)" SecPluginPython
+    SetShellVarContext current
+    CreateDirectory "$APPDATA\MigotoStudio\plugins\python-runner"
+    SetOutPath "$APPDATA\MigotoStudio\plugins\python-runner"
+    File /r "default-plugins\python-runner\*.*"
+  SectionEnd
+
+  Section "$(secPluginLint)" SecPluginLint
+    SetShellVarContext current
+    CreateDirectory "$APPDATA\MigotoStudio\plugins\resource-checker"
+    SetOutPath "$APPDATA\MigotoStudio\plugins\resource-checker"
+    File /r "default-plugins\resource-checker\*.*"
+  SectionEnd
+
+  Section "$(secPluginZZMI)" SecPluginZZMI
+    SetShellVarContext current
+    CreateDirectory "$APPDATA\MigotoStudio\plugins\zzmi-support"
+    SetOutPath "$APPDATA\MigotoStudio\plugins\zzmi-support"
+    File /r "default-plugins\zzmi-support\*.*"
+  SectionEnd
+SectionGroupEnd
+
+!insertmacro MUI_FUNCTION_DESCRIPTION_BEGIN
+  !insertmacro MUI_DESCRIPTION_TEXT ${SecMain} $(secMainDesc)
+  !insertmacro MUI_DESCRIPTION_TEXT ${SecGroupPlugins} $(secDefaultPluginsDesc)
+  !insertmacro MUI_DESCRIPTION_TEXT ${SecPluginAI} $(secPluginAIDesc)
+  !insertmacro MUI_DESCRIPTION_TEXT ${SecPluginViewer} $(secPluginViewerDesc)
+  !insertmacro MUI_DESCRIPTION_TEXT ${SecPluginPython} $(secPluginPythonDesc)
+  !insertmacro MUI_DESCRIPTION_TEXT ${SecPluginLint} $(secPluginLintDesc)
+  !insertmacro MUI_DESCRIPTION_TEXT ${SecPluginZZMI} $(secPluginZZMIDesc)
+!insertmacro MUI_FUNCTION_DESCRIPTION_END
 
 Function .onInstSuccess
   ; Check for `/R` flag only in silent and passive installers because

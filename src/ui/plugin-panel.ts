@@ -412,24 +412,22 @@ export class PluginPanel {
     reorderWrap.append(upBtn, downBtn);
     rightControls.append(reorderWrap);
 
-    if (!p.isBuiltin) {
-      const deleteBtn = document.createElement('button');
-      deleteBtn.className = 'icon-btn delete-plugin-btn';
-      deleteBtn.title = '플러그인 삭제';
-      deleteBtn.innerHTML = `
-        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <polyline points="3 6 5 6 21 6"></polyline>
-          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-        </svg>
-      `;
-      deleteBtn.onclick = async (e) => {
-        e.stopPropagation();
-        if (confirm(`플러그인 "${p.manifest.name}"을(를) 삭제하시겠습니까?`)) {
-          await this.manager.deletePlugin(p.manifest.id);
-        }
-      };
-      rightControls.append(deleteBtn);
-    }
+    const deleteBtn = document.createElement('button');
+    deleteBtn.className = 'icon-btn delete-plugin-btn';
+    deleteBtn.title = '플러그인 삭제';
+    deleteBtn.innerHTML = `
+      <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="3 6 5 6 21 6"></polyline>
+        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+      </svg>
+    `;
+    deleteBtn.onclick = async (e) => {
+      e.stopPropagation();
+      if (confirm(`플러그인 "${p.manifest.name}"을(를) 삭제하시겠습니까?`)) {
+        await this.manager.deletePlugin(p.manifest.id);
+      }
+    };
+    rightControls.append(deleteBtn);
 
     // Toggle switch
     const toggleLabel = document.createElement('label');
@@ -466,7 +464,7 @@ export class PluginPanel {
     metaRow.className = 'plugin-meta-row';
     metaRow.innerHTML = `
       <span class="plugin-author">제작: ${p.manifest.author || '알 수 없음'}</span>
-      ${p.isBuiltin ? '<span class="plugin-badge">내장</span>' : '<span class="plugin-badge user">사용자</span>'}
+      <span class="plugin-badge user">v${p.manifest.version || '1.0.0'}</span>
       ${p.enabled ? '<span class="plugin-status-badge enabled">활성</span>' : '<span class="plugin-status-badge disabled">비활성</span>'}
     `;
 

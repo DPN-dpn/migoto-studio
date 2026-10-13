@@ -468,4 +468,33 @@ test('zzmi-support plugin activates and registers allowed resource and code temp
   assert.equal(registeredView, null);
 });
 
+test('default-plugins directory contains all 5 standalone plugins ready for installation', async () => {
+  const fs = await import('node:fs');
+  const path = await import('node:path');
+  const url = await import('node:url');
+
+  const defaultIds = ['python-runner', 'asset-viewer', 'ai-assistant', 'resource-checker', 'zzmi-support'];
+  const baseDir = path.resolve(process.cwd(), 'default-plugins');
+
+  for (const id of defaultIds) {
+    const pJson = path.join(baseDir, id, 'plugin.json');
+    const pJs = path.join(baseDir, id, 'plugin.js');
+
+    assert.ok(fs.existsSync(pJson), `plugin.json must exist for ${id}`);
+    assert.ok(fs.existsSync(pJs), `plugin.js must exist for ${id}`);
+
+    const manifest = JSON.parse(fs.readFileSync(pJson, 'utf8'));
+    assert.equal(manifest.id, id);
+    assert.equal(manifest.main, 'plugin.js');
+    assert.ok(manifest.icon && manifest.icon.includes('<svg'), `Plugin ${id} manifest must embed SVG icon`);
+
+    // Dynamically import standalone bundle
+    const fileUrl = url.pathToFileURL(pJs).href;
+    const mod = await import(fileUrl);
+    const plugin = mod.default || mod;
+    assert.equal(typeof plugin.activate, 'function', `Plugin ${id} must export activate function`);
+  }
+});
+
+
 

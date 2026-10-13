@@ -5,7 +5,6 @@ import type { DocumentManager } from '../core/documents';
 import type { FileExplorer } from '../ui/explorer';
 import { openModal } from '../ui/modal';
 import { showToast } from '../ui/toast';
-import { BUILTIN_PLUGINS } from './builtin';
 import type { ActivityBar } from '../ui/activitybar';
 import { registerAllowedResource, registerAllowedVariable } from '../core/lint';
 import { registerPluginTemplate } from '../core/templates';
@@ -254,21 +253,15 @@ export class PluginManager {
       }
     })();
 
-    // 1. Initialize built-in plugins
-    for (const def of BUILTIN_PLUGINS) {
-      const isEnabled = savedStates[def.manifest.id] !== false; // enabled by default
-      const instance: PluginInstance = {
-        manifest: def.manifest,
-        enabled: isEnabled,
-        isBuiltin: true,
-      };
-      this.plugins.set(def.manifest.id, instance);
-      if (isEnabled) {
-        await this.activatePlugin(instance, def.createPlugin());
-      }
+    for (const p of this.plugins.values()) {
+      try {
+        p.cleanup?.();
+      } catch { }
+      p.cleanup = undefined;
+      p.instance = undefined;
     }
+    this.plugins.clear();
 
-    // 2. Discover & initialize disk plugins in Desktop environment
     await this.loadDiskPlugins(savedStates);
 
     this.notify();
@@ -280,21 +273,7 @@ export class PluginManager {
     try {
       const diskList = await platform().listDiskPlugins!();
 
-      // Ensure built-ins are written to disk if empty so users can inspect/edit them
-      if (diskList.length === 0 && platform().saveDiskPlugin) {
-        for (const def of BUILTIN_PLUGINS) {
-          try {
-            await platform().saveDiskPlugin!(
-              def.manifest.id,
-              JSON.stringify(def.manifest, null, 2),
-              def.standaloneScript || `// ${def.manifest.name}\nexport default {\n  activate(context) {\n    context.ui.showToast('${def.manifest.name} 플러그인이 로드되었습니다.');\n  }\n};\n`,
-            );
-          } catch { }
-        }
-      }
-
       for (const disk of diskList) {
-        if (this.plugins.has(disk.id)) continue; // Built-in already registered
 
         let manifest: PluginManifest;
         try {
@@ -460,13 +439,8 @@ export class PluginManager {
       p.cleanup?.();
       p.cleanup = undefined;
       p.instance = undefined;
-    } else {
-      if (p.isBuiltin) {
-        const def = BUILTIN_PLUGINS.find((b) => b.manifest.id === pluginId);
-        if (def) await this.activatePlugin(p, def.createPlugin());
-      } else if (p.scriptContent) {
-        await this.loadAndActivateScriptPlugin(p, p.scriptContent);
-      }
+    } else if (p.scriptContent) {
+      await this.loadAndActivateScriptPlugin(p, p.scriptContent);
     }
 
     this.notify();
@@ -480,10 +454,6 @@ export class PluginManager {
   async deletePlugin(pluginId: string): Promise<boolean> {
     const p = this.plugins.get(pluginId);
     if (!p) return false;
-    if (p.isBuiltin) {
-      this.showToast('내장 플러그인은 삭제할 수 없습니다.', 'warn');
-      return false;
-    }
 
     if (p.enabled) {
       await this.togglePlugin(pluginId, false);
@@ -540,11 +510,6 @@ export class PluginManager {
     }
 
     const { manifest, files, manifestJson, scriptContent } = extracted;
-
-    if (BUILTIN_PLUGINS.some((b) => b.manifest.id === manifest.id)) {
-      this.showToast(`기본 내장 플러그인 ID("${manifest.id}")는 덮어쓸 수 없습니다.`, 'error');
-      return false;
-    }
 
     if (platform().kind === 'desktop' && platform().getPluginsDir && platform().writeBinaryFile) {
       try {
