@@ -69,11 +69,29 @@ jobs:
         id: notes
         run: node scripts/generate-release-notes.mjs ${{ steps.vars.outputs.tag }}
 
+      - name: Sanitize Tauri Signing Key
+        shell: pwsh
+        run: |
+          $rawKey = [System.Environment]::GetEnvironmentVariable('SECRET_KEY')
+          if ($rawKey) {
+            $cleanKey = ($rawKey -replace "[\r\n\s]", "").Trim()
+            Add-Content -Path $env:GITHUB_ENV -Value "TAURI_SIGNING_PRIVATE_KEY=$cleanKey"
+          }
+          $rawPass = [System.Environment]::GetEnvironmentVariable('SECRET_PASS')
+          if ($rawPass) {
+            $cleanPass = $rawPass.Trim()
+            Add-Content -Path $env:GITHUB_ENV -Value "TAURI_SIGNING_PRIVATE_KEY_PASSWORD=$cleanPass"
+          }
+        env:
+          SECRET_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          SECRET_PASS: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+
       - name: Build Tauri Desktop App & Create GitHub Release
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ env.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ env.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           tagName: ${{ steps.vars.outputs.tag }}
           releaseName: 'Migoto Studio ${{ steps.vars.outputs.tag }}'
