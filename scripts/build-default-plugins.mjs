@@ -11,6 +11,13 @@ const plugins = [
   'zzmi-support',
 ];
 
+const webCompatiblePlugins = [
+  'asset-viewer',
+  'ai-assistant',
+  'resource-checker',
+  'zzmi-support',
+];
+
 async function buildDefaultPlugins() {
   const rootDir = process.cwd();
 
@@ -58,6 +65,10 @@ async function buildDefaultPlugins() {
       resolve(rootDir, 'data/plugins', id),
     ];
 
+    if (webCompatiblePlugins.includes(id)) {
+      targetDirs.push(resolve(rootDir, 'public/default-plugins', id));
+    }
+
     for (const dir of targetDirs) {
       await mkdir(dir, { recursive: true });
       await writeFile(resolve(dir, 'plugin.json'), manifestJson, 'utf8');
@@ -72,6 +83,21 @@ async function buildDefaultPlugins() {
 
     console.log(`[build-default-plugins] Built ${id} -> plugin.json + plugin.js`);
   }
+
+  // Ensure desktop-only plugins are pruned from public/default-plugins
+  const webPythonDir = resolve(rootDir, 'public/default-plugins', 'python-runner');
+  if (existsSync(webPythonDir)) {
+    await rm(webPythonDir, { recursive: true, force: true });
+  }
+
+  // Write index.json for web discovery
+  await mkdir(resolve(rootDir, 'public/default-plugins'), { recursive: true });
+  await writeFile(
+    resolve(rootDir, 'public/default-plugins/index.json'),
+    JSON.stringify(webCompatiblePlugins, null, 2),
+    'utf8',
+  );
+  console.log('[build-default-plugins] Generated public/default-plugins/index.json');
 }
 
 buildDefaultPlugins().catch((err) => {

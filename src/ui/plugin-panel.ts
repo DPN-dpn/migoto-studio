@@ -56,6 +56,19 @@ export class PluginPanel {
     const plugins = this.manager.getPlugins();
     const isDesktop = platform().kind === 'desktop';
 
+    // Prune collapsed states for plugins that no longer exist
+    const currentIds = new Set(plugins.map((p) => p.manifest.id));
+    let collapsedChanged = false;
+    for (const id of Array.from(this.collapsedPlugins)) {
+      if (!currentIds.has(id)) {
+        this.collapsedPlugins.delete(id);
+        collapsedChanged = true;
+      }
+    }
+    if (collapsedChanged) {
+      this.saveCollapsedState();
+    }
+
     // 1. Header Row (Actions)
     const header = document.createElement('div');
     header.className = 'panel-header';

@@ -510,5 +510,104 @@ test('default-plugins directory contains all 5 standalone plugins ready for inst
   }
 });
 
+test('public/default-plugins contains web-compatible plugins and excludes python-runner', async () => {
+  const fs = await import('node:fs');
+  const path = await import('node:path');
+
+  const pubDir = path.resolve(process.cwd(), 'public/default-plugins');
+  assert.ok(fs.existsSync(pubDir), 'public/default-plugins directory must exist');
+
+  const indexJson = path.join(pubDir, 'index.json');
+  assert.ok(fs.existsSync(indexJson), 'index.json must exist');
+  const indexList = JSON.parse(fs.readFileSync(indexJson, 'utf8'));
+
+  assert.deepEqual(indexList, ['asset-viewer', 'ai-assistant', 'resource-checker', 'zzmi-support']);
+  assert.equal(fs.existsSync(path.join(pubDir, 'python-runner')), false, 'python-runner must not exist in public/default-plugins');
+
+  for (const id of indexList) {
+    assert.ok(fs.existsSync(path.join(pubDir, id, 'plugin.json')), `plugin.json must exist for ${id} in public/`);
+    assert.ok(fs.existsSync(path.join(pubDir, id, 'plugin.js')), `plugin.js must exist for ${id} in public/`);
+  }
+});
+
+test('web listDiskPlugins sanitizes stale localStorage, purges python-runner, and preserves valid custom plugins', async () => {
+  const { web, DEFAULT_WEB_PLUGINS, STORAGE_WEB_PLUGINS, STORAGE_DELETED_DEFAULTS } = await import('../src/platform/web.ts');
+
+  const mockStorage: Record<string, string> = {
+    [STORAGE_WEB_PLUGINS]: JSON.stringify({
+      'python-runner': {
+        id: 'python-runner',
+        manifestJson: JSON.stringify({ id: 'python-runner', name: 'Python Runner' }),
+        scriptContent: 'export default {}',
+      },
+      'asset-viewer': {
+        id: 'asset-viewer',
+        manifestJson: JSON.stringify({ id: 'asset-viewer', name: 'Old Asset Viewer' }),
+        scriptContent: 'export default {}',
+      },
+      'corrupt-plugin': {
+        id: 'corrupt-plugin',
+        manifestJson: '{ invalid json',
+        scriptContent: 'export default {}',
+      },
+      'my-custom-plugin': {
+        id: 'my-custom-plugin',
+        path: 'my-custom-plugin',
+        manifestJson: JSON.stringify({ id: 'my-custom-plugin', name: 'My Custom Plugin' }),
+        scriptContent: 'export default { activate() {} }',
+      },
+    }),
+  };
+
+  (globalThis as any).localStorage = {
+    getItem: (key: string) => mockStorage[key] ?? null,
+    setItem: (key: string, val: string) => { mockStorage[key] = val; },
+    removeItem: (key: string) => { delete mockStorage[key]; },
+  };
+
+  const originalFetch = globalThis.fetch;
+  (globalThis as any).fetch = async (url: string) => {
+    return {
+      ok: true,
+      text: async () => {
+        if (url.endsWith('.json')) {
+          const parts = url.split('/');
+          const id = parts[parts.length - 2];
+          return JSON.stringify({ id, name: id });
+        }
+        return 'export default { activate() {} }';
+      },
+    } as any;
+  };
+
+  try {
+    const list = await web.listDiskPlugins!();
+    const ids = list.map((p) => p.id);
+
+    assert.ok(!ids.includes('python-runner'), 'python-runner must be purged');
+    assert.ok(!ids.includes('corrupt-plugin'), 'corrupt-plugin must be purged');
+    assert.ok(ids.includes('my-custom-plugin'), 'my-custom-plugin must be preserved');
+    for (const defId of DEFAULT_WEB_PLUGINS) {
+      assert.ok(ids.includes(defId), `${defId} must be loaded as default plugin`);
+    }
+
+    const savedWebPlugins = JSON.parse(mockStorage[STORAGE_WEB_PLUGINS] || '{}');
+    assert.equal(savedWebPlugins['python-runner'], undefined, 'python-runner must be removed from localStorage');
+    assert.equal(savedWebPlugins['asset-viewer'], undefined, 'default plugins must be removed from localStorage');
+    assert.equal(savedWebPlugins['corrupt-plugin'], undefined, 'corrupt entries must be removed from localStorage');
+    assert.ok(savedWebPlugins['my-custom-plugin'], 'my-custom-plugin must remain in localStorage');
+
+    await web.deleteEntry!('default-plugins/asset-viewer');
+    const deletedList = JSON.parse(mockStorage[STORAGE_DELETED_DEFAULTS] || '[]');
+    assert.ok(deletedList.includes('asset-viewer'), 'asset-viewer must be recorded in deleted defaults');
+
+    const refreshedList = await web.listDiskPlugins!();
+    const refreshedIds = refreshedList.map((p) => p.id);
+    assert.ok(!refreshedIds.includes('asset-viewer'), 'deleted default plugin must not be returned');
+  } finally {
+    (globalThis as any).fetch = originalFetch;
+  }
+});
+
 
 

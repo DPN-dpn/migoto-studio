@@ -1,5 +1,5 @@
-import type { BackupEntry, BackupPolicy, DirEntry, Encoding, FileRef, LoadedFile, Platform, SaveChoice } from './types';
-import { openModal } from '../ui/modal';
+import type { BackupEntry, BackupPolicy, DirEntry, Encoding, FileRef, LoadedFile, Platform, SaveChoice } from './types.ts';
+import { openModal } from '../ui/modal.ts';
 
 const DB_NAME = 'MigotoStudioWeb';
 const DB_VERSION = 1;
@@ -294,6 +294,16 @@ function pickOpenWithFileInput(): Promise<FileRef | null> {
 }
 
 const hasFSAccess = typeof window !== 'undefined' && 'showOpenFilePicker' in window;
+
+export const DEFAULT_WEB_PLUGINS = [
+  'asset-viewer',
+  'ai-assistant',
+  'resource-checker',
+  'zzmi-support',
+];
+
+export const STORAGE_WEB_PLUGINS = 'migoto_studio_web_plugins';
+export const STORAGE_DELETED_DEFAULTS = 'migoto_web_deleted_defaults';
 
 export const web: Platform = {
   kind: 'web',
@@ -632,10 +642,27 @@ export const web: Platform = {
 
   deleteEntry: async (path: string) => {
     try {
-      const stored = JSON.parse(localStorage.getItem('migoto_studio_web_plugins') || '{}');
-      if (stored[path]) {
+      const cleanId = path
+        .replace(/^default-plugins\//, '')
+        .replace(/^web:\/\/default-plugins\//, '')
+        .trim();
+
+      // If user deletes a default plugin on web, remember so it stays removed across reloads
+      if (DEFAULT_WEB_PLUGINS.includes(cleanId)) {
+        const deleted: string[] = JSON.parse(
+          localStorage.getItem(STORAGE_DELETED_DEFAULTS) || '[]',
+        );
+        if (!deleted.includes(cleanId)) {
+          deleted.push(cleanId);
+          localStorage.setItem(STORAGE_DELETED_DEFAULTS, JSON.stringify(deleted));
+        }
+      }
+
+      const stored = JSON.parse(localStorage.getItem(STORAGE_WEB_PLUGINS) || '{}');
+      if (stored[cleanId] || stored[path]) {
+        delete stored[cleanId];
         delete stored[path];
-        localStorage.setItem('migoto_studio_web_plugins', JSON.stringify(stored));
+        localStorage.setItem(STORAGE_WEB_PLUGINS, JSON.stringify(stored));
       }
     } catch {}
   },
@@ -662,18 +689,135 @@ export const web: Platform = {
     exitCode: 1,
   }),
   listDiskPlugins: async () => {
+    // 1. Clean up legacy / obsolete / corrupt plugins from localStorage
+    const customPlugins: any[] = [];
     try {
-      const stored = JSON.parse(localStorage.getItem('migoto_studio_web_plugins') || '{}');
-      return Object.values(stored);
+      const raw = localStorage.getItem(STORAGE_WEB_PLUGINS);
+      if (raw) {
+        const stored = JSON.parse(raw);
+        let changed = false;
+
+        for (const [key, val] of Object.entries(stored)) {
+          const p = val as any;
+          const id = p?.id || key;
+
+          // Prune desktop-only plugins (python-runner) or default plugins left over in localStorage
+          if (id === 'python-runner' || DEFAULT_WEB_PLUGINS.includes(id)) {
+            delete stored[key];
+            changed = true;
+            continue;
+          }
+
+          // Prune corrupted or incomplete plugins
+          if (!p?.manifestJson || !p?.scriptContent || typeof p.manifestJson !== 'string') {
+            delete stored[key];
+            changed = true;
+            continue;
+          }
+
+          try {
+            const manifest = JSON.parse(p.manifestJson);
+            if (!manifest?.id || !manifest?.name) {
+              delete stored[key];
+              changed = true;
+              continue;
+            }
+          } catch {
+            delete stored[key];
+            changed = true;
+            continue;
+          }
+
+          customPlugins.push({
+            id: p.id || key,
+            path: p.path || key,
+            manifestJson: p.manifestJson,
+            scriptContent: p.scriptContent,
+          });
+        }
+
+        if (changed) {
+          localStorage.setItem(STORAGE_WEB_PLUGINS, JSON.stringify(stored));
+        }
+      }
     } catch {
-      return [];
+      try {
+        localStorage.removeItem(STORAGE_WEB_PLUGINS);
+      } catch {}
     }
+
+    // 2. Fetch web-compatible default plugins from public static assets
+    const defaultPlugins: any[] = [];
+    const deletedDefaults: string[] = (() => {
+      try {
+        return JSON.parse(localStorage.getItem(STORAGE_DELETED_DEFAULTS) || '[]');
+      } catch {
+        return [];
+      }
+    })();
+
+    const resolvePluginUrl = (relPath: string): string => {
+      try {
+        if (typeof window !== 'undefined' && window.location && window.location.href) {
+          const u = new URL(window.location.href);
+          if (!u.pathname.endsWith('/')) {
+            const lastSlash = u.pathname.lastIndexOf('/');
+            u.pathname = u.pathname.substring(0, lastSlash + 1);
+          }
+          u.search = '';
+          u.hash = '';
+          return new URL(relPath, u.href).href;
+        }
+      } catch {}
+      return relPath.startsWith('/') ? relPath : `./${relPath}`;
+    };
+
+    for (const id of DEFAULT_WEB_PLUGINS) {
+      if (deletedDefaults.includes(id)) continue;
+
+      try {
+        const manifestUrl = resolvePluginUrl(`default-plugins/${id}/plugin.json`);
+        const scriptUrl = resolvePluginUrl(`default-plugins/${id}/plugin.js`);
+
+        const [mRes, sRes] = await Promise.all([
+          fetch(manifestUrl),
+          fetch(scriptUrl),
+        ]);
+
+        if (mRes.ok && sRes.ok) {
+          const manifestJson = await mRes.text();
+          const scriptContent = await sRes.text();
+          defaultPlugins.push({
+            id,
+            path: `default-plugins/${id}`,
+            manifestJson,
+            scriptContent,
+          });
+        }
+      } catch (err) {
+        console.warn(`[web] Could not load default plugin "${id}":`, err);
+      }
+    }
+
+    return [...defaultPlugins, ...customPlugins];
   },
   saveDiskPlugin: async (id: string, manifestJson: string, scriptContent: string) => {
     try {
-      const stored = JSON.parse(localStorage.getItem('migoto_studio_web_plugins') || '{}');
-      stored[id] = { id, path: id, manifestJson, scriptContent };
-      localStorage.setItem('migoto_studio_web_plugins', JSON.stringify(stored));
+      // If user installs or reinstalls a default plugin, restore it from deleted list
+      const deletedDefaults: string[] = JSON.parse(
+        localStorage.getItem(STORAGE_DELETED_DEFAULTS) || '[]',
+      );
+      if (deletedDefaults.includes(id)) {
+        const updated = deletedDefaults.filter((d) => d !== id);
+        localStorage.setItem(STORAGE_DELETED_DEFAULTS, JSON.stringify(updated));
+      }
+
+      // If custom plugin, persist to localStorage
+      if (!DEFAULT_WEB_PLUGINS.includes(id)) {
+        const stored = JSON.parse(localStorage.getItem(STORAGE_WEB_PLUGINS) || '{}');
+        stored[id] = { id, path: id, manifestJson, scriptContent };
+        localStorage.setItem(STORAGE_WEB_PLUGINS, JSON.stringify(stored));
+      }
     } catch {}
   },
   pickPluginZip: async () => {

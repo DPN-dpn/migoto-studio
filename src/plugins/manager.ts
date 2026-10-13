@@ -274,6 +274,27 @@ export class PluginManager {
 
     await this.loadDiskPlugins(savedStates);
 
+    // Clean up stale IDs in savedStates and plugin order that no longer exist
+    const currentPluginIds = new Set(this.plugins.keys());
+    let statesChanged = false;
+    for (const id of Object.keys(savedStates)) {
+      if (!currentPluginIds.has(id)) {
+        delete savedStates[id];
+        statesChanged = true;
+      }
+    }
+    if (statesChanged) {
+      try {
+        localStorage.setItem(STORAGE_ENABLED_PLUGINS, JSON.stringify(savedStates));
+      } catch {}
+    }
+
+    const storedOrder = this.getStoredPluginOrder();
+    const cleanedOrder = storedOrder.filter((id) => currentPluginIds.has(id));
+    if (cleanedOrder.length !== storedOrder.length) {
+      this.saveStoredPluginOrder(cleanedOrder);
+    }
+
     this.notify();
   }
 
@@ -284,18 +305,27 @@ export class PluginManager {
       const diskList = await platform().listDiskPlugins!();
 
       for (const disk of diskList) {
-
         let manifest: PluginManifest;
         try {
           manifest = JSON.parse(disk.manifestJson);
         } catch {
-          manifest = {
-            id: disk.id,
-            name: disk.id,
-            version: '1.0.0',
-            description: '로컬 플러그인',
-            author: 'Local',
-          };
+          console.warn(`[plugins] Skipping plugin with invalid manifest (${disk.id})`);
+          continue;
+        }
+
+        if (!manifest || typeof manifest.id !== 'string' || !manifest.id.trim()) {
+          console.warn(`[plugins] Skipping plugin with missing id:`, disk);
+          continue;
+        }
+
+        // On web platform, python-runner is not supported
+        if (platform().kind === 'web' && manifest.id === 'python-runner') {
+          continue;
+        }
+
+        if (!disk.scriptContent || typeof disk.scriptContent !== 'string') {
+          console.warn(`[plugins] Skipping plugin without scriptContent (${manifest.id})`);
+          continue;
         }
 
         const isEnabled = savedStates[manifest.id] !== false;
@@ -469,9 +499,9 @@ export class PluginManager {
       await this.togglePlugin(pluginId, false);
     }
 
-    if (p.path && platform().deleteEntry) {
+    if (platform().deleteEntry) {
       try {
-        await platform().deleteEntry!(p.path);
+        await platform().deleteEntry!(p.path || pluginId);
       } catch (err) {
         this.showToast(`플러그인 삭제 실패: ${err}`, 'error');
         return false;
@@ -479,6 +509,9 @@ export class PluginManager {
     }
 
     this.plugins.delete(pluginId);
+
+    const storedOrder = this.getStoredPluginOrder().filter((id) => id !== pluginId);
+    this.saveStoredPluginOrder(storedOrder);
 
     try {
       const savedStates: Record<string, boolean> = JSON.parse(
