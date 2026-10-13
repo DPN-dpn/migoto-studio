@@ -308,7 +308,7 @@ export default definePlugin({
         const templates: Array<{ label: string; text?: string; isAction?: boolean }> = [
           {
             label: '[분석] 문법 및 오류 분석',
-            text: '현재 INI 파일의 문법적 오류나 권장되지 않는 작성 방식을 검사하고 수정안을 제시해 줘.',
+            text: '현재 INI 파일의 문법적 오류나 권장되지 않는 작성 방식을 3DMigoto/XXMI 규격(elif 및 빌트인 키워드 지원) 기준으로 검사하고 개선안을 제시해 줘.',
           },
           {
             label: '[생성] 토글 키 섹션 생성',
@@ -1229,9 +1229,21 @@ export default definePlugin({
 2. 사용자 정의 변수:
    - 모더가 정의하는 상태 변수나 토글 변수는 '$'로 시작합니다 (예: '$toggle', '$active', 'global $costume = 0').
    - 사용자 변수는 [Constants] 섹션에 선언되거나 [KeyToggle] 등에서 정의됩니다.
-3. 조건문 문법:
-   - 조건 비교는 '==' 연산자를 사용합니다 (예: 'if $toggle == 1', 'if DRAW_TYPE == 1').
-   - 'if' 블록은 반드시 'endif'로 닫혀야 합니다.
+3. 조건문 문법 및 elif 지원 (매우 중요):
+   - 3DMigoto 및 XXMI 파서는 'if', 'elif', 'else if', 'else', 'endif'를 공식적으로 완전하게 지원합니다.
+   - 예시 구조:
+     if <조건1>
+         ...
+     elif <조건2>
+         ...
+     else if <조건3>
+         ...
+     else
+         ...
+     endif
+   - 'elif'와 'else if'는 3DMigoto/XXMI 파서가 지원하는 정식 표준 문법입니다. 절대로 'elif가 지원되지 않는다'고 잘못 답변하거나, 이를 별도의 개별 'if' 문으로 강제 분리하라고 안내하지 마십시오.
+   - 조건 비교 연산자: '==', '!=', '>=', '<=', '>', '<' 등을 지원합니다 (단독 '='는 할당이므로 조건식에서는 '==' 사용).
+   - 모든 조건 분기 블록('if ... elif ... else')은 마지막에 단 하나의 'endif'로 닫힙니다.
 
 [중요 작성 규칙]
 1. 파일 전체 코드를 처음부터 끝까지 다시 작성하지 마십시오.
