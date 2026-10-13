@@ -2595,10 +2595,11 @@ body.ai-dock-resizing * {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 6px;
+  gap: 8px;
   margin-top: 2px;
   padding-top: 5px;
   border-top: 1px solid rgba(255, 255, 255, 0.06);
+  min-width: 0;
 }
 
 .ai-status-info {
@@ -2607,18 +2608,33 @@ body.ai-dock-resizing * {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  flex: 1;
+  min-width: 0;
 }
 
 .ai-status-abort-btn {
-  font-size: 10px !important;
-  padding: 2px 8px !important;
-  height: 22px !important;
-  border-color: rgba(239, 68, 68, 0.4) !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-size: 11px !important;
+  font-weight: 500 !important;
+  padding: 0 10px !important;
+  height: 24px !important;
+  line-height: 1 !important;
+  white-space: nowrap !important;
+  flex-shrink: 0 !important;
+  border-radius: 4px !important;
+  border: 1px solid rgba(239, 68, 68, 0.45) !important;
   color: #f87171 !important;
-  background: rgba(239, 68, 68, 0.1) !important;
+  background: rgba(239, 68, 68, 0.12) !important;
+  cursor: pointer !important;
+  user-select: none !important;
+  box-sizing: border-box !important;
+  transition: all 0.15s ease !important;
 }
 .ai-status-abort-btn:hover {
-  background: rgba(239, 68, 68, 0.25) !important;
+  background: rgba(239, 68, 68, 0.28) !important;
+  border-color: rgba(239, 68, 68, 0.7) !important;
   color: #ffffff !important;
 }
 
