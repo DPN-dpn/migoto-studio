@@ -1,5 +1,7 @@
 ; NSIS custom installer & uninstaller hooks for Migoto Studio
 
+!define DEFAULT_PLUGINS_DIR "${__FILEDIR__}\default-plugins"
+
 !macro NSIS_HOOK_POSTUNINSTALL
   ; If the user checked the "Delete app data" checkbox on the uninstaller screen,
   ; also clean up the custom MigotoStudio data directory (%APPDATA%\MigotoStudio).

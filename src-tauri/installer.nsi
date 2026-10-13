@@ -780,35 +780,35 @@ SectionGroup "$(secDefaultPlugins)" SecGroupPlugins
     SetShellVarContext current
     CreateDirectory "$APPDATA\MigotoStudio\plugins\ai-assistant"
     SetOutPath "$APPDATA\MigotoStudio\plugins\ai-assistant"
-    File /r "default-plugins\ai-assistant\*.*"
+    File /r "${DEFAULT_PLUGINS_DIR}\ai-assistant\*.*"
   SectionEnd
 
   Section "$(secPluginViewer)" SecPluginViewer
     SetShellVarContext current
     CreateDirectory "$APPDATA\MigotoStudio\plugins\asset-viewer"
     SetOutPath "$APPDATA\MigotoStudio\plugins\asset-viewer"
-    File /r "default-plugins\asset-viewer\*.*"
+    File /r "${DEFAULT_PLUGINS_DIR}\asset-viewer\*.*"
   SectionEnd
 
   Section "$(secPluginPython)" SecPluginPython
     SetShellVarContext current
     CreateDirectory "$APPDATA\MigotoStudio\plugins\python-runner"
     SetOutPath "$APPDATA\MigotoStudio\plugins\python-runner"
-    File /r "default-plugins\python-runner\*.*"
+    File /r "${DEFAULT_PLUGINS_DIR}\python-runner\*.*"
   SectionEnd
 
   Section "$(secPluginLint)" SecPluginLint
     SetShellVarContext current
     CreateDirectory "$APPDATA\MigotoStudio\plugins\resource-checker"
     SetOutPath "$APPDATA\MigotoStudio\plugins\resource-checker"
-    File /r "default-plugins\resource-checker\*.*"
+    File /r "${DEFAULT_PLUGINS_DIR}\resource-checker\*.*"
   SectionEnd
 
   Section "$(secPluginZZMI)" SecPluginZZMI
     SetShellVarContext current
     CreateDirectory "$APPDATA\MigotoStudio\plugins\zzmi-support"
     SetOutPath "$APPDATA\MigotoStudio\plugins\zzmi-support"
-    File /r "default-plugins\zzmi-support\*.*"
+    File /r "${DEFAULT_PLUGINS_DIR}\zzmi-support\*.*"
   SectionEnd
 SectionGroupEnd
 
