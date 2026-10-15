@@ -115,6 +115,8 @@ export interface PluginContext {
     registerRule(rule: CustomLintRule): () => void;
     registerAllowedResource(resourceOrPattern: string | RegExp | ((name: string) => boolean)): () => void;
     registerAllowedVariable(variableOrPattern: string | RegExp | ((name: string) => boolean)): () => void;
+    registerAllowedUsedResource(resourceOrPattern: string | RegExp | ((name: string) => boolean)): () => void;
+    registerAllowedUsedVariable(variableOrPattern: string | RegExp | ((name: string) => boolean)): () => void;
   };
 
   // ---- Templates ----

@@ -23,8 +23,12 @@ import { zipSync, strToU8 } from 'fflate';
 import {
   isAllowedResource,
   isAllowedVariable,
+  isAllowedUsedResource,
+  isAllowedUsedVariable,
   registerAllowedResource,
   registerAllowedVariable,
+  registerAllowedUsedVariable,
+  registerAllowedUsedResource,
 } from '../src/core/ini/lint.ts';
 
 test('definePlugin returns identical plugin definition with type inference', () => {
@@ -341,6 +345,12 @@ test('custom-lint (resource-checker) plugin activates and registers both resourc
       registerAllowedVariable: (pattern: any) => {
         return registerAllowedVariable(pattern);
       },
+      registerAllowedUsedVariable: (pattern: any) => {
+        return registerAllowedUsedVariable(pattern);
+      },
+      registerAllowedUsedResource: (pattern: any) => {
+        return registerAllowedUsedResource(pattern);
+      },
     },
     ui: {
       registerSidebarView: (view: any) => {
@@ -363,6 +373,8 @@ test('custom-lint (resource-checker) plugin activates and registers both resourc
   assert.equal(registeredRules.length, 2);
   assert.equal(registeredView, null);
   assert.ok(allowedResources.includes('CommandListSkinTexture'));
+  assert.ok(isAllowedResource('CommandListSkinTexture'));
+  assert.ok(isAllowedUsedResource('CommandListSkinTexture'));
 
   const resourceRule = registeredRules.find((r) => r.id === 'missing-resource-files')!;
   const nsRule = registeredRules.find((r) => r.id === 'xxmi-namespace-check')!;

@@ -465,10 +465,14 @@ export function lintModel(model: TextModelLike, options: LintOptions): monaco.ed
     // Unused variables
     const usedVarNames = new Set(varUsages.map((u) => u.name));
     for (const [name, decl] of declaredVars) {
-      if (!usedVarNames.has(name)) {
+      if (!usedVarNames.has(name) && !isAllowedUsedVariable(name)) {
+        let message = `변수 '$${name}'이(가) 선언되었지만 다른 곳에서 사용되지 않았습니다.`;
+        if (!options.hasFolder) {
+          message += ' (단일 ini 파일로 열려 있어 외부 네임스페이스나 다른 파일에서의 사용 여부는 확인되지 않습니다)';
+        }
         markers.push({
           severity: MarkerSeverity.Info,
-          message: `변수 '$${name}'이(가) 선언되었지만 다른 곳에서 사용되지 않았습니다.`,
+          message,
           startLineNumber: decl.line,
           startColumn: decl.col,
           endLineNumber: decl.line,
@@ -480,11 +484,19 @@ export function lintModel(model: TextModelLike, options: LintOptions): monaco.ed
     // Unused Resources / CommandLists
     const referencedSecNames = new Set(resourceRefs.map((r) => r.name.toLowerCase()));
     for (const [lowerName, defs] of sections) {
-      if (/^(?:resource|commandlist)/i.test(lowerName) && !referencedSecNames.has(lowerName)) {
+      if (
+        /^(?:resource|commandlist)/i.test(lowerName) &&
+        !referencedSecNames.has(lowerName) &&
+        !isAllowedUsedResource(lowerName)
+      ) {
         for (const def of defs) {
+          let message = `'[${def.name}]' 섹션이 정의되었지만 파일 내에서 참조되지 않았습니다.`;
+          if (!options.hasFolder) {
+            message += ' (단일 ini 파일로 열려 있어 외부 네임스페이스나 다른 파일에서의 참조 여부는 확인되지 않습니다)';
+          }
           markers.push({
             severity: MarkerSeverity.Info,
-            message: `'[${def.name}]' 섹션이 정의되었지만 파일 내에서 참조되지 않았습니다.`,
+            message,
             startLineNumber: def.line,
             startColumn: def.col,
             endLineNumber: def.line,
@@ -545,6 +557,7 @@ export function isAllowedResource(name: string): boolean {
 
 export function clearAllowedResources(): void {
   registeredAllowedResources = [];
+  registeredAllowedUsedResources = [];
 }
 
 let registeredAllowedVariables: (string | RegExp | ((name: string) => boolean))[] = [];
@@ -574,5 +587,69 @@ export function isAllowedVariable(name: string): boolean {
 
 export function clearAllowedVariables(): void {
   registeredAllowedVariables = [];
+  registeredAllowedUsedVariables = [];
 }
+
+let registeredAllowedUsedVariables: (string | RegExp | ((name: string) => boolean))[] = [];
+
+export function registerAllowedUsedVariable(
+  pattern: string | RegExp | ((name: string) => boolean),
+): () => void {
+  registeredAllowedUsedVariables.push(pattern);
+  return () => {
+    registeredAllowedUsedVariables = registeredAllowedUsedVariables.filter((p) => p !== pattern);
+  };
+}
+
+export function isAllowedUsedVariable(name: string): boolean {
+  const norm = name.toLowerCase();
+  const trimmed = norm.startsWith('\\') ? norm.slice(1) : norm;
+  return registeredAllowedUsedVariables.some((p) => {
+    if (typeof p === 'function') {
+      return p(name) || p(norm) || p(trimmed) || p(`\\${trimmed}`);
+    }
+    if (typeof p === 'string') {
+      const pNorm = p.toLowerCase();
+      const pTrimmed = pNorm.startsWith('\\') ? pNorm.slice(1) : pNorm;
+      return norm === pNorm || trimmed === pTrimmed;
+    }
+    return p.test(name) || p.test(norm) || p.test(trimmed) || p.test(`\\${trimmed}`);
+  });
+}
+
+export function clearAllowedUsedVariables(): void {
+  registeredAllowedUsedVariables = [];
+}
+
+let registeredAllowedUsedResources: (string | RegExp | ((name: string) => boolean))[] = [];
+
+export function registerAllowedUsedResource(
+  pattern: string | RegExp | ((name: string) => boolean),
+): () => void {
+  registeredAllowedUsedResources.push(pattern);
+  return () => {
+    registeredAllowedUsedResources = registeredAllowedUsedResources.filter((p) => p !== pattern);
+  };
+}
+
+export function isAllowedUsedResource(name: string): boolean {
+  const norm = name.toLowerCase();
+  const trimmed = norm.startsWith('\\') ? norm.slice(1) : norm;
+  return registeredAllowedUsedResources.some((p) => {
+    if (typeof p === 'function') {
+      return p(name) || p(norm) || p(trimmed) || p(`\\${trimmed}`);
+    }
+    if (typeof p === 'string') {
+      const pNorm = p.toLowerCase();
+      const pTrimmed = pNorm.startsWith('\\') ? pNorm.slice(1) : pNorm;
+      return norm === pNorm || trimmed === pTrimmed;
+    }
+    return p.test(name) || p.test(norm) || p.test(trimmed) || p.test(`\\${trimmed}`);
+  });
+}
+
+export function clearAllowedUsedResources(): void {
+  registeredAllowedUsedResources = [];
+}
+
 

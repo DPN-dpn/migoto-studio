@@ -6,7 +6,14 @@ import type { FileExplorer } from '../ui/panels/explorer';
 import { openModal } from '../ui/modals/modal';
 import { showToast } from '../ui/common/toast';
 import type { ActivityBar } from '../ui/layout/activitybar';
-import { registerAllowedResource, registerAllowedVariable, isAllowedResource, isAllowedVariable } from '../core/ini/lint';
+import {
+  registerAllowedResource,
+  registerAllowedVariable,
+  registerAllowedUsedResource,
+  registerAllowedUsedVariable,
+  isAllowedResource,
+  isAllowedVariable,
+} from '../core/ini/lint';
 import { registerPluginTemplate } from '../core/ini/templates';
 import { parseIni, classifyIniSection, mergeIniSections, formatIniSection } from '../core/ini/ini';
 import type {
@@ -901,6 +908,26 @@ export default {
         },
         registerAllowedVariable: (pattern: string | RegExp | ((name: string) => boolean)) => {
           const unregister = registerAllowedVariable(pattern);
+          this.triggerLint();
+          const cleanup = () => {
+            unregister();
+            this.triggerLint();
+          };
+          callbacks.onRegisterCleanup(cleanup);
+          return cleanup;
+        },
+        registerAllowedUsedResource: (pattern: string | RegExp | ((name: string) => boolean)) => {
+          const unregister = registerAllowedUsedResource(pattern);
+          this.triggerLint();
+          const cleanup = () => {
+            unregister();
+            this.triggerLint();
+          };
+          callbacks.onRegisterCleanup(cleanup);
+          return cleanup;
+        },
+        registerAllowedUsedVariable: (pattern: string | RegExp | ((name: string) => boolean)) => {
+          const unregister = registerAllowedUsedVariable(pattern);
           this.triggerLint();
           const cleanup = () => {
             unregister();

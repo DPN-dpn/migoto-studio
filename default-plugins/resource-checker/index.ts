@@ -7,6 +7,8 @@ interface NamespaceExport {
   filePath: string;
   variables: Set<string>;
   sections: Set<string>;
+  usedVariables: Set<string>;
+  usedSections: Set<string>;
 }
 
 interface NamespaceGroup {
@@ -22,6 +24,8 @@ function parseIniExports(text: string, filePath: string): NamespaceExport {
   let currentSection = '';
   const variables = new Set<string>();
   const sections = new Set<string>();
+  const usedVariables = new Set<string>();
+  const usedSections = new Set<string>();
 
   // 1차 스캔: 섹션 시작 전에 선언된 namespace = 확인
   for (let i = 0; i < lines.length; i++) {
@@ -95,7 +99,8 @@ function parseIniExports(text: string, filePath: string): NamespaceExport {
     }
 
     // In [Constants], lines like `$costume = 1` or `$active`
-    if (currentSection.toLowerCase() === 'constants' && !foundExplicit) {
+    const isConstants = currentSection.toLowerCase() === 'constants';
+    if (isConstants && !foundExplicit) {
       const constLineMatch = /^\s*(?:persist\s+|global\s+|local\s+)*\$([a-zA-Z0-9_\\]+)/i.exec(code);
       if (constLineMatch) {
         const vName = constLineMatch[1].toLowerCase();
@@ -105,6 +110,58 @@ function parseIniExports(text: string, filePath: string): NamespaceExport {
         variables.add(vName);
       }
     }
+
+    // Variable usages
+    const eqIdx = code.indexOf('=');
+    const varRefRe = /\$([a-zA-Z0-9_\\]+)/g;
+    let vum: RegExpExecArray | null;
+    while ((vum = varRefRe.exec(code)) !== null) {
+      if (eqIdx !== -1 && vum.index < eqIdx) {
+        if (foundExplicit || isConstants) {
+          continue;
+        }
+      } else if (eqIdx === -1 && (foundExplicit || isConstants)) {
+        continue;
+      }
+      const vName = vum[1].toLowerCase();
+      usedVariables.add(vName);
+      const clean = vName.startsWith('\\') ? vName.slice(1) : vName;
+      usedVariables.add(clean);
+      const parts = clean.split('\\').filter(Boolean);
+      if (parts.length > 1) {
+        usedVariables.add(parts[parts.length - 1]);
+      }
+    }
+
+    // Section references (run = ..., ps-t0 = ..., Resource = ..., etc.)
+    const resRefMatch = /^\s*(?:(?:pre\s+|post\s+)?run|this|vb\d+|ib|[a-z]{2}-(?:[tu]|cb)\d+|Resource(?:\\[a-zA-Z0-9_]+)*|(?:cs|vs|ps|hs|ds|gs))\s*=\s*(?:ref\s+|copy\s+)?([a-zA-Z0-9_\\]+)/i.exec(code);
+    if (resRefMatch) {
+      const target = resRefMatch[1].trim().toLowerCase();
+      if (!['null', 'skip', 'auto', 'default'].includes(target)) {
+        usedSections.add(target);
+        const clean = target.startsWith('\\') ? target.slice(1) : target;
+        usedSections.add(clean);
+        const parts = clean.split('\\').filter(Boolean);
+        if (parts.length > 1) {
+          usedSections.add(parts[parts.length - 1]);
+        }
+      }
+    }
+
+    const refCopyRe = /\b(?:ref|copy)\s+([a-zA-Z0-9_\\]+)/gi;
+    let rcm: RegExpExecArray | null;
+    while ((rcm = refCopyRe.exec(code)) !== null) {
+      const target = rcm[1].trim().toLowerCase();
+      if (!['null', 'skip', 'auto', 'default'].includes(target)) {
+        usedSections.add(target);
+        const clean = target.startsWith('\\') ? target.slice(1) : target;
+        usedSections.add(clean);
+        const parts = clean.split('\\').filter(Boolean);
+        if (parts.length > 1) {
+          usedSections.add(parts[parts.length - 1]);
+        }
+      }
+    }
   }
 
   return {
@@ -112,11 +169,15 @@ function parseIniExports(text: string, filePath: string): NamespaceExport {
     filePath,
     variables,
     sections,
+    usedVariables,
+    usedSections,
   };
 }
 
 let unregisterAllowedVars: (() => void) | null = null;
 let unregisterAllowedGroupResources: (() => void) | null = null;
+let unregisterAllowedUsedVars: (() => void) | null = null;
+let unregisterAllowedUsedResources: (() => void) | null = null;
 
 export default definePlugin({
   activate(context) {
@@ -127,6 +188,12 @@ export default definePlugin({
       context.linter.registerAllowedResource(/^(?:builtin\\)?commandlistskintexture$/i);
       context.linter.registerAllowedResource(/^commandlist\\(?:builtin\\)?skintexture$/i);
       context.linter.registerAllowedResource(/^builtin\\skintexture$/i);
+    }
+    if (context.linter?.registerAllowedUsedResource) {
+      context.linter.registerAllowedUsedResource('CommandListSkinTexture');
+      context.linter.registerAllowedUsedResource(/^(?:builtin\\)?commandlistskintexture$/i);
+      context.linter.registerAllowedUsedResource(/^commandlist\\(?:builtin\\)?skintexture$/i);
+      context.linter.registerAllowedUsedResource(/^builtin\\skintexture$/i);
     }
 
     // Helper to collect all INI files in workspace
@@ -241,11 +308,13 @@ export default definePlugin({
         // 모드 폴더 내 모든 INI 파일의 네임스페이스 및 내보내기 색인 빌드
         const namespaceMap = new Map<string, NamespaceGroup>();
         const allKnownVariables = new Set<string>();
+        const allSummaries: NamespaceExport[] = [];
 
         for (const iniPath of iniPaths) {
           const content = await readIniText(ctx, iniPath);
           if (!content) continue;
           const exp = parseIniExports(content, iniPath);
+          allSummaries.push(exp);
 
           if (exp.namespace) {
             const nsKey = exp.namespace.toLowerCase();
@@ -277,6 +346,7 @@ export default definePlugin({
         const currentModelExp = parseIniExports(ctx.model.getValue(), ctx.file?.path || ctx.file?.name || '');
         const currentNsKey = currentModelExp.namespace ? currentModelExp.namespace.toLowerCase() : '';
         const currentNsGroup = currentNsKey ? namespaceMap.get(currentNsKey) : null;
+        const currentFilePath = (ctx.file?.path || ctx.file?.name || '').toLowerCase();
 
         // 이전 동적 등록 정리
         if (unregisterAllowedVars) {
@@ -287,9 +357,67 @@ export default definePlugin({
           unregisterAllowedGroupResources();
           unregisterAllowedGroupResources = null;
         }
+        if (unregisterAllowedUsedVars) {
+          unregisterAllowedUsedVars();
+          unregisterAllowedUsedVars = null;
+        }
+        if (unregisterAllowedUsedResources) {
+          unregisterAllowedUsedResources();
+          unregisterAllowedUsedResources = null;
+        }
 
         const sharedVars = currentNsGroup ? currentNsGroup.variables : null;
         const sharedSections = currentNsGroup ? currentNsGroup.sections : null;
+
+        // 다른 ini 파일에서 참조된 변수 및 섹션 수집 (외부 파일에서 사용되었으므로 unused 경고 제외)
+        const externallyUsedVars = new Set<string>();
+        const externallyUsedResources = new Set<string>();
+
+        for (const other of allSummaries) {
+          const otherPath = other.filePath.toLowerCase();
+          if (
+            otherPath &&
+            currentFilePath &&
+            (otherPath === currentFilePath ||
+              otherPath.endsWith(`/${currentFilePath}`) ||
+              otherPath.endsWith(`\\${currentFilePath}`) ||
+              currentFilePath.endsWith(`/${otherPath}`) ||
+              currentFilePath.endsWith(`\\${otherPath}`))
+          ) {
+            continue;
+          }
+
+          const otherNsKey = other.namespace ? other.namespace.toLowerCase() : '';
+
+          if (currentNsKey && otherNsKey === currentNsKey) {
+            // 동일 네임스페이스를 공유하는 파일: 해당 파일에서 사용된 모든 변수와 섹션 인정
+            for (const uv of other.usedVariables) externallyUsedVars.add(uv);
+            for (const us of other.usedSections) externallyUsedResources.add(us);
+          } else if (!currentNsKey && !otherNsKey) {
+            // 네임스페이스가 없는 단일 모드 폴더 내 파일들: 상호 참조 인정
+            for (const uv of other.usedVariables) externallyUsedVars.add(uv);
+            for (const us of other.usedSections) externallyUsedResources.add(us);
+          } else if (currentNsKey) {
+            // 다른 네임스페이스에서 \CurrentNamespace\var 또는 CommandList\CurrentNamespace\action 으로 참조한 경우
+            for (const uv of other.usedVariables) {
+              const clean = uv.startsWith('\\') ? uv.slice(1) : uv;
+              if (clean.startsWith(`${currentNsKey}\\`)) {
+                const varName = clean.slice(currentNsKey.length + 1);
+                externallyUsedVars.add(varName);
+              }
+            }
+            for (const us of other.usedSections) {
+              const clean = us.startsWith('\\') ? us.slice(1) : us;
+              const parts = clean.split('\\');
+              if (parts.length >= 3 && parts[1] === currentNsKey) {
+                const type = parts[0];
+                const action = parts.slice(2).join('\\');
+                externallyUsedResources.add(`${type}${action}`.toLowerCase());
+                externallyUsedResources.add(clean);
+              }
+            }
+          }
+        }
 
         // 코어 린터에 허용 변수 등록:
         // 1) \Namespace\var 형태의 명시적 네임스페이스 변수
@@ -313,6 +441,26 @@ export default definePlugin({
         if (sharedSections && sharedSections.size > 0 && context.linter?.registerAllowedResource) {
           unregisterAllowedGroupResources = context.linter.registerAllowedResource((name: string) => {
             return sharedSections.has(name.toLowerCase());
+          });
+        }
+
+        // 코어 린터에 타 파일에서 참조된 변수/섹션 허용 등록 (Unused 경고 방지)
+        if (externallyUsedVars.size > 0 && context.linter?.registerAllowedUsedVariable) {
+          unregisterAllowedUsedVars = context.linter.registerAllowedUsedVariable((name: string) => {
+            const clean = name.toLowerCase().replace(/^[\\$]+/, '');
+            return externallyUsedVars.has(clean);
+          });
+        }
+
+        if (externallyUsedResources.size > 0 && context.linter?.registerAllowedUsedResource) {
+          unregisterAllowedUsedResources = context.linter.registerAllowedUsedResource((name: string) => {
+            const clean = name.toLowerCase().replace(/^[\\\/]+/, '');
+            if (externallyUsedResources.has(clean)) return true;
+            const parts = clean.split('\\').filter(Boolean);
+            if (parts.length > 1 && externallyUsedResources.has(parts[parts.length - 1])) {
+              return true;
+            }
+            return false;
           });
         }
 
@@ -442,6 +590,14 @@ export default definePlugin({
     if (unregisterAllowedGroupResources) {
       unregisterAllowedGroupResources();
       unregisterAllowedGroupResources = null;
+    }
+    if (unregisterAllowedUsedVars) {
+      unregisterAllowedUsedVars();
+      unregisterAllowedUsedVars = null;
+    }
+    if (unregisterAllowedUsedResources) {
+      unregisterAllowedUsedResources();
+      unregisterAllowedUsedResources = null;
     }
   },
 });

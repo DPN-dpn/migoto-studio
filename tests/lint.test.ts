@@ -6,6 +6,8 @@ import {
   MarkerSeverity,
   registerAllowedResource,
   clearAllowedResources,
+  registerAllowedUsedVariable,
+  registerAllowedUsedResource,
   type TextModelLike,
   type LintOptions,
 } from '../src/core/ini/lint.ts';
@@ -267,6 +269,45 @@ test('CommandListSkinTexture is recognized as valid when allowed', () => {
     markersAfter.some((m) => m.message.includes('CommandListSkinTexture')),
     'Should report warning when CommandListSkinTexture is not allowed'
   );
+});
+
+test('suppresses unused warning when variable or resource is externally allowed', () => {
+  const model = createMockModel(`[Constants]
+global $costume = 0
+
+[ResourceCostume]
+type = Buffer
+`);
+
+  // Without external allowance, both $costume and ResourceCostume are marked as unused
+  const markersBefore = lintModel(model, defaultOptions);
+  assert.ok(
+    markersBefore.some((m) => m.message.includes('$costume') && m.message.includes('사용되지 않았습니다')),
+    'Should report $costume as unused'
+  );
+  assert.ok(
+    markersBefore.some((m) => m.message.includes('ResourceCostume') && m.message.includes('참조되지 않았습니다')),
+    'Should report ResourceCostume as unreferenced'
+  );
+
+  // Register external allowance
+  const unregVar = registerAllowedUsedVariable('costume');
+  const unregRes = registerAllowedUsedResource('resourcecostume');
+
+  const markersAfter = lintModel(model, defaultOptions);
+  const unusedAfter = markersAfter.filter(
+    (m) => m.message.includes('사용되지 않았습니다') || m.message.includes('참조되지 않았습니다')
+  );
+  assert.equal(unusedAfter.length, 0, 'Should not report unused warnings when registered as externally used');
+
+  unregVar();
+  unregRes();
+
+  const markersRestored = lintModel(model, defaultOptions);
+  const unusedRestored = markersRestored.filter(
+    (m) => m.message.includes('사용되지 않았습니다') || m.message.includes('참조되지 않았습니다')
+  );
+  assert.equal(unusedRestored.length, 2, 'Should report unused warnings after unregistering');
 });
 
 
