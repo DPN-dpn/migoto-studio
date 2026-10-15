@@ -69,6 +69,11 @@ async function boot() {
     fontFamily: "'Cascadia Code', 'D2Coding', Consolas, monospace",
     smoothScrolling: true,
     scrollBeyondLastLine: false,
+    scrollbar: {
+      verticalScrollbarSize: 6,
+      horizontalScrollbarSize: 6,
+      useShadows: false,
+    },
   });
 
   // ---- 3DMigoto Key Helper Context Menu Action ----
