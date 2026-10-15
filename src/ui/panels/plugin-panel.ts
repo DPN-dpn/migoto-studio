@@ -1,21 +1,30 @@
 import { platform } from '../../platform';
 import { type PluginManager, type PluginInstance, renderPluginIcon } from '../../plugins';
 
+const CHEVRON_SVG = `
+  <svg viewBox="0 0 16 16" width="10" height="10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <polyline points="6 4 10 8 6 12"></polyline>
+  </svg>
+`;
+
 export class PluginPanel {
   private searchQuery: string = '';
   private showCreateForm: boolean = false;
-  private collapsedPlugins: Set<string> = new Set();
+  // 기본값: 모든 플러그인 접힌 상태 (펼쳐진 플러그인 ID 집합을 추적)
+  private expandedPlugins: Set<string> = new Set();
 
   constructor(
     private root: HTMLElement,
     private manager: PluginManager,
   ) {
     try {
-      const stored = localStorage.getItem('migoto_plugins_collapsed');
+      const stored = localStorage.getItem('migoto_plugins_expanded');
       if (stored) {
         const parsed = JSON.parse(stored);
         if (Array.isArray(parsed)) {
-          this.collapsedPlugins = new Set(parsed);
+          this.expandedPlugins = new Set(
+            parsed.map((id: string) => (id === 'resource-checker' ? 'custom-lint' : id)),
+          );
         }
       }
     } catch {}
@@ -25,28 +34,30 @@ export class PluginPanel {
   }
 
   private toggleCollapse(id: string) {
-    if (this.collapsedPlugins.has(id)) {
-      this.collapsedPlugins.delete(id);
+    if (this.expandedPlugins.has(id)) {
+      this.expandedPlugins.delete(id);
     } else {
-      this.collapsedPlugins.add(id);
+      this.expandedPlugins.add(id);
     }
-    this.saveCollapsedState();
+    this.saveExpandedState();
     this.render();
   }
 
   private toggleAllCollapse(plugins: PluginInstance[]) {
-    if (this.collapsedPlugins.size >= plugins.length) {
-      this.collapsedPlugins.clear();
+    const anyExpanded = plugins.some((p) => this.expandedPlugins.has(p.manifest.id));
+    if (anyExpanded) {
+      this.expandedPlugins.clear();
     } else {
-      this.collapsedPlugins = new Set(plugins.map((p) => p.manifest.id));
+      this.expandedPlugins = new Set(plugins.map((p) => p.manifest.id));
     }
-    this.saveCollapsedState();
+    this.saveExpandedState();
     this.render();
   }
 
-  private saveCollapsedState() {
+  private saveExpandedState() {
     try {
-      localStorage.setItem('migoto_plugins_collapsed', JSON.stringify(Array.from(this.collapsedPlugins)));
+      localStorage.setItem('migoto_plugins_expanded', JSON.stringify(Array.from(this.expandedPlugins)));
+      localStorage.removeItem('migoto_plugins_collapsed');
     } catch {}
   }
 
@@ -56,17 +67,17 @@ export class PluginPanel {
     const plugins = this.manager.getPlugins();
     const isDesktop = platform().kind === 'desktop';
 
-    // Prune collapsed states for plugins that no longer exist
+    // Prune expanded states for plugins that no longer exist
     const currentIds = new Set(plugins.map((p) => p.manifest.id));
-    let collapsedChanged = false;
-    for (const id of Array.from(this.collapsedPlugins)) {
+    let expandedChanged = false;
+    for (const id of Array.from(this.expandedPlugins)) {
       if (!currentIds.has(id)) {
-        this.collapsedPlugins.delete(id);
-        collapsedChanged = true;
+        this.expandedPlugins.delete(id);
+        expandedChanged = true;
       }
     }
-    if (collapsedChanged) {
-      this.saveCollapsedState();
+    if (expandedChanged) {
+      this.saveExpandedState();
     }
 
     // 1. Header Row (Actions)
@@ -300,11 +311,11 @@ export class PluginPanel {
     statsHint.className = 'plugin-stats-hint';
     statsHint.textContent = `전체 ${plugins.length}개 중 ${activeCount}개 활성화`;
 
-    const isAllCollapsed = plugins.length > 0 && this.collapsedPlugins.size >= plugins.length;
+    const anyExpanded = plugins.length > 0 && plugins.some((p) => this.expandedPlugins.has(p.manifest.id));
     const toggleAllBtn = document.createElement('button');
     toggleAllBtn.className = 'plugin-toggle-all-btn';
-    toggleAllBtn.textContent = isAllCollapsed ? '모두 펼치기' : '모두 접기';
-    toggleAllBtn.title = isAllCollapsed ? '모든 플러그인 상세 내용 표시' : '모든 플러그인을 한 줄로 간략히 보기';
+    toggleAllBtn.textContent = anyExpanded ? '모두 접기' : '모두 펼치기';
+    toggleAllBtn.title = anyExpanded ? '모든 플러그인을 한 줄로 간략히 접기' : '모든 플러그인 상세 내용 표시';
     toggleAllBtn.onclick = () => this.toggleAllCollapse(plugins);
 
     statsRow.append(statsHint, toggleAllBtn);
@@ -347,7 +358,7 @@ export class PluginPanel {
   }
 
   private createPluginCard(p: PluginInstance, index: number, total: number): HTMLElement {
-    const isCollapsed = this.collapsedPlugins.has(p.manifest.id);
+    const isCollapsed = !this.expandedPlugins.has(p.manifest.id);
     const card = document.createElement('div');
     card.className = `plugin-card${p.enabled ? ' is-enabled' : ''}${isCollapsed ? ' is-collapsed' : ''}`;
 
@@ -362,6 +373,7 @@ export class PluginPanel {
     titleClickArea.style.cursor = 'pointer';
     titleClickArea.title = isCollapsed ? '클릭하여 상세 정보 펼치기' : '클릭하여 간략히 접기';
     titleClickArea.innerHTML = `
+      <span class="plugin-chevron">${CHEVRON_SVG}</span>
       <span class="plugin-icon">${renderPluginIcon(p.manifest.icon)}</span>
       <strong class="plugin-name">${p.manifest.name}</strong>
     `;

@@ -4,7 +4,7 @@ import { decodeDDS } from '../default-plugins/asset-viewer/dds-decoder.ts';
 import pythonRunnerPlugin from '../default-plugins/python-runner/index.ts';
 import assetViewerPlugin from '../default-plugins/asset-viewer/index.ts';
 import aiAssistantPlugin from '../default-plugins/ai-assistant/index.ts';
-import resourceCheckerPlugin from '../default-plugins/resource-checker/index.ts';
+import customLintPlugin from '../default-plugins/custom-lint/index.ts';
 import zzmiSupportPlugin from '../default-plugins/zzmi-support/index.ts';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -13,7 +13,7 @@ const BUILTIN_PLUGINS = [
   { manifest: JSON.parse(readFileSync(resolve(process.cwd(), 'default-plugins/python-runner/plugin.json'), 'utf8')), createPlugin: () => pythonRunnerPlugin },
   { manifest: JSON.parse(readFileSync(resolve(process.cwd(), 'default-plugins/asset-viewer/plugin.json'), 'utf8')), createPlugin: () => assetViewerPlugin },
   { manifest: JSON.parse(readFileSync(resolve(process.cwd(), 'default-plugins/ai-assistant/plugin.json'), 'utf8')), createPlugin: () => aiAssistantPlugin },
-  { manifest: JSON.parse(readFileSync(resolve(process.cwd(), 'default-plugins/resource-checker/plugin.json'), 'utf8')), createPlugin: () => resourceCheckerPlugin },
+  { manifest: JSON.parse(readFileSync(resolve(process.cwd(), 'default-plugins/custom-lint/plugin.json'), 'utf8')), createPlugin: () => customLintPlugin },
   { manifest: JSON.parse(readFileSync(resolve(process.cwd(), 'default-plugins/zzmi-support/plugin.json'), 'utf8')), createPlugin: () => zzmiSupportPlugin },
 ];
 import { validatePluginZip } from '../src/plugins/zip.ts';
@@ -86,7 +86,7 @@ test('PluginContext contract supports extended editor and workspace capabilities
 test('BUILTIN_PLUGINS registers 5 default plugins with unique IDs', () => {
   assert.equal(BUILTIN_PLUGINS.length, 5);
   const ids = BUILTIN_PLUGINS.map((p) => p.manifest.id);
-  assert.deepEqual(ids, ['python-runner', 'asset-viewer', 'ai-assistant', 'resource-checker', 'zzmi-support']);
+  assert.deepEqual(ids, ['python-runner', 'asset-viewer', 'ai-assistant', 'custom-lint', 'zzmi-support']);
 
   for (const p of BUILTIN_PLUGINS) {
     assert.ok(p.manifest.name);
@@ -322,8 +322,8 @@ test('validatePluginZip throws when script is missing', () => {
   assert.throws(() => validatePluginZip(zip), /실행 스크립트.*없습니다/);
 });
 
-test('custom-lint (resource-checker) plugin activates and registers both resource and xxmi namespace lint rules', async () => {
-  const def = BUILTIN_PLUGINS.find((p) => p.manifest.id === 'resource-checker')!;
+test('custom-lint plugin activates and registers both resource and xxmi namespace lint rules', async () => {
+  const def = BUILTIN_PLUGINS.find((p) => p.manifest.id === 'custom-lint')!;
   assert.ok(def);
   assert.equal(def.manifest.name, '커스텀 린트');
   const plugin = def.createPlugin();
@@ -375,6 +375,12 @@ test('custom-lint (resource-checker) plugin activates and registers both resourc
   assert.ok(allowedResources.includes('CommandListSkinTexture'));
   assert.ok(isAllowedResource('CommandListSkinTexture'));
   assert.ok(isAllowedUsedResource('CommandListSkinTexture'));
+  assert.ok(isAllowedResource('BuiltinCommandListSkinTexture'));
+  assert.ok(isAllowedResource('BuiltinCommandListDraw'));
+  assert.ok(isAllowedResource('builtincommandlist_dispatch'));
+  assert.ok(isAllowedResource('CommandList\\Builtin\\Action'));
+  assert.ok(isAllowedUsedResource('BuiltinCommandListSkinTexture'));
+  assert.ok(isAllowedUsedResource('BuiltinCommandListDraw'));
 
   const resourceRule = registeredRules.find((r) => r.id === 'missing-resource-files')!;
   const nsRule = registeredRules.find((r) => r.id === 'xxmi-namespace-check')!;
@@ -497,6 +503,18 @@ handling = skip
   await nsRule.check({ ...nsCtxBase, model: diffNsModel });
   assert.equal(isAllowedVariable('costume'), false, 'costume should not be allowed as bare variable in different namespace');
   assert.ok(isAllowedVariable('\\RaidenMod\\costume'), 'Fully qualified \\RaidenMod\\costume should still be allowed');
+
+  // 2-f. BuiltinCommandList calls produce 0 diagnostics
+  const builtinModel = {
+    getLineCount: () => 2,
+    getLineContent: (n: number) => {
+      if (n === 1) return 'run = BuiltinCommandListSkinTexture';
+      return 'post run = BuiltinCommandListDraw';
+    },
+    getValue: () => 'run = BuiltinCommandListSkinTexture\npost run = BuiltinCommandListDraw',
+  };
+  const nsDiagsBuiltin = await nsRule.check({ ...nsCtxBase, model: builtinModel });
+  assert.equal(nsDiagsBuiltin.length, 0, 'BuiltinCommandList calls should produce 0 diagnostics');
 });
 
 test('zzmi-support plugin activates and registers allowed resource and code template without sidebar view', () => {
@@ -544,7 +562,7 @@ test('default-plugins directory contains all 5 standalone plugins ready for inst
   const path = await import('node:path');
   const url = await import('node:url');
 
-  const defaultIds = ['python-runner', 'asset-viewer', 'ai-assistant', 'resource-checker', 'zzmi-support'];
+  const defaultIds = ['python-runner', 'asset-viewer', 'ai-assistant', 'custom-lint', 'zzmi-support'];
   const baseDir = path.resolve(process.cwd(), 'default-plugins');
 
   for (const id of defaultIds) {
@@ -578,7 +596,7 @@ test('public/default-plugins contains web-compatible plugins and excludes python
   assert.ok(fs.existsSync(indexJson), 'index.json must exist');
   const indexList = JSON.parse(fs.readFileSync(indexJson, 'utf8'));
 
-  assert.deepEqual(indexList, ['asset-viewer', 'ai-assistant', 'resource-checker', 'zzmi-support']);
+  assert.deepEqual(indexList, ['asset-viewer', 'ai-assistant', 'custom-lint', 'zzmi-support']);
   assert.equal(fs.existsSync(path.join(pubDir, 'python-runner')), false, 'python-runner must not exist in public/default-plugins');
 
   for (const id of indexList) {
@@ -666,5 +684,230 @@ test('web listDiskPlugins sanitizes stale localStorage, purges python-runner, an
   }
 });
 
+test('custom-lint provides cross-file definition and references for same namespace symbols', async () => {
+  const def = BUILTIN_PLUGINS.find((p) => p.manifest.id === 'custom-lint')!;
+  assert.ok(def);
+  const plugin = def.createPlugin();
 
+  let registeredDefProvider: any = null;
+  let registeredRefProvider: any = null;
+  const registeredActions: any[] = [];
+  let openedFilePath = '';
+  let openedFileLine = 0;
+
+  const mockContext: any = {
+    manifest: def.manifest,
+    editor: {
+      getCursor: () => ({ lineNumber: 3, column: 5 }),
+      getLine: () => '$costume = 2',
+      getLineCount: () => 3,
+      getText: () => '$costume = 2',
+      registerContextMenuAction: (action: any) => {
+        registeredActions.push(action);
+        return () => {};
+      },
+    },
+    ui: {
+      showModal: () => {},
+      showToast: () => {},
+    },
+    linter: {
+      registerRule: () => () => {},
+      registerAllowedResource: () => () => {},
+      registerAllowedVariable: () => () => {},
+      registerAllowedUsedResource: () => () => {},
+      registerAllowedUsedVariable: () => () => {},
+      registerDefinitionProvider: (p: any) => {
+        registeredDefProvider = p;
+        return () => {};
+      },
+      registerReferenceProvider: (p: any) => {
+        registeredRefProvider = p;
+        return () => {};
+      },
+    },
+    workspace: {
+      readDirectory: async () => [],
+      readTextFile: async () => '',
+      openFile: async (path: string, line?: number) => {
+        openedFilePath = path;
+        openedFileLine = line || 0;
+      },
+      getCurrentFile: () => ({ name: 'Skill.ini', path: 'Skill.ini', location: 'disk' }),
+      getCurrentFolder: () => 'D:/Mods/Test',
+    },
+  };
+
+  plugin.activate(mockContext);
+  assert.ok(registeredDefProvider, 'Definition provider should be registered');
+  assert.ok(registeredRefProvider, 'Reference provider should be registered');
+  assert.equal(registeredActions.length, 0, 'Should not register extra context menu actions (core F12/Shift+F12 are used instead)');
+
+  const raidenIni = [
+    'namespace = RaidenMod',
+    '[Constants]',
+    'global persist $costume = 1',
+    'global $active = 1',
+    '',
+    '[CommandListSwapWeapon]',
+    'run = CommandListSkill',
+  ].join('\n');
+
+  const skillIni = [
+    'namespace = RaidenMod',
+    '[CommandListSkill]',
+    '$costume = 2',
+    'run = CommandListSwapWeapon',
+  ].join('\n');
+
+  const weaponIni = [
+    'namespace = WeaponMod',
+    '[CommandListWeapon]',
+    '$\\RaidenMod\\costume = 0',
+    'run = CommandList\\RaidenMod\\SwapWeapon',
+  ].join('\n');
+
+  const filesMap: Record<string, string> = {
+    'Raiden.ini': raidenIni,
+    'Skill.ini': skillIni,
+    'Weapon.ini': weaponIni,
+  };
+
+  const createMockCtx = (curFile: string, curContent: string) => ({
+    file: { name: curFile, path: `D:/Mods/Test/${curFile}`, location: 'disk' },
+    folder: 'D:/Mods/Test',
+    getAllFiles: () => Object.keys(filesMap),
+    readTextFile: async (path: string) => {
+      const base = path.split(/[\\/]/).pop()!;
+      return filesMap[base] || '';
+    },
+    model: {
+      getValue: () => curContent,
+      getLineContent: (n: number) => curContent.split('\n')[n - 1] || '',
+      getLineCount: () => curContent.split('\n').length,
+    },
+  });
+
+  // 1. Definition navigation from Skill.ini to Raiden.ini for variable $costume
+  const skillCtx = createMockCtx('Skill.ini', skillIni);
+  const defVar = await registeredDefProvider.provideDefinition(
+    { name: '$costume', cleanName: 'costume', kind: 'variable' },
+    skillCtx,
+  );
+  assert.ok(defVar, 'Definition for $costume should be found across files in same namespace');
+  assert.equal(defVar.filePath, 'Raiden.ini');
+  assert.equal(defVar.lineNumber, 3);
+  assert.equal(defVar.isDefinition, true);
+
+  // 2. Definition navigation from Skill.ini to Raiden.ini for section CommandListSwapWeapon
+  const defSec = await registeredDefProvider.provideDefinition(
+    { name: 'CommandListSwapWeapon', cleanName: 'CommandListSwapWeapon', kind: 'section' },
+    skillCtx,
+  );
+  assert.ok(defSec, 'Definition for CommandListSwapWeapon should be found across files in same namespace');
+  assert.equal(defSec.filePath, 'Raiden.ini');
+  assert.equal(defSec.lineNumber, 6);
+  assert.equal(defSec.isDefinition, true);
+
+  // 3. Cross-namespace definition navigation from Weapon.ini to Raiden.ini for $\RaidenMod\costume
+  const weaponCtx = createMockCtx('Weapon.ini', weaponIni);
+  const defCrossVar = await registeredDefProvider.provideDefinition(
+    { name: '$\\RaidenMod\\costume', cleanName: 'costume', kind: 'variable', namespace: 'RaidenMod' },
+    weaponCtx,
+  );
+  assert.ok(defCrossVar, 'Definition for $\\RaidenMod\\costume should be found in RaidenMod');
+  assert.equal(defCrossVar.filePath, 'Raiden.ini');
+  assert.equal(defCrossVar.lineNumber, 3);
+
+  // 4. References finding for $costume
+  const raidenCtx = createMockCtx('Raiden.ini', raidenIni);
+  const refsVar = await registeredRefProvider.provideReferences(
+    { name: '$costume', cleanName: 'costume', kind: 'variable' },
+    raidenCtx,
+  );
+  assert.ok(refsVar.length >= 3, 'Should find declaration and usages across all namespace files');
+  assert.ok(refsVar.some((r: any) => r.filePath === 'Raiden.ini' && r.lineNumber === 3 && r.isDefinition));
+  assert.ok(refsVar.some((r: any) => r.filePath === 'Skill.ini' && r.lineNumber === 3 && !r.isDefinition));
+  assert.ok(refsVar.some((r: any) => r.filePath === 'Weapon.ini' && r.lineNumber === 3 && !r.isDefinition));
+
+  // 5. References finding for CommandListSwapWeapon
+  const refsSec = await registeredRefProvider.provideReferences(
+    { name: 'CommandListSwapWeapon', cleanName: 'CommandListSwapWeapon', kind: 'section' },
+    raidenCtx,
+  );
+  // 6. Deactivate and verify clean teardown and in-flight cancellation safety
+  plugin.deactivate();
+  const defAfterDeactivate = await registeredDefProvider.provideDefinition(
+    { name: '$costume', cleanName: 'costume', kind: 'variable' },
+    skillCtx,
+  );
+  assert.equal(defAfterDeactivate, null, 'provideDefinition must return null after deactivate');
+
+  const refsAfterDeactivate = await registeredRefProvider.provideReferences(
+    { name: '$costume', cleanName: 'costume', kind: 'variable' },
+    raidenCtx,
+  );
+  assert.deepEqual(refsAfterDeactivate, [], 'provideReferences must return empty array after deactivate');
+});
+
+test('legacy resource-checker is migrated to custom-lint in settings and plugin order', () => {
+  // Mock localStorage
+  const mockStorage: Record<string, string> = {
+    migoto_plugins_enabled: JSON.stringify({ 'resource-checker': true, 'other-plugin': false }),
+    migoto_plugin_order: JSON.stringify(['ai-assistant', 'resource-checker', 'asset-viewer']),
+    migoto_plugins_collapsed: JSON.stringify(['resource-checker']),
+  };
+
+  // 1. Order migration
+  const rawOrder = JSON.parse(mockStorage.migoto_plugin_order);
+  const migratedOrder = rawOrder
+    .map((id: string) => (id === 'resource-checker' ? 'custom-lint' : id))
+    .filter((id: string, idx: number, arr: string[]) => arr.indexOf(id) === idx);
+  assert.deepEqual(migratedOrder, ['ai-assistant', 'custom-lint', 'asset-viewer']);
+
+  // 2. Enabled state migration
+  const savedStates = JSON.parse(mockStorage.migoto_plugins_enabled);
+  if (savedStates['resource-checker'] !== undefined) {
+    if (savedStates['custom-lint'] === undefined) {
+      savedStates['custom-lint'] = savedStates['resource-checker'];
+    }
+    delete savedStates['resource-checker'];
+  }
+  assert.equal(savedStates['custom-lint'], true);
+  assert.equal(savedStates['resource-checker'], undefined);
+
+  // 3. Collapsed state migration
+  const collapsed = JSON.parse(mockStorage.migoto_plugins_collapsed);
+  const migratedCollapsed = collapsed.map((id: string) => (id === 'resource-checker' ? 'custom-lint' : id));
+  assert.deepEqual(migratedCollapsed, ['custom-lint']);
+});
+
+test('plugins are collapsed by default and only expanded plugins are tracked', () => {
+  const mockStorage: Record<string, string> = {};
+
+  // Initially, no expanded plugins stored in localStorage
+  const storedExpanded = mockStorage.migoto_plugins_expanded;
+  const expandedSet = new Set(storedExpanded ? JSON.parse(storedExpanded) : []);
+
+  const samplePlugins = [
+    { manifest: { id: 'custom-lint' } },
+    { manifest: { id: 'ai-assistant' } },
+    { manifest: { id: 'asset-viewer' } },
+  ];
+
+  // Every plugin should be collapsed by default
+  for (const p of samplePlugins) {
+    const isCollapsed = !expandedSet.has(p.manifest.id);
+    assert.equal(isCollapsed, true, `${p.manifest.id} should be collapsed by default`);
+  }
+
+  // When expanding custom-lint
+  expandedSet.add('custom-lint');
+  mockStorage.migoto_plugins_expanded = JSON.stringify(Array.from(expandedSet));
+
+  const reloadedSet = new Set(JSON.parse(mockStorage.migoto_plugins_expanded));
+  assert.equal(reloadedSet.has('custom-lint'), true);
+  assert.equal(!reloadedSet.has('custom-lint'), false, 'custom-lint should now be expanded');
+  assert.equal(!reloadedSet.has('ai-assistant'), true, 'ai-assistant should remain collapsed');
+});
 

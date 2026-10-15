@@ -298,7 +298,7 @@ const hasFSAccess = typeof window !== 'undefined' && 'showOpenFilePicker' in win
 export const DEFAULT_WEB_PLUGINS = [
   'asset-viewer',
   'ai-assistant',
-  'resource-checker',
+  'custom-lint',
   'zzmi-support',
 ];
 
@@ -701,8 +701,8 @@ export const web: Platform = {
           const p = val as any;
           const id = p?.id || key;
 
-          // Prune desktop-only plugins (python-runner) or default plugins left over in localStorage
-          if (id === 'python-runner' || DEFAULT_WEB_PLUGINS.includes(id)) {
+          // Prune desktop-only plugins (python-runner), legacy resource-checker, or default plugins left over in localStorage
+          if (id === 'python-runner' || id === 'resource-checker' || DEFAULT_WEB_PLUGINS.includes(id)) {
             delete stored[key];
             changed = true;
             continue;

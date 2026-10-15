@@ -1,9 +1,8 @@
 import type { monaco } from '../editor/monaco.ts';
 let monacoRef: typeof monaco | null = null;
-import type { DocumentManager, DocumentTab } from '../workspace/documents.ts';
+import type { DocumentManager } from '../workspace/documents.ts';
 import { platform, type FileRef } from '../../platform/index.ts';
 import { showToast } from '../../ui/common/toast.ts';
-import type { FileExplorer } from '../../ui/panels/explorer.ts';
 
 export const LANGUAGE_ID = 'migoto';
 
@@ -236,10 +235,10 @@ export function scanModelOccurrences(
       const currentSecLower = currentSection.toLowerCase();
 
       if (target.kind === 'section') {
-        // Compare with cleanName
+        // Strict match: cleanName or full name
         if (
           currentSecLower === targetCleanLower ||
-          (target.namespace && currentSecLower.endsWith(targetCleanLower))
+          currentSecLower === targetNameLower
         ) {
           const bracketIdx = rawLine.indexOf('[');
           results.push({
@@ -275,23 +274,10 @@ export function scanModelOccurrences(
         const innerContent = vm[1]; // e.g. "swapvar" or "Raiden\costume"
         const innerLower = innerContent.toLowerCase();
 
-        let isMatch = false;
-        let isNamespacedUsage = false;
-
-        if (innerLower === targetCleanLower || fullMatched.toLowerCase() === targetNameLower) {
-          isMatch = true;
-        } else if (innerContent.includes('\\')) {
-          const parts = innerContent.split('\\').filter(Boolean);
-          const leafVar = parts[parts.length - 1]?.toLowerCase();
-          const ns = parts[0]?.toLowerCase();
-
-          if (leafVar === targetCleanLower) {
-            if (!target.namespace || target.namespace.toLowerCase() === ns) {
-              isMatch = true;
-              isNamespacedUsage = true;
-            }
-          }
-        }
+        // Strict match within open model
+        const isMatch =
+          innerLower === targetCleanLower ||
+          fullMatched.toLowerCase() === targetNameLower;
 
         if (isMatch) {
           const startCol = vm.index + 1;
@@ -363,14 +349,14 @@ export function scanModelOccurrences(
 }
 
 /**
- * Finds definition of a symbol across open tabs synchronously.
+ * Finds definition of a symbol within the current model synchronously.
  */
 export function findDefinitionSync(
   target: SymbolTarget,
   currentModel: monaco.editor.ITextModel,
   doc: DocumentManager,
 ): SymbolOccurrence | null {
-  // 1. Current model first
+  // Current model only (strict single file core feature)
   const currentOccs = scanModelOccurrences(
     currentModel,
     target,
@@ -378,119 +364,25 @@ export function findDefinitionSync(
     doc.currentTabId,
     doc.file,
   );
-  const def = currentOccs.find((o) => o.isDefinition);
-  if (def) return def;
-
-  // 2. Other open tabs
-  for (const tab of doc.allTabs) {
-    if (tab.model === currentModel || tab.kind !== 'text') continue;
-    const occs = scanModelOccurrences(
-      tab.model,
-      target,
-      tab.title,
-      tab.id,
-      tab.file,
-    );
-    const tabDef = occs.find((o) => o.isDefinition);
-    if (tabDef) return tabDef;
-  }
-
-  return null;
+  return currentOccs.find((o) => o.isDefinition) ?? null;
 }
 
 /**
- * Finds all occurrences across open tabs synchronously.
+ * Finds all occurrences within the current model synchronously.
  */
 export function findAllOccurrencesSync(
   target: SymbolTarget,
   currentModel: monaco.editor.ITextModel,
   doc: DocumentManager,
 ): SymbolOccurrence[] {
-  const all: SymbolOccurrence[] = [];
-
-  // Current tab first
-  all.push(
-    ...scanModelOccurrences(
-      currentModel,
-      target,
-      doc.fileName,
-      doc.currentTabId,
-      doc.file,
-    ),
+  // Current model only (strict single file core feature)
+  return scanModelOccurrences(
+    currentModel,
+    target,
+    doc.fileName,
+    doc.currentTabId,
+    doc.file,
   );
-
-  // Other tabs
-  for (const tab of doc.allTabs) {
-    if (tab.model === currentModel || tab.kind !== 'text') continue;
-    all.push(
-      ...scanModelOccurrences(
-        tab.model,
-        target,
-        tab.title,
-        tab.id,
-        tab.file,
-      ),
-    );
-  }
-
-  return all;
-}
-
-/**
- * Comprehensive async scanner across open tabs AND unopened workspace INI files.
- */
-export async function findAllOccurrencesAsync(
-  target: SymbolTarget,
-  editor: monaco.editor.IStandaloneCodeEditor,
-  doc: DocumentManager,
-  explorer?: FileExplorer,
-): Promise<SymbolOccurrence[]> {
-  const model = editor.getModel();
-  if (!model) return [];
-
-  // Start with all open tabs
-  const results: SymbolOccurrence[] = findAllOccurrencesSync(target, model, doc);
-
-  // If explorer has folder, search unopened INI files
-  if (explorer && explorer.hasFolder) {
-    const allPaths = explorer.getAllFilePaths();
-    const openPaths = new Set<string>();
-    for (const tab of doc.allTabs) {
-      if (tab.file?.id) openPaths.add(tab.file.id);
-      if (tab.title) openPaths.add(tab.title);
-    }
-
-    const iniPaths = allPaths.filter((p) => /\.(ini|3dm|migoto)$/i.test(p));
-
-    for (const relPath of iniPaths) {
-      if (openPaths.has(relPath)) continue;
-
-      try {
-        const ref = platform().refFromId(relPath);
-        const loaded = await platform().readFile(ref);
-        if (!loaded.text) continue;
-
-        if (!monacoRef) continue;
-        const tempUri = monacoRef.Uri.parse(`tempfile:///${encodeURIComponent(relPath)}`);
-        const tempModel = monacoRef.editor.createModel(loaded.text, LANGUAGE_ID, tempUri);
-
-        const fileOccs = scanModelOccurrences(
-          tempModel,
-          target,
-          ref.name,
-          undefined,
-          ref,
-          relPath,
-        );
-        results.push(...fileOccs);
-        tempModel.dispose();
-      } catch {
-        // Skip inaccessible files
-      }
-    }
-  }
-
-  return results;
 }
 
 /**
@@ -533,13 +425,35 @@ export function flashLineHighlight(
   }, 1800);
 }
 
+export type CustomDefinitionResolver = (
+  target: SymbolTarget,
+  currentModel: monaco.editor.ITextModel,
+  doc: DocumentManager,
+) => Promise<SymbolOccurrence | null>;
+
+export type CustomReferencesResolver = (
+  target: SymbolTarget,
+  currentModel: monaco.editor.ITextModel,
+  doc: DocumentManager,
+) => Promise<SymbolOccurrence[]>;
+
+let customDefinitionResolver: CustomDefinitionResolver | null = null;
+let customReferencesResolver: CustomReferencesResolver | null = null;
+
+export function setCustomDefinitionResolver(resolver: CustomDefinitionResolver | null) {
+  customDefinitionResolver = resolver;
+}
+
+export function setCustomReferencesResolver(resolver: CustomReferencesResolver | null) {
+  customReferencesResolver = resolver;
+}
+
 /**
- * Action: Jump to definition (F12)
+ * Action: Jump to definition (F12) - Plugins can provide cross-file namespace definitions via API.
  */
 export async function jumpToDefinition(
   editor: monaco.editor.IStandaloneCodeEditor,
   doc: DocumentManager,
-  explorer?: FileExplorer,
 ): Promise<boolean> {
   const model = editor.getModel();
   const pos = editor.getPosition();
@@ -551,13 +465,19 @@ export async function jumpToDefinition(
     return false;
   }
 
-  // 1. Check open tabs
-  let def = findDefinitionSync(target, model, doc);
+  // 1. Try plugin-provided definition resolver (e.g. cross-file same namespace from custom-lint)
+  let def: SymbolOccurrence | null = null;
+  if (customDefinitionResolver) {
+    try {
+      def = await customDefinitionResolver(target, model, doc);
+    } catch (err) {
+      console.warn('[symbol-nav] Custom definition resolver error:', err);
+    }
+  }
 
-  // 2. If not found in open tabs, search workspace files
-  if (!def && explorer && explorer.hasFolder) {
-    const allOccs = await findAllOccurrencesAsync(target, editor, doc, explorer);
-    def = allOccs.find((o) => o.isDefinition) ?? null;
+  // 2. Fallback to core single-file synchronous definition search
+  if (!def) {
+    def = findDefinitionSync(target, model, doc);
   }
 
   if (!def) {
@@ -565,11 +485,13 @@ export async function jumpToDefinition(
     return false;
   }
 
-  // Check if cursor is already right at the definition
-  if (
-    def.uri.toString() === model.uri.toString() &&
-    def.range.startLineNumber === pos.lineNumber
-  ) {
+  // Check if cursor is already right at the definition in current file
+  const isCurrentModel =
+    def.uri.toString() === model.uri.toString() ||
+    (def.filePath && doc.file?.id && def.filePath.toLowerCase().replace(/\\/g, '/') === doc.file.id.toLowerCase().replace(/\\/g, '/')) ||
+    (def.title && doc.fileName && def.title.toLowerCase() === doc.fileName.toLowerCase());
+
+  if (isCurrentModel && def.range.startLineNumber === pos.lineNumber) {
     showToast(`현재 위치가 ${target.name}의 선언부입니다. (Shift+F12로 사용된 곳 검색)`, 'info');
     return true;
   }
@@ -591,8 +513,27 @@ export async function jumpToOccurrence(
   if (occ.tabId && occ.tabId !== doc.currentTabId) {
     doc.switchTab(occ.tabId);
   } else if (occ.fileRef && (!doc.file || doc.file.id !== occ.fileRef.id)) {
-    // Open the file
     await doc.openFile(occ.fileRef);
+  } else if (occ.filePath) {
+    const normOccPath = occ.filePath.replace(/\\/g, '/').toLowerCase();
+    const baseOccName = normOccPath.split('/').pop() || normOccPath;
+    const targetTab = doc.allTabs.find((t) => {
+      const tPath = (t.file?.id || t.title || '').replace(/\\/g, '/').toLowerCase();
+      return (
+        tPath === normOccPath ||
+        tPath.endsWith(`/${normOccPath}`) ||
+        normOccPath.endsWith(`/${tPath}`) ||
+        t.title.toLowerCase() === baseOccName
+      );
+    });
+    if (targetTab) {
+      doc.switchTab(targetTab.id);
+    } else {
+      const ref = occ.fileRef || (occ.filePath ? platform().refFromId(occ.filePath) : null);
+      if (ref) {
+        await doc.openFile(ref);
+      }
+    }
   }
 
   editor.revealLineInCenter(occ.range.startLineNumber);
@@ -605,12 +546,11 @@ export async function jumpToOccurrence(
 }
 
 /**
- * Action: Show references dialog (Shift+F12)
+ * Action: Show references dialog (Shift+F12) - Plugins can provide cross-file namespace references via API.
  */
 export async function showReferencesDialog(
   editor: monaco.editor.IStandaloneCodeEditor,
   doc: DocumentManager,
-  explorer?: FileExplorer,
 ) {
   const model = editor.getModel();
   const pos = editor.getPosition();
@@ -622,8 +562,20 @@ export async function showReferencesDialog(
     return;
   }
 
-  showToast(`'${target.name}' 참조 및 사용 위치 검색 중...`, 'info');
-  const occs = await findAllOccurrencesAsync(target, editor, doc, explorer);
+  // 1. Try plugin-provided references resolver (e.g. cross-file same namespace from custom-lint)
+  let occs: SymbolOccurrence[] = [];
+  if (customReferencesResolver) {
+    try {
+      occs = await customReferencesResolver(target, model, doc);
+    } catch (err) {
+      console.warn('[symbol-nav] Custom reference resolver error:', err);
+    }
+  }
+
+  // 2. Fallback to core single-file synchronous references search
+  if (occs.length === 0) {
+    occs = findAllOccurrencesSync(target, model, doc);
+  }
 
   if (occs.length === 0) {
     showToast(`참조 또는 사용된 위치를 찾을 수 없습니다: ${target.name}`, 'warn');
@@ -643,13 +595,21 @@ export function registerSymbolProviders(
 ) {
   monacoRef = monacoInstance;
 
-  // 1. Definition Provider (F12, Alt+F12 Peek, Ctrl+Click)
+  // 1. Definition Provider (F12, Ctrl+Click)
   monacoInstance.languages.registerDefinitionProvider(LANGUAGE_ID, {
-    provideDefinition(model, position) {
+    async provideDefinition(model, position) {
       const target = getSymbolAtPosition(model, position);
       if (!target) return null;
 
-      const def = findDefinitionSync(target, model, doc);
+      let def: SymbolOccurrence | null = null;
+      if (customDefinitionResolver) {
+        try {
+          def = await customDefinitionResolver(target, model, doc);
+        } catch {}
+      }
+      if (!def) {
+        def = findDefinitionSync(target, model, doc);
+      }
       if (!def) return null;
 
       return {
@@ -659,13 +619,22 @@ export function registerSymbolProviders(
     },
   });
 
-  // 2. Reference Provider (Shift+F12, Find All References, Peek References)
+  // 2. Reference Provider (Shift+F12, Find All References)
   monacoInstance.languages.registerReferenceProvider(LANGUAGE_ID, {
-    provideReferences(model, position) {
+    async provideReferences(model, position) {
       const target = getSymbolAtPosition(model, position);
       if (!target) return [];
 
-      const occs = findAllOccurrencesSync(target, model, doc);
+      let occs: SymbolOccurrence[] = [];
+      if (customReferencesResolver) {
+        try {
+          occs = await customReferencesResolver(target, model, doc);
+        } catch {}
+      }
+      if (occs.length === 0) {
+        occs = findAllOccurrencesSync(target, model, doc);
+      }
+
       return occs.map((o) => ({
         uri: o.uri,
         range: o.range,
@@ -675,7 +644,7 @@ export function registerSymbolProviders(
 
   // 3. Editor Opener for cross-model navigation
   monacoInstance.editor.registerEditorOpener({
-    openCodeEditor(sourceEditor, resource, selectionOrPosition) {
+    async openCodeEditor(sourceEditor, resource, selectionOrPosition) {
       const targetTab = doc.allTabs.find(
         (t) => t.model.uri.toString() === resource.toString(),
       );
@@ -693,6 +662,23 @@ export function registerSymbolProviders(
         sourceEditor.focus();
         return true;
       }
+
+      const path = resource.fsPath || resource.path;
+      if (path) {
+        const ref = platform().refFromId(path);
+        if (ref) {
+          await doc.openFile(ref);
+        }
+        if (selectionOrPosition) {
+          if ('lineNumber' in selectionOrPosition) {
+            sourceEditor.setPosition(selectionOrPosition);
+            sourceEditor.revealPositionInCenter(selectionOrPosition);
+          }
+        }
+        sourceEditor.focus();
+        return true;
+      }
+
       return false;
     },
   });

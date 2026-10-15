@@ -11,6 +11,13 @@ export interface FolderRef {
   id: string;
 }
 
+export interface ExplorerFileInfo {
+  relPath: string;
+  name: string;
+  entry: DirEntry;
+  fileRef: FileRef;
+}
+
 const CHEVRON_SVG = `
   <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
     <polyline points="6 4 10 8 6 12"></polyline>
@@ -127,20 +134,60 @@ export class FileExplorer {
     return searchTree(this.entries);
   }
 
-  getAllFilePaths(): string[] {
-    const result: string[] = [];
+  getAllFiles(): ExplorerFileInfo[] {
+    const result: ExplorerFileInfo[] = [];
     const traverse = (list: DirEntry[], prefix = '') => {
       for (const entry of list) {
         const rel = prefix ? `${prefix}/${entry.name}` : entry.name;
         if (entry.isDir && entry.children) {
           traverse(entry.children, rel);
         } else if (!entry.isDir) {
-          result.push(rel);
+          const entryKey = entry.id || entry.path;
+          const fileRef = platform().refFromId(entryKey);
+          fileRef.name = entry.name;
+          result.push({
+            relPath: rel,
+            name: entry.name,
+            entry,
+            fileRef,
+          });
         }
       }
     };
     traverse(this.entries);
     return result;
+  }
+
+  getAllFilePaths(): string[] {
+    return this.getAllFiles().map((f) => f.relPath);
+  }
+
+  getFileRef(relativePathOrId: string): FileRef | null {
+    if (!relativePathOrId) return null;
+    const clean = relativePathOrId.trim().replace(/^["']|["']$/g, '').trim().replace(/\\/g, '/').toLowerCase();
+    const cleanNoDot = clean.startsWith('./') ? clean.slice(2) : clean;
+    const baseName = cleanNoDot.split('/').pop() || cleanNoDot;
+
+    const all = this.getAllFiles();
+    // 1. Exact match on relPath or id
+    const exact = all.find((f) => {
+      const relNorm = f.relPath.toLowerCase().replace(/\\/g, '/');
+      const idNorm = (f.fileRef.id || '').toLowerCase().replace(/\\/g, '/');
+      return relNorm === cleanNoDot || idNorm === clean || idNorm.endsWith(`/${cleanNoDot}`);
+    });
+    if (exact) return exact.fileRef;
+
+    // 2. Basename match if relative path didn't include slashes
+    if (!cleanNoDot.includes('/')) {
+      const byBase = all.find((f) => f.name.toLowerCase() === baseName);
+      if (byBase) return byBase.fileRef;
+    }
+
+    // 3. Desktop fallback: if path was absolute, use platform refFromId
+    if (platform().kind === 'desktop' && (clean.includes(':') || clean.startsWith('/'))) {
+      return platform().refFromId(relativePathOrId);
+    }
+    return null;
   }
 
   private bindGlobalEvents() {

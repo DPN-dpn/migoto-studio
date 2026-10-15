@@ -5,19 +5,29 @@ import type { DocumentManager } from '../core/workspace/documents';
 import type { FileExplorer } from '../ui/panels/explorer';
 import { openModal } from '../ui/modals/modal';
 import { showToast } from '../ui/common/toast';
+import {
+  flashLineHighlight,
+  setCustomDefinitionResolver,
+  setCustomReferencesResolver,
+  type SymbolOccurrence,
+} from '../core/ini/symbol-nav';
 import type { ActivityBar } from '../ui/layout/activitybar';
 import {
   registerAllowedResource,
   registerAllowedVariable,
   registerAllowedUsedResource,
   registerAllowedUsedVariable,
+  clearAllowedVariables,
+  clearAllowedResources,
   isAllowedResource,
   isAllowedVariable,
 } from '../core/ini/lint';
 import { registerPluginTemplate } from '../core/ini/templates';
 import { parseIni, classifyIniSection, mergeIniSections, formatIniSection } from '../core/ini/ini';
 import type {
+  CustomDefinitionProvider,
   CustomLintRule,
+  CustomReferenceProvider,
   CustomViewerDefinition,
   MigotoPlugin,
   PluginContext,
@@ -25,6 +35,7 @@ import type {
   PluginManifest,
   PluginTemplate,
   RegisteredSidebarView,
+  SymbolLocation,
 } from './types';
 import { createUIBuilder } from './ui-builder';
 
@@ -50,6 +61,8 @@ export class PluginManager {
   private statusBarEl: HTMLElement | null = null;
   private pluginStatusBarItems: Map<string, HTMLElement> = new Map();
   private customLintRules: Map<string, CustomLintRule> = new Map();
+  private customDefinitionProviders: CustomDefinitionProvider[] = [];
+  private customReferenceProviders: CustomReferenceProvider[] = [];
   private lintTrigger?: () => void;
 
   private doc: DocumentManager;
@@ -69,6 +82,21 @@ export class PluginManager {
     this.activityBar = activityBar;
     this.statusBarEl = document.getElementById('statusbar');
     this.doc.setViewerProvider(this);
+
+    // Register plugin symbol resolution providers into the core symbol navigation system
+    setCustomDefinitionResolver(async (target, model) => {
+      if (this.customDefinitionProviders.length === 0) return null;
+      const loc = await this.resolveCustomDefinition(target, model);
+      if (!loc) return null;
+      return this.symbolLocationToOccurrence(loc, target);
+    });
+
+    setCustomReferencesResolver(async (target, model) => {
+      if (this.customReferenceProviders.length === 0) return [];
+      const locs = await this.resolveCustomReferences(target, model);
+      if (!locs || locs.length === 0) return [];
+      return locs.map((loc) => this.symbolLocationToOccurrence(loc, target));
+    });
   }
 
   private isLinting = false;
@@ -99,10 +127,166 @@ export class PluginManager {
     this.listeners.forEach((fn) => fn());
   }
 
+  registerDefinitionProvider(provider: CustomDefinitionProvider): () => void {
+    this.customDefinitionProviders.push(provider);
+    return () => {
+      this.customDefinitionProviders = this.customDefinitionProviders.filter((p) => p !== provider);
+    };
+  }
+
+  registerReferenceProvider(provider: CustomReferenceProvider): () => void {
+    this.customReferenceProviders.push(provider);
+    return () => {
+      this.customReferenceProviders = this.customReferenceProviders.filter((p) => p !== provider);
+    };
+  }
+
+  private symbolLocationToOccurrence(loc: SymbolLocation, target: any): SymbolOccurrence {
+    const rawPath = loc.filePath || '';
+    const norm = rawPath.replace(/\\/g, '/');
+    const baseName = norm.split('/').pop() || rawPath;
+
+    const openTab = this.doc.allTabs.find((t) => {
+      const tPath = (t.file?.id || t.title || '').replace(/\\/g, '/');
+      return (
+        tPath === norm ||
+        tPath.endsWith(`/${norm}`) ||
+        norm.endsWith(`/${tPath}`) ||
+        t.title === baseName
+      );
+    });
+
+    const uri = openTab ? openTab.model.uri : monaco.Uri.file(rawPath);
+
+    return {
+      title: baseName,
+      filePath: rawPath,
+      fileRef: openTab?.file || (this.explorer && this.explorer.hasFolder ? this.explorer.getFileRef(rawPath) : null),
+      tabId: openTab?.id,
+      uri,
+      range: {
+        startLineNumber: loc.lineNumber,
+        startColumn: loc.startColumn,
+        endLineNumber: loc.lineNumber,
+        endColumn: loc.endColumn,
+      },
+      lineContent: loc.lineContent || '',
+      section: loc.section || '',
+      isDefinition: loc.isDefinition ?? true,
+      kind: target.kind || 'variable',
+      matchedText: target.name || '',
+    };
+  }
+
+  private createSymbolContext(model: monaco.editor.ITextModel) {
+    const curFile = this.doc.file
+      ? {
+          name: this.doc.fileName,
+          path: this.doc.file.id,
+          location: this.doc.file.location,
+        }
+      : {
+          name: this.doc.fileName,
+          path: this.doc.fileName,
+          location: 'memory',
+        };
+    const curFolder =
+      this.explorer && this.explorer.hasFolder
+        ? (this.explorer as any).currentFolder?.id ?? null
+        : null;
+
+    return {
+      model: {
+        getValue: () => model.getValue(),
+        getLineContent: (n: number) => model.getLineContent(n),
+        getLineCount: () => model.getLineCount(),
+      },
+      file: curFile,
+      folder: curFolder,
+      getAllFiles: (): string[] => {
+        const fileSet = new Set<string>();
+        if (this.explorer && this.explorer.hasFolder) {
+          for (const f of this.explorer.getAllFilePaths()) {
+            fileSet.add(f);
+          }
+        }
+        for (const tab of this.doc.allTabs) {
+          if (tab.file?.id) {
+            fileSet.add(tab.file.id);
+          } else if (tab.title) {
+            fileSet.add(tab.title);
+          }
+        }
+        return Array.from(fileSet);
+      },
+      readTextFile: async (relOrAbsPath: string): Promise<string> => {
+        const cleanNoSlash = relOrAbsPath.trim().replace(/^["']|["']$/g, '').trim().replace(/\\/g, '/');
+        const baseName = cleanNoSlash.split('/').pop() || cleanNoSlash;
+        for (const tab of this.doc.allTabs) {
+          const tf = tab.file;
+          const p = (tf?.id || tab.title || '').replace(/\\/g, '/');
+          if (p === cleanNoSlash || p.endsWith(`/${cleanNoSlash}`) || cleanNoSlash.endsWith(`/${p}`) || tab.title === baseName) {
+            return tab.model.getValue();
+          }
+        }
+        if (this.explorer && this.explorer.hasFolder) {
+          const fileRef = this.explorer.getFileRef(relOrAbsPath);
+          if (fileRef) {
+            const loaded = await platform().readFile(fileRef);
+            return loaded.text;
+          }
+        }
+        let clean = relOrAbsPath.trim().replace(/^["']|["']$/g, '').trim();
+        if (curFolder && !clean.includes(':') && !clean.startsWith('/') && !clean.startsWith('\\')) {
+          clean = `${curFolder.replace(/\\/g, '/')}/${clean.replace(/\\/g, '/')}`;
+        }
+        const ref = platform().refFromId(clean);
+        const loaded = await platform().readFile(ref);
+        return loaded.text;
+      },
+    };
+  }
+
+  async resolveCustomDefinition(target: any, model: monaco.editor.ITextModel): Promise<SymbolLocation | null> {
+    const ctx = this.createSymbolContext(model);
+    for (const prov of this.customDefinitionProviders) {
+      try {
+        const res = await prov.provideDefinition(target, ctx);
+        if (res) return res;
+      } catch (err) {
+        console.warn('[PluginManager] Definition provider error:', err);
+      }
+    }
+    return null;
+  }
+
+  async resolveCustomReferences(target: any, model: monaco.editor.ITextModel): Promise<SymbolLocation[]> {
+    const ctx = this.createSymbolContext(model);
+    const results: SymbolLocation[] = [];
+    for (const prov of this.customReferenceProviders) {
+      try {
+        const list = await prov.provideReferences(target, ctx);
+        if (list && list.length > 0) {
+          results.push(...list);
+        }
+      } catch (err) {
+        console.warn('[PluginManager] Reference provider error:', err);
+      }
+    }
+    return results;
+  }
+
   private getStoredPluginOrder(): string[] {
     try {
       const raw = localStorage.getItem('migoto_plugin_order');
-      return raw ? JSON.parse(raw) : [];
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        return parsed
+          .map((id) => (id === 'resource-checker' ? 'custom-lint' : id))
+          .filter((id, idx, arr) => arr.indexOf(id) === idx);
+      }
+      return [];
     } catch {
       return [];
     }
@@ -270,6 +454,17 @@ export class PluginManager {
       }
     })();
 
+    // Migrate saved state from legacy 'resource-checker' to 'custom-lint'
+    if (savedStates['resource-checker'] !== undefined) {
+      if (savedStates['custom-lint'] === undefined) {
+        savedStates['custom-lint'] = savedStates['resource-checker'];
+      }
+      delete savedStates['resource-checker'];
+      try {
+        localStorage.setItem(STORAGE_ENABLED_PLUGINS, JSON.stringify(savedStates));
+      } catch {}
+    }
+
     for (const p of this.plugins.values()) {
       try {
         p.cleanup?.();
@@ -312,6 +507,18 @@ export class PluginManager {
       const diskList = await platform().listDiskPlugins!();
 
       for (const disk of diskList) {
+        // Prune legacy resource-checker plugin if still present on disk
+        if (disk.id === 'resource-checker' || disk.path.toLowerCase().endsWith('resource-checker')) {
+          if (platform().deleteEntry) {
+            try {
+              await platform().deleteEntry!(disk.path || disk.id);
+            } catch (err) {
+              console.warn('[plugins] Failed to prune legacy resource-checker folder:', err);
+            }
+          }
+          continue;
+        }
+
         let manifest: PluginManifest;
         try {
           manifest = JSON.parse(disk.manifestJson);
@@ -377,7 +584,7 @@ export class PluginManager {
     const unregisterViews: string[] = [];
     const unregisterStatusItems: string[] = [];
     const unregisterCustomViewers: string[] = [];
-    const unregisterCleanups: Array<() => void> = [];
+    const unregisterCleanups = new Set<() => void>();
 
     const context = this.createContext(instance.manifest, {
       onRegisterView: (view) => {
@@ -429,7 +636,10 @@ export class PluginManager {
         });
       },
       onRegisterCleanup: (fn) => {
-        unregisterCleanups.push(fn);
+        unregisterCleanups.add(fn);
+      },
+      onRemoveCleanup: (fn) => {
+        unregisterCleanups.delete(fn);
       },
     });
 
@@ -444,6 +654,7 @@ export class PluginManager {
         unregisterCleanups.forEach((fn) => {
           try { fn(); } catch { }
         });
+        unregisterCleanups.clear();
         unregisterViews.forEach((vId) => {
           this.sidebarViews.delete(vId);
           const disposer = this.dynamicTabDisposers.get(vId);
@@ -486,6 +697,10 @@ export class PluginManager {
       p.cleanup?.();
       p.cleanup = undefined;
       p.instance = undefined;
+      if (this.customLintRules.size === 0) {
+        clearAllowedVariables();
+        clearAllowedResources();
+      }
     } else if (p.scriptContent) {
       await this.loadAndActivateScriptPlugin(p, p.scriptContent);
     }
@@ -705,6 +920,7 @@ export default {
       onRegisterStatusItem: (id: string, el: HTMLElement) => void;
       onRegisterCustomViewer: (def: CustomViewerDefinition) => void;
       onRegisterCleanup: (fn: () => void) => void;
+      onRemoveCleanup: (fn: () => void) => void;
     },
   ): PluginContext {
     return {
@@ -778,11 +994,18 @@ export default {
           callbacks.onRegisterCleanup(cleanup);
           return cleanup;
         },
-        registerContextMenuAction: (options: { id: string; label: string; onClick: () => void }) => {
+        registerContextMenuAction: (options: {
+          id: string;
+          label: string;
+          contextMenuGroupId?: string;
+          contextMenuOrder?: number;
+          onClick: () => void;
+        }) => {
           const action = this.editor.addAction({
             id: `plugin-${manifest.id}-${options.id}`,
             label: options.label,
-            contextMenuGroupId: 'navigation',
+            contextMenuGroupId: options.contextMenuGroupId || 'navigation',
+            contextMenuOrder: options.contextMenuOrder,
             run: () => options.onClick(),
           });
           const cleanup = () => action.dispose();
@@ -800,6 +1023,16 @@ export default {
             this.customLintRules.delete(ruleKey);
             this.triggerLint();
           };
+          callbacks.onRegisterCleanup(cleanup);
+          return cleanup;
+        },
+        registerDefinitionProvider: (provider: CustomDefinitionProvider) => {
+          const cleanup = this.registerDefinitionProvider(provider);
+          callbacks.onRegisterCleanup(cleanup);
+          return cleanup;
+        },
+        registerReferenceProvider: (provider: CustomReferenceProvider) => {
+          const cleanup = this.registerReferenceProvider(provider);
           callbacks.onRegisterCleanup(cleanup);
           return cleanup;
         },
@@ -821,9 +1054,32 @@ export default {
           }
           return null;
         },
-        openFile: async (pathOrName: string) => {
-          const ref = platform().refFromId(pathOrName);
-          await this.doc.openFile(ref);
+        openFile: async (pathOrName: string, line?: number, col?: number) => {
+          const clean = pathOrName.replace(/\\/g, '/');
+          const base = clean.split('/').pop() || clean;
+          const openTab = this.doc.allTabs.find((t) => {
+            if (t.file && t.file.id.replace(/\\/g, '/') === clean) return true;
+            if (t.file && t.file.id.replace(/\\/g, '/').endsWith(`/${clean}`)) return true;
+            if (t.title === base || t.title === pathOrName) return true;
+            return false;
+          });
+
+          if (openTab) {
+            this.doc.switchTab(openTab.id);
+          } else {
+            let ref = this.explorer && this.explorer.hasFolder ? this.explorer.getFileRef(pathOrName) : null;
+            if (!ref) {
+              ref = platform().refFromId(pathOrName);
+            }
+            await this.doc.openFile(ref);
+          }
+
+          if (typeof line === 'number') {
+            this.editor.setPosition({ lineNumber: line, column: col || 1 });
+            this.editor.revealLineInCenter(line);
+            this.editor.focus();
+            flashLineHighlight(this.editor, line);
+          }
         },
         saveCurrentFile: async () => {
           await this.doc.save();
@@ -898,41 +1154,60 @@ export default {
         },
         registerAllowedResource: (pattern: string | RegExp | ((name: string) => boolean)) => {
           const unregister = registerAllowedResource(pattern);
-          this.triggerLint();
           const cleanup = () => {
             unregister();
-            this.triggerLint();
+            callbacks.onRemoveCleanup(cleanup);
           };
           callbacks.onRegisterCleanup(cleanup);
           return cleanup;
         },
         registerAllowedVariable: (pattern: string | RegExp | ((name: string) => boolean)) => {
           const unregister = registerAllowedVariable(pattern);
-          this.triggerLint();
           const cleanup = () => {
             unregister();
-            this.triggerLint();
+            callbacks.onRemoveCleanup(cleanup);
           };
           callbacks.onRegisterCleanup(cleanup);
           return cleanup;
         },
         registerAllowedUsedResource: (pattern: string | RegExp | ((name: string) => boolean)) => {
           const unregister = registerAllowedUsedResource(pattern);
-          this.triggerLint();
           const cleanup = () => {
             unregister();
-            this.triggerLint();
+            callbacks.onRemoveCleanup(cleanup);
           };
           callbacks.onRegisterCleanup(cleanup);
           return cleanup;
         },
         registerAllowedUsedVariable: (pattern: string | RegExp | ((name: string) => boolean)) => {
           const unregister = registerAllowedUsedVariable(pattern);
-          this.triggerLint();
           const cleanup = () => {
             unregister();
-            this.triggerLint();
+            callbacks.onRemoveCleanup(cleanup);
           };
+          callbacks.onRegisterCleanup(cleanup);
+          return cleanup;
+        },
+        registerDefinitionProvider: (provider: CustomDefinitionProvider) => {
+          const cleanup = this.registerDefinitionProvider(provider);
+          callbacks.onRegisterCleanup(cleanup);
+          return cleanup;
+        },
+        registerReferenceProvider: (provider: CustomReferenceProvider) => {
+          const cleanup = this.registerReferenceProvider(provider);
+          callbacks.onRegisterCleanup(cleanup);
+          return cleanup;
+        },
+      },
+
+      languages: {
+        registerDefinitionProvider: (provider: CustomDefinitionProvider) => {
+          const cleanup = this.registerDefinitionProvider(provider);
+          callbacks.onRegisterCleanup(cleanup);
+          return cleanup;
+        },
+        registerReferenceProvider: (provider: CustomReferenceProvider) => {
+          const cleanup = this.registerReferenceProvider(provider);
           callbacks.onRegisterCleanup(cleanup);
           return cleanup;
         },

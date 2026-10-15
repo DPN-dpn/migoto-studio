@@ -21,6 +21,27 @@ pub struct PluginDiskInfo {
 pub fn plugins_dir() -> PathBuf {
   let p = crate::storage::data_dir().join("plugins");
   let _ = fs::create_dir_all(&p);
+
+  // Auto-prune legacy "resource-checker" folder and ensure "custom-lint" is freshly installed
+  let legacy_checker = p.join("resource-checker");
+  let had_legacy = legacy_checker.exists();
+  if had_legacy {
+    let _ = fs::remove_dir_all(&legacy_checker);
+  }
+
+  let custom_lint_dir = p.join("custom-lint");
+  if had_legacy || !custom_lint_dir.exists() {
+    let _ = fs::create_dir_all(&custom_lint_dir);
+    let _ = fs::write(
+      custom_lint_dir.join("plugin.json"),
+      include_str!("../default-plugins/custom-lint/plugin.json"),
+    );
+    let _ = fs::write(
+      custom_lint_dir.join("plugin.js"),
+      include_str!("../default-plugins/custom-lint/plugin.js"),
+    );
+  }
+
   p
 }
 
@@ -177,6 +198,9 @@ pub fn list_disk_plugins() -> Result<Vec<PluginDiskInfo>, String> {
             fs::read_to_string(&script_path),
           ) {
             let id = p.file_name().unwrap_or_default().to_string_lossy().to_string();
+            if id == "resource-checker" {
+              continue;
+            }
             list.push(PluginDiskInfo {
               id,
               path: p.to_string_lossy().to_string(),

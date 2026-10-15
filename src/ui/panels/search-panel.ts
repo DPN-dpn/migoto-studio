@@ -371,23 +371,25 @@ export class SearchPanel {
     this.summaryEl.textContent = '검색 중...';
 
     const results: SearchFileResult[] = [];
-    const scannedPaths = new Set<string>();
+    const scannedTabFileIds = new Set<string>();
+    const scannedNames = new Set<string>();
 
     // 1. Search Open Tabs first (live unsaved contents)
     for (const tab of this.doc.allTabs) {
       if (tab.kind !== 'text') continue;
       const tabName = tab.title || '이름 없음';
-      const pathKey = tab.file?.id || tabName;
-      scannedPaths.add(pathKey);
+      if (tab.file?.id) scannedTabFileIds.add(tab.file.id);
+      scannedNames.add(tabName.toLowerCase());
 
-      if (this.includePattern && !matchesPattern(pathKey, this.includePattern)) continue;
-      if (this.excludePattern && matchesPattern(pathKey, this.excludePattern)) continue;
+      const displayPath = tab.file?.location || tab.file?.id || tabName;
+      if (this.includePattern && !matchesPattern(displayPath, this.includePattern) && !matchesPattern(tabName, this.includePattern)) continue;
+      if (this.excludePattern && (matchesPattern(displayPath, this.excludePattern) || matchesPattern(tabName, this.excludePattern))) continue;
 
       const text = tab.model.getValue();
       const matches = searchInText(text, regex);
       if (matches.length > 0) {
         results.push({
-          filePath: tab.file?.id || tabName,
+          filePath: displayPath,
           fileName: tabName,
           fileRef: tab.file,
           tabId: tab.id,
@@ -399,29 +401,35 @@ export class SearchPanel {
 
     // 2. Search Unopened Workspace Files (if explorer folder is open)
     if (this.explorer && this.explorer.hasFolder) {
-      const allPaths = this.explorer.getAllFilePaths();
+      const allFiles = this.explorer.getAllFiles();
 
-      for (const relPath of allPaths) {
-        if (scannedPaths.has(relPath)) continue;
+      for (const fileInfo of allFiles) {
+        // Skip if already searched in open tabs
+        if (fileInfo.fileRef.id && scannedTabFileIds.has(fileInfo.fileRef.id)) continue;
+        if (scannedNames.has(fileInfo.name.toLowerCase())) {
+          const isOpen = this.doc.allTabs.some(
+            (t) => t.file?.id === fileInfo.fileRef.id || t.title === fileInfo.name || t.file?.name === fileInfo.name,
+          );
+          if (isOpen) continue;
+        }
 
         // Skip binary extensions
-        const ext = relPath.split('.').pop()?.toLowerCase() ?? '';
+        const ext = fileInfo.relPath.split('.').pop()?.toLowerCase() ?? '';
         if (BINARY_EXTENSIONS.has(ext)) continue;
 
-        if (this.includePattern && !matchesPattern(relPath, this.includePattern)) continue;
-        if (this.excludePattern && matchesPattern(relPath, this.excludePattern)) continue;
+        if (this.includePattern && !matchesPattern(fileInfo.relPath, this.includePattern) && !matchesPattern(fileInfo.name, this.includePattern)) continue;
+        if (this.excludePattern && (matchesPattern(fileInfo.relPath, this.excludePattern) || matchesPattern(fileInfo.name, this.excludePattern))) continue;
 
         try {
-          const ref = platform().refFromId(relPath);
-          const loaded = await platform().readFile(ref);
-          if (!loaded.text) continue;
+          const loaded = await platform().readFile(fileInfo.fileRef);
+          if (!loaded || typeof loaded.text !== 'string') continue;
 
           const matches = searchInText(loaded.text, regex);
           if (matches.length > 0) {
             results.push({
-              filePath: relPath,
-              fileName: ref.name,
-              fileRef: ref,
+              filePath: fileInfo.relPath,
+              fileName: fileInfo.name,
+              fileRef: fileInfo.fileRef,
               matches,
               isCollapsed: false,
             });

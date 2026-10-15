@@ -104,3 +104,48 @@ test('replaceAllInText replaces all matching occurrences and reports total count
   assert.equal(count, 2);
   assert.equal(newText, 'val1 = $active\nval2 = $active\nval3 = $other');
 });
+
+test('workspace global search scans both open tabs and unopened folder files', async () => {
+  const openTabs = [
+    { id: 'tab1', title: 'active.ini', file: { id: 'active.ini', name: 'active.ini', location: 'disk' }, text: '[Constants]\n$costume = 1\n$active = 1' },
+  ];
+
+  const unopenedFiles = [
+    { relPath: 'sub/unopened.ini', name: 'unopened.ini', fileRef: { id: 'sub/unopened.ini', name: 'unopened.ini', location: 'disk' }, text: '[CommandListSwap]\n$costume = 2\nrun = CommandListSwap' },
+    { relPath: 'sub/other.ini', name: 'other.ini', fileRef: { id: 'sub/other.ini', name: 'other.ini', location: 'disk' }, text: '[ResourceTex]\nfilename = tex.dds' },
+  ];
+
+  const query = '$costume';
+  const regex = buildSearchRegex(query);
+
+  const results: any[] = [];
+  const scannedTabFileIds = new Set<string>();
+
+  // 1. Search Open Tabs
+  for (const tab of openTabs) {
+    scannedTabFileIds.add(tab.file.id);
+    const matches = searchInText(tab.text, regex);
+    if (matches.length > 0) {
+      results.push({ filePath: tab.file.id, fileName: tab.title, matches });
+    }
+  }
+
+  // 2. Search Unopened Files
+  for (const fileInfo of unopenedFiles) {
+    if (scannedTabFileIds.has(fileInfo.fileRef.id)) continue;
+    const matches = searchInText(fileInfo.text, regex);
+    if (matches.length > 0) {
+      results.push({ filePath: fileInfo.relPath, fileName: fileInfo.name, matches });
+    }
+  }
+
+  assert.equal(results.length, 2);
+  assert.equal(results[0].fileName, 'active.ini');
+  assert.equal(results[0].matches.length, 1);
+  assert.equal(results[0].matches[0].lineNumber, 2);
+
+  assert.equal(results[1].fileName, 'unopened.ini');
+  assert.equal(results[1].matches.length, 1);
+  assert.equal(results[1].matches[0].lineNumber, 2);
+});
+

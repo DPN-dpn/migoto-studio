@@ -1,6 +1,19 @@
 import { definePlugin } from '../../src/plugins/api.ts';
 import { stripComments } from '../../src/core/ini/lint.ts';
-import type { DirEntry, LintDiagnostic } from '../../src/plugins/types.ts';
+import type { DirEntry, LintDiagnostic, SymbolLocation, CustomDefinitionProvider, CustomReferenceProvider } from '../../src/plugins/types.ts';
+
+export interface SymbolLocationRecord {
+  name: string;        // Lowercase name or clean name
+  rawName: string;
+  kind: 'variable' | 'section';
+  line: number;
+  startCol: number;
+  endCol: number;
+  lineContent: string;
+  section: string;
+  filePath: string;
+  namespace?: string;
+}
 
 interface NamespaceExport {
   namespace: string;
@@ -9,6 +22,8 @@ interface NamespaceExport {
   sections: Set<string>;
   usedVariables: Set<string>;
   usedSections: Set<string>;
+  declarations: SymbolLocationRecord[];
+  usages: SymbolLocationRecord[];
 }
 
 interface NamespaceGroup {
@@ -26,6 +41,8 @@ function parseIniExports(text: string, filePath: string): NamespaceExport {
   const sections = new Set<string>();
   const usedVariables = new Set<string>();
   const usedSections = new Set<string>();
+  const declarations: SymbolLocationRecord[] = [];
+  const usages: SymbolLocationRecord[] = [];
 
   // 1차 스캔: 섹션 시작 전에 선언된 namespace = 확인
   for (let i = 0; i < lines.length; i++) {
@@ -67,19 +84,75 @@ function parseIniExports(text: string, filePath: string): NamespaceExport {
       const secLower = currentSection.toLowerCase();
       sections.add(secLower);
 
+      const bracketIdx = raw.indexOf('[');
+      const startCol = bracketIdx !== -1 ? bracketIdx + 2 : 1;
+      const endCol = startCol + currentSection.length;
+
+      declarations.push({
+        name: secLower,
+        rawName: currentSection,
+        kind: 'section',
+        line: i + 1,
+        startCol,
+        endCol,
+        lineContent: raw,
+        section: `[${currentSection}]`,
+        filePath,
+        namespace: currentNamespace,
+      });
+
       // If section is e.g. CommandListSwap and namespace is Raiden,
       // register CommandList\Raiden\Swap variant
       if (currentNamespace) {
         const nsLower = currentNamespace.toLowerCase();
         if (secLower.startsWith('commandlist') && secLower.length > 11) {
           const action = secLower.slice(11);
-          sections.add(`commandlist\\${nsLower}\\${action}`);
+          const alias = `commandlist\\${nsLower}\\${action}`;
+          sections.add(alias);
+          declarations.push({
+            name: alias,
+            rawName: `CommandList\\${currentNamespace}\\${currentSection.slice(11)}`,
+            kind: 'section',
+            line: i + 1,
+            startCol,
+            endCol,
+            lineContent: raw,
+            section: `[${currentSection}]`,
+            filePath,
+            namespace: currentNamespace,
+          });
         } else if (secLower.startsWith('resource') && secLower.length > 8) {
           const res = secLower.slice(8);
-          sections.add(`resource\\${nsLower}\\${res}`);
+          const alias = `resource\\${nsLower}\\${res}`;
+          sections.add(alias);
+          declarations.push({
+            name: alias,
+            rawName: `Resource\\${currentNamespace}\\${currentSection.slice(8)}`,
+            kind: 'section',
+            line: i + 1,
+            startCol,
+            endCol,
+            lineContent: raw,
+            section: `[${currentSection}]`,
+            filePath,
+            namespace: currentNamespace,
+          });
         } else if (secLower.startsWith('customshader') && secLower.length > 12) {
           const shader = secLower.slice(12);
-          sections.add(`customshader\\${nsLower}\\${shader}`);
+          const alias = `customshader\\${nsLower}\\${shader}`;
+          sections.add(alias);
+          declarations.push({
+            name: alias,
+            rawName: `CustomShader\\${currentNamespace}\\${currentSection.slice(12)}`,
+            kind: 'section',
+            line: i + 1,
+            startCol,
+            endCol,
+            lineContent: raw,
+            section: `[${currentSection}]`,
+            filePath,
+            namespace: currentNamespace,
+          });
         }
       }
       continue;
@@ -96,6 +169,39 @@ function parseIniExports(text: string, filePath: string): NamespaceExport {
       const simpleName = parts[parts.length - 1];
       if (simpleName) variables.add(simpleName);
       variables.add(vName);
+
+      const rawIdx = raw.indexOf(vm[0]);
+      const dollarRel = vm[0].indexOf('$');
+      const startCol = rawIdx !== -1 && dollarRel !== -1 ? rawIdx + dollarRel + 1 : (rawIdx !== -1 ? rawIdx + 1 : 1);
+      const endCol = startCol + vm[1].length + 1;
+
+      declarations.push({
+        name: simpleName ? simpleName.toLowerCase() : vName,
+        rawName: `$${vm[1]}`,
+        kind: 'variable',
+        line: i + 1,
+        startCol,
+        endCol,
+        lineContent: raw,
+        section: currentSection ? `[${currentSection}]` : '',
+        filePath,
+        namespace: currentNamespace,
+      });
+
+      if (vName.includes('\\')) {
+        declarations.push({
+          name: vName,
+          rawName: `$${vm[1]}`,
+          kind: 'variable',
+          line: i + 1,
+          startCol,
+          endCol,
+          lineContent: raw,
+          section: currentSection ? `[${currentSection}]` : '',
+          filePath,
+          namespace: currentNamespace,
+        });
+      }
     }
 
     // In [Constants], lines like `$costume = 1` or `$active`
@@ -108,6 +214,38 @@ function parseIniExports(text: string, filePath: string): NamespaceExport {
         const simpleName = parts[parts.length - 1];
         if (simpleName) variables.add(simpleName);
         variables.add(vName);
+
+        const rawIdx = raw.indexOf(`$${constLineMatch[1]}`);
+        const startCol = rawIdx !== -1 ? rawIdx + 1 : 1;
+        const endCol = startCol + constLineMatch[1].length + 1;
+
+        declarations.push({
+          name: simpleName ? simpleName.toLowerCase() : vName,
+          rawName: `$${constLineMatch[1]}`,
+          kind: 'variable',
+          line: i + 1,
+          startCol,
+          endCol,
+          lineContent: raw,
+          section: `[${currentSection}]`,
+          filePath,
+          namespace: currentNamespace,
+        });
+
+        if (vName.includes('\\')) {
+          declarations.push({
+            name: vName,
+            rawName: `$${constLineMatch[1]}`,
+            kind: 'variable',
+            line: i + 1,
+            startCol,
+            endCol,
+            lineContent: raw,
+            section: `[${currentSection}]`,
+            filePath,
+            namespace: currentNamespace,
+          });
+        }
       }
     }
 
@@ -128,22 +266,95 @@ function parseIniExports(text: string, filePath: string): NamespaceExport {
       const clean = vName.startsWith('\\') ? vName.slice(1) : vName;
       usedVariables.add(clean);
       const parts = clean.split('\\').filter(Boolean);
+      let targetNs = currentNamespace;
+      let leafName = clean;
       if (parts.length > 1) {
+        targetNs = parts[0];
+        leafName = parts.slice(1).join('\\');
         usedVariables.add(parts[parts.length - 1]);
+      }
+
+      const startCol = vum.index + 1;
+      const endCol = startCol + vum[0].length;
+
+      usages.push({
+        name: leafName.toLowerCase(),
+        rawName: vum[0],
+        kind: 'variable',
+        line: i + 1,
+        startCol,
+        endCol,
+        lineContent: raw,
+        section: currentSection ? `[${currentSection}]` : '',
+        filePath,
+        namespace: targetNs,
+      });
+
+      if (parts.length > 1) {
+        usages.push({
+          name: clean.toLowerCase(),
+          rawName: vum[0],
+          kind: 'variable',
+          line: i + 1,
+          startCol,
+          endCol,
+          lineContent: raw,
+          section: currentSection ? `[${currentSection}]` : '',
+          filePath,
+          namespace: targetNs,
+        });
       }
     }
 
     // Section references (run = ..., ps-t0 = ..., Resource = ..., etc.)
     const resRefMatch = /^\s*(?:(?:pre\s+|post\s+)?run|this|vb\d+|ib|[a-z]{2}-(?:[tu]|cb)\d+|Resource(?:\\[a-zA-Z0-9_]+)*|(?:cs|vs|ps|hs|ds|gs))\s*=\s*(?:ref\s+|copy\s+)?([a-zA-Z0-9_\\]+)/i.exec(code);
     if (resRefMatch) {
-      const target = resRefMatch[1].trim().toLowerCase();
-      if (!['null', 'skip', 'auto', 'default'].includes(target)) {
-        usedSections.add(target);
-        const clean = target.startsWith('\\') ? target.slice(1) : target;
+      const target = resRefMatch[1].trim();
+      const targetLower = target.toLowerCase();
+      if (!['null', 'skip', 'auto', 'default'].includes(targetLower)) {
+        usedSections.add(targetLower);
+        const clean = targetLower.startsWith('\\') ? targetLower.slice(1) : targetLower;
         usedSections.add(clean);
         const parts = clean.split('\\').filter(Boolean);
-        if (parts.length > 1) {
+        let targetNs = currentNamespace;
+        let actionName = clean;
+        if (parts.length >= 3) {
+          targetNs = parts[1];
+          actionName = `${parts[0]}${parts[parts.length - 1]}`.toLowerCase();
           usedSections.add(parts[parts.length - 1]);
+        } else if (parts.length > 1) {
+          usedSections.add(parts[parts.length - 1]);
+        }
+
+        const matchIdx = raw.indexOf(resRefMatch[1]);
+        const startCol = matchIdx !== -1 ? matchIdx + 1 : 1;
+        const endCol = startCol + resRefMatch[1].length;
+
+        usages.push({
+          name: actionName.toLowerCase(),
+          rawName: target,
+          kind: 'section',
+          line: i + 1,
+          startCol,
+          endCol,
+          lineContent: raw,
+          section: currentSection ? `[${currentSection}]` : '',
+          filePath,
+          namespace: targetNs,
+        });
+        if (clean !== actionName) {
+          usages.push({
+            name: clean.toLowerCase(),
+            rawName: target,
+            kind: 'section',
+            line: i + 1,
+            startCol,
+            endCol,
+            lineContent: raw,
+            section: currentSection ? `[${currentSection}]` : '',
+            filePath,
+            namespace: targetNs,
+          });
         }
       }
     }
@@ -151,14 +362,51 @@ function parseIniExports(text: string, filePath: string): NamespaceExport {
     const refCopyRe = /\b(?:ref|copy)\s+([a-zA-Z0-9_\\]+)/gi;
     let rcm: RegExpExecArray | null;
     while ((rcm = refCopyRe.exec(code)) !== null) {
-      const target = rcm[1].trim().toLowerCase();
-      if (!['null', 'skip', 'auto', 'default'].includes(target)) {
-        usedSections.add(target);
-        const clean = target.startsWith('\\') ? target.slice(1) : target;
+      const target = rcm[1].trim();
+      const targetLower = target.toLowerCase();
+      if (!['null', 'skip', 'auto', 'default'].includes(targetLower)) {
+        usedSections.add(targetLower);
+        const clean = targetLower.startsWith('\\') ? targetLower.slice(1) : targetLower;
         usedSections.add(clean);
         const parts = clean.split('\\').filter(Boolean);
-        if (parts.length > 1) {
+        let targetNs = currentNamespace;
+        let actionName = clean;
+        if (parts.length >= 3) {
+          targetNs = parts[1];
+          actionName = `${parts[0]}${parts[parts.length - 1]}`.toLowerCase();
           usedSections.add(parts[parts.length - 1]);
+        } else if (parts.length > 1) {
+          usedSections.add(parts[parts.length - 1]);
+        }
+
+        const startCol = rcm.index + 1;
+        const endCol = startCol + rcm[0].length;
+
+        usages.push({
+          name: actionName.toLowerCase(),
+          rawName: target,
+          kind: 'section',
+          line: i + 1,
+          startCol,
+          endCol,
+          lineContent: raw,
+          section: currentSection ? `[${currentSection}]` : '',
+          filePath,
+          namespace: targetNs,
+        });
+        if (clean !== actionName) {
+          usages.push({
+            name: clean.toLowerCase(),
+            rawName: target,
+            kind: 'section',
+            line: i + 1,
+            startCol,
+            endCol,
+            lineContent: raw,
+            section: currentSection ? `[${currentSection}]` : '',
+            filePath,
+            namespace: targetNs,
+          });
         }
       }
     }
@@ -171,29 +419,60 @@ function parseIniExports(text: string, filePath: string): NamespaceExport {
     sections,
     usedVariables,
     usedSections,
+    declarations,
+    usages,
   };
 }
 
+export function isBuiltinResource(name: string): boolean {
+  if (!name) return false;
+  const norm = name.toLowerCase().replace(/^[\\\/]+/, '');
+  return (
+    norm.startsWith('builtincommandlist') ||
+    norm.startsWith('builtin_commandlist') ||
+    norm.startsWith('builtin\\') ||
+    norm.startsWith('commandlist\\builtin') ||
+    norm.startsWith('commandlist\\skintexture') ||
+    norm === 'commandlistskintexture' ||
+    norm === 'builtin'
+  );
+}
+
+let isPluginActive = false;
+let unregisterBuiltinResources: (() => void)[] = [];
 let unregisterAllowedVars: (() => void) | null = null;
 let unregisterAllowedGroupResources: (() => void) | null = null;
 let unregisterAllowedUsedVars: (() => void) | null = null;
 let unregisterAllowedUsedResources: (() => void) | null = null;
+let unregisterDefProvider: (() => void) | null = null;
+let unregisterRefProvider: (() => void) | null = null;
 
 export default definePlugin({
   activate(context) {
+    isPluginActive = true;
 
-    // 0. XXMI 표준 내장 커맨드리스트 허용 등록 (GIMI / ZZMI / XXMI 내장 함수)
+    // 0. XXMI 표준 내장 커맨드리스트 허용 등록 (GIMI / ZZMI / XXMI 내장 함수: BuiltinCommandList~, CommandListSkinTexture 등)
     if (context.linter?.registerAllowedResource) {
-      context.linter.registerAllowedResource('CommandListSkinTexture');
-      context.linter.registerAllowedResource(/^(?:builtin\\)?commandlistskintexture$/i);
-      context.linter.registerAllowedResource(/^commandlist\\(?:builtin\\)?skintexture$/i);
-      context.linter.registerAllowedResource(/^builtin\\skintexture$/i);
+      const u1 = context.linter.registerAllowedResource((name: string) => isBuiltinResource(name));
+      const u2 = context.linter.registerAllowedResource(/^builtincommandlist/i);
+      const u3 = context.linter.registerAllowedResource('CommandListSkinTexture');
+      const u4 = context.linter.registerAllowedResource(/^(?:builtin\\)?commandlistskintexture$/i);
+      const u5 = context.linter.registerAllowedResource(/^commandlist\\(?:builtin\\)?skintexture$/i);
+      const u6 = context.linter.registerAllowedResource(/^builtin\\skintexture$/i);
+      const u7 = context.linter.registerAllowedResource(/^(?:commandlist\\)?builtin\\/i);
+      const u8 = context.linter.registerAllowedResource(/^builtin\\/i);
+      unregisterBuiltinResources.push(u1, u2, u3, u4, u5, u6, u7, u8);
     }
     if (context.linter?.registerAllowedUsedResource) {
-      context.linter.registerAllowedUsedResource('CommandListSkinTexture');
-      context.linter.registerAllowedUsedResource(/^(?:builtin\\)?commandlistskintexture$/i);
-      context.linter.registerAllowedUsedResource(/^commandlist\\(?:builtin\\)?skintexture$/i);
-      context.linter.registerAllowedUsedResource(/^builtin\\skintexture$/i);
+      const u1 = context.linter.registerAllowedUsedResource((name: string) => isBuiltinResource(name));
+      const u2 = context.linter.registerAllowedUsedResource(/^builtincommandlist/i);
+      const u3 = context.linter.registerAllowedUsedResource('CommandListSkinTexture');
+      const u4 = context.linter.registerAllowedUsedResource(/^(?:builtin\\)?commandlistskintexture$/i);
+      const u5 = context.linter.registerAllowedUsedResource(/^commandlist\\(?:builtin\\)?skintexture$/i);
+      const u6 = context.linter.registerAllowedUsedResource(/^builtin\\skintexture$/i);
+      const u7 = context.linter.registerAllowedUsedResource(/^(?:commandlist\\)?builtin\\/i);
+      const u8 = context.linter.registerAllowedUsedResource(/^builtin\\/i);
+      unregisterBuiltinResources.push(u1, u2, u3, u4, u5, u6, u7, u8);
     }
 
     // Helper to collect all INI files in workspace
@@ -240,6 +519,50 @@ export default definePlugin({
       } catch {
         return '';
       }
+    };
+
+    // Helper to build workspace index of namespaces, exports, declarations, and usages
+    const buildWorkspaceIndex = async (ctx: any): Promise<{
+      allSummaries: NamespaceExport[];
+      namespaceMap: Map<string, NamespaceGroup>;
+      allKnownVariables: Set<string>;
+    }> => {
+      const iniPaths = await collectIniFiles(ctx);
+      const namespaceMap = new Map<string, NamespaceGroup>();
+      const allKnownVariables = new Set<string>();
+      const allSummaries: NamespaceExport[] = [];
+
+      for (const iniPath of iniPaths) {
+        const content = await readIniText(ctx, iniPath);
+        if (!content) continue;
+        const exp = parseIniExports(content, iniPath);
+        allSummaries.push(exp);
+
+        if (exp.namespace) {
+          const nsKey = exp.namespace.toLowerCase();
+          let group = namespaceMap.get(nsKey);
+          if (!group) {
+            group = {
+              namespace: exp.namespace,
+              files: [],
+              variables: new Set<string>(),
+              sections: new Set<string>(),
+            };
+            namespaceMap.set(nsKey, group);
+          }
+          group.files.push(iniPath);
+          for (const v of exp.variables) {
+            group.variables.add(v);
+            allKnownVariables.add(`\\${nsKey}\\${v}`);
+            allKnownVariables.add(`${nsKey}\\${v}`);
+          }
+          for (const s of exp.sections) {
+            group.sections.add(s);
+          }
+        }
+      }
+
+      return { allSummaries, namespaceMap, allKnownVariables };
     };
 
     // 1. 에디터 린트 규칙: 모드 리소스 파일 실재성 검사
@@ -296,6 +619,9 @@ export default definePlugin({
       id: 'xxmi-namespace-check',
       name: 'XXMI 네임스페이스 및 변수 검사',
       check: async (ctx) => {
+        if (!isPluginActive) {
+          return [];
+        }
         // 단일 INI 파일로 열린 경우 (모드 폴더가 없는 경우)는 코어 린터가
         // "네임스페이스에 있는 변수인지 확인해야 합니다" 안내 메시지를 표시하므로 중복 방지를 위해 건너뜁니다.
         if (!ctx.folder) {
@@ -303,41 +629,10 @@ export default definePlugin({
         }
 
         const diagnostics: LintDiagnostic[] = [];
-        const iniPaths = await collectIniFiles(ctx);
+        const { allSummaries, namespaceMap, allKnownVariables } = await buildWorkspaceIndex(ctx);
 
-        // 모드 폴더 내 모든 INI 파일의 네임스페이스 및 내보내기 색인 빌드
-        const namespaceMap = new Map<string, NamespaceGroup>();
-        const allKnownVariables = new Set<string>();
-        const allSummaries: NamespaceExport[] = [];
-
-        for (const iniPath of iniPaths) {
-          const content = await readIniText(ctx, iniPath);
-          if (!content) continue;
-          const exp = parseIniExports(content, iniPath);
-          allSummaries.push(exp);
-
-          if (exp.namespace) {
-            const nsKey = exp.namespace.toLowerCase();
-            let group = namespaceMap.get(nsKey);
-            if (!group) {
-              group = {
-                namespace: exp.namespace,
-                files: [],
-                variables: new Set<string>(),
-                sections: new Set<string>(),
-              };
-              namespaceMap.set(nsKey, group);
-            }
-            group.files.push(iniPath);
-            for (const v of exp.variables) {
-              group.variables.add(v);
-              allKnownVariables.add(`\\${nsKey}\\${v}`);
-              allKnownVariables.add(`${nsKey}\\${v}`);
-            }
-            for (const s of exp.sections) {
-              group.sections.add(s);
-            }
-          }
+        if (!isPluginActive) {
+          return [];
         }
 
         // 현재 에디터 모델의 네임스페이스 확인
@@ -533,10 +828,12 @@ export default definePlugin({
             if (target.includes('\\')) {
               const parts = target.split('\\').filter(Boolean);
               const prefix = parts[0];
-              const isBuiltIn = prefix.toLowerCase().startsWith('builtin');
-              const isAllowed = ctx.isAllowedResource ? ctx.isAllowedResource(target) : false;
+              const isBuiltIn =
+                isBuiltinResource(target) ||
+                prefix.toLowerCase().startsWith('builtin') ||
+                (ctx.isAllowedResource ? ctx.isAllowedResource(target) : false);
 
-              if (!isBuiltIn && !isAllowed && parts.length >= 3) {
+              if (!isBuiltIn && parts.length >= 3) {
                 const nsName = parts.slice(1, -1).join('\\');
                 const actionName = parts[parts.length - 1];
                 const nsData = namespaceMap.get(nsName.toLowerCase());
@@ -581,8 +878,245 @@ export default definePlugin({
         return diagnostics;
       },
     });
+
+    // 3. 에디터 / 린터: 동일 네임스페이스 및 크로스 파일 심볼 정의(선언) 추적
+    const definitionProvider: CustomDefinitionProvider = {
+      provideDefinition: async (target, ctx) => {
+        if (!isPluginActive || !target) return null;
+        const { allSummaries } = await buildWorkspaceIndex(ctx);
+        if (!isPluginActive || allSummaries.length === 0) return null;
+
+        const curPath = (ctx.file?.path || ctx.file?.name || '').toLowerCase();
+        let currentNs = target.namespace ? target.namespace.toLowerCase() : '';
+        if (!currentNs) {
+          const curExp = parseIniExports(ctx.model.getValue(), ctx.file?.path || ctx.file?.name || '');
+          if (curExp.namespace) {
+            currentNs = curExp.namespace.toLowerCase();
+          } else {
+            const currentSummary = allSummaries.find((s) => {
+              const p = s.filePath.toLowerCase();
+              return p === curPath || p.endsWith(`/${curPath}`) || curPath.endsWith(`/${p}`);
+            });
+            if (currentSummary && currentSummary.namespace) {
+              currentNs = currentSummary.namespace.toLowerCase();
+            }
+          }
+        }
+
+        const targetNameClean = (target.cleanName || target.name || '')
+          .replace(/^[\[\]\$]+|[\[\]\$]+$/g, '')
+          .toLowerCase();
+        const targetBase = targetNameClean.includes('\\') ? targetNameClean.split('\\').pop()! : targetNameClean;
+
+        const matchesDecl = (decl: SymbolLocationRecord): boolean => {
+          const declName = decl.name.toLowerCase();
+          const declRaw = decl.rawName.toLowerCase();
+          if (target.kind === 'variable' && decl.kind === 'variable') {
+            if (declName === targetNameClean || declName === targetBase) return true;
+            const cleanDecl = declName.replace(/^[\\\$]+/, '');
+            if (cleanDecl === targetNameClean || cleanDecl === targetBase) return true;
+            if (cleanDecl.endsWith(`\\${targetNameClean}`) || cleanDecl.endsWith(`\\${targetBase}`)) return true;
+            return false;
+          } else if (target.kind === 'section' && decl.kind === 'section') {
+            if (declName === targetNameClean || declRaw === targetNameClean || declName === targetBase || declRaw === targetBase) return true;
+            if (declName === `[${targetNameClean}]` || declName === `[${targetBase}]`) return true;
+            if (declName.endsWith(`\\${targetNameClean}`) || declName.endsWith(`\\${targetBase}`)) return true;
+            if (declName.startsWith('commandlist') && (declName.slice(11) === targetNameClean || declName.slice(11) === targetBase)) return true;
+            if (declName.startsWith('builtincommandlist') && (declName.slice(18) === targetNameClean || declName.slice(18) === targetBase)) return true;
+            if (targetNameClean.startsWith('builtincommandlist') && (declName === targetNameClean.slice(18) || declName === targetBase)) return true;
+            if (targetNameClean.startsWith('builtincommandlist') && declName === `commandlist${targetNameClean.slice(18)}`) return true;
+            if (declName.startsWith('builtincommandlist') && targetNameClean === `commandlist${declName.slice(18)}`) return true;
+            if (declName.startsWith('resource') && (declName.slice(8) === targetNameClean || declName.slice(8) === targetBase)) return true;
+            if (declName.startsWith('customshader') && (declName.slice(12) === targetNameClean || declName.slice(12) === targetBase)) return true;
+            return false;
+          }
+          return false;
+        };
+
+        // Phase 1: Search within files in the same namespace
+        if (currentNs) {
+          for (const s of allSummaries) {
+            if (s.namespace && s.namespace.toLowerCase() === currentNs) {
+              const found = s.declarations.find(matchesDecl);
+              if (found) {
+                return {
+                  filePath: found.filePath,
+                  lineNumber: found.line,
+                  startColumn: found.startCol,
+                  endColumn: found.endCol,
+                  lineContent: found.lineContent,
+                  section: found.section,
+                  isDefinition: true,
+                };
+              }
+            }
+          }
+        }
+
+        // Phase 2: If target has explicit namespace prefix
+        if (target.namespace) {
+          const targetNsLower = target.namespace.toLowerCase();
+          for (const s of allSummaries) {
+            if (s.namespace && s.namespace.toLowerCase() === targetNsLower) {
+              const found = s.declarations.find(matchesDecl);
+              if (found) {
+                return {
+                  filePath: found.filePath,
+                  lineNumber: found.line,
+                  startColumn: found.startCol,
+                  endColumn: found.endCol,
+                  lineContent: found.lineContent,
+                  section: found.section,
+                  isDefinition: true,
+                };
+              }
+            }
+          }
+        }
+
+        // Phase 3: Global / all files search fallback
+        for (const s of allSummaries) {
+          const found = s.declarations.find(matchesDecl);
+          if (found) {
+            return {
+              filePath: found.filePath,
+              lineNumber: found.line,
+              startColumn: found.startCol,
+              endColumn: found.endCol,
+              lineContent: found.lineContent,
+              section: found.section,
+              isDefinition: true,
+            };
+          }
+        }
+
+        return null;
+      },
+    };
+
+    // 4. 에디터 / 린터: 동일 네임스페이스 및 크로스 파일 심볼 참조(사용) 추적
+    const referenceProvider: CustomReferenceProvider = {
+      provideReferences: async (target, ctx) => {
+        if (!isPluginActive || !target) return [];
+        const { allSummaries } = await buildWorkspaceIndex(ctx);
+        if (!isPluginActive || allSummaries.length === 0) return [];
+
+        const curPath = (ctx.file?.path || ctx.file?.name || '').toLowerCase();
+        let currentNs = target.namespace ? target.namespace.toLowerCase() : '';
+        if (!currentNs) {
+          const curExp = parseIniExports(ctx.model.getValue(), ctx.file?.path || ctx.file?.name || '');
+          if (curExp.namespace) {
+            currentNs = curExp.namespace.toLowerCase();
+          } else {
+            const currentSummary = allSummaries.find((s) => {
+              const p = s.filePath.toLowerCase();
+              return p === curPath || p.endsWith(`/${curPath}`) || curPath.endsWith(`/${p}`);
+            });
+            if (currentSummary && currentSummary.namespace) {
+              currentNs = currentSummary.namespace.toLowerCase();
+            }
+          }
+        }
+
+        const targetNameClean = (target.cleanName || target.name || '')
+          .replace(/^[\[\]\$]+|[\[\]\$]+$/g, '')
+          .toLowerCase();
+        const targetBase = targetNameClean.includes('\\')
+          ? targetNameClean.split('\\').pop() || targetNameClean
+          : targetNameClean;
+
+        const matchesRecord = (rec: SymbolLocationRecord): boolean => {
+          const recName = rec.name.toLowerCase();
+          const recRaw = rec.rawName.toLowerCase();
+          if (target.kind === 'variable' && rec.kind === 'variable') {
+            if (recName === targetNameClean || recName === targetBase) return true;
+            const cleanRec = recName.replace(/^[\\\$]+/, '');
+            if (cleanRec === targetNameClean || cleanRec === targetBase) return true;
+            if (cleanRec.endsWith(`\\${targetNameClean}`) || cleanRec.endsWith(`\\${targetBase}`)) return true;
+            return false;
+          } else if (target.kind === 'section' && rec.kind === 'section') {
+            if (recName === targetNameClean || recRaw === targetNameClean || recName === targetBase || recRaw === targetBase) return true;
+            if (recName === `[${targetNameClean}]` || recName === `[${targetBase}]`) return true;
+            if (recName.endsWith(`\\${targetNameClean}`) || recName.endsWith(`\\${targetBase}`)) return true;
+            if (recName.startsWith('commandlist') && (recName.slice(11) === targetNameClean || recName.slice(11) === targetBase)) return true;
+            if (recName.startsWith('builtincommandlist') && (recName.slice(18) === targetNameClean || recName.slice(18) === targetBase)) return true;
+            if (targetNameClean.startsWith('builtincommandlist') && recName === targetNameClean.slice(18)) return true;
+            if (targetNameClean.startsWith('builtincommandlist') && recName === `commandlist${targetNameClean.slice(18)}`) return true;
+            if (recName.startsWith('builtincommandlist') && targetNameClean === `commandlist${recName.slice(18)}`) return true;
+            if (recName.startsWith('resource') && (recName.slice(8) === targetNameClean || recName.slice(8) === targetBase)) return true;
+            if (recName.startsWith('customshader') && (recName.slice(12) === targetNameClean || recName.slice(12) === targetBase)) return true;
+            return false;
+          }
+          return false;
+        };
+
+        const results: SymbolLocation[] = [];
+        const seen = new Set<string>();
+
+        const addLocation = (rec: SymbolLocationRecord, isDef: boolean) => {
+          const key = `${rec.filePath}:${rec.line}:${rec.startCol}`;
+          if (seen.has(key)) return;
+          seen.add(key);
+          results.push({
+            filePath: rec.filePath,
+            lineNumber: rec.line,
+            startColumn: rec.startCol,
+            endColumn: rec.endCol,
+            lineContent: rec.lineContent,
+            section: rec.section,
+            isDefinition: isDef,
+          });
+        };
+
+        const isBuiltinTarget = isBuiltinResource(targetNameClean);
+
+        for (const s of allSummaries) {
+          const fileNs = s.namespace ? s.namespace.toLowerCase() : '';
+          const isSameNs = currentNs ? fileNs === currentNs : !fileNs;
+
+          if (isBuiltinTarget || isSameNs) {
+            // 1. Same namespace or builtin: collect declarations & usages
+            for (const d of s.declarations) {
+              if (matchesRecord(d)) addLocation(d, true);
+            }
+            for (const u of s.usages) {
+              if (matchesRecord(u)) addLocation(u, false);
+            }
+          } else if (currentNs) {
+            // 2. Different namespace: collect usages that explicitly prefix currentNs
+            for (const u of s.usages) {
+              const uNs = u.namespace ? u.namespace.toLowerCase() : '';
+              if (uNs === currentNs && matchesRecord(u)) {
+                addLocation(u, false);
+              }
+            }
+          }
+        }
+
+        return results;
+      },
+    };
+
+    if (context.editor?.registerDefinitionProvider) {
+      unregisterDefProvider = context.editor.registerDefinitionProvider(definitionProvider);
+    } else if (context.linter?.registerDefinitionProvider) {
+      unregisterDefProvider = context.linter.registerDefinitionProvider(definitionProvider);
+    }
+
+    if (context.editor?.registerReferenceProvider) {
+      unregisterRefProvider = context.editor.registerReferenceProvider(referenceProvider);
+    } else if (context.linter?.registerReferenceProvider) {
+      unregisterRefProvider = context.linter.registerReferenceProvider(referenceProvider);
+    }
   },
   deactivate() {
+    isPluginActive = false;
+    if (unregisterBuiltinResources.length > 0) {
+      for (const cleanup of unregisterBuiltinResources) {
+        try { cleanup(); } catch {}
+      }
+      unregisterBuiltinResources = [];
+    }
     if (unregisterAllowedVars) {
       unregisterAllowedVars();
       unregisterAllowedVars = null;
@@ -599,5 +1133,14 @@ export default definePlugin({
       unregisterAllowedUsedResources();
       unregisterAllowedUsedResources = null;
     }
+    if (unregisterDefProvider) {
+      unregisterDefProvider();
+      unregisterDefProvider = null;
+    }
+    if (unregisterRefProvider) {
+      unregisterRefProvider();
+      unregisterRefProvider = null;
+    }
   },
 });
+

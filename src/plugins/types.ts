@@ -65,6 +65,61 @@ export interface CustomLintRule {
   }) => Promise<LintDiagnostic[]> | LintDiagnostic[];
 }
 
+export interface SymbolLocation {
+  filePath: string;
+  fileRef?: any;
+  lineNumber: number;
+  startColumn: number;
+  endColumn: number;
+  lineContent?: string;
+  section?: string;
+  isDefinition?: boolean;
+}
+
+export interface CustomDefinitionProvider {
+  provideDefinition: (
+    target: {
+      name: string;
+      cleanName: string;
+      kind: 'variable' | 'section' | 'namespace';
+      namespace?: string;
+    },
+    context: {
+      model: {
+        getValue(): string;
+        getLineContent(lineNumber: number): string;
+        getLineCount(): number;
+      };
+      file: { name: string; path: string; location: string } | null;
+      folder: string | null;
+      getAllFiles?: () => string[];
+      readTextFile?: (path: string) => Promise<string>;
+    },
+  ) => Promise<SymbolLocation | null> | SymbolLocation | null;
+}
+
+export interface CustomReferenceProvider {
+  provideReferences: (
+    target: {
+      name: string;
+      cleanName: string;
+      kind: 'variable' | 'section' | 'namespace';
+      namespace?: string;
+    },
+    context: {
+      model: {
+        getValue(): string;
+        getLineContent(lineNumber: number): string;
+        getLineCount(): number;
+      };
+      file: { name: string; path: string; location: string } | null;
+      folder: string | null;
+      getAllFiles?: () => string[];
+      readTextFile?: (path: string) => Promise<string>;
+    },
+  ) => Promise<SymbolLocation[]> | SymbolLocation[];
+}
+
 export interface PluginTemplate {
   id?: string;
   label: string;
@@ -89,16 +144,24 @@ export interface PluginContext {
     getCursor(): { lineNumber: number; column: number };
     onDidChangeText(listener: (text: string) => void): () => void;
     onDidChangeCursor(listener: (cursor: { lineNumber: number; column: number }) => void): () => void;
-    registerContextMenuAction(options: { id: string; label: string; onClick: () => void }): () => void;
+    registerContextMenuAction(options: {
+      id: string;
+      label: string;
+      contextMenuGroupId?: string;
+      contextMenuOrder?: number;
+      onClick: () => void;
+    }): () => void;
     registerCustomViewer(options: CustomViewerDefinition): void;
     registerLintRule(rule: CustomLintRule): () => void;
+    registerDefinitionProvider?(provider: CustomDefinitionProvider): () => void;
+    registerReferenceProvider?(provider: CustomReferenceProvider): () => void;
   };
 
   // ---- Workspace & files ----
   workspace: {
     getCurrentFile(): { name: string; path: string; location: string } | null;
     getCurrentFolder(): string | null;
-    openFile(pathOrName: string): Promise<void>;
+    openFile(pathOrName: string, line?: number, col?: number): Promise<void>;
     saveCurrentFile(): Promise<void>;
     readTextFile(path: string): Promise<string>;
     writeTextFile(path: string, text: string): Promise<void>;
@@ -117,6 +180,14 @@ export interface PluginContext {
     registerAllowedVariable(variableOrPattern: string | RegExp | ((name: string) => boolean)): () => void;
     registerAllowedUsedResource(resourceOrPattern: string | RegExp | ((name: string) => boolean)): () => void;
     registerAllowedUsedVariable(variableOrPattern: string | RegExp | ((name: string) => boolean)): () => void;
+    registerDefinitionProvider?(provider: CustomDefinitionProvider): () => void;
+    registerReferenceProvider?(provider: CustomReferenceProvider): () => void;
+  };
+
+  // ---- Languages & Navigation ----
+  languages?: {
+    registerDefinitionProvider(provider: CustomDefinitionProvider): () => void;
+    registerReferenceProvider(provider: CustomReferenceProvider): () => void;
   };
 
   // ---- Templates ----

@@ -7,14 +7,14 @@ const plugins = [
   'python-runner',
   'asset-viewer',
   'ai-assistant',
-  'resource-checker',
+  'custom-lint',
   'zzmi-support',
 ];
 
 const webCompatiblePlugins = [
   'asset-viewer',
   'ai-assistant',
-  'resource-checker',
+  'custom-lint',
   'zzmi-support',
 ];
 
@@ -69,6 +69,11 @@ async function buildDefaultPlugins() {
       targetDirs.push(resolve(rootDir, 'public/default-plugins', id));
     }
 
+    if (process.env.APPDATA) {
+      const appDataDir = resolve(process.env.APPDATA, 'MigotoStudio', 'plugins', id);
+      targetDirs.push(appDataDir);
+    }
+
     for (const dir of targetDirs) {
       await mkdir(dir, { recursive: true });
       await writeFile(resolve(dir, 'plugin.json'), manifestJson, 'utf8');
@@ -84,10 +89,20 @@ async function buildDefaultPlugins() {
     console.log(`[build-default-plugins] Built ${id} -> plugin.json + plugin.js`);
   }
 
-  // Ensure desktop-only plugins are pruned from public/default-plugins
-  const webPythonDir = resolve(rootDir, 'public/default-plugins', 'python-runner');
-  if (existsSync(webPythonDir)) {
-    await rm(webPythonDir, { recursive: true, force: true });
+  // Ensure desktop-only plugins or legacy renamed plugins are pruned
+  const pruneDirs = [
+    resolve(rootDir, 'public/default-plugins', 'python-runner'),
+    resolve(rootDir, 'public/default-plugins', 'resource-checker'),
+    resolve(rootDir, 'src-tauri/default-plugins', 'resource-checker'),
+    resolve(rootDir, 'data/plugins', 'resource-checker'),
+  ];
+  if (process.env.APPDATA) {
+    pruneDirs.push(resolve(process.env.APPDATA, 'MigotoStudio', 'plugins', 'resource-checker'));
+  }
+  for (const dir of pruneDirs) {
+    if (existsSync(dir)) {
+      await rm(dir, { recursive: true, force: true });
+    }
   }
 
   // Write index.json for web discovery

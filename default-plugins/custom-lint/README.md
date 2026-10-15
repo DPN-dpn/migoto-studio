@@ -13,5 +13,5 @@
    - 단일 INI 파일로 열었을 경우 외부 네임스페이스 확인이 필요함을 안내합니다.
 
 3. **XXMI 표준 내장 함수 지원**
-   - `CommandListSkinTexture` 등 XXMI / GIMI / ZZMI 엔진 내장 커맨드리스트 호출 시 미정의 섹션 오류 없이 정상 구문으로 인식합니다.
+   - `BuiltinCommandList...` 및 `CommandListSkinTexture` 등 XXMI / GIMI / ZZMI 엔진 내장 커맨드리스트 호출 시 미정의 섹션 오류 없이 정상 구문으로 인식합니다.
 

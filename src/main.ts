@@ -1,5 +1,5 @@
 import './style.css';
-import { monaco } from './core/editor/monaco';
+import { monaco, pruneRedundantContextActions } from './core/editor/monaco';
 import EditorWorker from 'monaco-editor/editor/editor.worker.js?worker';
 import { initPlatform, platform } from './platform';
 
@@ -114,6 +114,7 @@ async function boot() {
 
   const doc = new DocumentManager(editor, $('custom-viewer-container'));
   registerSymbolProviders(monaco, doc);
+  pruneRedundantContextActions();
   const diffViewer = new DiffViewer($('diff-container'), doc);
   doc.setDiffViewer(diffViewer);
   const outline = new OutlinePanel(editor, doc, $('sidebar'), $('sidebar-panel-outline'), $('sidebar-resizer'));
@@ -143,26 +144,26 @@ async function boot() {
     }
   });
 
-  // ---- Symbol Navigation Actions (F12 / Shift+F12) ----
+  // ---- Symbol Navigation Actions (F12 / Shift+F12 / Ctrl+Shift+F) ----
   editor.addAction({
     id: 'migoto-go-to-definition',
-    label: '선언된 곳으로 이동 (Go to Definition)',
+    label: '정의로 이동 (Go to Definition)',
     keybindings: [monaco.KeyCode.F12],
     contextMenuGroupId: '10_navigation',
     contextMenuOrder: 1,
     run: () => {
-      jumpToDefinition(editor, doc, explorer);
+      jumpToDefinition(editor, doc);
     },
   });
 
   editor.addAction({
     id: 'migoto-find-references',
-    label: '참조 및 사용 위치 찾기 (Find Usages)...',
+    label: '참조 및 사용 위치 찾기 (Find References)...',
     keybindings: [monaco.KeyMod.Shift | monaco.KeyCode.F12],
     contextMenuGroupId: '10_navigation',
     contextMenuOrder: 2,
     run: () => {
-      showReferencesDialog(editor, doc, explorer);
+      showReferencesDialog(editor, doc);
     },
   });
 
@@ -225,8 +226,8 @@ async function boot() {
     explorer,
     activityBar,
     onJumpLint: jumpNextLint,
-    onGoToDefinition: () => jumpToDefinition(editor, doc, explorer),
-    onFindReferences: () => showReferencesDialog(editor, doc, explorer),
+    onGoToDefinition: () => jumpToDefinition(editor, doc),
+    onFindReferences: () => showReferencesDialog(editor, doc),
     onFindInFiles: openFindInFiles,
   });
 
@@ -252,13 +253,19 @@ async function boot() {
   const lintBtn = $('status-lint');
   let currentMarkers: monaco.editor.IMarkerData[] = [];
   let lintTimer = 0;
+  let lintRunId = 0;
 
   const runLint = async () => {
+    const currentRunId = ++lintRunId;
     const model = editor.getModel();
     if (!model) return;
     const s = getSettings();
     const hasFolder = Boolean(explorer && explorer.hasFolder);
     const customMarkers = await pluginManager.runCustomLintRules(model);
+    if (currentRunId !== lintRunId) {
+      // Discard stale result if a newer lint run has started
+      return;
+    }
     const baseMarkers = lintModel(model, optionsFromSettings(s, hasFolder));
     currentMarkers = [...baseMarkers, ...customMarkers];
     monaco.editor.setModelMarkers(model, 'migoto-lint', currentMarkers);
@@ -298,8 +305,7 @@ async function boot() {
   };
 
   pluginManager.setLintTrigger(() => {
-    window.clearTimeout(lintTimer);
-    runLint();
+    scheduleLint();
   });
 
   editor.onDidChangeModelContent(scheduleLint);

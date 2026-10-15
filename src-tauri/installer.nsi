@@ -799,9 +799,10 @@ SectionGroup "$(secDefaultPlugins)" SecGroupPlugins
 
   Section "$(secPluginLint)" SecPluginLint
     SetShellVarContext current
-    CreateDirectory "$APPDATA\MigotoStudio\plugins\resource-checker"
-    SetOutPath "$APPDATA\MigotoStudio\plugins\resource-checker"
-    File /r "${DEFAULT_PLUGINS_DIR}\resource-checker\*.*"
+    RMDir /r "$APPDATA\MigotoStudio\plugins\resource-checker"
+    CreateDirectory "$APPDATA\MigotoStudio\plugins\custom-lint"
+    SetOutPath "$APPDATA\MigotoStudio\plugins\custom-lint"
+    File /r "${DEFAULT_PLUGINS_DIR}\custom-lint\*.*"
   SectionEnd
 
   Section "$(secPluginZZMI)" SecPluginZZMI
