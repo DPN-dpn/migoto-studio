@@ -1,5 +1,5 @@
-import type { IniSection, IniDocument, IniMergeResult } from '../core/ini.ts';
-export type { IniSection, IniDocument, IniMergeResult } from '../core/ini.ts';
+import type { IniSection, IniDocument, IniMergeResult } from '../core/ini/ini.ts';
+export type { IniSection, IniDocument, IniMergeResult } from '../core/ini/ini.ts';
 
 export interface PluginManifest {
   id: string;

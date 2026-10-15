@@ -1,7 +1,7 @@
-import { openModal } from '../ui/modal';
+import { openModal } from '../ui/modals/modal';
 import { platform } from '../platform';
-import { getSettings } from '../core/settings';
-import { renderMarkdown } from '../ui/markdown';
+import { getSettings } from '../core/workspace/settings';
+import { renderMarkdown } from '../ui/common/markdown';
 
 import { CURRENT_APP_VERSION, isNewerVersion } from './version';
 

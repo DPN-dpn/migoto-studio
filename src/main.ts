@@ -1,35 +1,35 @@
 import './style.css';
-import { monaco } from './core/monaco';
+import { monaco } from './core/editor/monaco';
 import EditorWorker from 'monaco-editor/editor/editor.worker.js?worker';
 import { initPlatform, platform } from './platform';
 
-import { LANGUAGE_ID, registerMigotoLanguage, upstreamGrammarVersion } from './core/grammar';
-import { defineThemes, THEME_DARK, THEME_LIGHT } from './core/theme';
-import { DocumentManager, ENCODING_LABELS, type Encoding } from './core/documents';
-import { TabBar } from './ui/tabbar';
-import { FileExplorer } from './ui/explorer';
-import { SearchPanel } from './ui/search-panel';
-import { TemplatePanel } from './ui/template-panel';
+import { LANGUAGE_ID, registerMigotoLanguage, upstreamGrammarVersion } from './core/editor/grammar';
+import { defineThemes, THEME_DARK, THEME_LIGHT } from './core/editor/theme';
+import { DocumentManager, ENCODING_LABELS, type Encoding } from './core/workspace/documents';
+import { TabBar } from './ui/layout/tabbar';
+import { FileExplorer } from './ui/panels/explorer';
+import { SearchPanel } from './ui/panels/search-panel';
+import { TemplatePanel } from './ui/panels/template-panel';
 import { PluginManager } from './plugins';
-import { PluginPanel } from './ui/plugin-panel';
-import { ActivityBar } from './ui/activitybar';
-import { MenuBar } from './ui/menubar';
-import { getSettings, loadSettings, onSettingsChange } from './core/settings';
-import { OutlinePanel } from './ui/outline';
-import { registerSnippetCompletions, initCustomTemplates } from './core/templates';
-import { openSettings } from './ui/settings-ui';
-import { openHelp } from './ui/help-ui';
-import { lintModel, optionsFromSettings } from './core/lint';
-import { registerSmartCompletions } from './core/completions';
-import { registerFoldingProvider } from './core/folding';
-import { DiffViewer } from './ui/diff-viewer';
-import { openCompareDialog } from './ui/diff-dialog';
-import { openKeyHelperModal } from './ui/key-helper';
+import { PluginPanel } from './ui/panels/plugin-panel';
+import { ActivityBar } from './ui/layout/activitybar';
+import { MenuBar } from './ui/layout/menubar';
+import { getSettings, loadSettings, onSettingsChange } from './core/workspace/settings';
+import { OutlinePanel } from './ui/panels/outline';
+import { registerSnippetCompletions, initCustomTemplates } from './core/ini/templates';
+import { openSettings } from './ui/modals/settings-ui';
+import { openHelp } from './ui/modals/help-ui';
+import { lintModel, optionsFromSettings } from './core/ini/lint';
+import { registerSmartCompletions } from './core/editor/completions';
+import { registerFoldingProvider } from './core/editor/folding';
+import { DiffViewer } from './ui/views/diff-viewer';
+import { openCompareDialog } from './ui/modals/diff-dialog';
+import { openKeyHelperModal } from './ui/modals/key-helper';
 import {
   registerSymbolProviders,
   jumpToDefinition,
   showReferencesDialog,
-} from './core/symbol-nav';
+} from './core/ini/symbol-nav';
 import { initPwa } from './pwa';
 import { checkOnStartup } from './updater/updater';
 import { CURRENT_APP_VERSION } from './updater/version';

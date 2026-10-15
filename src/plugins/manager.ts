@@ -1,14 +1,14 @@
-import { monaco } from '../core/monaco';
+import { monaco } from '../core/editor/monaco';
 import { platform } from '../platform';
 import { validatePluginZip, type ExtractedPlugin } from './zip';
-import type { DocumentManager } from '../core/documents';
-import type { FileExplorer } from '../ui/explorer';
-import { openModal } from '../ui/modal';
-import { showToast } from '../ui/toast';
-import type { ActivityBar } from '../ui/activitybar';
-import { registerAllowedResource, registerAllowedVariable, isAllowedResource, isAllowedVariable } from '../core/lint';
-import { registerPluginTemplate } from '../core/templates';
-import { parseIni, classifyIniSection, mergeIniSections, formatIniSection } from '../core/ini';
+import type { DocumentManager } from '../core/workspace/documents';
+import type { FileExplorer } from '../ui/panels/explorer';
+import { openModal } from '../ui/modals/modal';
+import { showToast } from '../ui/common/toast';
+import type { ActivityBar } from '../ui/layout/activitybar';
+import { registerAllowedResource, registerAllowedVariable, isAllowedResource, isAllowedVariable } from '../core/ini/lint';
+import { registerPluginTemplate } from '../core/ini/templates';
+import { parseIni, classifyIniSection, mergeIniSections, formatIniSection } from '../core/ini/ini';
 import type {
   CustomLintRule,
   CustomViewerDefinition,
