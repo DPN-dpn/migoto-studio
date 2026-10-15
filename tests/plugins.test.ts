@@ -20,6 +20,12 @@ import { validatePluginZip } from '../src/plugins/zip.ts';
 import { definePlugin } from '../src/plugins/api.ts';
 import { renderPluginIcon } from '../src/plugins/types.ts';
 import { zipSync, strToU8 } from 'fflate';
+import {
+  isAllowedResource,
+  isAllowedVariable,
+  registerAllowedResource,
+  registerAllowedVariable,
+} from '../src/core/ini/lint.ts';
 
 test('definePlugin returns identical plugin definition with type inference', () => {
   const plugin = definePlugin({
@@ -330,8 +336,11 @@ test('custom-lint (resource-checker) plugin activates and registers both resourc
       },
       registerAllowedResource: (pattern: any) => {
         allowedResources.push(pattern);
+        return registerAllowedResource(pattern);
       },
-      registerAllowedVariable: () => () => {},
+      registerAllowedVariable: (pattern: any) => {
+        return registerAllowedVariable(pattern);
+      },
     },
     ui: {
       registerSidebarView: (view: any) => {
@@ -445,6 +454,37 @@ handling = skip
     model: undeclaredVarModel,
   });
   assert.equal(singleIniDiags.length, 0);
+
+  // 2-e. Shared namespace across multiple INI files:
+  // If test.ini also declares namespace = RaidenMod, variables and sections from Raiden.ini
+  // are accessible directly ($costume, run = CommandListSwapWeapon)
+  const sharedNsModel = {
+    getLineCount: () => 4,
+    getLineContent: (n: number) => {
+      if (n === 1) return 'namespace = RaidenMod';
+      if (n === 2) return 'if $costume == 1';
+      if (n === 3) return '    run = CommandListSwapWeapon';
+      return 'endif';
+    },
+    getValue: () => 'namespace = RaidenMod\nif $costume == 1\n    run = CommandListSwapWeapon\nendif',
+  };
+  const sharedNsDiags = await nsRule.check({ ...nsCtxBase, model: sharedNsModel });
+  assert.equal(sharedNsDiags.length, 0, 'Shared namespace should have 0 diagnostics for shared variables and sections');
+  assert.ok(isAllowedVariable('costume'), 'costume should be allowed variable via shared namespace');
+  assert.ok(isAllowedResource('CommandListSwapWeapon'), 'CommandListSwapWeapon should be allowed resource via shared namespace');
+
+  // If another file has a different namespace, bare $costume is NOT allowed
+  const diffNsModel = {
+    getLineCount: () => 2,
+    getLineContent: (n: number) => {
+      if (n === 1) return 'namespace = AyakaMod';
+      return 'if $costume == 1';
+    },
+    getValue: () => 'namespace = AyakaMod\nif $costume == 1',
+  };
+  await nsRule.check({ ...nsCtxBase, model: diffNsModel });
+  assert.equal(isAllowedVariable('costume'), false, 'costume should not be allowed as bare variable in different namespace');
+  assert.ok(isAllowedVariable('\\RaidenMod\\costume'), 'Fully qualified \\RaidenMod\\costume should still be allowed');
 });
 
 test('zzmi-support plugin activates and registers allowed resource and code template without sidebar view', () => {

@@ -23,6 +23,23 @@ function parseIniExports(text: string, filePath: string): NamespaceExport {
   const variables = new Set<string>();
   const sections = new Set<string>();
 
+  // 1차 스캔: 섹션 시작 전에 선언된 namespace = 확인
+  for (let i = 0; i < lines.length; i++) {
+    const { code } = stripComments(lines[i]);
+    const trimmed = code.trim();
+    if (!trimmed) continue;
+    if (trimmed.startsWith('[')) break;
+    const nsMatch = /^\s*namespace\s*=\s*([^;\r\n#]*)/i.exec(code);
+    if (nsMatch) {
+      let ns = nsMatch[1].trim();
+      if ((ns.startsWith('"') && ns.endsWith('"')) || (ns.startsWith("'") && ns.endsWith("'"))) {
+        ns = ns.slice(1, -1).trim();
+      }
+      currentNamespace = ns;
+      break;
+    }
+  }
+
   for (let i = 0; i < lines.length; i++) {
     const raw = lines[i];
     const { code } = stripComments(raw);
@@ -98,9 +115,11 @@ function parseIniExports(text: string, filePath: string): NamespaceExport {
   };
 }
 
+let unregisterAllowedVars: (() => void) | null = null;
+let unregisterAllowedGroupResources: (() => void) | null = null;
+
 export default definePlugin({
   activate(context) {
-    let unregisterAllowedVars: (() => void) | null = null;
 
     // 0. XXMI 표준 내장 커맨드리스트 허용 등록 (GIMI / ZZMI / XXMI 내장 함수)
     if (context.linter?.registerAllowedResource) {
@@ -252,16 +271,48 @@ export default definePlugin({
           }
         }
 
-        // 코어 린터에 모드 폴더에서 발견된 네임스페이스 변수들을 허용 변수로 동적 등록
+        // 현재 에디터 모델의 네임스페이스 확인
+        // ini 파일에서 namespace = 가 정의돼있으면 그 ini는 그 네임스페이스를 사용하며,
+        // 다른 ini와 동일한 namespace = 로 공유되면 같은 네임스페이스 스코프를 공유합니다.
+        const currentModelExp = parseIniExports(ctx.model.getValue(), ctx.file?.path || ctx.file?.name || '');
+        const currentNsKey = currentModelExp.namespace ? currentModelExp.namespace.toLowerCase() : '';
+        const currentNsGroup = currentNsKey ? namespaceMap.get(currentNsKey) : null;
+
+        // 이전 동적 등록 정리
         if (unregisterAllowedVars) {
           unregisterAllowedVars();
           unregisterAllowedVars = null;
         }
-        if (allKnownVariables.size > 0 && context.linter.registerAllowedVariable) {
+        if (unregisterAllowedGroupResources) {
+          unregisterAllowedGroupResources();
+          unregisterAllowedGroupResources = null;
+        }
+
+        const sharedVars = currentNsGroup ? currentNsGroup.variables : null;
+        const sharedSections = currentNsGroup ? currentNsGroup.sections : null;
+
+        // 코어 린터에 허용 변수 등록:
+        // 1) \Namespace\var 형태의 명시적 네임스페이스 변수
+        // 2) 현재 파일과 동일한 namespace = 를 공유하는 다른 ini 파일들의 변수 ($var 접두사 없이 사용 가능)
+        if (context.linter?.registerAllowedVariable) {
           unregisterAllowedVars = context.linter.registerAllowedVariable((name: string) => {
             const norm = name.toLowerCase().replace(/^\/+/, '');
             const clean = norm.startsWith('\\') ? norm.slice(1) : norm;
-            return allKnownVariables.has(`\\${clean}`) || allKnownVariables.has(clean);
+            if (allKnownVariables.has(`\\${clean}`) || allKnownVariables.has(clean)) {
+              return true;
+            }
+            if (sharedVars && sharedVars.has(clean)) {
+              return true;
+            }
+            return false;
+          });
+        }
+
+        // 코어 린터에 허용 섹션(리소스/커맨드리스트) 등록:
+        // 현재 파일과 동일한 namespace = 를 공유하는 다른 ini 파일들에 정의된 모든 섹션 허용
+        if (sharedSections && sharedSections.size > 0 && context.linter?.registerAllowedResource) {
+          unregisterAllowedGroupResources = context.linter.registerAllowedResource((name: string) => {
+            return sharedSections.has(name.toLowerCase());
           });
         }
 
@@ -382,5 +433,15 @@ export default definePlugin({
         return diagnostics;
       },
     });
+  },
+  deactivate() {
+    if (unregisterAllowedVars) {
+      unregisterAllowedVars();
+      unregisterAllowedVars = null;
+    }
+    if (unregisterAllowedGroupResources) {
+      unregisterAllowedGroupResources();
+      unregisterAllowedGroupResources = null;
+    }
   },
 });

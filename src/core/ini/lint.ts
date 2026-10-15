@@ -523,9 +523,11 @@ function checkConditionComparison(
   }
 }
 
-let registeredAllowedResources: (string | RegExp)[] = [];
+let registeredAllowedResources: (string | RegExp | ((name: string) => boolean))[] = [];
 
-export function registerAllowedResource(pattern: string | RegExp): () => void {
+export function registerAllowedResource(
+  pattern: string | RegExp | ((name: string) => boolean),
+): () => void {
   registeredAllowedResources.push(pattern);
   return () => {
     registeredAllowedResources = registeredAllowedResources.filter((p) => p !== pattern);
@@ -533,8 +535,10 @@ export function registerAllowedResource(pattern: string | RegExp): () => void {
 }
 
 export function isAllowedResource(name: string): boolean {
+  const norm = name.toLowerCase();
   return registeredAllowedResources.some((p) => {
-    if (typeof p === 'string') return p.toLowerCase() === name.toLowerCase();
+    if (typeof p === 'function') return p(name) || p(norm);
+    if (typeof p === 'string') return p.toLowerCase() === norm;
     return p.test(name);
   });
 }

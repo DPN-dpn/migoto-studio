@@ -889,7 +889,7 @@ export default {
           callbacks.onRegisterCleanup(cleanup);
           return cleanup;
         },
-        registerAllowedResource: (pattern: string | RegExp) => {
+        registerAllowedResource: (pattern: string | RegExp | ((name: string) => boolean)) => {
           const unregister = registerAllowedResource(pattern);
           this.triggerLint();
           const cleanup = () => {

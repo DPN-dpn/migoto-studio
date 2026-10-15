@@ -13,10 +13,10 @@
       "include": "#preamble"
     },
     {
-      "include": "#comment"
+      "include": "#section"
     },
     {
-      "include": "#section"
+      "include": "#comment"
     }
   ],
   "repository": {
@@ -65,7 +65,7 @@
       ]
     },
     "comment": {
-      "begin": "(?i)(?=^.*?;)",
+      "begin": "(?i)(?=^[ \\t]*[;#])",
       "end": "$|\\n",
       "patterns": [
         {
@@ -125,13 +125,40 @@
         },
         {
           "include": "#commandlist-section"
+        },
+        {
+          "name": "meta.section.generic.migoto",
+          "begin": "(?xi)^[ \\t]*(\\[)[ \\t]*([^\\s\\]]+.*?)[ \\t]*(\\])[ \\t]*(?:(([;#]).*))?$",
+          "end": "(?i)(?=^[ \\t]*\\[[^\\]]+\\][ \\t]*(?:[;#].*)?$|\\z)",
+          "beginCaptures": {
+            "1": {
+              "name": "punctuation.definition.entity.begin.migoto"
+            },
+            "2": {
+              "name": "entity.name.section.group-title.migoto"
+            },
+            "3": {
+              "name": "punctuation.definition.entity.end.migoto"
+            },
+            "4": {
+              "name": "comment.line.semicolon.migoto"
+            },
+            "5": {
+              "name": "punctuation.definition.comment.migoto"
+            }
+          },
+          "patterns": [
+            {
+              "include": "#section-body"
+            }
+          ]
         }
       ]
     },
     "pool-section": {
       "name": "meta.section.pool.migoto",
-      "begin": "(?i)(?:^[ \\t]*(\\[)\\s*(Pool.+)\\s*(\\])[ \\t]*$)",
-      "end": "(?i)(?=^[ \\t]*\\[.+\\][ \\t]*$|\\z)",
+      "begin": "(?i)^[ \\t]*(\\[)\\s*(Pool[^\\r\\n\\]]+)\\s*(\\])[ \\t]*(?:(([;#]).*))?$",
+      "end": "(?i)(?=^[ \\t]*\\[[^\\]]+\\][ \\t]*(?:[;#].*)?$|\\z)",
       "beginCaptures": {
         "1": {
           "name": "punctuation.definition.entity.begin.migoto"
@@ -141,6 +168,12 @@
         },
         "3": {
           "name": "punctuation.definition.entity.end.migoto"
+        },
+        "4": {
+          "name": "comment.line.semicolon.migoto"
+        },
+        "5": {
+          "name": "punctuation.definition.comment.migoto"
         }
       },
       "patterns": [
@@ -197,8 +230,8 @@
       "patterns": [
         {
           "name": "meta.section.shader-regex.pattern.migoto",
-          "begin": "(?i)(?:^[ \\t]*(\\[)\\s*(ShaderRegex.+\\.Pattern)\\s*(\\])[ \\t]*$)",
-          "end": "(?i)(?=^[ \\t]*\\[.+\\][ \\t]*$|\\z)",
+          "begin": "(?i)^[ \\t]*(\\[)\\s*(ShaderRegex.+\\.Pattern)\\s*(\\])[ \\t]*(?:(([;#]).*))?$",
+          "end": "(?i)(?=^[ \\t]*\\[[^\\]]+\\][ \\t]*(?:[;#].*)?$|\\z)",
           "beginCaptures": {
             "1": {
               "name": "punctuation.definition.entity.begin.migoto"
@@ -208,6 +241,12 @@
             },
             "3": {
               "name": "punctuation.definition.entity.end.migoto"
+            },
+            "4": {
+              "name": "comment.line.semicolon.migoto"
+            },
+            "5": {
+              "name": "punctuation.definition.comment.migoto"
             }
           },
           "contentName": "meta.embedded.block.regexp",
@@ -222,8 +261,8 @@
         },
         {
           "name": "meta.section.shader-regex.replace.migoto",
-          "begin": "(?i)(?:^[ \\t]*(\\[)\\s*(ShaderRegex.+\\.Pattern\\.Replace)\\s*(\\])[ \\t]*$)",
-          "end": "(?i)(?=^[ \\t]*\\[.+\\][ \\t]*$|\\z)",
+          "begin": "(?i)^[ \\t]*(\\[)\\s*(ShaderRegex.+\\.Pattern\\.Replace)\\s*(\\])[ \\t]*(?:(([;#]).*))?$",
+          "end": "(?i)(?=^[ \\t]*\\[[^\\]]+\\][ \\t]*(?:[;#].*)?$|\\z)",
           "beginCaptures": {
             "1": {
               "name": "punctuation.definition.entity.begin.migoto"
@@ -233,6 +272,12 @@
             },
             "3": {
               "name": "punctuation.definition.entity.end.migoto"
+            },
+            "4": {
+              "name": "comment.line.semicolon.migoto"
+            },
+            "5": {
+              "name": "punctuation.definition.comment.migoto"
             }
           },
           "patterns": [
@@ -246,8 +291,8 @@
         },
         {
           "name": "meta.section.shader-regex.declarations.migoto",
-          "begin": "(?i)(?:^[ \\t]*(\\[)\\s*(ShaderRegex.+\\.InsertDeclarations)\\s*(\\])[ \\t]*$)",
-          "end": "(?i)(?=^[ \\t]*\\[.+\\][ \\t]*$|\\z)",
+          "begin": "(?i)^[ \\t]*(\\[)\\s*(ShaderRegex.+\\.InsertDeclarations)\\s*(\\])[ \\t]*(?:(([;#]).*))?$",
+          "end": "(?i)(?=^[ \\t]*\\[[^\\]]+\\][ \\t]*(?:[;#].*)?$|\\z)",
           "beginCaptures": {
             "1": {
               "name": "punctuation.definition.entity.begin.migoto"
@@ -257,6 +302,12 @@
             },
             "3": {
               "name": "punctuation.definition.entity.end.migoto"
+            },
+            "4": {
+              "name": "comment.line.semicolon.migoto"
+            },
+            "5": {
+              "name": "punctuation.definition.comment.migoto"
             }
           },
           "patterns": [
@@ -267,8 +318,8 @@
         },
         {
           "name": "meta.section.shader-regex.migoto",
-          "begin": "(?xi)\n(?<!^[ \\t]*\\[\\s*ShaderRegex.+(?:\\.Pattern.*|\\.InsertDeclarations)\\s*\\][ \\t]*$) # Ensure this is not one of the other 3\n(?:^[ \\t]*(\\[)\\s*(ShaderRegex.+)\\s*(\\])[ \\t]*$)",
-          "end": "(?i)(?=^[ \\t]*\\[.+\\][ \\t]*$|\\z)",
+          "begin": "(?xi)\n(?<!^[ \\t]*\\[\\s*ShaderRegex.+(?:\\.Pattern.*|\\.InsertDeclarations)\\s*\\][ \\t]*(?:[;#].*)?$) # Ensure this is not one of the other 3\n^[ \\t]*(\\[)\\s*(ShaderRegex[^\\r\\n\\]]+)\\s*(\\])[ \\t]*(?:(([;#]).*))?$",
+          "end": "(?i)(?=^[ \\t]*\\[[^\\]]+\\][ \\t]*(?:[;#].*)?$|\\z)",
           "beginCaptures": {
             "1": {
               "name": "punctuation.definition.entity.begin.migoto"
@@ -278,6 +329,12 @@
             },
             "3": {
               "name": "punctuation.definition.entity.end.migoto"
+            },
+            "4": {
+              "name": "comment.line.semicolon.migoto"
+            },
+            "5": {
+              "name": "punctuation.definition.comment.migoto"
             }
           },
           "patterns": [
@@ -331,8 +388,8 @@
     },
     "setting-section": {
       "name": "meta.section.settings.migoto",
-      "begin": "(?xi)(?:\n^[ \\t]*\n  (\\[) # capture group 1, opening bracket\n  [ \\t]*\n  (\n    Hunting|Input|Logging|System|Device|Stereo|\n    Rendering|Profile|ConvergenceMap|Loader|\n    (?:Resource|Key|Preset).+|Include.*\n  ) # capture group 2, section header\n  [ \\t]*\n  (\\]) # capture group 3, closing bracket\n[ \\t]*$\n)",
-      "end": "(?i)(?=^[ \\t]*\\[.+\\][ \\t]*$|\\z)",
+      "begin": "(?xi)^[ \\t]*(\\[)[ \\t]*((?:Hunting|Input|Logging|System|Device|Stereo|Rendering|Profile|ConvergenceMap|Loader|(?:Resource|Key|Preset)[^\\r\\n\\]]+|Include[^\\r\\n\\]]*))[ \\t]*(\\])[ \\t]*(?:(([;#]).*))?$",
+      "end": "(?i)(?=^[ \\t]*\\[[^\\]]+\\][ \\t]*(?:[;#].*)?$|\\z)",
       "beginCaptures": {
         "1": {
           "name": "punctuation.definition.entity.begin.migoto"
@@ -342,6 +399,12 @@
         },
         "3": {
           "name": "punctuation.definition.entity.end.migoto"
+        },
+        "4": {
+          "name": "comment.line.semicolon.migoto"
+        },
+        "5": {
+          "name": "punctuation.definition.comment.migoto"
         }
       },
       "patterns": [
@@ -352,8 +415,8 @@
     },
     "commandlist-section": {
       "name": "meta.section.commandlists.migoto",
-      "begin": "(?xi)(?:\n^[ \\t]*\n  (\\[) # capture group 1, opening bracket\n  [ \\t]*\n  (?:\n    ( Clear(?:RenderTarget|DepthStencil)View |\n      ClearUnorderedAccessView(?:Uint|Float) |\n      (?: TextureOverride | ShaderOverride ).+ ) |\n    ( Present | (?:BuiltIn)?(?:CustomShader|CommandList).+ ) |\n    ( Constants )\n  )    # capture group 2, 3, & 4 section header\n  [ \\t]*\n  (\\]) # capture group 5, closing bracket\n[ \\t]*$\n)",
-      "end": "(?i)(?=^[ \\t]*\\[.+\\][ \\t]*$|\\z)",
+      "begin": "(?xi)^[ \\t]*(\\[)[ \\t]*(?:(Clear(?:RenderTarget|DepthStencil)View|ClearUnorderedAccessView(?:Uint|Float)|(?:TextureOverride|ShaderOverride)[^\\r\\n\\]]+)|(Present|(?:BuiltIn)?(?:CustomShader|CommandList)[^\\r\\n\\]]+)|(Constants))[ \\t]*(\\])[ \\t]*(?:(([;#]).*))?$",
+      "end": "(?i)(?=^[ \\t]*\\[[^\\]]+\\][ \\t]*(?:[;#].*)?$|\\z)",
       "beginCaptures": {
         "1": {
           "name": "punctuation.definition.entity.begin.migoto"
@@ -369,6 +432,12 @@
         },
         "5": {
           "name": "punctuation.definition.entity.end.migoto"
+        },
+        "6": {
+          "name": "comment.line.semicolon.migoto"
+        },
+        "7": {
+          "name": "punctuation.definition.comment.migoto"
         }
       },
       "patterns": [

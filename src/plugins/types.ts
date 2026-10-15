@@ -113,7 +113,7 @@ export interface PluginContext {
   // ---- Linter & Diagnostics ----
   linter: {
     registerRule(rule: CustomLintRule): () => void;
-    registerAllowedResource(resourceOrPattern: string | RegExp): () => void;
+    registerAllowedResource(resourceOrPattern: string | RegExp | ((name: string) => boolean)): () => void;
     registerAllowedVariable(variableOrPattern: string | RegExp | ((name: string) => boolean)): () => void;
   };
 
