@@ -204,20 +204,27 @@ export class PluginManager {
       file: curFile,
       folder: curFolder,
       getAllFiles: (): string[] => {
-        const fileSet = new Set<string>();
-        if (this.explorer && this.explorer.hasFolder) {
-          for (const f of this.explorer.getAllFilePaths()) {
-            fileSet.add(f);
+        const norm = (p: string) => p.replace(/\\/g, '/').toLowerCase();
+        const list: string[] = [];
+        const seen = new Set<string>();
+        const isSame = (a: string, b: string) => a === b || a.endsWith(`/${b}`) || b.endsWith(`/${a}`);
+        const add = (p: string) => {
+          const n = norm(p);
+          for (const s of seen) {
+            if (isSame(s, n)) return;
           }
-        }
+          seen.add(n);
+          list.push(p);
+        };
+        // 탭(절대경로)과 탐색기(상대경로)가 같은 파일을 가리키므로 하나로 합친다.
         for (const tab of this.doc.allTabs) {
-          if (tab.file?.id) {
-            fileSet.add(tab.file.id);
-          } else if (tab.title) {
-            fileSet.add(tab.title);
-          }
+          if (tab.file?.id) add(tab.file.id);
+          else if (tab.title) add(tab.title);
         }
-        return Array.from(fileSet);
+        if (this.explorer && this.explorer.hasFolder) {
+          for (const f of this.explorer.getAllFilePaths()) add(f);
+        }
+        return list;
       },
       readTextFile: async (relOrAbsPath: string): Promise<string> => {
         const cleanNoSlash = relOrAbsPath.trim().replace(/^["']|["']$/g, '').trim().replace(/\\/g, '/');
