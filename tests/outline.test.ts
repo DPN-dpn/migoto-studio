@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseSections } from '../src/ui/outline.ts';
+import { parseSections } from '../src/ui/panels/outline.ts';
 
 test('parseSections extracts section headers and groups correctly', () => {
   const content = [

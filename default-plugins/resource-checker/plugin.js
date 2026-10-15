@@ -3,7 +3,7 @@ function e(e) {
 	return e;
 }
 //#endregion
-//#region src/core/lint.ts
+//#region src/core/ini/lint.ts
 function t(e) {
 	let t = null;
 	for (let n = 0; n < e.length; n++) {

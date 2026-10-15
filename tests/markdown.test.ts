@@ -4,7 +4,7 @@ import {
   escapeHtml,
   formatInlineMarkdown,
   renderMarkdownToHtml,
-} from '../src/ui/markdown.ts';
+} from '../src/ui/common/markdown.ts';
 
 test('escapeHtml escapes dangerous HTML characters', () => {
   assert.equal(

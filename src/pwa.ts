@@ -1,5 +1,5 @@
 import { isDesktop } from './platform';
-import { showToast } from './ui/toast';
+import { showToast } from './ui/common/toast';
 
 const PWA_INSTALLED_STORAGE_KEY = 'migoto_pwa_installed';
 

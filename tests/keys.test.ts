@@ -6,7 +6,7 @@ import {
   formatKeyBinding,
   generateKeySnippet,
   parseKeyBindingLine,
-} from '../src/core/keys.ts';
+} from '../src/core/ini/keys.ts';
 
 test('CODE_TO_VK maps common browser event codes to 3DMigoto virtual keys', () => {
   // Function keys

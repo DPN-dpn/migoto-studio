@@ -6,7 +6,7 @@ import {
   searchInText,
   replaceAllInText,
   escapeRegex,
-} from '../src/core/search.ts';
+} from '../src/core/workspace/search.ts';
 
 test('escapeRegex escapes special regex characters', () => {
   assert.equal(escapeRegex('hello.world[1]?(a+b)'), 'hello\\.world\\[1\\]\\?\\(a\\+b\\)');

@@ -8,7 +8,7 @@ import {
   clearAllowedResources,
   type TextModelLike,
   type LintOptions,
-} from '../src/core/lint.ts';
+} from '../src/core/ini/lint.ts';
 
 function createMockModel(content: string): TextModelLike {
   const lines = content.split(/\r?\n/);

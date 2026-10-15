@@ -5,7 +5,7 @@ import {
   classifyIniSection,
   mergeIniSections,
   formatIniSection,
-} from '../src/core/ini.ts';
+} from '../src/core/ini/ini.ts';
 
 test('classifyIniSection correctly identifies 3DMigoto/XXMI section types', () => {
   assert.equal(classifyIniSection('TextureOverrideBody'), '텍스처 오버라이드');

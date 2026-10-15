@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { extractSymbols, computeSuggestions, type TextModelLike } from '../src/core/symbols.ts';
+import { extractSymbols, computeSuggestions, type TextModelLike } from '../src/core/ini/symbols.ts';
 
 function createMockModel(content: string): TextModelLike {
   const lines = content.split(/\r?\n/);

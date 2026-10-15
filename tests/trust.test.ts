@@ -7,7 +7,7 @@ import {
   removeTrustedFolder,
   clearTrustedFolders,
   getTrustedFolders,
-} from '../src/core/trust.ts';
+} from '../src/core/workspace/trust.ts';
 
 // Mock localStorage for node test environment
 const mockStorage: Record<string, string> = {};

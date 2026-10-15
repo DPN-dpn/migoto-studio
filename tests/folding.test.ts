@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { computeFoldingRanges, FoldingRangeKind } from '../src/core/folding.ts';
+import { computeFoldingRanges, FoldingRangeKind } from '../src/core/editor/folding.ts';
 
 function createMockModel(content: string) {
   const lines = content.split('\n');

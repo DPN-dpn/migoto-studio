@@ -180,7 +180,7 @@ export interface RegisteredSidebarView {
   render: (container: HTMLElement) => void | (() => void);
 }
 
-import type { CustomViewerDefinition } from '../core/documents';
+import type { CustomViewerDefinition } from '../core/workspace/documents.ts';
 export type { CustomViewerDefinition };
 
 export interface PluginInstance {

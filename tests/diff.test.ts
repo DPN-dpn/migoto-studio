@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import type { DocumentTab, DiffTabInfo } from '../src/core/documents.ts';
+import type { DocumentTab, DiffTabInfo } from '../src/core/workspace/documents.ts';
 
 test('Diff tab kind is treated as not dirty and supports DiffTabInfo', () => {
   const dummyModel = {

@@ -4,7 +4,7 @@ import {
   getSymbolAtPosition,
   scanModelOccurrences,
   type SymbolTarget,
-} from '../src/core/symbol-nav.ts';
+} from '../src/core/ini/symbol-nav.ts';
 
 // Mock text model for testing
 function createMockModel(content: string, uriStr = 'inifile:///test.ini') {
