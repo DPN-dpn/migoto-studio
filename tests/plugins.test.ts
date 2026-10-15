@@ -319,6 +319,7 @@ test('custom-lint (resource-checker) plugin activates and registers both resourc
   const plugin = def.createPlugin();
 
   const registeredRules: any[] = [];
+  const allowedResources: any[] = [];
   let registeredView: any = null;
 
   const mockContext: any = {
@@ -326,6 +327,9 @@ test('custom-lint (resource-checker) plugin activates and registers both resourc
     linter: {
       registerRule: (rule: any) => {
         registeredRules.push(rule);
+      },
+      registerAllowedResource: (pattern: any) => {
+        allowedResources.push(pattern);
       },
       registerAllowedVariable: () => () => {},
     },
@@ -349,6 +353,7 @@ test('custom-lint (resource-checker) plugin activates and registers both resourc
   plugin.activate(mockContext);
   assert.equal(registeredRules.length, 2);
   assert.equal(registeredView, null);
+  assert.ok(allowedResources.includes('CommandListSkinTexture'));
 
   const resourceRule = registeredRules.find((r) => r.id === 'missing-resource-files')!;
   const nsRule = registeredRules.find((r) => r.id === 'xxmi-namespace-check')!;

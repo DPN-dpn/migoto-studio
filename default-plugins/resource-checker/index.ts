@@ -102,6 +102,14 @@ export default definePlugin({
   activate(context) {
     let unregisterAllowedVars: (() => void) | null = null;
 
+    // 0. XXMI 표준 내장 커맨드리스트 허용 등록 (GIMI / ZZMI / XXMI 내장 함수)
+    if (context.linter?.registerAllowedResource) {
+      context.linter.registerAllowedResource('CommandListSkinTexture');
+      context.linter.registerAllowedResource(/^(?:builtin\\)?commandlistskintexture$/i);
+      context.linter.registerAllowedResource(/^commandlist\\(?:builtin\\)?skintexture$/i);
+      context.linter.registerAllowedResource(/^builtin\\skintexture$/i);
+    }
+
     // Helper to collect all INI files in workspace
     const collectIniFiles = async (ctx: any): Promise<string[]> => {
       if (ctx.getAllFiles) {

@@ -11,3 +11,7 @@
    - 모드 폴더 내 모든 `.ini` 파일의 `namespace` 선언 및 `[Constants]` 변수, `[CommandList]` 등을 자동으로 색인합니다.
    - `$\Namespace\Var` 또는 `CommandList\Namespace\Action` 구문이 대상 네임스페이스에 선언되어 있는지 검증합니다.
    - 단일 INI 파일로 열었을 경우 외부 네임스페이스 확인이 필요함을 안내합니다.
+
+3. **XXMI 표준 내장 함수 지원**
+   - `CommandListSkinTexture` 등 XXMI / GIMI / ZZMI 엔진 내장 커맨드리스트 호출 시 미정의 섹션 오류 없이 정상 구문으로 인식합니다.
+

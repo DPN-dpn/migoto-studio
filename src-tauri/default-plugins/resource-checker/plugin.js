@@ -73,7 +73,9 @@ function n(e, n) {
 	};
 }
 var r = e({ activate(e) {
-	let r = null, i = async (t) => {
+	let r = null;
+	e.linter?.registerAllowedResource && (e.linter.registerAllowedResource("CommandListSkinTexture"), e.linter.registerAllowedResource(/^(?:builtin\\)?commandlistskintexture$/i), e.linter.registerAllowedResource(/^commandlist\\(?:builtin\\)?skintexture$/i), e.linter.registerAllowedResource(/^builtin\\skintexture$/i));
+	let i = async (t) => {
 		if (t.getAllFiles) {
 			let e = t.getAllFiles();
 			if (e && e.length > 0) return e.filter((e) => /\.(ini|3dm|migoto)$/i.test(e));

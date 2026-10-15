@@ -103,6 +103,7 @@ test('computeSuggestions suggests command lists after run =', () => {
 
   assert.equal(suggestions.some((s) => s.label === 'CommandListSwap'), true);
   assert.equal(suggestions.some((s) => s.label === 'CustomShaderPost'), true);
+  assert.equal(suggestions.some((s) => s.label === 'CommandListSkinTexture'), true);
 });
 
 test('computeSuggestions suggests templates after [', () => {

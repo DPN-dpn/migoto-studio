@@ -5,7 +5,7 @@ function e(e) {
 //#endregion
 //#region default-plugins/zzmi-support/index.ts
 var t = e({ activate(e) {
-	e.linter.registerAllowedResource(/^commandlist\\zzmi\\/i), e.linter.registerAllowedResource(/^resource\\zzmi\\/i), e.linter.registerAllowedResource("CommandList\\ZZMI\\SetTextures"), e.templates.registerTemplate({
+	e.linter.registerAllowedResource(/^commandlist\\zzmi\\/i), e.linter.registerAllowedResource(/^resource\\zzmi\\/i), e.linter.registerAllowedResource("CommandList\\ZZMI\\SetTextures"), e.linter.registerAllowedResource("CommandListSkinTexture"), e.templates.registerTemplate({
 		id: "zzmi_slot_fix",
 		group: "ZZMI (젠레스 존 제로)",
 		label: "ZZMI 텍스처 슬롯픽스 (SlotFix)",

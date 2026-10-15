@@ -249,3 +249,24 @@ this = ResourceNotExist
   );
 });
 
+test('CommandListSkinTexture is recognized as valid when allowed', () => {
+  clearAllowedResources();
+  const unregister = registerAllowedResource('CommandListSkinTexture');
+
+  const model = createMockModel('[TextureOverrideFace]\nhash = 12345678\nrun = CommandListSkinTexture\n');
+  const markers = lintModel(model, defaultOptions);
+
+  const errors = markers.filter((m) => m.severity === MarkerSeverity.Error);
+  const warnings = markers.filter((m) => m.severity === MarkerSeverity.Warning);
+  assert.equal(errors.length, 0, 'No errors for CommandListSkinTexture');
+  assert.equal(warnings.length, 0, 'No warnings for allowed CommandListSkinTexture');
+
+  unregister();
+  const markersAfter = lintModel(model, defaultOptions);
+  assert.ok(
+    markersAfter.some((m) => m.message.includes('CommandListSkinTexture')),
+    'Should report warning when CommandListSkinTexture is not allowed'
+  );
+});
+
+

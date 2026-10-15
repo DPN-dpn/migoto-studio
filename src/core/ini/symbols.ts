@@ -190,7 +190,7 @@ export function computeSuggestions(
     const typedWord = runMatch[1];
     const startCol = column - typedWord.length;
 
-    return symbols.commandLists.map((cmd) => ({
+    const items: SuggestionItem[] = symbols.commandLists.map((cmd) => ({
       label: cmd,
       kind: 'command',
       detail: '커맨드 리스트 / 셰이더',
@@ -198,6 +198,19 @@ export function computeSuggestions(
       startCol,
       endCol: column,
     }));
+
+    if (!symbols.commandLists.some((c) => c.toLowerCase() === 'commandlistskintexture')) {
+      items.push({
+        label: 'CommandListSkinTexture',
+        kind: 'command',
+        detail: 'XXMI 내장 스킨 텍스처 커맨드리스트',
+        insertText: 'CommandListSkinTexture',
+        startCol,
+        endCol: column,
+      });
+    }
+
+    return items;
   }
 
   // 4. Section header start: `[` at the start of a line

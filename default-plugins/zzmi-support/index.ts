@@ -6,6 +6,7 @@ export default definePlugin({
     context.linter.registerAllowedResource(/^commandlist\\zzmi\\/i);
     context.linter.registerAllowedResource(/^resource\\zzmi\\/i);
     context.linter.registerAllowedResource('CommandList\\ZZMI\\SetTextures');
+    context.linter.registerAllowedResource('CommandListSkinTexture');
 
     // 2. 코드 템플릿: ZZMI 슬롯픽스 구문 (WEngineFX 포함)
     context.templates.registerTemplate({
