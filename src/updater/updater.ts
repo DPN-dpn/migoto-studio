@@ -1,6 +1,7 @@
 import { openModal } from '../ui/modal';
 import { platform } from '../platform';
 import { getSettings } from '../core/settings';
+import { renderMarkdown } from '../ui/markdown';
 
 import { CURRENT_APP_VERSION, isNewerVersion } from './version';
 
@@ -196,9 +197,10 @@ export function showUpdateModal(info: UpdateInfo) {
     okBox.style.padding = '16px 8px';
 
     const icon = document.createElement('div');
-    icon.style.fontSize = '32px';
-    icon.style.marginBottom = '8px';
-    icon.textContent = '✨';
+    icon.style.display = 'flex';
+    icon.style.justifyContent = 'center';
+    icon.style.marginBottom = '12px';
+    icon.innerHTML = `<svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>`;
 
     const title = document.createElement('h3');
     title.style.margin = '0 0 6px';
@@ -237,9 +239,9 @@ export function showUpdateModal(info: UpdateInfo) {
 
   const verBox = document.createElement('div');
   verBox.innerHTML = `
-    <div style="font-weight: 600; font-size: 14px; margin-bottom: 2px;">새로운 버전이 출시되었습니다!</div>
+    <div style="font-weight: 600; font-size: 14px; margin-bottom: 2px;">새로운 버전이 출시되었습니다</div>
     <div style="font-size: 12px; color: var(--fg-dim);">
-      현재 버전: <code>v${info.currentVersion}</code> ➔ 최신 버전: <strong style="color: var(--accent);">v${info.latestVersion}</strong>
+      현재 버전: <code>v${info.currentVersion}</code> &rarr; 최신 버전: <strong style="color: var(--accent);">v${info.latestVersion}</strong>
     </div>
   `;
   header.append(verBox);
@@ -253,16 +255,22 @@ export function showUpdateModal(info: UpdateInfo) {
   notesTitle.textContent = '릴리스 노트:';
 
   const notesBox = document.createElement('div');
-  notesBox.style.maxHeight = '180px';
+  notesBox.className = 'update-release-notes markdown-body';
+  notesBox.style.maxHeight = '280px';
   notesBox.style.overflowY = 'auto';
-  notesBox.style.padding = '10px 12px';
+  notesBox.style.padding = '12px 14px';
   notesBox.style.background = 'var(--bg)';
   notesBox.style.border = '1px solid var(--border)';
   notesBox.style.borderRadius = '6px';
-  notesBox.style.fontSize = '12px';
-  notesBox.style.lineHeight = '1.6';
-  notesBox.style.whiteSpace = 'pre-wrap';
-  notesBox.textContent = info.releaseNotes || '상세 개선사항 및 버그 수정이 포함되어 있습니다.';
+  renderMarkdown(
+    notesBox,
+    info.releaseNotes || '상세 개선사항 및 버그 수정이 포함되어 있습니다.',
+    {
+      onLinkClick: (url) => {
+        openExternalUrl(url);
+      },
+    },
+  );
 
   body.append(notesTitle, notesBox);
 
@@ -273,7 +281,7 @@ export function showUpdateModal(info: UpdateInfo) {
 
   if (info.isPortable) {
     statusEl.innerHTML =
-      '💡 <strong>포터블 모드</strong>: 릴리스 페이지에서 최신 포터블 <code>.zip</code>을 받아 압축 해제하시면 데이터가 보존됩니다.';
+      '<strong>포터블 모드</strong>: 릴리스 페이지에서 최신 포터블 <code>.zip</code>을 받아 압축 해제하시면 데이터가 보존됩니다.';
   }
   body.append(statusEl);
 
@@ -289,7 +297,7 @@ export function showUpdateModal(info: UpdateInfo) {
   if (info.canAutoInstall && info.downloadAndInstall) {
     const installBtn = document.createElement('button');
     installBtn.className = 'primary';
-    installBtn.textContent = '🚀 지금 바로 업데이트';
+    installBtn.textContent = '지금 바로 업데이트';
 
     installBtn.onclick = async () => {
       installBtn.disabled = true;
@@ -311,7 +319,7 @@ export function showUpdateModal(info: UpdateInfo) {
         console.error('Update install failed:', err);
         statusEl.style.color = '#ef4444';
         statusEl.innerHTML = `
-          <div style="font-weight: 600; margin-bottom: 4px;">⚠️ 자동 업데이트 실패 (${err?.message || err})</div>
+          <div style="font-weight: 600; margin-bottom: 4px;">자동 업데이트 실패 (${err?.message || err})</div>
           <div style="font-size: 12px; color: var(--fg); line-height: 1.5;">
             네트워크 연결 또는 권한 문제로 자동 설치를 완료하지 못했습니다.<br>
             GitHub 릴리스 페이지에서 최신 설치 파일(.exe) 또는 무설치 포터블(.zip)을 직접 다운로드해 주세요.
@@ -324,7 +332,7 @@ export function showUpdateModal(info: UpdateInfo) {
         if (!btnRow.querySelector('.gh-release-fallback-btn')) {
           const ghBtn = document.createElement('button');
           ghBtn.className = 'primary gh-release-fallback-btn';
-          ghBtn.textContent = '🌐 GitHub 릴리스 페이지 열기';
+          ghBtn.textContent = 'GitHub 릴리스 페이지 열기';
           ghBtn.onclick = () => {
             openExternalUrl(info.releaseUrl || GITHUB_RELEASES_URL);
           };
@@ -351,7 +359,7 @@ export function showUpdateModal(info: UpdateInfo) {
 
   body.append(btnRow);
 
-  closeDialog = openModal('Migoto Studio 업데이트 알림', body, { autoHeight: true });
+  closeDialog = openModal('Migoto Studio 업데이트 알림', body, { autoHeight: true, className: 'modal-update' });
 }
 
 /**
@@ -388,7 +396,7 @@ export async function runUpdateCheck(silent = false) {
       let closeDialog = () => {};
       const ghBtn = document.createElement('button');
       ghBtn.className = 'primary';
-      ghBtn.textContent = '🌐 GitHub 릴리스 페이지 열기';
+      ghBtn.textContent = 'GitHub 릴리스 페이지 열기';
       ghBtn.onclick = () => {
         openExternalUrl(GITHUB_RELEASES_URL);
         closeDialog();

@@ -253,7 +253,7 @@ function renderAbout(): HTMLElement {
   note.style.fontSize = '12px';
   note.style.color = 'var(--fg-dim)';
   note.style.lineHeight = '1.6';
-  note.innerHTML = '💡 <strong>자동 백업 보호</strong>: 파일을 저장할 때마다 이전 내용이 앱 데이터 폴더에 자동으로 안전하게 백업됩니다. 문제 발생 시 툴바의 <strong>백업 복원</strong>으로 이전 버전을 되돌릴 수 있습니다.';
+  note.innerHTML = '<strong>자동 백업 보호</strong>: 파일을 저장할 때마다 이전 내용이 앱 데이터 폴더에 자동으로 안전하게 백업됩니다. 문제 발생 시 툴바의 <strong>백업 복원</strong>으로 이전 버전을 되돌릴 수 있습니다.';
 
   container.append(hero, details, note);
   return container;
