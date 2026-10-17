@@ -596,10 +596,11 @@ export function createUIBuilder() {
       subtitle?: string;
       badge?: { text: string; variant?: 'info' | 'success' | 'warn' | 'error' | 'neutral' };
       children?: HTMLElement[];
+      content?: HTMLElement[];
       actions?: HTMLElement[];
     }): HTMLElement {
       const card = document.createElement('div');
-      card.className = 'plugin-card';
+      card.className = 'plugin-card plugin-ui-card';
 
       const header = document.createElement('div');
       header.className = 'plugin-card-header';
@@ -629,10 +630,11 @@ export function createUIBuilder() {
       }
       card.append(header);
 
-      if (options.children && options.children.length > 0) {
+      const childNodes = options.children || options.content;
+      if (childNodes && childNodes.length > 0) {
         const body = document.createElement('div');
         body.className = 'plugin-card-body';
-        options.children.forEach((c) => body.append(c));
+        childNodes.forEach((c) => body.append(c));
         card.append(body);
       }
 

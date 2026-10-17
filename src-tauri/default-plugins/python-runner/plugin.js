@@ -45,15 +45,6 @@ function buildPythonRunnerView(context, container) {
 		checked: context.storage.get("pass_file", true),
 		onChange: (checked) => context.storage.set("pass_file", checked)
 	});
-	const configCard = context.ui.createCard({
-		title: "실행 환경 및 옵션",
-		subtitle: "파이썬 인터프리터 및 커맨드라인 파라미터를 설정합니다.",
-		content: [
-			cmdSelect.row,
-			argsInput.row,
-			passFileCheck.row
-		]
-	});
 	const codeEditor = context.ui.createCodeEditor({
 		label: "실행할 Python 코드:",
 		rows: 6,
@@ -114,15 +105,7 @@ function buildPythonRunnerView(context, container) {
 		}
 	});
 	const actionRow = context.ui.createButtonRow([runBtn, insertBtn]);
-	const scriptCard = context.ui.createCard({
-		title: "스크립트 작성 및 실행 결과",
-		content: [
-			codeEditor.container,
-			actionRow,
-			consoleView.container
-		]
-	});
-	container.append(header, configCard, scriptCard);
+	container.append(header, cmdSelect.row, argsInput.row, passFileCheck.row, codeEditor.container, actionRow, consoleView.container);
 }
 //#endregion
 export { plugin as default };

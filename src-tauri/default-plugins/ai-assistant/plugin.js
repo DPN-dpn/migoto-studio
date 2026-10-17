@@ -1096,13 +1096,6 @@ var plugin = {
 				};
 			}
 		});
-		context.ui?.registerMenuItem?.({
-			label: "AI 모딩 에이전트 열기",
-			shortcut: "Ctrl+Shift+A",
-			action: () => {
-				context.ui.showToast("좌측 액티비티 바에서 [AI 에이전트] 탭을 엽니다.", "info");
-			}
-		});
 	},
 	deactivate() {}
 };
