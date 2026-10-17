@@ -2,6 +2,7 @@ import type { SelectOption, FormConfig, FormFieldDef, FormInstance } from './typ
 import { CODE_TO_VK } from '../core/ini/keys.ts';
 import { openKeyHelperModal, type KeyHelperModalOptions } from '../ui/modals/key-helper.ts';
 import { openConfirmModal, openPromptModal, type ConfirmOptions, type PromptOptions } from '../ui/modals/confirm-ui.ts';
+import { platform } from '../platform/index.ts';
 export type { ConfirmOptions, PromptOptions };
 
 /**
@@ -1273,6 +1274,575 @@ export function createUIBuilder() {
         },
       };
     },
+
+    /**
+     * 인라인 탭 내비게이션 바 및 화면 전환 컨테이너를 생성합니다.
+     */
+    createTabs(options: TabsOptions): TabsInstance {
+      const container = document.createElement('div');
+      container.className = `plugin-tabs-container${options.className ? ` ${options.className}` : ''}`;
+
+      const tabNav = document.createElement('div');
+      tabNav.className = 'plugin-tab-nav';
+
+      const tabContent = document.createElement('div');
+      tabContent.className = 'plugin-tab-content';
+
+      const buttons = new Map<string, HTMLButtonElement>();
+      const panels = new Map<string, HTMLElement>();
+      const badges = new Map<string, HTMLElement>();
+
+      let activeTabId = options.defaultTab || options.tabs[0]?.id || '';
+
+      const switchTab = (tabId: string) => {
+        const targetTab = options.tabs.find((t) => t.id === tabId);
+        if (!targetTab || targetTab.disabled) return;
+
+        activeTabId = tabId;
+
+        buttons.forEach((btn, id) => {
+          const isActive = id === tabId;
+          btn.classList.toggle('active', isActive);
+          btn.setAttribute('aria-selected', String(isActive));
+        });
+
+        panels.forEach((panel, id) => {
+          panel.hidden = id !== tabId;
+        });
+
+        options.onChange?.(tabId);
+      };
+
+      options.tabs.forEach((tab) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = `plugin-tab-btn${tab.id === activeTabId ? ' active' : ''}`;
+        btn.setAttribute('role', 'tab');
+        btn.setAttribute('aria-selected', String(tab.id === activeTabId));
+        if (tab.disabled) btn.disabled = true;
+
+        if (tab.icon) {
+          const iconSpan = document.createElement('span');
+          iconSpan.className = 'plugin-tab-icon';
+          iconSpan.textContent = tab.icon;
+          btn.append(iconSpan);
+        }
+
+        const labelSpan = document.createElement('span');
+        labelSpan.className = 'plugin-tab-label';
+        labelSpan.textContent = tab.label;
+        btn.append(labelSpan);
+
+        if (tab.badge) {
+          const badgeSpan = document.createElement('span');
+          badgeSpan.className = 'plugin-tab-badge';
+          badgeSpan.textContent = tab.badge;
+          btn.append(badgeSpan);
+          badges.set(tab.id, badgeSpan);
+        }
+
+        btn.onclick = () => switchTab(tab.id);
+        buttons.set(tab.id, btn);
+        tabNav.append(btn);
+
+        const panel = document.createElement('div');
+        panel.className = 'plugin-tab-panel';
+        panel.setAttribute('role', 'tabpanel');
+        panel.hidden = tab.id !== activeTabId;
+        panel.append(tab.content);
+        panels.set(tab.id, panel);
+        tabContent.append(panel);
+      });
+
+      container.append(tabNav, tabContent);
+
+      return {
+        container,
+        tabNav,
+        tabContent,
+        switchTab,
+        getActiveTab: () => activeTabId,
+        setTabBadge: (tabId: string, badge?: string) => {
+          let b = badges.get(tabId);
+          if (badge) {
+            if (!b) {
+              b = document.createElement('span');
+              b.className = 'plugin-tab-badge';
+              badges.set(tabId, b);
+              buttons.get(tabId)?.append(b);
+            }
+            b.textContent = badge;
+            b.hidden = false;
+          } else if (b) {
+            b.hidden = true;
+          }
+        },
+        setTabDisabled: (tabId: string, disabled: boolean) => {
+          const btn = buttons.get(tabId);
+          if (btn) btn.disabled = disabled;
+          const tab = options.tabs.find((t) => t.id === tabId);
+          if (tab) tab.disabled = disabled;
+        },
+      };
+    },
+
+    /**
+     * 헤더 클릭 시 본문을 접거나 펼칠 수 있는 아코디언 컴포넌트를 생성합니다.
+     */
+    createCollapsible(options: CollapsibleOptions): CollapsibleInstance {
+      const container = document.createElement('div');
+      let isOpen = options.defaultOpen ?? true;
+      container.className = `plugin-collapsible${isOpen ? ' open' : ''}${options.className ? ` ${options.className}` : ''}`;
+
+      const header = document.createElement('div');
+      header.className = 'plugin-collapsible-header';
+
+      const left = document.createElement('div');
+      left.className = 'plugin-collapsible-left';
+
+      const chevron = document.createElement('span');
+      chevron.className = 'plugin-collapsible-chevron';
+      chevron.textContent = '▶';
+      left.append(chevron);
+
+      const titleWrap = document.createElement('div');
+      titleWrap.className = 'plugin-collapsible-title-wrap';
+
+      const titleEl = document.createElement('div');
+      titleEl.className = 'plugin-collapsible-title';
+      titleEl.textContent = options.title;
+      titleWrap.append(titleEl);
+
+      if (options.subtitle) {
+        const subEl = document.createElement('div');
+        subEl.className = 'plugin-collapsible-subtitle';
+        subEl.textContent = options.subtitle;
+        titleWrap.append(subEl);
+      }
+      left.append(titleWrap);
+
+      if (options.badge) {
+        const badge = this.createBadge({
+          text: options.badge.text,
+          variant: options.badge.variant || 'neutral',
+        });
+        badge.style.marginLeft = '6px';
+        left.append(badge);
+      }
+
+      header.append(left);
+
+      if (options.headerActions && options.headerActions.length > 0) {
+        const actionsWrap = document.createElement('div');
+        actionsWrap.className = 'plugin-collapsible-actions';
+        options.headerActions.forEach((act) => {
+          act.addEventListener('click', (e) => e.stopPropagation());
+          actionsWrap.append(act);
+        });
+        header.append(actionsWrap);
+      }
+
+      const body = document.createElement('div');
+      body.className = 'plugin-collapsible-body';
+      body.hidden = !isOpen;
+
+      const items = Array.isArray(options.content) ? options.content : [options.content];
+      items.forEach((c) => body.append(c));
+
+      const setOpen = (open: boolean) => {
+        isOpen = open;
+        container.classList.toggle('open', isOpen);
+        body.hidden = !isOpen;
+        options.onToggle?.(isOpen);
+      };
+
+      header.addEventListener('click', () => {
+        setOpen(!isOpen);
+      });
+
+      container.append(header, body);
+
+      return {
+        container,
+        header,
+        body,
+        toggle: () => setOpen(!isOpen),
+        open: () => setOpen(true),
+        close: () => setOpen(false),
+        isOpen: () => isOpen,
+        setTitle: (title: string) => {
+          titleEl.textContent = title;
+        },
+      };
+    },
+
+    /**
+     * 상호 배타적인 옵션(예: Cycle / Hold)을 선택할 수 있는 세그먼트 컨트롤 버튼 그룹을 생성합니다.
+     */
+    createSegmentedControl(options: SegmentedControlOptions): SegmentedControlInstance {
+      const ctrl = document.createElement('div');
+      ctrl.className = `plugin-segmented-control${options.className ? ` ${options.className}` : ''}`;
+      ctrl.setAttribute('role', 'radiogroup');
+
+      let currentValue = options.value ?? (
+        typeof options.options[0] === 'string' ? options.options[0] : options.options[0]?.value ?? ''
+      );
+
+      const buttons = new Map<string, HTMLButtonElement>();
+
+      const setValue = (val: string) => {
+        currentValue = val;
+        buttons.forEach((btn, v) => {
+          const isActive = v === val;
+          btn.classList.toggle('active', isActive);
+          btn.setAttribute('aria-checked', String(isActive));
+        });
+        options.onChange?.(val);
+      };
+
+      options.options.forEach((opt) => {
+        const val = typeof opt === 'string' ? opt : opt.value;
+        const label = typeof opt === 'string' ? opt : opt.label;
+        const icon = typeof opt === 'string' ? undefined : opt.icon;
+        const title = typeof opt === 'string' ? undefined : opt.title;
+
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = `plugin-segment-btn${val === currentValue ? ' active' : ''}`;
+        btn.setAttribute('role', 'radio');
+        btn.setAttribute('aria-checked', String(val === currentValue));
+        if (title) btn.title = title;
+
+        if (icon) {
+          const iconSpan = document.createElement('span');
+          iconSpan.textContent = icon;
+          btn.append(iconSpan);
+        }
+
+        const labelSpan = document.createElement('span');
+        labelSpan.textContent = label;
+        btn.append(labelSpan);
+
+        btn.onclick = () => {
+          if (currentValue !== val) {
+            setValue(val);
+          }
+        };
+
+        buttons.set(val, btn);
+        ctrl.append(btn);
+      });
+
+      const row = options.label ? this.createFormRow(options.label, ctrl) : ctrl;
+
+      return {
+        row,
+        container: ctrl,
+        getValue: () => currentValue,
+        setValue: (v: string) => setValue(v),
+        setDisabled: (disabled: boolean) => {
+          buttons.forEach((btn) => {
+            btn.disabled = disabled;
+          });
+        },
+      };
+    },
+
+    /**
+     * 돋보기 아이콘, 실시간 입력 디바운스, 원클릭 지우기(✕)가 포함된 검색 입력 필드를 생성합니다.
+     */
+    createSearchInput(options?: SearchInputOptions): SearchInputInstance {
+      const opts = options || {};
+      const wrap = document.createElement('div');
+      wrap.className = `plugin-search-input-wrap${opts.className ? ` ${opts.className}` : ''}`;
+
+      const icon = document.createElement('span');
+      icon.className = 'plugin-search-icon';
+      icon.textContent = '🔍';
+
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.className = 'plugin-input plugin-search-field';
+      input.placeholder = opts.placeholder || '검색…';
+      if (opts.value) input.value = opts.value;
+
+      const clearBtn = document.createElement('button');
+      clearBtn.type = 'button';
+      clearBtn.className = 'plugin-search-clear-btn';
+      clearBtn.textContent = '✕';
+      clearBtn.title = '지우기';
+      clearBtn.hidden = !input.value;
+
+      let debounceTimer: any = null;
+      const debounceMs = opts.debounceMs ?? 150;
+
+      const triggerSearch = (query: string) => {
+        if (debounceTimer) clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => {
+          opts.onSearch?.(query);
+        }, debounceMs);
+      };
+
+      input.oninput = () => {
+        clearBtn.hidden = !input.value;
+        triggerSearch(input.value);
+      };
+
+      input.onkeydown = (e) => {
+        if (e.key === 'Escape') {
+          clear();
+        }
+      };
+
+      const clear = () => {
+        input.value = '';
+        clearBtn.hidden = true;
+        if (debounceTimer) clearTimeout(debounceTimer);
+        opts.onClear?.();
+        opts.onSearch?.('');
+        input.focus();
+      };
+
+      clearBtn.onclick = () => clear();
+
+      wrap.append(icon, input, clearBtn);
+
+      const row = opts.label ? this.createFormRow(opts.label, wrap) : wrap;
+
+      return {
+        row,
+        input,
+        clearBtn,
+        getValue: () => input.value,
+        setValue: (val: string, runSearch = false) => {
+          input.value = val;
+          clearBtn.hidden = !val;
+          if (runSearch) triggerSearch(val);
+        },
+        clear,
+        focus: () => input.focus(),
+      };
+    },
+
+    /**
+     * 경로 입력창과 [찾아보기…] 버튼이 결합된 파일/폴더 선택 위젯을 생성합니다.
+     */
+    createFilePicker(options?: FilePickerOptions): FilePickerInstance {
+      const opts = options || {};
+      const wrap = document.createElement('div');
+      wrap.className = `plugin-file-picker-wrap${opts.className ? ` ${opts.className}` : ''}`;
+
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.className = 'plugin-input plugin-file-picker-field';
+      if (opts.placeholder) input.placeholder = opts.placeholder;
+      if (opts.value) input.value = opts.value;
+
+      input.oninput = () => {
+        opts.onChange?.(input.value);
+      };
+
+      const browseBtn = document.createElement('button');
+      browseBtn.type = 'button';
+      browseBtn.className = 'small-btn plugin-file-picker-btn';
+      browseBtn.textContent = opts.buttonText || '찾아보기…';
+
+      browseBtn.onclick = async () => {
+        let picked: string | null = null;
+        if (opts.onBrowse) {
+          picked = await opts.onBrowse();
+        } else {
+          try {
+            const fileRef = await platform().pickOpen();
+            if (fileRef) {
+              picked = fileRef.id || fileRef.name;
+            }
+          } catch {
+            // dialog cancelled or failed
+          }
+        }
+
+        if (picked) {
+          input.value = picked;
+          opts.onChange?.(picked);
+        }
+      };
+
+      wrap.append(input, browseBtn);
+
+      const row = opts.label ? this.createFormRow(opts.label, wrap) : wrap;
+
+      return {
+        row,
+        input,
+        browseBtn,
+        getValue: () => input.value,
+        setValue: (val: string) => {
+          input.value = val;
+          opts.onChange?.(val);
+        },
+      };
+    },
+
+    /**
+     * 특정 요소에 마우스 호버 시 떠오르는 도움말 툴팁을 연결합니다. 반환된 함수를 호출하면 툴팁을 정리(해제)합니다.
+     */
+    attachTooltip(element: HTMLElement, options: string | TooltipOptions): () => void {
+      const opts: TooltipOptions = typeof options === 'string' ? { text: options } : options;
+      let tooltipEl: HTMLElement | null = null;
+      let timer: any = null;
+
+      const show = () => {
+        if (tooltipEl) return;
+        timer = setTimeout(() => {
+          tooltipEl = document.createElement('div');
+          tooltipEl.className = `plugin-tooltip${opts.className ? ` ${opts.className}` : ''}`;
+          tooltipEl.textContent = opts.text;
+          document.body.appendChild(tooltipEl);
+
+          const targetRect = element.getBoundingClientRect();
+          const tipRect = tooltipEl.getBoundingClientRect();
+          const pos = opts.position || 'top';
+
+          let top = 0;
+          let left = 0;
+
+          if (pos === 'top') {
+            top = targetRect.top - tipRect.height - 6;
+            left = targetRect.left + (targetRect.width - tipRect.width) / 2;
+          } else if (pos === 'bottom') {
+            top = targetRect.bottom + 6;
+            left = targetRect.left + (targetRect.width - tipRect.width) / 2;
+          } else if (pos === 'left') {
+            top = targetRect.top + (targetRect.height - tipRect.height) / 2;
+            left = targetRect.left - tipRect.width - 6;
+          } else if (pos === 'right') {
+            top = targetRect.top + (targetRect.height - tipRect.height) / 2;
+            left = targetRect.right + 6;
+          }
+
+          left = Math.max(8, Math.min(window.innerWidth - tipRect.width - 8, left));
+          top = Math.max(8, Math.min(window.innerHeight - tipRect.height - 8, top));
+
+          tooltipEl.style.top = `${top}px`;
+          tooltipEl.style.left = `${left}px`;
+        }, opts.delay ?? 200);
+      };
+
+      const hide = () => {
+        if (timer) {
+          clearTimeout(timer);
+          timer = null;
+        }
+        if (tooltipEl) {
+          tooltipEl.remove();
+          tooltipEl = null;
+        }
+      };
+
+      element.addEventListener('mouseenter', show);
+      element.addEventListener('mouseleave', hide);
+      element.addEventListener('mousedown', hide);
+
+      return () => {
+        hide();
+        element.removeEventListener('mouseenter', show);
+        element.removeEventListener('mouseleave', hide);
+        element.removeEventListener('mousedown', hide);
+      };
+    },
+
+    /**
+     * 파일 드래그 앤 드롭을 수신할 수 있는 드롭존 영역을 생성합니다.
+     */
+    createDropZone(options?: DropZoneOptions): DropZoneInstance {
+      const opts = options || {};
+      const container = document.createElement('div');
+      container.className = `plugin-drop-zone${opts.className ? ` ${opts.className}` : ''}`;
+
+      const icon = document.createElement('div');
+      icon.className = 'plugin-drop-zone-icon';
+      icon.textContent = opts.icon || '📁';
+
+      const label = document.createElement('div');
+      label.className = 'plugin-drop-zone-label';
+      label.textContent = opts.label || '파일을 이곳으로 드래그 앤 드롭하세요';
+
+      container.append(icon, label);
+
+      let sublabel: HTMLElement | null = null;
+      if (opts.sublabel) {
+        sublabel = document.createElement('div');
+        sublabel.className = 'plugin-drop-zone-sublabel';
+        sublabel.textContent = opts.sublabel;
+        container.append(sublabel);
+      }
+
+      const onDragOver = (e: DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        container.classList.add('dragover');
+      };
+
+      const onDragLeave = (e: DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        container.classList.remove('dragover');
+      };
+
+      const onDrop = async (e: DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        container.classList.remove('dragover');
+
+        if (!e.dataTransfer || !e.dataTransfer.files || e.dataTransfer.files.length === 0) return;
+
+        let files = Array.from(e.dataTransfer.files);
+
+        if (opts.accept && opts.accept.length > 0) {
+          const lowerExts = opts.accept.map((ext) => ext.toLowerCase());
+          files = files.filter((f) => {
+            const ext = `.${f.name.split('.').pop()?.toLowerCase()}`;
+            return lowerExts.some((acc) => acc === ext || f.type.includes(acc.replace('.', '')));
+          });
+        }
+
+        if (files.length === 0) return;
+        if (!opts.multiple) files = [files[0]];
+
+        await opts.onDrop?.(files);
+      };
+
+      container.addEventListener('dragover', onDragOver);
+      container.addEventListener('dragenter', onDragOver);
+      container.addEventListener('dragleave', onDragLeave);
+      container.addEventListener('drop', onDrop);
+
+      if (opts.onClick) {
+        container.addEventListener('click', opts.onClick);
+      }
+
+      return {
+        container,
+        setLabel: (newLabel: string, newSublabel?: string) => {
+          label.textContent = newLabel;
+          if (newSublabel !== undefined) {
+            if (!sublabel) {
+              sublabel = document.createElement('div');
+              sublabel.className = 'plugin-drop-zone-sublabel';
+              container.append(sublabel);
+            }
+            sublabel.textContent = newSublabel;
+          }
+        },
+        dispose: () => {
+          container.removeEventListener('dragover', onDragOver);
+          container.removeEventListener('dragenter', onDragOver);
+          container.removeEventListener('dragleave', onDragLeave);
+          container.removeEventListener('drop', onDrop);
+        },
+      };
+    },
   };
 }
 
@@ -1356,4 +1926,141 @@ export interface ScrollContainerInstance {
   setScrollTop: (top: number) => void;
 }
 
+export interface TabDef {
+  id: string;
+  label: string;
+  icon?: string;
+  badge?: string;
+  content: HTMLElement;
+  disabled?: boolean;
+}
+
+export interface TabsOptions {
+  tabs: TabDef[];
+  defaultTab?: string;
+  onChange?: (tabId: string) => void;
+  className?: string;
+}
+
+export interface TabsInstance {
+  container: HTMLElement;
+  tabNav: HTMLElement;
+  tabContent: HTMLElement;
+  switchTab: (tabId: string) => void;
+  getActiveTab: () => string;
+  setTabBadge: (tabId: string, badge?: string) => void;
+  setTabDisabled: (tabId: string, disabled: boolean) => void;
+}
+
+export interface CollapsibleOptions {
+  title: string;
+  subtitle?: string;
+  badge?: { text: string; variant?: 'info' | 'success' | 'warn' | 'error' | 'neutral' };
+  content: HTMLElement | HTMLElement[];
+  defaultOpen?: boolean;
+  headerActions?: HTMLElement[];
+  onToggle?: (isOpen: boolean) => void;
+  className?: string;
+}
+
+export interface CollapsibleInstance {
+  container: HTMLElement;
+  header: HTMLElement;
+  body: HTMLElement;
+  toggle: () => void;
+  open: () => void;
+  close: () => void;
+  isOpen: () => boolean;
+  setTitle: (title: string) => void;
+}
+
+export interface SegmentOption {
+  value: string;
+  label: string;
+  icon?: string;
+  title?: string;
+}
+
+export interface SegmentedControlOptions {
+  label?: string;
+  options: Array<string | SegmentOption>;
+  value?: string;
+  onChange?: (value: string) => void;
+  className?: string;
+}
+
+export interface SegmentedControlInstance {
+  row: HTMLElement;
+  container: HTMLElement;
+  getValue: () => string;
+  setValue: (value: string) => void;
+  setDisabled: (disabled: boolean) => void;
+}
+
+export interface SearchInputOptions {
+  label?: string;
+  placeholder?: string;
+  value?: string;
+  debounceMs?: number;
+  onSearch?: (query: string) => void;
+  onClear?: () => void;
+  className?: string;
+}
+
+export interface SearchInputInstance {
+  row: HTMLElement;
+  input: HTMLInputElement;
+  clearBtn: HTMLButtonElement;
+  getValue: () => string;
+  setValue: (value: string, triggerSearch?: boolean) => void;
+  clear: () => void;
+  focus: () => void;
+}
+
+export interface FilePickerOptions {
+  label?: string;
+  placeholder?: string;
+  value?: string;
+  buttonText?: string;
+  title?: string;
+  filter?: string;
+  pickMode?: 'file' | 'folder';
+  onChange?: (path: string) => void;
+  onBrowse?: () => Promise<string | null> | string | null;
+  className?: string;
+}
+
+export interface FilePickerInstance {
+  row: HTMLElement;
+  input: HTMLInputElement;
+  browseBtn: HTMLButtonElement;
+  getValue: () => string;
+  setValue: (path: string) => void;
+}
+
+export interface TooltipOptions {
+  text: string;
+  position?: 'top' | 'bottom' | 'left' | 'right';
+  delay?: number;
+  className?: string;
+}
+
+export interface DropZoneOptions {
+  label?: string;
+  sublabel?: string;
+  icon?: string;
+  accept?: string[];
+  multiple?: boolean;
+  onDrop?: (files: File[]) => void | Promise<void>;
+  onClick?: () => void;
+  className?: string;
+}
+
+export interface DropZoneInstance {
+  container: HTMLElement;
+  setLabel: (label: string, sublabel?: string) => void;
+  dispose: () => void;
+}
+
 export type PluginUIBuilder = ReturnType<typeof createUIBuilder>;
+

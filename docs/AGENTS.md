@@ -23,6 +23,7 @@
    - 사용자 확인이 필요할 때는 `context.ui.confirm` 및 `context.ui.prompt` 비동기 모달을 사용하세요.
    - 텍스트 변경점 비교 시 `context.ui.openDiffTab`을 열고, 백업 복원 시 `context.ui.openRestoreModal`을 활용하세요.
    - 토글키/단축키 입력 필드가 필요할 때는 `type: 'key'` 필드를 사용하면 에디터 자체 실시간 키 감지 위젯이 자동 바인딩되며, 모달 창이 필요할 때는 `context.ui.openKeyBindingModal`을 호출하세요.
+   - 고품질 인터페이스 구현 시 분할 화면(`createSplitView`), 탭 네비게이션(`createTabs`), 아코디언(`createCollapsible`), 세그먼트 컨트롤(`createSegmentedControl`), 디바운스 검색창(`createSearchInput`), 파일 선택기(`createFilePicker`), 드롭존(`createDropZone`), 툴팁(`attachTooltip`)을 적극 활용하세요.
 4. INI 파일 조작 시:
    - 텍스트 전체를 무작위로 교체하지 말고 `context.ini.upsertSection`, `context.ini.formatKeyToggle`, `context.ini.merge`를 사용하여 기존 주석과 배치를 보존하세요.
    - 변수/리소스/섹션 구조 파악 시 `context.ini.extractSymbols`를 사용하세요.
@@ -196,6 +197,13 @@ context.ui.registerSidebarView({
   const scroll = context.ui.createScrollContainer({ maxHeight: 350, autoScroll: true });
   scroll.append(logItem1, logItem2);
   ```
+- `createTabs({ tabs, defaultTab?, className?, onChange? })`: 탭 네비게이션 컨테이너 (`{ container, tabNav, tabContent, switchTab(id), getActiveTab(), setTabBadge(id, badge), setTabDisabled(id, disabled) }` 반환)
+- `createCollapsible({ title, subtitle?, badge?, defaultOpen?, content, headerActions?, className?, onToggle? })`: 아코디언 접기/펼치기 섹션 (`{ container, header, body, toggle(), open(), close(), isOpen(), setTitle(title) }` 반환)
+- `createSegmentedControl({ label?, options, value?, className?, disabled?, onChange? })`: 알약(Pill) 스타일 라디오 버튼 그룹 (`{ row, container, getValue(), setValue(val), setDisabled(disabled) }` 반환)
+- `createSearchInput({ placeholder?, value?, debounceMs?, className?, onSearch?, onClear? })`: 디바운스 실시간 검색창 (`{ container, input, clearBtn, getValue(), setValue(val, trigger?), clear(), focus() }` 반환)
+- `createFilePicker({ label?, placeholder?, value?, buttonText?, filter?, onChange?, onBrowse? })`: 파일 경로 입력 + 탐색 대화상자 결합 필드 (`{ row, input, browseBtn, getValue(), setValue(val), focus() }` 반환)
+- `attachTooltip(element, textOrOptions)`: 요소에 마우스 호버 시 플로팅 툴팁 연결 (해제 함수 `() => void` 반환)
+- `createDropZone({ label?, sublabel?, icon?, accept?, className?, onDrop?, onClick? })`: 파일 드래그 & 드롭 영역 (`{ container, labelEl, sublabelEl, iconEl, setLabel(label, sublabel), dispose() }` 반환)
 - `openKeyBindingModal({ title?, initialKey?, onApply? })`: 3DMigoto 단축키 설정 대화상자를 비동기(`Promise<string | null>`)로 호출 (실시간 키 캡처, 수식키 조합, 가상키 목록 검색 제공)
 - `openKeyHelperModal(options)`: `openKeyBindingModal`의 별칭
 - `createKeyInput({ label?, value?, description?, onChange? })`: 실시간 키 캡처 및 [키 도우미] 모달 버튼이 포함된 단축키 입력 필드

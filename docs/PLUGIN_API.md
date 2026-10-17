@@ -386,6 +386,158 @@ context.ui.openKeyBindingModal({
 
 ---
 
+### 3.10 고급 확장 UI 컴포넌트 (`context.ui.*`)
+
+플러그인 화면을 데스크톱 네이티브 앱 수준의 고품질 UI로 쉽게 빌드할 수 있도록 탭 네비게이션, 아코디언, 세그먼트 컨트롤, 실시간 디바운스 검색창, 파일 선택기, 툴팁, 파일 드롭존 등의 확장 컴포넌트를 제공합니다.
+
+#### A. 인라인 탭 네비게이션 (`context.ui.createTabs`)
+플러그인 탭이나 패널 내부에서 섹션별 서브 화면을 전환할 수 있는 탭 네비게이션입니다.
+
+```typescript
+const tabs = context.ui.createTabs({
+  tabs: [
+    { id: 'settings', label: '설정', icon: '⚙️', content: settingsEl },
+    { id: 'logs', label: '로그', icon: '📜', badge: '3', content: logsEl },
+    { id: 'advanced', label: '고급', content: advancedEl },
+  ],
+  defaultTab: 'settings',
+  onChange: (tabId) => {
+    console.log('선택된 탭:', tabId);
+  },
+});
+
+// 프로그래밍 방식 탭 제어
+tabs.switchTab('logs');
+tabs.setTabBadge('logs', '5'); // 배지 업데이트 (생략 시 숨김)
+tabs.setTabDisabled('advanced', true); // 탭 비활성화
+
+container.append(tabs.container);
+```
+
+#### B. 접기/펼치기 아코디언 (`context.ui.createCollapsible`)
+설정 그룹, 하위 옵션 등을 깔끔하게 접거나 펼칠 수 있는 아코디언 컴포넌트입니다.
+
+```typescript
+const section = context.ui.createCollapsible({
+  title: '고급 그래픽 설정',
+  subtitle: '텍스처 오버라이드 및 셰이더 세부 옵션',
+  defaultOpen: false,
+  badge: { text: '실험적', variant: 'warning' }, // 'neutral'|'info'|'success'|'warning'|'danger'
+  content: [opt1, opt2, opt3],
+  onToggle: (isOpen) => {
+    console.log('접힘 상태:', isOpen);
+  },
+});
+
+// 프로그래밍 방식 제어
+// section.open();
+// section.close();
+// section.toggle();
+// section.setTitle('새 제목');
+
+container.append(section.container);
+```
+
+#### C. 세그먼트 컨트롤 (`context.ui.createSegmentedControl`)
+라디오 버튼보다 직관적인 알약(Pill) 스타일의 옵션 선택 버튼 그룹입니다 (예: 순환/홀드 모드, 테마 선택).
+
+```typescript
+const modeControl = context.ui.createSegmentedControl({
+  label: '토글 동작 방식',
+  options: [
+    { value: 'cycle', label: '순환 (Cycle)', icon: '🔄' },
+    { value: 'hold', label: '홀드 (Hold)', icon: '⏱️' },
+  ],
+  value: 'cycle',
+  onChange: (val) => {
+    console.log('선택된 모드:', val);
+  },
+});
+
+// modeControl.setValue('hold');
+// modeControl.setDisabled(true);
+
+container.append(modeControl.row);
+```
+
+#### D. 실시간 디바운스 검색 입력창 (`context.ui.createSearchInput`)
+검색 아이콘, 실시간 타이핑 디바운스(200ms 기본), 원클릭 내용 지우기(✕) 버튼이 내장된 검색창입니다.
+
+```typescript
+const search = context.ui.createSearchInput({
+  placeholder: '섹션 또는 변수명 검색…',
+  debounceMs: 250,
+  onSearch: (query) => {
+    filterList(query);
+  },
+  onClear: () => {
+    filterList('');
+  },
+});
+
+// search.setValue('TextureOverride', true); // 두 번째 인자가 true이면 검색 콜백 즉시 실행
+// search.clear();
+// search.focus();
+
+container.append(search.container);
+```
+
+#### E. 파일 경로 선택기 (`context.ui.createFilePicker`)
+경로 입력 필드와 [찾아보기…] 버튼이 결합된 위젯입니다. 플랫폼 네이티브 파일 열기 대화상자와 자동 연동됩니다.
+
+```typescript
+const picker = context.ui.createFilePicker({
+  label: '텍스처 파일 경로',
+  placeholder: 'DDS 또는 PNG 파일 선택',
+  onChange: (path) => {
+    console.log('선택된 경로:', path);
+  },
+  // 커스텀 대화상자 로직이 필요한 경우 onBrowse 지정 (생략 시 기본 platform().pickOpen() 연동)
+  // onBrowse: async () => { ... return filePath; }
+});
+
+// picker.setValue('d:/mods/character/diffuse.dds');
+container.append(picker.row);
+```
+
+#### F. 동적 플로팅 툴팁 (`context.ui.attachTooltip`)
+임의의 HTML 요소에 마우스 호버 시 자연스럽게 나타나는 테마 툴팁을 연결합니다.
+
+```typescript
+const helpBtn = context.ui.createButton({ text: '?', variant: 'small' });
+
+// 단순 텍스트 툴팁
+const detach = context.ui.attachTooltip(helpBtn, '3DMigoto 가상 키 코드를 선택하는 도움말 창을 엽니다.');
+
+// 옵션 지정 툴팁 (상/하/좌/우 위치, 지연 시간)
+context.ui.attachTooltip(helpBtn, {
+  text: '현재 파일의 백업 기록을 확인합니다.',
+  position: 'top', // 'top' | 'bottom' | 'left' | 'right'
+  delayMs: 150,
+});
+
+// 해제 시: detach();
+```
+
+#### G. 파일 드래그 & 드롭 영역 (`context.ui.createDropZone`)
+외부 파일(DDS 텍스처, INI 파일, 스크립트 등)을 마우스로 끌어다 놓을 수 있는 점선 하이라이트 드롭 영역입니다.
+
+```typescript
+const dropZone = context.ui.createDropZone({
+  label: 'DDS 텍스처 또는 INI 파일을 이곳에 드롭하세요',
+  sublabel: '또는 클릭하여 파일 탐색기 열기',
+  accept: ['.dds', '.ini', '.txt'], // 지원 확장자 필터
+  onDrop: (files) => {
+    console.log('드롭된 파일 목록:', files);
+    files.forEach((f) => processFile(f));
+  },
+});
+
+container.append(dropZone.container);
+```
+
+---
+
 ## 4. INI 문서 파싱 및 조작 API (`context.ini`)
 
 3DMigoto 및 XXMI 문법에 특화된 고수준 조작 유틸리티를 제공합니다.

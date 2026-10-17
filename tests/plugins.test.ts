@@ -1462,3 +1462,161 @@ test('Plugin UI Builder layout components (split, row, column, grid, divider, sc
     else delete (globalThis as any).document;
   }
 });
+
+test('Plugin UI Builder extended components (tabs, collapsible, segmented, search, file picker, tooltip, dropzone) work properly', () => {
+  const createElement = (tag: string) => {
+    const el: any = {
+      tagName: tag.toUpperCase(),
+      className: '',
+      title: '',
+      value: '',
+      style: {},
+      children: [],
+      classList: {
+        add: (...cls: string[]) => { el.className = `${el.className} ${cls.join(' ')}`.trim(); },
+        remove: (...cls: string[]) => {
+          cls.forEach((c) => { el.className = el.className.replace(new RegExp(`\\b${c}\\b`, 'g'), '').trim(); });
+        },
+        toggle: (c: string, force?: boolean) => {
+          const has = el.className.includes(c);
+          const should = force !== undefined ? force : !has;
+          if (should) el.classList.add(c);
+          else el.classList.remove(c);
+        },
+      },
+      append: (...nodes: any[]) => el.children.push(...nodes),
+      appendChild: (node: any) => el.children.push(node),
+      remove: () => {},
+      replaceChildren: (...nodes: any[]) => { el.children = [...nodes]; },
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      setAttribute: (k: string, v: string) => { el[k] = v; },
+      getAttribute: (k: string) => el[k],
+      getBoundingClientRect: () => ({ top: 100, left: 100, width: 200, height: 40, right: 300, bottom: 140 }),
+      focus: () => {},
+    };
+    return el;
+  };
+
+  const origDoc = (globalThis as any).document;
+  (globalThis as any).document = {
+    createElement,
+    body: {
+      classList: { add: () => {}, remove: () => {} },
+      appendChild: () => {},
+    },
+  };
+
+  try {
+    const builder = createUIBuilder();
+
+    // 1. Test createTabs
+    const p1 = createElement('div');
+    const p2 = createElement('div');
+    let tabSwitched = '';
+    const tabs = builder.createTabs({
+      tabs: [
+        { id: 'tab_a', label: 'Tab A', icon: '🅰️', content: p1 },
+        { id: 'tab_b', label: 'Tab B', content: p2 },
+      ],
+      defaultTab: 'tab_a',
+      onChange: (id) => { tabSwitched = id; },
+    });
+
+    assert.equal(tabs.getActiveTab(), 'tab_a');
+    assert.equal(tabs.tabContent.children[0].hidden, false);
+    assert.equal(tabs.tabContent.children[1].hidden, true);
+
+    tabs.switchTab('tab_b');
+    assert.equal(tabs.getActiveTab(), 'tab_b');
+    assert.equal(tabSwitched, 'tab_b');
+    assert.equal(tabs.tabContent.children[0].hidden, true);
+    assert.equal(tabs.tabContent.children[1].hidden, false);
+
+    // 2. Test createCollapsible
+    let toggledState = false;
+    const bodyContent = createElement('div');
+    const coll = builder.createCollapsible({
+      title: '고급 설정',
+      defaultOpen: false,
+      content: bodyContent,
+      onToggle: (open) => { toggledState = open; },
+    });
+
+    assert.equal(coll.isOpen(), false);
+    assert.equal(coll.body.hidden, true);
+    coll.open();
+    assert.equal(coll.isOpen(), true);
+    assert.equal(coll.body.hidden, false);
+    assert.equal(toggledState, true);
+    coll.toggle();
+    assert.equal(coll.isOpen(), false);
+
+    // 3. Test createSegmentedControl
+    let segmentVal = '';
+    const seg = builder.createSegmentedControl({
+      label: '모드',
+      options: [
+        { value: 'cycle', label: '순환' },
+        { value: 'hold', label: '홀드' },
+      ],
+      value: 'cycle',
+      onChange: (v) => { segmentVal = v; },
+    });
+
+    assert.equal(seg.getValue(), 'cycle');
+    seg.setValue('hold');
+    assert.equal(seg.getValue(), 'hold');
+    assert.equal(segmentVal, 'hold');
+
+    // 4. Test createSearchInput
+    let searchedQuery = '';
+    const search = builder.createSearchInput({
+      placeholder: '검색어 입력',
+      debounceMs: 0,
+      onSearch: (q) => { searchedQuery = q; },
+    });
+
+    assert.equal(search.input.placeholder, '검색어 입력');
+    search.setValue('TextureOverride', true);
+    assert.equal(search.getValue(), 'TextureOverride');
+    search.clear();
+    assert.equal(search.getValue(), '');
+
+    // 5. Test createFilePicker
+    let pickedPath = '';
+    const picker = builder.createFilePicker({
+      label: '파일 경로',
+      placeholder: '경로를 선택하세요',
+      onChange: (p) => { pickedPath = p; },
+      onBrowse: () => 'd:/mods/outfit.dds',
+    });
+
+    assert.equal(picker.input.placeholder, '경로를 선택하세요');
+    picker.setValue('d:/custom/mod.ini');
+    assert.equal(pickedPath, 'd:/custom/mod.ini');
+    picker.browseBtn.onclick?.({} as any);
+
+    // 6. Test attachTooltip
+    const targetEl = createElement('button');
+    const detach = builder.attachTooltip(targetEl, '도움말 툴팁 내용');
+    assert.equal(typeof detach, 'function');
+    detach();
+
+    // 7. Test createDropZone
+    let droppedFiles: any[] = [];
+    const dropZone = builder.createDropZone({
+      label: 'DDS 파일을 드롭하세요',
+      accept: ['.dds'],
+      onDrop: (files) => { droppedFiles = files; },
+    });
+
+    assert.ok(dropZone.container.className.includes('plugin-drop-zone'));
+    dropZone.setLabel('새 라벨', '새 서브라벨');
+    dropZone.dispose();
+  } finally {
+    if (origDoc) (globalThis as any).document = origDoc;
+    else delete (globalThis as any).document;
+  }
+});
+
