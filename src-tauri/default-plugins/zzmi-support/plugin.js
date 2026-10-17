@@ -51,9 +51,9 @@ var ZZMI_TEMPLATES = [
 		description: "Transparency Texture Lib (TTL) 단일 알파 투명도 렌더링 구문 (No Texture)",
 		body: [
 			"; ZZMI TTL (Transparency Texture Lib - Uniform Alpha)",
-			"$\\TTL\\alpha = ${1:0.4}",
+			"$\\TTL\\alpha = ${1:0.5}",
 			"$\\TTL\\_1 = ${2:IndexCount}",
-			"$\\TTL\\_2 = ${3:StartIndexLocation}",
+			"$\\TTL\\_2 = ${3:FirstIndex}",
 			"run = CommandList\\TTL\\Draw"
 		].join("\n") + "\n"
 	},
@@ -66,7 +66,7 @@ var ZZMI_TEMPLATES = [
 			"; ZZMI TTL (Transparency Texture Lib - Texture Mask)",
 			"Resource\\TTL\\TransparencyTex = ref Resource${1:Transparency}",
 			"$\\TTL\\_1 = ${2:IndexCount}",
-			"$\\TTL\\_2 = ${3:StartIndexLocation}",
+			"$\\TTL\\_2 = ${3:FirstIndex}",
 			"$\\TTL\\mask_channel = ${4:3}",
 			"$\\TTL\\mask_invert = ${5:0}",
 			"run = CommandList\\TTL\\Draw"
