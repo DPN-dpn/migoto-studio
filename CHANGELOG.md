@@ -1,6 +1,6 @@
 # 릴리스 노트 (Release Notes)
 
-## [다음 버전]
+## [0.12.4] - 2026-10-17
 
 ### 신규 기능
 - ZZMI TTL(Transparency Texture Lib) 투명도 라이브러리 구문 및 템플릿 지원:
