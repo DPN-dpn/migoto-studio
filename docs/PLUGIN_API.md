@@ -400,6 +400,7 @@ const keyInput = context.ui.createKeyInput({
 
 #### A. 리사이저블 스플릿 뷰 (`context.ui.createSplitView`)
 마우스 드래그로 실시간 크기를 조절할 수 있는 분할 뷰입니다. 가로(좌우) 및 세로(상하) 분할을 지원하며, 사용자가 조절한 크기를 `localStorage`에 자동 영구 보존할 수 있습니다.
+`firstPane`과 `secondPane` 모두 코어 차원에서 `display: flex; flex-direction: column; overflow: hidden; min-height: 0;`가 기본 보장되어, 내부에 `createScrollContainer`나 `createTabs`를 넣었을 때 뷰포트 크기에 정확히 맞춰집니다.
 
 ```typescript
 const split = context.ui.createSplitView({
@@ -523,6 +524,7 @@ context.ui.openKeyBindingModal({
 
 #### A. 인라인 탭 네비게이션 (`context.ui.createTabs`)
 플러그인 탭이나 패널 내부에서 섹션별 서브 화면을 전환할 수 있는 탭 네비게이션입니다.
+탭 컨테이너와 내부 패널 모두 `flex: 1 1 0%`, `min-height: 0`, `height: 100%`, `overflow: hidden`이 적용되어 있어, 각 패널 내부에 `createScrollContainer`나 `createSplitView`를 배치했을 때 무한히 늘어나지 않고 뷰포트에 맞추어 자연스럽게 스크롤바가 작동합니다.
 
 ```typescript
 const tabs = context.ui.createTabs({
@@ -846,9 +848,72 @@ console.log('stdout:', result.stdout);
 
 ---
 
-## 9. 실전 예제
+## 9. 린터 및 템플릿 확장 API (`context.linter`, `context.templates`)
 
-### 9.1 단일 파일 플러그인 예제
+Migoto Studio의 코어 린터 및 코드 템플릿 제안을 플러그인에서 동적으로 확장할 수 있습니다.
+
+### 9.1 허용 리소스 및 변수 화이트리스트 등록 (`context.linter`)
+
+특정 게임 프레임워크(ZZMI, GIMI 등)나 전용 라이브러리(TTL 등)에서 사용되는 고유 커맨드리스트, 슬롯 리소스, 변수를 등록하여 미정의 오류/경고 없이 정상 문법으로 인식하도록 합니다.
+문자열, 정규식, 또는 콜백 함수(`(name: string) => boolean`)를 전달할 수 있으며, 반환되는 정리 함수(`() => void`)를 호출하면 등록이 해제됩니다.
+
+```typescript
+// 1. 특정 커맨드리스트 및 리소스 허용
+context.linter.registerAllowedResource('CommandList\\ZZMI\\SetTextures');
+context.linter.registerAllowedResource(/^commandlist\\ttl\\/i);
+context.linter.registerAllowedResource(/^resource\\ttl\\/i);
+
+// 2. 전용 변수 허용 ($\TTL\alpha, $\TTL\_1 등)
+context.linter.registerAllowedVariable((name: string) => {
+  const norm = name.toLowerCase().replace(/^[\\$]+/, '');
+  return norm.startsWith('ttl\\');
+});
+context.linter.registerAllowedVariable(/^\\?ttl\\/i);
+
+// 3. 미사용(Unused) 경고 방지 등록
+context.linter.registerAllowedUsedVariable(/^\\?ttl\\/i);
+context.linter.registerAllowedUsedResource(/^resource\\ttl\\/i);
+```
+
+### 9.2 커스텀 린트 규칙 등록 (`context.linter.registerRule`)
+
+에디터 검사 시 실시간으로 실행될 커스텀 린트 검사 로직을 추가합니다:
+
+```typescript
+context.linter.registerRule({
+  id: 'my-custom-check',
+  name: '모드 리소스 무결성 검사',
+  run: (iniDoc, ctx) => {
+    const diagnostics = [];
+    // 검사 로직 작성 후 Diagnostic 객체 반환
+    return diagnostics;
+  },
+});
+```
+
+### 9.3 커스텀 코드 템플릿 등록 (`context.templates.registerTemplate`)
+
+Monaco 에디터에서 `[` 입력 시 노출되는 인라인 자동완성 템플릿 또는 템플릿 패널에 새 코드 스니펫을 등록합니다:
+
+```typescript
+context.templates.registerTemplate({
+  id: 'zzmi_ttl_draw',
+  title: 'ZZMI TTL 투명도 드로우 (단일 투명도)',
+  description: '텍스처 없이 지정한 알파 값으로 반투명을 렌더링하는 TTL 기본 드로우 구문',
+  category: 'zzmi',
+  snippet: [
+    '; --- ZZMI TTL Transparency Draw ---',
+    '$\\TTL\\alpha = ${1:0.5}',
+    'run = CommandList\\TTL\\Draw',
+  ].join('\n'),
+});
+```
+
+---
+
+## 10. 실전 예제
+
+### 10.1 단일 파일 플러그인 예제
 
 ```javascript
 // index.js
@@ -901,7 +966,7 @@ function openStudioTab(context) {
 }
 ```
 
-### 9.2 다중 파일 모듈 분할 예제 (Multi-File Plugins)
+### 10.2 다중 파일 모듈 분할 예제 (Multi-File Plugins)
 
 번들러 빌드 없이 코드를 기능별로 분할하여 작성할 수 있습니다.
 
@@ -1005,7 +1070,7 @@ export default {
 
 ---
 
-## 10. 플러그인 설치 및 배포
+## 11. 플러그인 설치 및 배포
 
 ### 1) 데스크톱 환경 직접 복사
 1. 액티비티 바 하단 **[플러그인]** 탭(`Ctrl+Shift+P`)으로 이동합니다.
@@ -1019,7 +1084,7 @@ export default {
 
 ---
 
-## 11. AI 코딩 어시스턴트 활용 (ChatGPT / Claude / Cursor)
+## 12. AI 코딩 어시스턴트 활용 (ChatGPT / Claude / Cursor)
 
 다른 AI(ChatGPT, Claude, Cursor 등)에게 Migoto Studio 플러그인 개발을 요청할 때는 [`docs/AGENTS.md`](./AGENTS.md) 지침서를 시스템 프롬프트로 제공하세요.
 내부 코드를 일일이 설명할 필요 없이 선언형 폼 빌더(`openFormTab`)와 `context.ini` API, 그리고 가상 모듈 링커 기반 다중 파일 구조를 활용한 고품질 플러그인을 단번에 작성할 수 있습니다.

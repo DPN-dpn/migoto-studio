@@ -357,6 +357,7 @@ export default {
 | 정규식으로 INI 파싱하다 주석 깨뜨림 | `context.ini.upsertSection` 또는 `context.ini.merge` 사용 |
 | 사이드바 좁은 공간에 거대한 양식 밀어넣음 | `context.ui.openFormTab`으로 넓은 에디터 탭 생성 |
 | 단축키를 일반 텍스트 입력창으로 처리 | `{ id: 'key', type: 'key' }` 필드로 실시간 키 감지 지원 |
+| 스크롤바를 위해 `style.css`에서 `!important`나 부모 flex를 수동 주입 | 에디터 코어 API(`createScrollContainer`, `createTabs`, `createSplitView`, `openTab`)에 `flex: 1 1 0; min-height: 0;` 및 테마 스크롤바가 자동 내장되어 있으므로 수동 스타일 조작 없이 API만 호출 |
 | `document.getElementById` 전역 검색 | 컨테이너 스코프 내부 검색(`container.querySelector`) |
 | 코드가 길어졌을 때 단일 파일에 억지로 우겨넣음 | `index.js`, `ui.js`, `constants.js`, `style.css` 등으로 분할하여 상대 경로 `import` 사용 |
 | Vite/webpack/esbuild 번들러 설정 생성 시도 | 에디터 코어 가상 모듈 링커가 런타임에 자동 해석하므로 번들러 불필요 (순수 ESM 작성) |
