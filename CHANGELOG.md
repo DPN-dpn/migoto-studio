@@ -3,10 +3,16 @@
 ## [다음 버전]
 
 ### 신규 기능
+- 가상 모듈 링커(Virtual Module Linker) 기반 다중 파일 플러그인(Multi-File Plugins) 지원:
+  - 플러그인 코드를 단일 파일에 몰아넣지 않고 `index.js`, `ui.js`, `constants.js`, `config.json`, `style.css` 등 여러 파일로 분할 작성 지원
+  - Vite나 esbuild 등 외부 번들러 빌드 없이 순수 ES Module 상대 경로 `import`(`import ... from './ui.js'`)를 런타임에서 자동으로 해석 및 위상 정렬 기반 인메모리 링크
+  - `.json` 데이터 모듈 및 `.css` 스타일 모듈(플러그인 로드 시 자동 DOM 주입, 언로드 시 자동 정리) 지원
+  - 데스크톱(Tauri 파일 재귀 탐색) 및 웹(localStorage 파일 영속화) 환경 모두 완전 지원
+  - 플러그인 엔트리 스크립트로 `index.js` 표준 인식 (`plugin.json`의 `main` 필드 또는 `index.js` -> `plugin.js` -> `main.js` 우선순위 자동 탐색)
 
 ### 기능 개선
-
-### 버그 수정
+- 플러그인 관리 패널 UI 패딩 정규화: 플러그인 항목들을 접었을 때와 펼쳤을 때 내부 패딩이 동일한 기준선에 맞춰지도록 개선하여 시각적 어색함 해소
+- 플러그인 개발 가이드 및 API 레퍼런스(`docs/PLUGIN_API.md`, `docs/AGENTS.md`, `migoto-studio.wiki`) 최신화: 다중 파일 구조 및 가상 모듈 링커 명세 반영
 
 ---
 

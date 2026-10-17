@@ -278,6 +278,76 @@ export default {
 
 ---
 
+### 템플릿 C: 다중 파일 모듈 분할 플러그인 (UI, 상수, 스타일 분리 - 번들러 불필요)
+
+Migoto Studio는 내장 가상 모듈 링커를 제공하므로, Vite나 esbuild 없이 순수 JS/ESM 문법으로 코드를 여러 파일로 분할할 수 있습니다.
+
+```
+my-advanced-plugin/
+├── plugin.json
+├── index.js      # 엔트리 포인트
+├── ui.js         # UI 빌더 로직
+├── constants.js  # 상수 정의
+├── config.json   # JSON 설정값
+└── style.css     # 전용 스타일시트
+```
+
+```javascript
+// constants.js
+export const DEFAULT_KEY = 'VK_F4';
+export const DEFAULT_TYPE = 'cycle';
+```
+
+```javascript
+// ui.js
+import { DEFAULT_KEY, DEFAULT_TYPE } from './constants.js';
+import config from './config.json';
+import './style.css'; // 플러그인 활성화 시 DOM에 자동 주입
+
+export function openWizard(context) {
+  context.ui.openFormTab({
+    id: 'advanced-wizard-tab',
+    title: '고급 모드 마법사',
+    icon: '🧩',
+    config: {
+      title: '다중 모듈 토글 키 설정',
+      description: `버전: ${config.version || '1.0.0'}`,
+      fields: [
+        { id: 'section', label: '섹션명', type: 'text', default: 'KeyToggleOutfit', required: true },
+        { id: 'key', label: '단축키', type: 'key', default: DEFAULT_KEY, required: true },
+        { id: 'type', label: '모드', type: 'select', default: DEFAULT_TYPE, options: ['cycle', 'hold'] },
+      ],
+      onSubmit: (values) => {
+        context.ini.upsertSection(values.section, {
+          key: values.key,
+          type: values.type,
+        });
+        context.ui.showToast(`[${values.section}] 섹션이 반영되었습니다!`, 'info');
+      },
+    },
+  });
+}
+```
+
+```javascript
+// index.js
+import { openWizard } from './ui.js';
+
+export default {
+  activate(context) {
+    context.ui.registerMenuItem({
+      label: '고급 모드 마법사 열기',
+      shortcut: 'Ctrl+Shift+Z',
+      action: () => openWizard(context),
+    });
+    context.ui.showToast(`${context.manifest.name} 활성화됨`, 'info');
+  },
+  deactivate() {}
+};
+```
+
+---
+
 ## 6. AI 생성 시 자주 발생하는 오류와 방지책
 
 | 자주 발생하는 실수 | 올바른 접근법 |
@@ -288,3 +358,5 @@ export default {
 | 사이드바 좁은 공간에 거대한 양식 밀어넣음 | `context.ui.openFormTab`으로 넓은 에디터 탭 생성 |
 | 단축키를 일반 텍스트 입력창으로 처리 | `{ id: 'key', type: 'key' }` 필드로 실시간 키 감지 지원 |
 | `document.getElementById` 전역 검색 | 컨테이너 스코프 내부 검색(`container.querySelector`) |
+| 코드가 길어졌을 때 단일 파일에 억지로 우겨넣음 | `index.js`, `ui.js`, `constants.js`, `style.css` 등으로 분할하여 상대 경로 `import` 사용 |
+| Vite/webpack/esbuild 번들러 설정 생성 시도 | 에디터 코어 가상 모듈 링커가 런타임에 자동 해석하므로 번들러 불필요 (순수 ESM 작성) |

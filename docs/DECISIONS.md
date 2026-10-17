@@ -117,6 +117,18 @@
     - 좌측 액티비티 바 4번째 탭 `act-plugins` (`Ctrl+Shift+X`).
     - 상단 서브 탭(관리 목록 / 각 활성화된 플러그인의 전용 UI 뷰) 전환 및 토글 스위치 제공.
 
+### 가상 모듈 링커 기반 다중 파일 플러그인 지원 (Native Multi-File Plugins via Virtual Module Linker) (완료)
+- **배경 및 요구사항**:
+  - 플러그인의 기능이 복잡해질수록 전체 코드를 단일 `index.js`에 몰아넣는 방식은 가독성과 유지보수성을 심각하게 저하시킨다.
+  - 외부 번들러(Vite, esbuild, webpack)를 필수로 요구하면 플러그인 개발 진입장벽이 지나치게 높아지고, 웹 및 배포판 환경에서 동적 로드 시 설정 복잡성이 급증한다.
+- **아키텍처 결정**:
+  - 코어 에디터 내부에 순수 인메모리 **가상 모듈 링커(`src/plugins/module-linker.ts`)**를 구현.
+  - 플러그인 개발자는 번들러 빌드 없이 표준 순수 ES 모듈(ESM) 문법(`import { helper } from './ui.js'`)으로 자유롭게 파일을 분할 작성.
+  - 런타임에 상대 경로 의존성 그래프를 분석하여 **위상 정렬(Topological Sort)** 기반으로 인메모리 Blob URL을 합성하고 상대 specifier를 자동 리라이팅.
+  - `.json` 모듈(export default) 및 `.css` 스타일 모듈(`document.head` 자동 주입) 지원.
+  - 플러그인 수명주기(`dispose`)와 연동하여 플러그인 비활성화/삭제 시 모든 Blob URL을 즉시 해제(`revokeObjectURL`)하고 주입된 스타일을 제거하여 메모리 누수를 원천 방지.
+  - 백엔드(Rust `list_disk_plugins` 하위 파일 재귀 스캔) 및 웹 스토리지(`localStorage` 파일 맵 영속화) 완벽 대응.
+
 
 ## 배포 방식 (설치형 + 웹, 둘 다 지원)
 
