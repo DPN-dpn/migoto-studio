@@ -36,6 +36,15 @@ import {
   formatKeyBinding,
   VK_KEY_LIST,
 } from '../core/ini/keys';
+import { openRestore } from '../ui/modals/restore-ui';
+import { openConfirmModal, openPromptModal, type ConfirmOptions, type PromptOptions } from '../ui/modals/confirm-ui';
+import {
+  searchInText,
+  buildSearchRegex,
+  matchesPattern,
+  BINARY_EXTENSIONS as SEARCH_BINARY_EXTENSIONS,
+} from '../core/workspace/search';
+import { extractSymbols } from '../core/ini/symbols';
 import type {
   CustomDefinitionProvider,
   CustomLintRule,
@@ -52,6 +61,11 @@ import type {
   SymbolLocation,
   FormConfig,
   FormInstance,
+  PluginDiffOptions,
+  PluginTabInfo,
+  WorkspaceSearchOptions,
+  WorkspaceSearchResult,
+  IniSymbolsResult,
 } from './types';
 import { createUIBuilder } from './ui-builder';
 
@@ -1178,6 +1192,106 @@ export default {
           callbacks.onRegisterCleanup(unlisten);
           return unlisten;
         },
+        search: async (query: string, options?: WorkspaceSearchOptions): Promise<WorkspaceSearchResult[]> => {
+          if (!query) return [];
+          const regex = buildSearchRegex(query, {
+            matchCase: options?.caseSensitive,
+            wholeWord: options?.wholeWord,
+            isRegex: options?.isRegex,
+          });
+
+          const results: WorkspaceSearchResult[] = [];
+          const scannedTabFileIds = new Set<string>();
+          const scannedNames = new Set<string>();
+
+          // 1. Search Open Tabs
+          for (const tab of this.doc.allTabs) {
+            const tabName = tab.title || '이름 없음';
+            if (tab.file?.id) scannedTabFileIds.add(tab.file.id);
+            scannedNames.add(tabName.toLowerCase());
+
+            const displayPath = tab.file?.location || tab.file?.id || tabName;
+            if (options?.includePatterns && !options.includePatterns.some((p) => matchesPattern(displayPath, p) || matchesPattern(tabName, p))) continue;
+            if (options?.excludePatterns && options.excludePatterns.some((p) => matchesPattern(displayPath, p) || matchesPattern(tabName, p))) continue;
+
+            const text = tab.model.getValue();
+            const matches = searchInText(text, regex);
+            for (const m of matches) {
+              results.push({
+                filePath: displayPath,
+                fileName: tabName,
+                line: m.lineNumber,
+                column: m.startColumn,
+                lineContent: m.lineContent,
+                matchedText: m.matchedText,
+              });
+            }
+          }
+
+          // 2. Search Explorer files
+          if (this.explorer && this.explorer.hasFolder) {
+            const allFiles = this.explorer.getAllFiles();
+            for (const fileInfo of allFiles) {
+              if (fileInfo.fileRef.id && scannedTabFileIds.has(fileInfo.fileRef.id)) continue;
+              if (scannedNames.has(fileInfo.name.toLowerCase())) {
+                const isOpen = this.doc.allTabs.some(
+                  (t) => t.file?.id === fileInfo.fileRef.id || t.title === fileInfo.name || t.file?.name === fileInfo.name,
+                );
+                if (isOpen) continue;
+              }
+
+              const ext = fileInfo.relPath.split('.').pop()?.toLowerCase() ?? '';
+              if (SEARCH_BINARY_EXTENSIONS.has(ext)) continue;
+
+              if (options?.includePatterns && !options.includePatterns.some((p) => matchesPattern(fileInfo.relPath, p) || matchesPattern(fileInfo.name, p))) continue;
+              if (options?.excludePatterns && options.excludePatterns.some((p) => matchesPattern(fileInfo.relPath, p) || matchesPattern(fileInfo.name, p))) continue;
+
+              try {
+                const loaded = await platform().readFile(fileInfo.fileRef);
+                if (!loaded || typeof loaded.text !== 'string') continue;
+                const matches = searchInText(loaded.text, regex);
+                for (const m of matches) {
+                  results.push({
+                    filePath: fileInfo.relPath,
+                    fileName: fileInfo.name,
+                    line: m.lineNumber,
+                    column: m.startColumn,
+                    lineContent: m.lineContent,
+                    matchedText: m.matchedText,
+                  });
+                }
+              } catch {}
+            }
+          }
+
+          return results;
+        },
+        createBackup: async (filePath?: string, label?: string): Promise<string | null> => {
+          const ref = filePath
+            ? (this.explorer && this.explorer.hasFolder ? this.explorer.getFileRef(filePath) : null) ?? platform().refFromId(filePath)
+            : this.doc.file;
+          if (!ref) return null;
+          if (platform().createBackup) {
+            return await platform().createBackup!(ref, label);
+          }
+          return null;
+        },
+        getOpenTabs: (): PluginTabInfo[] => {
+          return this.doc.allTabs.map((t) => ({
+            id: t.id,
+            title: t.title,
+            path: t.file?.id ?? null,
+            isDirty: this.doc.isTabDirty(t),
+            kind: t.kind,
+            isActive: t.id === this.doc.activeTab.id,
+          }));
+        },
+        closeTab: async (tabId: string): Promise<boolean> => {
+          return await this.doc.closeTab(tabId);
+        },
+        focusTab: (tabId: string): void => {
+          this.doc.switchTab(tabId);
+        },
       },
 
       linter: {
@@ -1348,6 +1462,25 @@ export default {
           }
           return res.deleted;
         },
+        extractSymbols: (text?: string): IniSymbolsResult => {
+          const rawText = text !== undefined ? text : this.editor.getValue();
+          const lines = rawText.split('\n');
+          const modelLike = {
+            getLineCount: () => lines.length,
+            getLineContent: (n: number) => lines[n - 1] ?? '',
+          };
+          const syms = extractSymbols(modelLike);
+          const variables: Record<string, string> = {};
+          syms.variables.forEach((v, k) => {
+            variables[k] = v;
+          });
+          return {
+            variables,
+            resources: syms.resources,
+            commandLists: syms.commandLists,
+            sections: syms.sections,
+          };
+        },
       },
 
       ui: {
@@ -1484,6 +1617,38 @@ export default {
           callbacks.onRegisterCleanup(unregister);
           return unregister;
         },
+        openDiffTab: (options: PluginDiffOptions) => {
+          const diffTab = this.doc.openDiffTab({
+            title: options.title,
+            originalTitle: options.originalTitle,
+            modifiedTitle: options.modifiedTitle,
+            originalText: options.originalText,
+            modifiedText: options.modifiedText,
+            languageId: options.languageId,
+          });
+
+          const close = () => {
+            this.doc.closeTab(diffTab.id);
+          };
+          const focus = () => {
+            this.doc.switchTab(diffTab.id);
+          };
+
+          const cleanup = () => {
+            close();
+          };
+          callbacks.onRegisterCleanup(cleanup);
+
+          return { id: diffTab.id, close, focus };
+        },
+        openRestoreModal: (filePath?: string) => {
+          const ref = filePath
+            ? (this.explorer && this.explorer.hasFolder ? this.explorer.getFileRef(filePath) : null) ?? platform().refFromId(filePath)
+            : null;
+          openRestore(this.doc, ref);
+        },
+        confirm: (options: ConfirmOptions) => openConfirmModal(options),
+        prompt: (options: PromptOptions) => openPromptModal(options),
       },
 
       system: {

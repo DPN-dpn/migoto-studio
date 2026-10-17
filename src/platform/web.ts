@@ -537,6 +537,30 @@ export const web: Platform = {
     }
   },
 
+  async createBackup(ref: FileRef, label?: string): Promise<string | null> {
+    try {
+      const loaded = await this.readFile(ref);
+      const db = await openDb();
+      const backupId = `backup_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+      return new Promise<string | null>((resolve) => {
+        const tx = db.transaction('backups', 'readwrite');
+        const store = tx.objectStore('backups');
+        const req = store.add({
+          id: backupId,
+          fileId: ref.name,
+          text: loaded.text,
+          timestamp: Date.now(),
+          size: loaded.text.length,
+          label: label || undefined,
+        });
+        req.onsuccess = () => resolve(backupId);
+        req.onerror = () => resolve(null);
+      });
+    } catch {
+      return null;
+    }
+  },
+
   async loadSettingsText(): Promise<string> {
     return localStorage.getItem('migoto_studio_settings') || '';
   },

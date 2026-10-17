@@ -1061,5 +1061,206 @@ test('Plugin UI API and INI API provide toggle key and key binding helpers', () 
   assert.ok(invoked);
 });
 
+test('Plugin UI API confirm and prompt dialog contracts work as expected', async () => {
+  let confirmCalled = false;
+  let promptCalled = false;
+
+  const plugin = definePlugin({
+    async activate(context) {
+      const confirmRes = await context.ui.confirm({
+        title: '삭제 확인',
+        message: '정말 삭제하시겠습니까?',
+        variant: 'danger',
+      });
+      assert.equal(confirmRes, true);
+
+      const promptRes = await context.ui.prompt({
+        title: '이름 변경',
+        message: '새로운 이름을 입력하세요:',
+        defaultValue: 'ModNew',
+      });
+      assert.equal(promptRes, 'ModNew');
+    },
+  });
+
+  await plugin.activate({
+    ui: {
+      confirm: async (opts: any) => {
+        confirmCalled = true;
+        return true;
+      },
+      prompt: async (opts: any) => {
+        promptCalled = true;
+        return typeof opts === 'string' ? 'test' : opts.defaultValue ?? '';
+      },
+    },
+  } as any);
+
+  assert.ok(confirmCalled);
+  assert.ok(promptCalled);
+});
+
+test('Plugin Workspace and Tab APIs contract supports search, tabs control and backups', async () => {
+  let searchCalled = false;
+  let backupCalled = false;
+  let closeTabCalled = false;
+  let focusTabCalled = false;
+
+  const plugin = definePlugin({
+    async activate(context) {
+      // 1. Tab control
+      const tabs = context.workspace.getOpenTabs();
+      assert.equal(tabs.length, 2);
+      assert.equal(tabs[0].title, 'main.ini');
+      assert.equal(tabs[0].isActive, true);
+
+      await context.workspace.focusTab('tab_2');
+      assert.ok(focusTabCalled);
+
+      const closed = await context.workspace.closeTab('tab_2');
+      assert.equal(closed, true);
+      assert.ok(closeTabCalled);
+
+      // 2. Search
+      const searchResults = await context.workspace.search('swapvar', { caseSensitive: true });
+      assert.equal(searchResults.length, 1);
+      assert.equal(searchResults[0].filePath, 'main.ini');
+      assert.equal(searchResults[0].line, 10);
+      assert.equal(searchResults[0].matchedText, 'swapvar');
+
+      // 3. Backup
+      const backupId = await context.workspace.createBackup('main.ini', 'before-edit');
+      assert.equal(backupId, 'backup_12345');
+      assert.ok(backupCalled);
+    },
+  });
+
+  await plugin.activate({
+    workspace: {
+      getOpenTabs: () => [
+        { id: 'tab_1', title: 'main.ini', path: 'd:/mods/main.ini', isDirty: false, kind: 'text', isActive: true },
+        { id: 'tab_2', title: 'sub.ini', path: 'd:/mods/sub.ini', isDirty: true, kind: 'text', isActive: false },
+      ],
+      focusTab: (id: string) => {
+        focusTabCalled = true;
+      },
+      closeTab: async (id: string) => {
+        closeTabCalled = true;
+        return true;
+      },
+      search: async (query: string, opts?: any) => {
+        searchCalled = true;
+        return [
+          { filePath: 'main.ini', fileName: 'main.ini', line: 10, column: 5, lineContent: '$swapvar = 1', matchedText: query },
+        ];
+      },
+      createBackup: async (path?: string, label?: string) => {
+        backupCalled = true;
+        return 'backup_12345';
+      },
+    },
+  } as any);
+
+  assert.ok(searchCalled);
+});
+
+test('Plugin INI API extractSymbols parses symbols cleanly', () => {
+  const sampleIni = `
+[Constants]
+global persist $swapvar = 0
+$skin = 1
+
+[KeyToggleDress]
+key = VK_F1
+type = cycle
+$dress = 0, 1
+
+[ResourceTexture]
+filename = Tex.dds
+
+[CommandListTest]
+run = CommandListOther
+`;
+
+  const lines = sampleIni.split('\n');
+  const modelLike = {
+    getLineCount: () => lines.length,
+    getLineContent: (n: number) => lines[n - 1] ?? '',
+  };
+
+  const plugin = definePlugin({
+    activate(context) {
+      const symbols = context.ini.extractSymbols(sampleIni);
+      assert.ok(symbols.variables['swapvar']);
+      assert.ok(symbols.variables['skin']);
+      assert.ok(symbols.variables['dress']);
+      assert.ok(symbols.resources.includes('ResourceTexture'));
+      assert.ok(symbols.commandLists.includes('CommandListTest'));
+      assert.ok(symbols.sections.includes('KeyToggleDress'));
+    },
+  });
+
+  plugin.activate({
+    ini: {
+      extractSymbols: (text?: string) => {
+        return {
+          variables: {
+            swapvar: '0',
+            skin: '1',
+            dress: '0, 1',
+          },
+          resources: ['ResourceTexture'],
+          commandLists: ['CommandListTest'],
+          sections: ['Constants', 'KeyToggleDress', 'ResourceTexture', 'CommandListTest'],
+        };
+      },
+    },
+  } as any);
+});
+
+test('Plugin UI API openDiffTab and openRestoreModal contracts work as expected', () => {
+  let diffOpened = false;
+  let restoreOpened = false;
+
+  const plugin = definePlugin({
+    activate(context) {
+      const diffTab = context.ui.openDiffTab({
+        title: '수정 전 ↔ 수정 후',
+        originalTitle: '원본',
+        modifiedTitle: '수정본',
+        originalText: 'a = 1',
+        modifiedText: 'a = 2',
+      });
+
+      assert.equal(diffTab.id, 'diff_tab_1');
+      diffTab.focus();
+      diffTab.close();
+
+      context.ui.openRestoreModal('main.ini');
+      assert.ok(restoreOpened);
+    },
+  });
+
+  plugin.activate({
+    ui: {
+      openDiffTab: (opts: any) => {
+        diffOpened = true;
+        return {
+          id: 'diff_tab_1',
+          focus: () => {},
+          close: () => {},
+        };
+      },
+      openRestoreModal: (filePath?: string) => {
+        restoreOpened = true;
+      },
+    },
+  } as any);
+
+  assert.ok(diffOpened);
+  assert.ok(restoreOpened);
+});
+
+
 
 

@@ -72,6 +72,7 @@ export interface Platform {
   listBackups(ref: FileRef): Promise<BackupEntry[]>;
   readBackup(entry: BackupEntry): Promise<string>;
   pruneBackups(policy: Pick<BackupPolicy, 'keepDays' | 'maxPerFile'>): Promise<void>;
+  createBackup?(ref: FileRef, label?: string): Promise<string | null>;
 
   // ---- user data ----
   /** Raw settings JSON, empty string if none saved yet. */

@@ -1,16 +1,18 @@
 import { openModal } from './modal';
-import { platform } from '../../platform';
+import { platform, type FileRef } from '../../platform';
 import type { DocumentManager } from '../../core/workspace/documents';
 
 const fmtSize = (n: number) => (n < 1024 ? `${n} B` : `${(n / 1024).toFixed(1)} KB`);
 
 /** Lists the automatic backups of the current file; restoring loads one into the editor (undoable, not saved yet). */
-export async function openRestore(doc: DocumentManager) {
-  if (!doc.file) {
+export async function openRestore(doc: DocumentManager, targetRef?: FileRef | null) {
+  const file = targetRef ?? doc.file;
+  if (!file) {
     await platform().showInfo('백업에서 복원', '먼저 파일을 열거나 저장해야 백업을 볼 수 있습니다.');
     return;
   }
-  const backups = await platform().listBackups(doc.file);
+  const backups = await platform().listBackups(file);
+  const targetName = file.name || doc.fileName;
 
   const body = document.createElement('div');
   body.className = 'restore';
@@ -18,8 +20,8 @@ export async function openRestore(doc: DocumentManager) {
   const intro = document.createElement('p');
   intro.className = 'hint';
   intro.textContent = backups.length
-    ? `"${doc.fileName}"의 이전 저장본입니다. 복원하면 에디터에 불러오며, 저장하기 전에는 파일이 바뀌지 않습니다. (Ctrl+Z로 되돌릴 수 있습니다)`
-    : `"${doc.fileName}"의 백업이 아직 없습니다. 파일을 저장하면 이전 내용이 자동으로 보관됩니다.`;
+    ? `"${targetName}"의 이전 저장본입니다. 복원하면 에디터에 불러오며, 저장하기 전에는 파일이 바뀌지 않습니다. (Ctrl+Z로 되돌릴 수 있습니다)`
+    : `"${targetName}"의 백업이 아직 없습니다. 파일을 저장하면 이전 내용이 자동으로 보관됩니다.`;
   body.append(intro);
 
   const close = openModal('백업에서 복원', body);

@@ -116,6 +116,17 @@ pub fn list_backups(path: String) -> Vec<BackupInfo> {
   list
 }
 
+#[tauri::command]
+pub fn create_backup(path: String) -> Result<String, String> {
+  let p = Path::new(&path);
+  if !p.exists() {
+    return Err(format!("파일이 존재하지 않습니다: {path}"));
+  }
+  create(p, 30, 20)?;
+  let backups = list_backups(path);
+  Ok(backups.first().map(|b| b.path.clone()).unwrap_or_default())
+}
+
 #[cfg(test)]
 mod tests {
   use super::*;

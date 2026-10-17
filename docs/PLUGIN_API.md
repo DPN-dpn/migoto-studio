@@ -164,12 +164,95 @@ const unregister = context.ui.registerMenuItem({
 
 ---
 
-### 3.6 UI 빌더 헬퍼 함수 (`context.ui.*`)
+### 3.3 대화형 확인 대화상자 (`context.ui.confirm`)
+
+플러그인에서 위험 작업(파일 삭제, 대량 변경 등)을 수행하기 전 사용자에게 확인을 요청하는 모달 대화상자입니다.
+
+```typescript
+// 1. 단순 문자열 호출
+const ok = await context.ui.confirm('이 섹션을 정말 삭제하시겠습니까?');
+
+// 2. 제목, 버튼 문구, 위험 스타일 지정
+const confirmed = await context.ui.confirm({
+  title: '모드 프리셋 초기화',
+  message: '모든 커스텀 설정이 기본값으로 초기화됩니다.\n계속 진행하시겠습니까?',
+  confirmText: '초기화 실행',
+  cancelText: '취소',
+  variant: 'danger', // 'danger' | 'primary' (빨간색 강조)
+});
+
+if (confirmed) {
+  // 사용자가 확인을 누름
+}
+```
+
+---
+
+### 3.4 텍스트 입력 프롬프트 (`context.ui.prompt`)
+
+사용자에게 텍스트 입력을 비동기로 요청하는 입력 대화상자입니다. 취소하거나 창을 닫으면 `null`을 반환합니다.
+
+```typescript
+// 1. 단순 프롬프트
+const name = await context.ui.prompt('생성할 새 섹션 이름을 입력하세요:');
+
+// 2. 기본값 및 placeholder 지정
+const varName = await context.ui.prompt({
+  title: '새 토글 변수 추가',
+  message: '등록할 전역 변수명을 입력하세요 ($ 접두사 포함):',
+  placeholder: '$my_variable',
+  defaultValue: '$outfit_state',
+  confirmText: '변수 생성',
+});
+
+if (varName !== null) {
+  console.log('입력된 변수명:', varName);
+}
+```
+
+---
+
+### 3.5 Monaco 기반 Diff 비교 탭 열기 (`context.ui.openDiffTab`)
+
+두 텍스트 간의 차이점을 나란히(Side-by-Side) 비교하고 인라인 차이점을 시각적으로 검토할 수 있는 메인 Diff 탭을 생성합니다.
+
+```typescript
+const diffTab = context.ui.openDiffTab({
+  title: '모드 변경 전후 비교',
+  originalTitle: '현재 INI 파일',
+  modifiedTitle: 'AI 자동 수정본',
+  originalText: currentText,
+  modifiedText: newText,
+  languageId: 'migoto', // 기본값: 'migoto' (3DMigoto 문법 하이라이팅 적용)
+});
+
+// 프로그래밍 방식으로 탭 제어 가능
+// diffTab.focus();
+// diffTab.close();
+```
+
+---
+
+### 3.6 백업 복원 및 Diff 비교 모달 열기 (`context.ui.openRestoreModal`)
+
+지정된 파일(또는 현재 활성 파일)의 자동 보관 백업 목록을 띄우고, 각 백업과의 즉시 Diff 비교 및 되돌리기(Undo 가능한 안전 복원) 기능을 제공합니다.
+
+```typescript
+// 현재 활성 파일의 백업 목록 열기
+context.ui.openRestoreModal();
+
+// 특정 경로 파일의 백업 목록 열기
+context.ui.openRestoreModal('d:/mods/Character/merged.ini');
+```
+
+---
+
+### 3.7 UI 빌더 헬퍼 함수 (`context.ui.*`)
 
 빠르고 일관된 테마 디자인을 위해 내장 컴포넌트 팩토리 메서드를 제공합니다.
 
 - `context.ui.createForm(config)`: 고수준 선언형 폼 컴포넌트 생성 (`getValues()`, `setValues()`, `reset()`)
-- `context.ui.createKeyInput(options)`: 3DMigoto 전용 키 캡처 입력기 위젯
+- `context.ui.createKeyInput(options)`: 3DMigoto 전용 키 캡처 입력기 위젯 ([키 감지] 및 [키 도우미] 버튼 내장)
 - `context.ui.createCard(options)`: 헤더/설명/액션 버튼이 포함된 스타일 카드
 - `context.ui.createButton(options)`: 일관된 스타일의 버튼 생성
 - `context.ui.createInput(options)`: 텍스트 입력 필드
@@ -180,7 +263,7 @@ const unregister = context.ui.registerMenuItem({
 
 ---
 
-### 3.7 키 바인딩 설정 모달 대화상자 (`context.ui.openKeyBindingModal`)
+### 3.8 키 바인딩 설정 모달 대화상자 (`context.ui.openKeyBindingModal`)
 
 3DMigoto 전용 키 입력 도우미 모달 대화상자를 호출하여 실시간 키보드 입력 감지, 필수/부정 수식키(`ctrl`, `no_ctrl`, `alt`, `no_alt` 등) 조합 및 전체 가상 키 목록 검색/선택을 제공합니다.
 사용자가 [확인]을 누르면 선택된 3DMigoto 단축키 문자열을 반환하고, 취소 시 `null`을 반환합니다.
@@ -260,7 +343,16 @@ const keySec = context.ini.findSection(/^Key/i); // 정규식 또는 문자열�
 // 8. 문서 내 선언된 모든 변수 목록 가져오기
 const variables = context.ini.getVariables(); // { "$hair": "0", "$active": "1" }
 
-// 9. 원본 파싱 및 수동 병합
+// 9. INI 심볼(변수, 리소스, CommandList, 섹션) 고속 구조 분석
+const symbols = context.ini.extractSymbols();
+// {
+//   variables: { "swapvar": "초기값: 0", "skin": "[Constants] 초기값: 1" },
+//   resources: ["ResourceTextureBody", "ResourceBuffer"],
+//   commandLists: ["CommandListSwap"],
+//   sections: ["Constants", "KeyToggleDress", ...]
+// }
+
+// 10. 원본 파싱 및 수동 병합
 const doc = context.ini.parse();
 const kind = context.ini.classifySection('TextureOverrideBody');
 const merged = context.ini.merge(currentTargetText, newSectionText, { appendNew: true });
@@ -296,6 +388,26 @@ await context.workspace.writeBinaryFile('d:/mods/character/output.bin', new Uint
 // 디렉토리 목록 읽기
 const entries = await context.workspace.readDirectory(folder);
 // entries: Array of { name, isDirectory, isFile, path }
+
+// 워크스페이스 전역 텍스트 검색 (열린 탭 + 미열린 모드 폴더 파일 통합 검색)
+const matches = await context.workspace.search('CommandList', {
+  caseSensitive: false,
+  wholeWord: true,
+  isRegex: false,
+  includePatterns: ['*.ini'], // 특정 파일 필터
+});
+// matches: Array of { filePath, fileName, line, column, lineContent, matchedText }
+
+// 안전 파일 백업 생성 (수정 전 안전 사본 보관)
+const backupPath = await context.workspace.createBackup(); // 현재 파일 백업
+// await context.workspace.createBackup('d:/mods/character/mod.ini', 'v1-작업전');
+
+// 열려 있는 탭 목록 조회 및 전환/닫기 제어
+const openTabs = context.workspace.getOpenTabs();
+// [ { id: 'tab_1', title: 'mod.ini', path: '...', isDirty: false, kind: 'text', isActive: true }, ... ]
+
+context.workspace.focusTab('tab_1'); // 해당 탭 활성화
+await context.workspace.closeTab('tab_1'); // 해당 탭 닫기 (미저장 변경 시 사용자에게 확인)
 
 // 파일 활성화 변경 감지
 const unlisten = context.workspace.onDidChangeActiveFile((file) => {

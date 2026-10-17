@@ -100,6 +100,15 @@ export const desktop: Platform = {
     await invoke('cleanup_backups', { keepDays: policy.keepDays, maxPerFile: policy.maxPerFile });
   },
 
+  async createBackup(ref, label) {
+    try {
+      const res = await invoke<string>('create_backup', { path: ref.id });
+      return res || null;
+    } catch {
+      return null;
+    }
+  },
+
   loadSettingsText: () => invoke<string>('load_settings'),
   saveSettingsText: (json) => invoke('save_settings', { json }),
   loadTemplatesText: () => invoke<string>('load_templates'),

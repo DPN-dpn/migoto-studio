@@ -27,11 +27,54 @@ export function renderPluginIcon(icon: string | undefined | null, fallback = 'PL
   return trimmed;
 }
 
-import type { PluginUIBuilder } from './ui-builder.ts';
+import type { PluginUIBuilder, ConfirmOptions, PromptOptions } from './ui-builder.ts';
+export type { ConfirmOptions, PromptOptions };
 import type { KeyHelperModalOptions } from '../ui/modals/key-helper.ts';
 export type { KeyHelperModalOptions };
 import type { VkKeyItem, ModifierState, KeyBindingComponents } from '../core/ini/keys.ts';
 export type { VkKeyItem, ModifierState, KeyBindingComponents };
+
+export interface PluginDiffOptions {
+  title?: string;
+  originalTitle: string;
+  modifiedTitle: string;
+  originalText: string;
+  modifiedText: string;
+  languageId?: string;
+}
+
+export interface PluginTabInfo {
+  id: string;
+  title: string;
+  path: string | null;
+  isDirty: boolean;
+  kind: string;
+  isActive: boolean;
+}
+
+export interface WorkspaceSearchOptions {
+  caseSensitive?: boolean;
+  wholeWord?: boolean;
+  isRegex?: boolean;
+  includePatterns?: string[];
+  excludePatterns?: string[];
+}
+
+export interface WorkspaceSearchResult {
+  filePath: string;
+  fileName: string;
+  line: number;
+  column: number;
+  lineContent: string;
+  matchedText: string;
+}
+
+export interface IniSymbolsResult {
+  variables: Record<string, string>;
+  resources: string[];
+  commandLists: string[];
+  sections: string[];
+}
 
 export interface SelectOption {
   value: string;
@@ -225,6 +268,11 @@ export interface PluginContext {
     pickFile(options?: { extensions?: string[]; title?: string }): Promise<string | null>;
     showInFolder(path: string): Promise<void>;
     onDidChangeActiveFile(listener: (file: { name: string; path: string; location: string } | null) => void): () => void;
+    search(query: string, options?: WorkspaceSearchOptions): Promise<WorkspaceSearchResult[]>;
+    createBackup(filePath?: string, label?: string): Promise<string | null>;
+    getOpenTabs(): PluginTabInfo[];
+    closeTab(tabId: string): Promise<boolean>;
+    focusTab(tabId: string): void;
   };
 
   // ---- Linter & Diagnostics ----
@@ -278,6 +326,7 @@ export interface PluginContext {
     getVariables(text?: string): Record<string, string>;
     upsertSection(name: string, properties: Record<string, string>, options?: { comments?: string[]; variables?: Record<string, string>; replaceExisting?: boolean }): void;
     deleteSection(name: string): boolean;
+    extractSymbols(text?: string): IniSymbolsResult;
   };
 
   // ---- UI integration ----
@@ -320,8 +369,12 @@ export interface PluginContext {
       shortcut?: string;
       action: () => void;
     }): () => void;
+    openDiffTab(options: PluginDiffOptions): { id: string; close: () => void; focus: () => void };
+    openRestoreModal(filePath?: string): void;
     openKeyBindingModal(options?: KeyHelperModalOptions): Promise<string | null>;
     openKeyHelperModal(options?: KeyHelperModalOptions): Promise<string | null>;
+    confirm(options: ConfirmOptions): Promise<boolean>;
+    prompt(options: PromptOptions): Promise<string | null>;
   } & PluginUIBuilder;
 
   // ---- System execution (desktop) ----

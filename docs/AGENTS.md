@@ -20,11 +20,15 @@
 3. UI 작업 시:
    - 넓은 공간이 필요한 도구/위젯은 `context.ui.openFormTab` 또는 `context.ui.openTab`을 사용하세요.
    - 상단 툴바 메뉴 등록은 `context.ui.registerMenuItem`을 사용하세요.
-   - 토글키/단축키 입력 필드가 필요할 때는 `type: 'key'` 필드를 사용하면 에디터 자체 실시간 키 감지 위젯이 자동 바인딩됩니다.
+   - 사용자 확인이 필요할 때는 `context.ui.confirm` 및 `context.ui.prompt` 비동기 모달을 사용하세요.
+   - 텍스트 변경점 비교 시 `context.ui.openDiffTab`을 열고, 백업 복원 시 `context.ui.openRestoreModal`을 활용하세요.
+   - 토글키/단축키 입력 필드가 필요할 때는 `type: 'key'` 필드를 사용하면 에디터 자체 실시간 키 감지 위젯이 자동 바인딩되며, 모달 창이 필요할 때는 `context.ui.openKeyBindingModal`을 호출하세요.
 4. INI 파일 조작 시:
    - 텍스트 전체를 무작위로 교체하지 말고 `context.ini.upsertSection`, `context.ini.formatKeyToggle`, `context.ini.merge`를 사용하여 기존 주석과 배치를 보존하세요.
-5. 에디터 텍스트 수정 시:
+   - 변수/리소스/섹션 구조 파악 시 `context.ini.extractSymbols`를 사용하세요.
+5. 에디터 텍스트 수정 및 작업영역:
    - Monaco 에디터의 실행 취소(`Ctrl+Z`) 기록을 온전히 보존하는 `context.editor.setText(text)` 또는 `context.editor.replaceSelection(text)`를 사용하세요.
+   - 워크스페이스 전역 검색은 `context.workspace.search`, 탭 제어는 `context.workspace.getOpenTabs / focusTab / closeTab`, 안전 백업은 `context.workspace.createBackup`을 활용하세요.
 
 자세한 API 명세와 선언형 폼 스키마, 템플릿은 아래 기술 지침을 엄격히 준수하세요.
 ```
@@ -161,7 +165,11 @@ context.ui.registerSidebarView({
 });
 ```
 
-#### 5) UI 빌더 팩토리 컴포넌트 (`context.ui.*`)
+#### 5) UI 빌더 팩토리 및 대화상자 API (`context.ui.*`)
+- `confirm(options: string | { title?, message, confirmText?, cancelText?, variant?: 'primary'|'danger' })`: 확인/취소 대화상자 (`Promise<boolean>`)
+- `prompt(options: string | { title?, message, placeholder?, defaultValue?, confirmText?, cancelText? })`: 텍스트 입력 프롬프트 (`Promise<string | null>`)
+- `openDiffTab({ title?, originalTitle, modifiedTitle, originalText, modifiedText, languageId? })`: Monaco 기반 Diff 비교 탭 열기 (`{ id, close(), focus() }` 반환)
+- `openRestoreModal(filePath?)`: 자동 보관 백업 목록 및 Diff 비교/복원 모달 호출
 - `openKeyBindingModal({ title?, initialKey?, onApply? })`: 3DMigoto 단축키 설정 대화상자를 비동기(`Promise<string | null>`)로 호출 (실시간 키 캡처, 수식키 조합, 가상키 목록 검색 제공)
 - `openKeyHelperModal(options)`: `openKeyBindingModal`의 별칭
 - `createKeyInput({ label?, value?, description?, onChange? })`: 실시간 키 캡처 및 [키 도우미] 모달 버튼이 포함된 단축키 입력 필드
@@ -220,10 +228,14 @@ const sections = context.ini.getSections(); // ['Constants', 'KeyToggleDress', .
 // 8. 문서 내 선언된 모든 $변수 목록 조회
 const vars = context.ini.getVariables(); // { "$dress": "0", "$active": "1" }
 
-// 9. 전체 구조 파싱
+// 9. INI 심볼(변수, 리소스, CommandList, 섹션) 구조 분석
+const syms = context.ini.extractSymbols();
+// { variables: { "dress": "0, 1" }, resources: [...], commandLists: [...], sections: [...] }
+
+// 10. 전체 구조 파싱
 const doc = context.ini.parse(); // { preamble, sections, properties, variables }
 
-// 10. 스마트 병합
+// 11. 스마트 병합
 const result = context.ini.merge(targetText, sourceText, { replaceInPlace: true });
 ```
 
@@ -253,6 +265,11 @@ const result = context.ini.merge(targetText, sourceText, { replaceInPlace: true 
 - `readBinaryFile(path)`: 바이너리 읽기 (`Promise<Uint8Array>`)
 - `writeBinaryFile(path, bytes)`: 바이너리 쓰기 (`Promise<void>`)
 - `readDirectory(path?)`: 디렉터리 항목 목록 트리 (`Promise<DirEntry[]>`)
+- `search(query, options?)`: 워크스페이스 전역 텍스트 검색 (`Promise<WorkspaceSearchResult[]>`)
+- `createBackup(filePath?, label?)`: 안전 파일 백업 생성 (`Promise<string | null>`)
+- `getOpenTabs()`: 현재 열려 있는 탭 목록 조회 (`PluginTabInfo[]`)
+- `closeTab(tabId)`: 탭 닫기 (`Promise<boolean>`)
+- `focusTab(tabId)`: 탭 활성화 포커스
 
 ---
 

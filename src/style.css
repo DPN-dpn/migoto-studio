@@ -1297,6 +1297,10 @@ select.status-btn option { background: var(--bg-elev); color: var(--fg); }
 .modal.modal-update {
   width: min(640px, 92vw);
 }
+.modal.modal-confirm-dialog,
+.modal.modal-prompt-dialog {
+  width: min(440px, 92vw);
+}
 
 .update-release-notes,
 .markdown-body {

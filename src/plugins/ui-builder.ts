@@ -1,6 +1,8 @@
 import type { SelectOption, FormConfig, FormFieldDef, FormInstance } from './types.ts';
 import { CODE_TO_VK } from '../core/ini/keys.ts';
 import { openKeyHelperModal, type KeyHelperModalOptions } from '../ui/modals/key-helper.ts';
+import { openConfirmModal, openPromptModal, type ConfirmOptions, type PromptOptions } from '../ui/modals/confirm-ui.ts';
+export type { ConfirmOptions, PromptOptions };
 
 /**
  * 플러그인 전용 고수준 UI 빌더 API 구현체
@@ -959,6 +961,20 @@ export function createUIBuilder() {
      */
     openKeyHelperModal(options?: KeyHelperModalOptions): Promise<string | null> {
       return openKeyHelperModal(options);
+    },
+
+    /**
+     * 사용자에게 확인/취소를 묻는 비동기 대화상자를 표시합니다.
+     */
+    confirm(options: ConfirmOptions): Promise<boolean> {
+      return openConfirmModal(options);
+    },
+
+    /**
+     * 사용자에게 텍스트 입력을 받는 비동기 프롬프트 대화상자를 표시합니다.
+     */
+    prompt(options: PromptOptions): Promise<string | null> {
+      return openPromptModal(options);
     },
   };
 }
