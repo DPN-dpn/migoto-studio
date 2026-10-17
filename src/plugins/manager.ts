@@ -33,6 +33,8 @@ import type {
   PluginContext,
   PluginInstance,
   PluginManifest,
+  PluginMenuGroup,
+  PluginMenuItemDef,
   PluginTemplate,
   RegisteredSidebarView,
   SymbolLocation,
@@ -63,6 +65,7 @@ export class PluginManager {
   private customLintRules: Map<string, CustomLintRule> = new Map();
   private customDefinitionProviders: CustomDefinitionProvider[] = [];
   private customReferenceProviders: CustomReferenceProvider[] = [];
+  private pluginMenuItems: Map<string, { manifest: PluginManifest; items: PluginMenuItemDef[] }> = new Map();
   private lintTrigger?: () => void;
 
   private doc: DocumentManager;
@@ -112,6 +115,22 @@ export class PluginManager {
 
   getCustomViewer(ext: string): CustomViewerDefinition | undefined {
     return this.customViewers.get(ext.toLowerCase().replace(/^\./, ''));
+  }
+
+  getPluginMenuItems(): PluginMenuGroup[] {
+    const groups: PluginMenuGroup[] = [];
+    for (const [pluginId, group] of this.pluginMenuItems) {
+      const pluginInstance = this.plugins.get(pluginId);
+      if (pluginInstance && pluginInstance.enabled && group.items.length > 0) {
+        groups.push({
+          pluginId,
+          pluginName: group.manifest.name || pluginId,
+          icon: group.manifest.icon,
+          items: [...group.items],
+        });
+      }
+    }
+    return groups;
   }
 
   setActivityBar(ab: ActivityBar) {
@@ -1273,6 +1292,66 @@ export default {
           if (options.onClick) btn.onclick = options.onClick;
           this.statusBarEl.append(btn);
           callbacks.onRegisterStatusItem(options.id, btn);
+        },
+        openTab: (options: {
+          id: string;
+          title: string;
+          icon?: string;
+          render: (container: HTMLElement) => void | (() => void);
+        }) => {
+          const tabId = `plugin_${manifest.id}_${options.id}`;
+          this.doc.openCustomTab({
+            id: tabId,
+            title: options.title,
+            icon: options.icon ?? manifest.icon,
+            render: options.render,
+          });
+
+          const close = () => {
+            this.doc.closeTab(tabId);
+          };
+          const focus = () => {
+            this.doc.switchTab(tabId);
+          };
+
+          const cleanup = () => {
+            close();
+          };
+          callbacks.onRegisterCleanup(cleanup);
+
+          return { close, focus };
+        },
+        registerMenuItem: (options: {
+          label: string;
+          shortcut?: string;
+          action: () => void;
+        }) => {
+          const itemDef: PluginMenuItemDef = {
+            label: options.label,
+            shortcut: options.shortcut,
+            action: options.action,
+          };
+
+          let group = this.pluginMenuItems.get(manifest.id);
+          if (!group) {
+            group = { manifest, items: [] };
+            this.pluginMenuItems.set(manifest.id, group);
+          }
+          group.items.push(itemDef);
+          this.notify();
+
+          const unregister = () => {
+            const g = this.pluginMenuItems.get(manifest.id);
+            if (g) {
+              g.items = g.items.filter((it) => it !== itemDef);
+              if (g.items.length === 0) {
+                this.pluginMenuItems.delete(manifest.id);
+              }
+              this.notify();
+            }
+          };
+          callbacks.onRegisterCleanup(unregister);
+          return unregister;
         },
       },
 

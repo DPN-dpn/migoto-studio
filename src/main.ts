@@ -230,6 +230,7 @@ async function boot() {
     editor,
     explorer,
     activityBar,
+    pluginManager,
     onJumpLint: jumpNextLint,
     onGoToDefinition: () => jumpToDefinition(editor, doc),
     onFindReferences: () => showReferencesDialog(editor, doc),
@@ -378,6 +379,7 @@ async function boot() {
     else if (key === 'e' && e.shiftKey) run(() => activityBar.switchTo('explorer'));
     else if (key === 'd' && e.shiftKey) run(() => openCompareDialog(doc));
     else if (key === 'k' && e.shiftKey) run(() => openKeyHelperModal(editor));
+    else if (key === 'x' && e.shiftKey) run(() => activityBar.switchTo('plugins'));
     else if (key === 'tab') run(() => (e.shiftKey ? doc.prevTab() : doc.nextTab()));
     else if (key === 'pageup') run(() => doc.prevTab());
     else if (key === 'pagedown') run(() => doc.nextTab());

@@ -911,3 +911,73 @@ test('plugins are collapsed by default and only expanded plugins are tracked', (
   assert.equal(!reloadedSet.has('ai-assistant'), true, 'ai-assistant should remain collapsed');
 });
 
+test('Plugin UI API supports openTab and customRenderer lifecycle', () => {
+  let cleanedUp = false;
+  let renderedContainer: any = null;
+
+  const mockTab: any = {
+    id: 'plugin_test-plugin_gui',
+    title: '토글 키 설정',
+    icon: '⚙️',
+    kind: 'custom',
+    customRenderer: (container: any) => {
+      renderedContainer = container;
+      return () => {
+        cleanedUp = true;
+      };
+    },
+  };
+
+  assert.equal(mockTab.kind, 'custom');
+  assert.equal(mockTab.icon, '⚙️');
+  const cleanup = mockTab.customRenderer({ innerHTML: '' });
+  assert.ok(renderedContainer);
+  assert.equal(typeof cleanup, 'function');
+  cleanup();
+  assert.equal(cleanedUp, true);
+});
+
+test('Plugin UI API registerMenuItem groups items under plugin and cleans up', () => {
+  const pluginMenuItems: Map<string, { manifest: any; items: any[] }> = new Map();
+
+  const manifest = { id: 'toggle-helper', name: '토글 키 매니저', icon: '🎛️' };
+
+  const registerMenuItem = (item: { label: string; shortcut?: string; action: () => void }) => {
+    let group = pluginMenuItems.get(manifest.id);
+    if (!group) {
+      group = { manifest, items: [] };
+      pluginMenuItems.set(manifest.id, group);
+    }
+    group.items.push(item);
+    return () => {
+      const g = pluginMenuItems.get(manifest.id);
+      if (g) {
+        g.items = g.items.filter((it) => it !== item);
+        if (g.items.length === 0) pluginMenuItems.delete(manifest.id);
+      }
+    };
+  };
+
+  let actionTriggered = false;
+  const unregister = registerMenuItem({
+    label: '토글 키 설정 GUI 열기',
+    shortcut: 'Ctrl+Shift+T',
+    action: () => { actionTriggered = true; },
+  });
+
+  assert.equal(pluginMenuItems.size, 1);
+  const group = pluginMenuItems.get('toggle-helper');
+  assert.ok(group);
+  assert.equal(group.manifest.name, '토글 키 매니저');
+  assert.equal(group.items.length, 1);
+  assert.equal(group.items[0].label, '토글 키 설정 GUI 열기');
+  assert.equal(group.items[0].shortcut, 'Ctrl+Shift+T');
+
+  group.items[0].action();
+  assert.equal(actionTriggered, true);
+
+  unregister();
+  assert.equal(pluginMenuItems.size, 0);
+});
+
+

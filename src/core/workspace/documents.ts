@@ -62,9 +62,11 @@ export interface DocumentTab {
   savedVersion: number;
   viewState: monaco.editor.ICodeEditorViewState | null;
   title: string;
+  icon?: string;
   customViewerId?: string;
   customBytes?: Uint8Array;
   customCleanup?: (() => void) | void;
+  customRenderer?: (container: HTMLElement) => void | (() => void);
   diffInfo?: DiffTabInfo;
 }
 
@@ -239,29 +241,40 @@ export class DocumentManager {
         customContainer.hidden = false;
         customContainer.replaceChildren();
 
-        const ext = target.file?.name.split('.').pop()?.toLowerCase() ?? '';
-        const viewer = this.viewerProvider?.getCustomViewer(ext);
-        if (viewer) {
-          target.customCleanup = viewer.render(customContainer, {
-            name: target.title,
-            path: target.file?.location ?? target.title,
-            bytes: target.customBytes ?? new Uint8Array(),
-          });
+        if (target.customRenderer) {
+          try {
+            const cleanup = target.customRenderer(customContainer);
+            if (typeof cleanup === 'function') {
+              target.customCleanup = cleanup;
+            }
+          } catch (err) {
+            console.error('Failed to render custom tab:', err);
+          }
         } else {
-          const placeholder = document.createElement('div');
-          placeholder.className = 'binary-file-placeholder';
-          placeholder.innerHTML = `
-            <div class="binary-placeholder-icon">
-              <svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
-                <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
-                <line x1="12" y1="22.08" x2="12" y2="12"></line>
-              </svg>
-            </div>
-            <div class="binary-placeholder-title">${target.title}</div>
-            <div class="binary-placeholder-desc">바이너리 파일이거나 열 수 있는 전용 뷰어가 없습니다.</div>
-          `;
-          customContainer.append(placeholder);
+          const ext = target.file?.name.split('.').pop()?.toLowerCase() ?? '';
+          const viewer = this.viewerProvider?.getCustomViewer(ext);
+          if (viewer) {
+            target.customCleanup = viewer.render(customContainer, {
+              name: target.title,
+              path: target.file?.location ?? target.title,
+              bytes: target.customBytes ?? new Uint8Array(),
+            });
+          } else {
+            const placeholder = document.createElement('div');
+            placeholder.className = 'binary-file-placeholder';
+            placeholder.innerHTML = `
+              <div class="binary-placeholder-icon">
+                <svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                  <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+                  <line x1="12" y1="22.08" x2="12" y2="12"></line>
+                </svg>
+              </div>
+              <div class="binary-placeholder-title">${target.title}</div>
+              <div class="binary-placeholder-desc">바이너리 파일이거나 열 수 있는 전용 뷰어가 없습니다.</div>
+            `;
+            customContainer.append(placeholder);
+          }
         }
       }
     } else {
@@ -534,6 +547,67 @@ export class DocumentManager {
     } catch (e) {
       await platform().showError('파일을 열 수 없습니다', String(e));
     }
+  }
+
+  openCustomTab(options: {
+    id: string;
+    title: string;
+    icon?: string;
+    render: (container: HTMLElement) => void | (() => void);
+  }): DocumentTab {
+    const existing = this.tabs.find((t) => t.id === options.id);
+    if (existing) {
+      existing.title = options.title;
+      if (options.icon !== undefined) existing.icon = options.icon;
+      existing.customRenderer = options.render;
+      this.switchTab(existing.id);
+      return existing;
+    }
+
+    const dummyModel = monaco.editor.createModel(
+      '',
+      'plaintext',
+      monaco.Uri.parse(`plugin-tab:///${encodeURIComponent(options.id)}`),
+    );
+
+    if (
+      this.tabs.length === 1 &&
+      !this.activeTab.file &&
+      !this.isTabDirty(this.activeTab) &&
+      this.activeTab.kind === 'text' &&
+      this.activeTab.model.getValue().length === 0
+    ) {
+      this.activeTab.id = options.id;
+      this.activeTab.kind = 'custom';
+      this.activeTab.file = null;
+      this.activeTab.title = options.title;
+      this.activeTab.icon = options.icon;
+      this.activeTab.customRenderer = options.render;
+      this.activeTab.model.dispose();
+      this.activeTab.model = dummyModel;
+      this.activeTabId = options.id;
+      this.switchTab(this.activeTab.id, true);
+      this.emit();
+      return this.activeTab;
+    }
+
+    const tab: DocumentTab = {
+      id: options.id,
+      file: null,
+      kind: 'custom',
+      encoding: 'utf-8',
+      model: dummyModel,
+      savedVersion: 1,
+      viewState: null,
+      title: options.title,
+      icon: options.icon,
+      customRenderer: options.render,
+    };
+
+    this.tabs.push(tab);
+    this.switchTab(tab.id, true);
+    this.emit();
+    return tab;
   }
 
   async save(tabId?: string): Promise<boolean> {

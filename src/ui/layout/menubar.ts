@@ -4,6 +4,7 @@ import { getSettings, updateSettings } from '../../core/workspace/settings';
 import type { DocumentManager } from '../../core/workspace/documents';
 import type { FileExplorer } from '../panels/explorer';
 import type { ActivityBar } from './activitybar';
+import type { PluginManager } from '../../plugins/manager';
 import { getAllTemplates, insertTemplate } from '../../core/ini/templates';
 import { openSettings } from '../modals/settings-ui';
 import { openHelp } from '../modals/help-ui';
@@ -17,6 +18,7 @@ export interface MenuBarCallbacks {
   editor: monaco.editor.IStandaloneCodeEditor;
   explorer: FileExplorer;
   activityBar: ActivityBar;
+  pluginManager?: PluginManager;
   onJumpLint: () => void;
   onGoToDefinition: () => void;
   onFindReferences: () => void;
@@ -250,6 +252,46 @@ export class MenuBar {
         },
       },
       {
+        id: 'plugins',
+        label: '플러그인',
+        items: () => {
+          const items: MenuItemDef[] = [
+            {
+              label: '플러그인 관리…',
+              shortcut: 'Ctrl+Shift+X',
+              action: () => {
+                this.cb.activityBar.switchTo('plugins');
+              },
+            },
+            {
+              label: '플러그인 폴더 열기…',
+              action: () => {
+                this.cb.pluginManager?.openPluginsFolder();
+              },
+            },
+          ];
+
+          const groups = this.cb.pluginManager?.getPluginMenuItems() ?? [];
+          if (groups.length > 0) {
+            items.push({ divider: true });
+            for (const group of groups) {
+              items.push({
+                label: group.pluginName,
+                submenu: () => {
+                  return group.items.map((subItem) => ({
+                    label: subItem.label,
+                    shortcut: subItem.shortcut,
+                    action: subItem.action,
+                  }));
+                },
+              });
+            }
+          }
+
+          return items;
+        },
+      },
+      {
         id: 'help',
         label: '도움말',
         items: () => [
@@ -396,6 +438,13 @@ export class MenuBar {
               subEl.style.left = 'auto';
               subEl.style.right = '100%';
             }
+          }
+        });
+
+        li.addEventListener('mouseleave', () => {
+          if (subEl) {
+            subEl.remove();
+            subEl = null;
           }
         });
       }

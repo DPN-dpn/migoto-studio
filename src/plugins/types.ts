@@ -219,6 +219,17 @@ export interface PluginContext {
       tooltip?: string;
       onClick?: () => void;
     }): void;
+    openTab(options: {
+      id: string;
+      title: string;
+      icon?: string;
+      render: (container: HTMLElement) => void | (() => void);
+    }): { close: () => void; focus: () => void };
+    registerMenuItem(options: {
+      label: string;
+      shortcut?: string;
+      action: () => void;
+    }): () => void;
   } & PluginUIBuilder;
 
   // ---- System execution (desktop) ----
@@ -266,3 +277,17 @@ export interface PluginInstance {
   cleanup?: () => void;
   error?: string;
 }
+
+export interface PluginMenuItemDef {
+  label: string;
+  shortcut?: string;
+  action: () => void;
+}
+
+export interface PluginMenuGroup {
+  pluginId: string;
+  pluginName: string;
+  icon?: string;
+  items: PluginMenuItemDef[];
+}
+

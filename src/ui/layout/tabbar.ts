@@ -1,6 +1,7 @@
 import type { DocumentManager, DocumentTab } from '../../core/workspace/documents';
 import { platform } from '../../platform';
 import { showToast } from '../common/toast';
+import { renderPluginIcon } from '../../plugins/types';
 
 /**
  * Manages the horizontal tab strip for multi-document editing.
@@ -185,7 +186,11 @@ export class TabBar {
       if (tab.kind === 'diff') {
         iconSpan.innerHTML = `<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 11V3m0 0L1.5 5.5M4 3l2.5 2.5M12 5v8m0 0l2.5-2.5M12 13l-2.5-2.5"/></svg>`;
       } else if (tab.kind === 'custom') {
-        iconSpan.innerHTML = `<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><rect x="2" y="2" width="12" height="12" rx="2"/><circle cx="5.5" cy="5.5" r="1.5"/><path d="M14 11l-3.5-3.5L3 14"/></svg>`;
+        if (tab.icon) {
+          iconSpan.innerHTML = renderPluginIcon(tab.icon);
+        } else {
+          iconSpan.innerHTML = `<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><rect x="2" y="2" width="12" height="12" rx="2"/><circle cx="5.5" cy="5.5" r="1.5"/><path d="M14 11l-3.5-3.5L3 14"/></svg>`;
+        }
       } else {
         iconSpan.innerHTML = `<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M3 2h6.5L13 5.5V14a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1z"/><polyline points="9 2 9 6 13 6"/></svg>`;
       }

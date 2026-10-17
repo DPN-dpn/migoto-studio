@@ -402,6 +402,13 @@ button.primary:hover { filter: brightness(1.1); background: var(--accent); }
   border-top: 2px solid var(--accent);
 }
 
+.tab-item .tab-icon img,
+.tab-item .tab-icon svg {
+  width: 14px;
+  height: 14px;
+  object-fit: contain;
+}
+
 .tab-item .tab-title {
   flex: 1;
   min-width: 0;
