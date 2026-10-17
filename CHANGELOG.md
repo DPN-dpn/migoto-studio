@@ -1,12 +1,19 @@
 # 릴리스 노트 (Release Notes)
 
-## [다음 버전]
+## [0.12.1] - 2026-10-17
 
 ### 신규 기능
+- 플러그인 대화상자 API (`context.ui.confirm`, `context.ui.prompt`): 플러그인에서 위험 작업 전 사용자 확인을 요청하는 모달(`variant: 'danger'` 지원) 및 텍스트 입력을 비동기로 받는 프롬프트 대화상자 추가
+- 플러그인 Diff 비교 탭 API (`context.ui.openDiffTab`): Monaco 기반 양방향 파일 비교 탭을 플러그인에서 프로그래밍 방식으로 직접 생성하고 제어할 수 있는 API 추가
+- 플러그인 워크스페이스 전역 검색 API (`context.workspace.search`): 열린 탭 및 모드 폴더 전체 파일을 대상으로 텍스트/정규식 통합 검색 기능 제공
+- 안전 백업 및 복원 API (`context.workspace.createBackup`, `context.ui.openRestoreModal`): 플러그인이 파일 수정 전 안전 백업을 생성하고, 파일별 백업 목록 및 Diff 비교/복원 모달을 호출할 수 있는 기능 추가
+- 플러그인 에디터 탭 제어 API (`context.workspace.getOpenTabs`, `context.workspace.focusTab`, `context.workspace.closeTab`): 현재 열려 있는 탭 목록 조회 및 특정 탭으로의 전환/닫기 제어 지원
+- INI 심볼 고속 추출 API (`context.ini.extractSymbols`): INI 문서 내 전역/로컬 변수, 리소스, 커맨드리스트, 섹션 구조를 초고속으로 파싱하여 반환하는 구조 분석 API 추가
+- 3DMigoto 토글키 설정창 및 단축키 도우미 API (`context.ui.openKeyBindingModal`, `context.ini.parseKeyBinding`, `context.ini.formatKeyBinding`, `context.ini.getKeyList`): 실시간 키보드/마우스 입력 감지, 필수/부정 수식키 조합, 가상키 목록 조회가 가능한 대화형 키 도우미 모달 및 파싱 유틸리티 추가
 
 ### 기능 개선
-
-### 버그 수정
+- 공식 문서 및 개발자 지침서 동기화: `docs/PLUGIN_API.md`, `docs/AGENTS.md` 및 `migoto-studio.wiki`(`Plugin-System.md`, `Key-Helper-Guide.md`, `Diff-Viewer-Guide.md`)에 신규 API 명세 및 실전 코드 예제 반영
+- 플러그인 폼 위젯 키 입력 도우미 연동: `createKeyInput` 및 FormField `'key'` 필드에 실시간 키 감지 외에 [키 도우미] 모달 버튼 기본 내장
 
 ---
 
