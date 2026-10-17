@@ -129,6 +129,16 @@
   - 플러그인 수명주기(`dispose`)와 연동하여 플러그인 비활성화/삭제 시 모든 Blob URL을 즉시 해제(`revokeObjectURL`)하고 주입된 스타일을 제거하여 메모리 누수를 원천 방지.
   - 백엔드(Rust `list_disk_plugins` 하위 파일 재귀 스캔) 및 웹 스토리지(`localStorage` 파일 맵 영속화) 완벽 대응.
 
+### 모딩 문법 플러그인의 역할 분담 원칙 (완료)
+- **커스텀 린트 플러그인 (`custom-lint`)**:
+  - 원본 3Dmigoto ini 확장 문법에 포함되지 않은 **범용 XXMI 기본 문법**에 대응합니다.
+  - 네임스페이스(`namespace = ...`), 네임스페이스 변수/커맨드리스트 참조(`$\Namespace\var`, `CommandList\Namespace\Action`), 모드 폴더 내 리소스 파일 실재성 검사, 크로스 파일 심볼 색인 및 이동 등 모든 XXMI 계열 모드에 공통 적용되는 기본 표준을 다룹니다.
+  - 특정 게임이나 전용 라이브러리(ZZMI, TTL 등)의 하드코딩이나 고유 문법은 일절 포함하지 않는 **순수 게임 중립적** 플러그인입니다.
+- **게임/라이브러리 전용 지원 플러그인 (예: `zzmi-support`)**:
+  - XXMI 기본 문법은 이미 커스텀 린트 플러그인 및 코어에서 충족된다고 가정합니다.
+  - 해당 게임이나 전용 라이브러리의 **특화 문법 및 템플릿**(예: ZZMI 슬롯픽스 `Resource\ZZMI\...`, WEngineFX, TTL 라이브러리의 `CommandList\TTL\Draw`, `Resource\TTL\TransparencyTex`, `$\TTL\alpha` 등)을 전담합니다.
+  - `context.linter.registerAllowedResource` / `context.linter.registerAllowedVariable` 등의 동적 확장 API를 통해 코어나 범용 린터를 오염시키지 않고 독립적으로 동작합니다.
+
 
 ## 배포 방식 (설치형 + 웹, 둘 다 지원)
 
