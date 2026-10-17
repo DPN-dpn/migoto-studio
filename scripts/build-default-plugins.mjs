@@ -77,8 +77,15 @@ async function buildDefaultPlugins() {
 
     for (const dir of targetDirs) {
       await mkdir(dir, { recursive: true });
-      await writeFile(resolve(dir, 'plugin.json'), manifestJson, 'utf8');
-      await writeFile(resolve(dir, 'plugin.js'), bundledCode, 'utf8');
+      const jsonPath = resolve(dir, 'plugin.json');
+      const jsPath = resolve(dir, 'plugin.js');
+
+      if (!existsSync(jsonPath) || (await readFile(jsonPath, 'utf8')) !== manifestJson) {
+        await writeFile(jsonPath, manifestJson, 'utf8');
+      }
+      if (!existsSync(jsPath) || (await readFile(jsPath, 'utf8')) !== bundledCode) {
+        await writeFile(jsPath, bundledCode, 'utf8');
+      }
 
       // Remove legacy placeholder main.js if it exists in data folder
       const legacyMain = resolve(dir, 'main.js');
@@ -106,13 +113,13 @@ async function buildDefaultPlugins() {
     }
   }
 
-  // Write index.json for web discovery
+  // Write index.json for web discovery if changed
   await mkdir(resolve(rootDir, 'public/default-plugins'), { recursive: true });
-  await writeFile(
-    resolve(rootDir, 'public/default-plugins/index.json'),
-    JSON.stringify(webCompatiblePlugins, null, 2),
-    'utf8',
-  );
+  const indexJson = JSON.stringify(webCompatiblePlugins, null, 2);
+  const indexPath = resolve(rootDir, 'public/default-plugins/index.json');
+  if (!existsSync(indexPath) || (await readFile(indexPath, 'utf8')) !== indexJson) {
+    await writeFile(indexPath, indexJson, 'utf8');
+  }
   console.log('[build-default-plugins] Generated public/default-plugins/index.json');
 }
 
