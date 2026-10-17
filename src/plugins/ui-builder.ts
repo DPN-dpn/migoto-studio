@@ -209,6 +209,9 @@ export function createUIBuilder() {
     createConsole(options: {
       title?: string;
       placeholder?: string;
+      enableInput?: boolean;
+      inputPlaceholder?: string;
+      onInputSubmit?: (value: string) => void;
       onClear?: () => void;
     }) {
       const container = document.createElement('div');
@@ -238,9 +241,45 @@ export function createUIBuilder() {
 
       container.append(header, output);
 
+      let inputEl: HTMLInputElement | null = null;
+      let sendBtnEl: HTMLButtonElement | null = null;
+
+      if (options.enableInput) {
+        const inputRow = document.createElement('div');
+        inputRow.className = 'plugin-console-input-row';
+
+        inputEl = document.createElement('input');
+        inputEl.type = 'text';
+        inputEl.className = 'plugin-input plugin-console-input';
+        inputEl.placeholder = options.inputPlaceholder || '프로세스 표준 입력 (stdin) 입력 후 Enter...';
+
+        sendBtnEl = document.createElement('button');
+        sendBtnEl.className = 'small-btn plugin-console-send-btn';
+        sendBtnEl.textContent = '전송';
+
+        const submitInput = () => {
+          const val = inputEl!.value;
+          if (options.onInputSubmit) {
+            options.onInputSubmit(val);
+          }
+        };
+
+        sendBtnEl.onclick = submitInput;
+        inputEl.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            submitInput();
+          }
+        });
+
+        inputRow.append(inputEl, sendBtnEl);
+        container.append(inputRow);
+      }
+
       return {
         container,
         output,
+        input: inputEl ?? undefined,
         append(text: string) {
           if (output.textContent === defaultPlaceholder) {
             output.textContent = '';
@@ -254,6 +293,15 @@ export function createUIBuilder() {
         },
         clear() {
           output.textContent = '';
+        },
+        getInputValue() {
+          return inputEl?.value ?? '';
+        },
+        setInputValue(val: string) {
+          if (inputEl) inputEl.value = val;
+        },
+        clearInput() {
+          if (inputEl) inputEl.value = '';
         },
       };
     },

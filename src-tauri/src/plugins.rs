@@ -141,6 +141,7 @@ pub fn exec_process(
   command: String,
   args: Vec<String>,
   cwd: Option<String>,
+  stdin: Option<String>,
 ) -> Result<ExecOutput, String> {
   let mut cmd = Command::new(&command);
   cmd.args(&args);
@@ -157,18 +158,37 @@ pub fn exec_process(
     cmd.creation_flags(0x08000000);
   }
 
-  match cmd.output() {
-    Ok(output) => {
-      let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-      let stderr = String::from_utf8_lossy(&output.stderr).to_string();
-      let exit_code = output.status.code().unwrap_or(-1);
-      Ok(ExecOutput {
-        stdout,
-        stderr,
-        exit_code,
-      })
+  if let Some(input_text) = stdin {
+    use std::io::Write;
+    cmd.stdin(std::process::Stdio::piped());
+    let mut child = cmd.spawn().map_err(|e| format!("프로세스 생성 실패 ({command}): {e}"))?;
+    if let Some(mut child_stdin) = child.stdin.take() {
+      let _ = child_stdin.write_all(input_text.as_bytes());
+      // child_stdin dropped and closed here
     }
-    Err(e) => Err(format!("프로세스 실행 실패 ({command}): {e}")),
+    let output = child.wait_with_output().map_err(|e| format!("프로세스 대기 실패 ({command}): {e}"))?;
+    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+    let exit_code = output.status.code().unwrap_or(-1);
+    Ok(ExecOutput {
+      stdout,
+      stderr,
+      exit_code,
+    })
+  } else {
+    match cmd.output() {
+      Ok(output) => {
+        let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+        let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+        let exit_code = output.status.code().unwrap_or(-1);
+        Ok(ExecOutput {
+          stdout,
+          stderr,
+          exit_code,
+        })
+      }
+      Err(e) => Err(format!("프로세스 실행 실패 ({command}): {e}")),
+    }
   }
 }
 

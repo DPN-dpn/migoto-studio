@@ -1801,6 +1801,25 @@ input:checked + .slider:before {
   word-break: break-all;
   margin: 0;
 }
+.plugin-console-input-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin-top: 6px;
+}
+.plugin-console-input {
+  flex: 1;
+  background: #0f1117;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 11px;
+  color: var(--fg);
+  font-family: 'Cascadia Code', Consolas, monospace;
+}
+.plugin-console-send-btn {
+  white-space: nowrap;
+}
 
 /* Plugin UI Builder: Badges, Progress, Divider, Table */
 .plugin-badge {

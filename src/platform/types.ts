@@ -99,7 +99,7 @@ export interface Platform {
   readBinaryFile?(path: string): Promise<Uint8Array>;
   writeBinaryFile?(path: string, bytes: Uint8Array): Promise<void>;
   launchInstallerAndExit?(path: string): Promise<void>;
-  execProcess?(command: string, args: string[], cwd?: string): Promise<ProcessOutput>;
+  execProcess?(command: string, args: string[], cwd?: string, stdin?: string): Promise<ProcessOutput>;
   listDiskPlugins?(): Promise<DiskPlugin[]>;
   saveDiskPlugin?(id: string, manifestJson: string, scriptContent: string): Promise<void>;
   pickPluginZip?(): Promise<Uint8Array | null>;

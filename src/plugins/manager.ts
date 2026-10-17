@@ -1479,9 +1479,9 @@ export default {
       },
 
       system: {
-        exec: async (command: string, args: string[] = [], cwd?: string) => {
+        exec: async (command: string, args: string[] = [], cwd?: string, stdin?: string) => {
           if (platform().execProcess) {
-            return platform().execProcess!(command, args, cwd);
+            return platform().execProcess!(command, args, cwd, stdin);
           }
           return {
             stdout: '',

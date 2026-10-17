@@ -146,8 +146,8 @@ export const desktop: Platform = {
     invoke('write_binary_file', { path, bytes: Array.from(bytes) }),
   launchInstallerAndExit: (path: string) =>
     invoke('launch_installer_and_exit', { path }),
-  execProcess: (command: string, args: string[], cwd?: string) =>
-    invoke<ProcessOutput>('exec_process', { command, args, cwd }),
+  execProcess: (command: string, args: string[], cwd?: string, stdin?: string) =>
+    invoke<ProcessOutput>('exec_process', { command, args, cwd, stdin }),
   listDiskPlugins: async () => {
     const list = await invoke<any[]>('list_disk_plugins');
     return list.map((p) => ({

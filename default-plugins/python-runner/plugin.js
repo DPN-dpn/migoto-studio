@@ -4,7 +4,8 @@ var iconSvg = `<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColo
 //#region default-plugins/python-runner/index.ts
 /**
 * Python 스크립트 실행기 플러그인
-* 파이썬 코드를 에디터 내에서 실행하고 표준 출력 결과를 확인하거나 에디터에 삽입할 수 있습니다.
+* 파이썬 코드를 직접 입력하거나 외부 .py 파일을 불러와 실행하고,
+* 표준 출력 결과 확인 및 사용자 입력(stdin) 전달, 에디터 본문 삽입을 지원합니다.
 */
 var plugin = {
 	activate(context) {
@@ -33,8 +34,67 @@ function buildPythonRunnerView(context, container) {
 		value: context.storage.get("cmd", "python"),
 		onChange: (cmd) => context.storage.set("cmd", cmd)
 	});
+	let currentMode = context.storage.get("run_mode", "code");
+	const modeSelect = context.ui.createSelect({
+		label: "실행 방식:",
+		options: [{
+			label: "코드 직접 작성 (인라인)",
+			value: "code"
+		}, {
+			label: "외부 Python 파일 (.py) 실행",
+			value: "file"
+		}],
+		value: currentMode,
+		onChange: (mode) => {
+			currentMode = mode;
+			context.storage.set("run_mode", mode);
+			updateModeVisibility();
+		}
+	});
+	const filePathInput = context.ui.createInput({
+		label: "Python 파일 (.py) 경로:",
+		placeholder: "예: C:/Scripts/my_tool.py 또는 ./script.py",
+		value: context.storage.get("script_file", ""),
+		onInput: (p) => context.storage.set("script_file", p)
+	});
+	const pickFileBtn = context.ui.createButton({
+		text: "파일 선택…",
+		variant: "secondary",
+		async onClick() {
+			const picked = await context.workspace.pickFile({
+				extensions: ["py"],
+				title: "실행할 Python 스크립트 (.py) 선택"
+			});
+			if (picked) {
+				filePathInput.setValue(picked);
+				context.storage.set("script_file", picked);
+			}
+		}
+	});
+	const fileBox = document.createElement("div");
+	fileBox.className = "plugin-field-group";
+	const fileBtnRow = document.createElement("div");
+	fileBtnRow.style.cssText = "display: flex; gap: 6px; margin-top: 4px;";
+	fileBtnRow.append(pickFileBtn);
+	fileBox.append(filePathInput.row, fileBtnRow);
+	const codeEditor = context.ui.createCodeEditor({
+		label: "실행할 Python 코드:",
+		rows: 6,
+		value: context.storage.get("code", `# Migoto Studio Python Runner\nimport sys\n\nname = input("이름을 입력하세요: ") if sys.stdin.isatty() or not sys.stdin.closed else "사용자"\nprint(f"안녕하세요, {name}님!")\n`),
+		onInput: (code) => context.storage.set("code", code)
+	});
+	const updateModeVisibility = () => {
+		if (currentMode === "file") {
+			fileBox.hidden = false;
+			codeEditor.container.hidden = true;
+		} else {
+			fileBox.hidden = true;
+			codeEditor.container.hidden = false;
+		}
+	};
+	updateModeVisibility();
 	const argsInput = context.ui.createInput({
-		label: "추가 인자:",
+		label: "추가 인자 (Arguments):",
 		placeholder: "예: --verbose output.ini",
 		value: context.storage.get("args", ""),
 		onInput: (args) => context.storage.set("args", args)
@@ -45,51 +105,69 @@ function buildPythonRunnerView(context, container) {
 		checked: context.storage.get("pass_file", true),
 		onChange: (checked) => context.storage.set("pass_file", checked)
 	});
-	const codeEditor = context.ui.createCodeEditor({
-		label: "실행할 Python 코드:",
-		rows: 6,
-		value: context.storage.get("code", `# Migoto Studio Python Runner\nimport sys\n\nprint("Python 실행 환경이 정상 작동 중입니다!")\nif len(sys.argv) > 1:\n    print(f"인자 파일: {sys.argv[1]}")\n`),
-		onInput: (code) => context.storage.set("code", code)
-	});
 	const consoleView = context.ui.createConsole({
 		title: "실행 결과 (Console)",
-		placeholder: "(실행 버튼을 누르면 여기에 출력이 표시됩니다)"
+		placeholder: "(실행 버튼을 누르거나 아래에 입력을 넣고 전송하세요)",
+		enableInput: true,
+		inputPlaceholder: "표준 입력 (stdin) 입력 후 Enter 또는 전송...",
+		onInputSubmit: (inputVal) => {
+			if (!inputVal.trim() && !inputVal) return;
+			consoleView.append(`\n> ${inputVal}\n`);
+			consoleView.clearInput();
+			executePython(inputVal + "\n");
+		}
 	});
+	async function executePython(stdinText) {
+		runBtn.disabled = true;
+		runBtn.textContent = "실행 중...";
+		const cmd = cmdSelect.getValue();
+		const extraArgs = argsInput.getValue().trim().split(/\s+/).filter(Boolean);
+		let args = [];
+		if (currentMode === "file") {
+			const scriptPath = filePathInput.getValue().trim();
+			if (!scriptPath) {
+				context.ui.showToast("실행할 Python (.py) 파일 경로를 지정해주세요.", "warn");
+				runBtn.disabled = false;
+				runBtn.textContent = "스크립트 실행";
+				return;
+			}
+			args = [scriptPath, ...extraArgs];
+		} else args = [
+			"-c",
+			codeEditor.getValue(),
+			...extraArgs
+		];
+		if (passFileCheck.isChecked()) {
+			const cur = context.workspace.getCurrentFile();
+			if (cur?.path) args.push(cur.path);
+		}
+		if (stdinText === void 0) consoleView.set("프로세스 시작...\n");
+		try {
+			const cwd = context.workspace.getCurrentFolder() || void 0;
+			const res = await context.system.exec(cmd, args, cwd, stdinText);
+			if (stdinText === void 0) consoleView.clear();
+			if (res.stdout) consoleView.append(res.stdout);
+			if (res.stderr) consoleView.append((res.stdout ? "\n" : "") + res.stderr);
+			if (!res.stdout && !res.stderr) consoleView.set(`(출력 없음 - 종료 코드: ${res.exitCode})`);
+			insertBtn.disabled = !res.stdout;
+			if (res.exitCode === 0) context.ui.showToast("Python 실행 완료", "info");
+			else context.ui.showToast(`실행 실패 (종료 코드 ${res.exitCode})`, "warn");
+		} catch (err) {
+			consoleView.append(`\n[오류] ${err}`);
+			context.ui.showToast("실행 오류 발생", "error");
+		} finally {
+			runBtn.disabled = false;
+			runBtn.textContent = "스크립트 실행";
+		}
+	}
 	const runBtn = context.ui.createButton({
 		text: "스크립트 실행",
 		variant: "primary",
 		async onClick() {
-			runBtn.disabled = true;
-			runBtn.textContent = "실행 중...";
-			consoleView.set("프로세스 시작...\n");
-			try {
-				const code = codeEditor.getValue();
-				const cmd = cmdSelect.getValue();
-				const args = [
-					"-c",
-					code,
-					...argsInput.getValue().trim().split(/\s+/).filter(Boolean)
-				];
-				if (passFileCheck.isChecked()) {
-					const cur = context.workspace.getCurrentFile();
-					if (cur?.path) args.push(cur.path);
-				}
-				const cwd = context.workspace.getCurrentFolder() || void 0;
-				const res = await context.system.exec(cmd, args, cwd);
-				consoleView.clear();
-				if (res.stdout) consoleView.append(res.stdout);
-				if (res.stderr) consoleView.append((res.stdout ? "\n" : "") + res.stderr);
-				if (!res.stdout && !res.stderr) consoleView.set(`(출력 없음 - 종료 코드: ${res.exitCode})`);
-				insertBtn.disabled = !res.stdout;
-				if (res.exitCode === 0) context.ui.showToast("Python 실행 완료", "info");
-				else context.ui.showToast(`실행 실패 (종료 코드 ${res.exitCode})`, "warn");
-			} catch (err) {
-				consoleView.append(`\n[오류] ${err}`);
-				context.ui.showToast("실행 오류 발생", "error");
-			} finally {
-				runBtn.disabled = false;
-				runBtn.textContent = "스크립트 실행";
-			}
+			const pendingInput = consoleView.getInputValue();
+			const stdin = pendingInput ? pendingInput + "\n" : void 0;
+			if (pendingInput) consoleView.clearInput();
+			await executePython(stdin);
 		}
 	});
 	const insertBtn = context.ui.createButton({
@@ -105,7 +183,7 @@ function buildPythonRunnerView(context, container) {
 		}
 	});
 	const actionRow = context.ui.createButtonRow([runBtn, insertBtn]);
-	container.append(header, cmdSelect.row, argsInput.row, passFileCheck.row, codeEditor.container, actionRow, consoleView.container);
+	container.append(header, cmdSelect.row, modeSelect.row, fileBox, codeEditor.container, argsInput.row, passFileCheck.row, actionRow, consoleView.container);
 }
 //#endregion
 export { plugin as default };

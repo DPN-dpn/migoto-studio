@@ -315,6 +315,7 @@ export interface PluginContext {
       command: string,
       args?: string[],
       cwd?: string,
+      stdin?: string,
     ): Promise<{ stdout: string; stderr: string; exitCode: number }>;
   };
 
