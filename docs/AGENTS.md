@@ -173,6 +173,12 @@ context.ui.registerSidebarView({
 - `openKeyBindingModal({ title?, initialKey?, onApply? })`: 3DMigoto 단축키 설정 대화상자를 비동기(`Promise<string | null>`)로 호출 (실시간 키 캡처, 수식키 조합, 가상키 목록 검색 제공)
 - `openKeyHelperModal(options)`: `openKeyBindingModal`의 별칭
 - `createKeyInput({ label?, value?, description?, onChange? })`: 실시간 키 캡처 및 [키 도우미] 모달 버튼이 포함된 단축키 입력 필드
+- `createSplitView({ direction?, first?, second?, initialSize?, minFirstSize?, minSecondSize?, resizable?, storageKey?, onResize? })`: 마우스 드래그 조절 스플릿 뷰 (`{ container, firstPane, secondPane, splitter, setSize(), getSize(), reset() }` 반환)
+- `createRow({ children?, gap?, align?, justify?, wrap? })`: 가로 방향 Flexbox 레이아웃 컨테이너
+- `createColumn({ children?, gap?, align?, justify? })`: 세로 방향 Flexbox 레이아웃 컨테이너
+- `createGrid({ columns?, gap?, children? })`: Grid 다단 레이아웃 컨테이너
+- `createDivider({ vertical?, margin? })`: 수평/수직 구분선 요소
+- `createScrollContainer({ content?, direction?, maxHeight?, height?, autoScroll? })`: 테마 스크롤바 컨테이너 (`{ container, content, append(), clear(), scrollToTop(), scrollToBottom() }` 반환)
 - `createCard({ title?, subtitle?, badge?, content?, actions? })`: 스타일 카드
 - `createForm(formConfig)`: 선언형 폼 인스턴스 (`getValues()`, `setValues()`, `reset()`)
 - `createButton({ text, variant?: 'primary'|'secondary'|'danger'|'small', onClick })`

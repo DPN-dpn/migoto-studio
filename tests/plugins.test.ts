@@ -18,6 +18,7 @@ const BUILTIN_PLUGINS = [
 ];
 import { validatePluginZip } from '../src/plugins/zip.ts';
 import { definePlugin } from '../src/plugins/api.ts';
+import { createUIBuilder } from '../src/plugins/ui-builder.ts';
 import { renderPluginIcon } from '../src/plugins/types.ts';
 import { zipSync, strToU8 } from 'fflate';
 import {
@@ -1373,4 +1374,91 @@ test('Dynamic tabs reorder correctly by pluginId for custom plugins with differi
   // Move custom plugin to the end
   reorder(['python-runner', 'ai-assistant', 'xxmi-toggle-manager']);
   assert.deepEqual(children.map((c) => c.id), ['btn-python', 'btn-ai', 'btn-toggle']);
+});
+
+test('Plugin UI Builder layout components (split, row, column, grid, divider, scroll) work as expected', () => {
+  const createElement = (tag: string) => {
+    const el: any = {
+      tagName: tag.toUpperCase(),
+      className: '',
+      title: '',
+      style: {},
+      children: [],
+      append: (...nodes: any[]) => el.children.push(...nodes),
+      replaceChildren: (...nodes: any[]) => { el.children = [...nodes]; },
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      getBoundingClientRect: () => ({ width: 400, height: 300 }),
+      scrollTo: () => {},
+    };
+    return el;
+  };
+
+  const origDoc = (globalThis as any).document;
+  (globalThis as any).document = {
+    createElement,
+    body: { classList: { add: () => {}, remove: () => {} } },
+  };
+
+  try {
+    const builder = createUIBuilder();
+    assert.equal(typeof builder.createSplitView, 'function');
+    assert.equal(typeof builder.createRow, 'function');
+    assert.equal(typeof builder.createColumn, 'function');
+    assert.equal(typeof builder.createGrid, 'function');
+    assert.equal(typeof builder.createDivider, 'function');
+    assert.equal(typeof builder.createScrollContainer, 'function');
+
+    // Test createSplitView horizontal
+    const split = builder.createSplitView({ direction: 'horizontal', initialSize: 200 });
+    assert.ok(split.container.className.includes('plugin-split-horizontal'));
+    assert.equal(split.firstPane.style.width, '200px');
+    split.setSize(250);
+    assert.equal(split.firstPane.style.width, '250px');
+    assert.equal(split.getSize(), 400);
+
+    // Test createSplitView vertical
+    const splitV = builder.createSplitView({ direction: 'vertical', initialSize: '40%' });
+    assert.ok(splitV.container.className.includes('plugin-split-vertical'));
+    assert.equal(splitV.firstPane.style.height, '40%');
+
+    // Test createRow
+    const row = builder.createRow({ gap: 12, align: 'center', justify: 'space-between', wrap: true });
+    assert.ok(row.className.includes('plugin-row'));
+    assert.equal(row.style.gap, '12px');
+    assert.equal(row.style.alignItems, 'center');
+    assert.equal(row.style.justifyContent, 'space-between');
+    assert.equal(row.style.flexWrap, 'wrap');
+
+    // Test createColumn
+    const col = builder.createColumn({ gap: 16 });
+    assert.ok(col.className.includes('plugin-column'));
+    assert.equal(col.style.gap, '16px');
+
+    // Test createGrid
+    const grid = builder.createGrid({ columns: 3, gap: 10 });
+    assert.ok(grid.className.includes('plugin-grid'));
+    assert.equal(grid.style.gridTemplateColumns, 'repeat(3, 1fr)');
+    assert.equal(grid.style.gap, '10px');
+
+    // Test createDivider
+    const divH = builder.createDivider();
+    assert.ok(divH.className.includes('horizontal'));
+    const divV = builder.createDivider({ vertical: true, margin: 8 });
+    assert.ok(divV.className.includes('vertical'));
+    assert.equal(divV.style.margin, '0 8px');
+
+    // Test createScrollContainer
+    const scroll = builder.createScrollContainer({ maxHeight: 300, direction: 'vertical' });
+    assert.ok(scroll.container.className.includes('scroll-vertical'));
+    assert.equal(scroll.container.style.maxHeight, '300px');
+    const child1 = createElement('div');
+    scroll.append(child1);
+    assert.equal(scroll.content.children.length, 1);
+    scroll.clear();
+    assert.equal(scroll.content.children.length, 0);
+  } finally {
+    if (origDoc) (globalThis as any).document = origDoc;
+    else delete (globalThis as any).document;
+  }
 });

@@ -464,10 +464,15 @@ export function createUIBuilder() {
       };
     },
 
-    createDivider(): HTMLElement {
-      const hr = document.createElement('div');
-      hr.className = 'plugin-divider';
-      return hr;
+    createDivider(options?: DividerOptions): HTMLElement {
+      const div = document.createElement('div');
+      const isVert = options?.vertical ?? false;
+      div.className = `plugin-divider ${isVert ? 'vertical' : 'horizontal'}${options?.className ? ` ${options.className}` : ''}`;
+      if (options?.margin !== undefined) {
+        const m = typeof options.margin === 'number' ? `${options.margin}px` : options.margin;
+        div.style.margin = isVert ? `0 ${m}` : `${m} 0`;
+      }
+      return div;
     },
 
     createTable(options: {
@@ -976,8 +981,379 @@ export function createUIBuilder() {
     prompt(options: PromptOptions): Promise<string | null> {
       return openPromptModal(options);
     },
+
+    /**
+     * 좌우(수평) 또는 상하(수직)로 패널을 나누고 사용자가 드래그하여 크기를 조절할 수 있는 스플릿 뷰를 생성합니다.
+     */
+    createSplitView(options?: SplitViewOptions): SplitViewInstance {
+      const opts = options || {};
+      const isHorizontal = (opts.direction || 'horizontal') === 'horizontal';
+      const container = document.createElement('div');
+      container.className = `plugin-split-container plugin-split-${isHorizontal ? 'horizontal' : 'vertical'}${opts.className ? ` ${opts.className}` : ''}`;
+
+      const firstPane = document.createElement('div');
+      firstPane.className = 'plugin-split-pane plugin-split-first';
+      if (opts.first) firstPane.append(opts.first);
+
+      const splitter = document.createElement('div');
+      splitter.className = 'plugin-split-resizer';
+      splitter.title = opts.resizable !== false ? '드래그하여 크기 조절 (더블 클릭: 기본 크기 복원)' : '';
+
+      const secondPane = document.createElement('div');
+      secondPane.className = 'plugin-split-pane plugin-split-second';
+      if (opts.second) secondPane.append(opts.second);
+
+      const minFirst = opts.minFirstSize ?? 50;
+      const minSecond = opts.minSecondSize ?? 50;
+
+      const applySize = (size: number | string) => {
+        const val = typeof size === 'number' ? `${size}px` : size;
+        if (isHorizontal) {
+          firstPane.style.width = val;
+          firstPane.style.flexBasis = val;
+        } else {
+          firstPane.style.height = val;
+          firstPane.style.flexBasis = val;
+        }
+      };
+
+      let initialVal: number | string = opts.initialSize ?? '50%';
+      if (opts.storageKey) {
+        try {
+          const saved = localStorage.getItem(opts.storageKey);
+          if (saved !== null && saved !== '') {
+            const num = parseFloat(saved);
+            if (!Number.isNaN(num) && num >= minFirst) {
+              initialVal = num;
+            } else {
+              initialVal = saved;
+            }
+          }
+        } catch {}
+      }
+      applySize(initialVal);
+
+      let isDragging = false;
+      let startPos = 0;
+      let startSize = 0;
+
+      const onMouseMove = (e: MouseEvent) => {
+        if (!isDragging) return;
+        const rect = container.getBoundingClientRect();
+        const containerSize = isHorizontal ? rect.width : rect.height;
+        const delta = isHorizontal ? e.clientX - startPos : e.clientY - startPos;
+        const resizerSize = 5;
+        const maxFirst = Math.max(minFirst, containerSize - resizerSize - minSecond);
+        const newSize = Math.max(minFirst, Math.min(maxFirst, startSize + delta));
+
+        applySize(newSize);
+
+        const secondSize = Math.max(0, containerSize - resizerSize - newSize);
+        opts.onResize?.(newSize, secondSize);
+
+        if (opts.storageKey) {
+          try {
+            localStorage.setItem(opts.storageKey, String(Math.round(newSize)));
+          } catch {}
+        }
+      };
+
+      const onMouseUp = () => {
+        if (!isDragging) return;
+        isDragging = false;
+        splitter.classList.remove('dragging');
+        document.body.classList.remove(isHorizontal ? 'plugin-split-resizing-h' : 'plugin-split-resizing-v');
+        window.removeEventListener('mousemove', onMouseMove);
+        window.removeEventListener('mouseup', onMouseUp);
+      };
+
+      if (opts.resizable !== false) {
+        splitter.addEventListener('mousedown', (e: MouseEvent) => {
+          e.preventDefault();
+          isDragging = true;
+          splitter.classList.add('dragging');
+          document.body.classList.add(isHorizontal ? 'plugin-split-resizing-h' : 'plugin-split-resizing-v');
+          startPos = isHorizontal ? e.clientX : e.clientY;
+          const r = firstPane.getBoundingClientRect();
+          startSize = isHorizontal ? r.width : r.height;
+
+          window.addEventListener('mousemove', onMouseMove);
+          window.addEventListener('mouseup', onMouseUp);
+        });
+
+        splitter.addEventListener('dblclick', () => {
+          applySize(opts.initialSize ?? '50%');
+          if (opts.storageKey) {
+            try {
+              localStorage.removeItem(opts.storageKey);
+            } catch {}
+          }
+        });
+      }
+
+      container.append(firstPane, splitter, secondPane);
+
+      return {
+        container,
+        firstPane,
+        secondPane,
+        splitter,
+        setSize: (size: number | string) => applySize(size),
+        getSize: () => {
+          const r = firstPane.getBoundingClientRect();
+          return isHorizontal ? r.width : r.height;
+        },
+        reset: () => {
+          applySize(opts.initialSize ?? '50%');
+          if (opts.storageKey) {
+            try {
+              localStorage.removeItem(opts.storageKey);
+            } catch {}
+          }
+        },
+        dispose: () => {
+          onMouseUp();
+        },
+      };
+    },
+
+    /**
+     * 가로 방향 Flexbox 레이아웃 컨테이너를 생성합니다.
+     */
+    createRow(options?: RowOptions): HTMLElement {
+      const row = document.createElement('div');
+      row.className = `plugin-row${options?.className ? ` ${options.className}` : ''}`;
+      if (options?.gap !== undefined) {
+        row.style.gap = typeof options.gap === 'number' ? `${options.gap}px` : options.gap;
+      } else {
+        row.style.gap = '8px';
+      }
+      if (options?.align) {
+        row.style.alignItems = options.align === 'start' ? 'flex-start' : options.align === 'end' ? 'flex-end' : options.align;
+      }
+      if (options?.justify) {
+        row.style.justifyContent = options.justify === 'start' ? 'flex-start' : options.justify === 'end' ? 'flex-end' : options.justify;
+      }
+      if (options?.wrap) {
+        row.style.flexWrap = 'wrap';
+      }
+      if (options?.style) {
+        Object.assign(row.style, options.style);
+      }
+      if (options?.children) {
+        options.children.forEach((c) => row.append(c));
+      }
+      return row;
+    },
+
+    /**
+     * 세로 방향 Flexbox 레이아웃 컨테이너를 생성합니다.
+     */
+    createColumn(options?: ColumnOptions): HTMLElement {
+      const col = document.createElement('div');
+      col.className = `plugin-column${options?.className ? ` ${options.className}` : ''}`;
+      if (options?.gap !== undefined) {
+        col.style.gap = typeof options.gap === 'number' ? `${options.gap}px` : options.gap;
+      } else {
+        col.style.gap = '8px';
+      }
+      if (options?.align) {
+        col.style.alignItems = options.align === 'start' ? 'flex-start' : options.align === 'end' ? 'flex-end' : options.align;
+      }
+      if (options?.justify) {
+        col.style.justifyContent = options.justify === 'start' ? 'flex-start' : options.justify === 'end' ? 'flex-end' : options.justify;
+      }
+      if (options?.style) {
+        Object.assign(col.style, options.style);
+      }
+      if (options?.children) {
+        options.children.forEach((c) => col.append(c));
+      }
+      return col;
+    },
+
+    /**
+     * Grid 레이아웃 컨테이너를 생성합니다.
+     */
+    createGrid(options?: GridOptions): HTMLElement {
+      const grid = document.createElement('div');
+      grid.className = `plugin-grid${options?.className ? ` ${options.className}` : ''}`;
+      const cols = options?.columns ?? 2;
+      grid.style.gridTemplateColumns = typeof cols === 'number' ? `repeat(${cols}, 1fr)` : cols;
+      if (options?.gap !== undefined) {
+        grid.style.gap = typeof options.gap === 'number' ? `${options.gap}px` : options.gap;
+      } else {
+        grid.style.gap = '8px';
+      }
+      if (options?.style) {
+        Object.assign(grid.style, options.style);
+      }
+      if (options?.children) {
+        options.children.forEach((c) => grid.append(c));
+      }
+      return grid;
+    },
+
+
+    /**
+     * 일관된 테마 스크롤바와 상/하단 스크롤 제어 메서드를 갖춘 스크롤 컨테이너를 생성합니다.
+     */
+    createScrollContainer(options?: ScrollContainerOptions): ScrollContainerInstance {
+      const container = document.createElement('div');
+      const dir = options?.direction || 'vertical';
+      container.className = `plugin-scroll-container scroll-${dir}${options?.className ? ` ${options.className}` : ''}`;
+
+      if (options?.maxHeight !== undefined) {
+        container.style.maxHeight = typeof options.maxHeight === 'number' ? `${options.maxHeight}px` : options.maxHeight;
+      }
+      if (options?.maxWidth !== undefined) {
+        container.style.maxWidth = typeof options.maxWidth === 'number' ? `${options.maxWidth}px` : options.maxWidth;
+      }
+      if (options?.height !== undefined) {
+        container.style.height = typeof options.height === 'number' ? `${options.height}px` : options.height;
+      }
+      if (options?.width !== undefined) {
+        container.style.width = typeof options.width === 'number' ? `${options.width}px` : options.width;
+      }
+      if (options?.padding !== undefined) {
+        container.style.padding = typeof options.padding === 'number' ? `${options.padding}px` : options.padding;
+      }
+
+      const content = document.createElement('div');
+      content.className = 'plugin-scroll-content';
+
+      if (options?.content) {
+        const items = Array.isArray(options.content) ? options.content : [options.content];
+        items.forEach((it) => content.append(it));
+      }
+
+      container.append(content);
+
+      const scrollToBottom = (smooth = false) => {
+        try {
+          container.scrollTo({
+            top: container.scrollHeight,
+            left: dir === 'horizontal' || dir === 'both' ? container.scrollWidth : 0,
+            behavior: smooth ? 'smooth' : 'auto',
+          });
+        } catch {
+          container.scrollTop = container.scrollHeight;
+        }
+      };
+
+      const scrollToTop = (smooth = false) => {
+        try {
+          container.scrollTo({ top: 0, left: 0, behavior: smooth ? 'smooth' : 'auto' });
+        } catch {
+          container.scrollTop = 0;
+        }
+      };
+
+      const append = (...items: HTMLElement[]) => {
+        items.forEach((it) => content.append(it));
+        if (options?.autoScroll) {
+          scrollToBottom();
+        }
+      };
+
+      const clear = () => {
+        content.replaceChildren();
+      };
+
+      return {
+        container,
+        content,
+        append,
+        clear,
+        scrollToTop,
+        scrollToBottom,
+        getScrollTop: () => container.scrollTop,
+        setScrollTop: (val: number) => {
+          container.scrollTop = val;
+        },
+      };
+    },
   };
 }
 
+export interface SplitViewOptions {
+  direction?: 'horizontal' | 'vertical';
+  first?: HTMLElement;
+  second?: HTMLElement;
+  initialSize?: number | string;
+  minFirstSize?: number;
+  minSecondSize?: number;
+  resizable?: boolean;
+  storageKey?: string;
+  onResize?: (firstSize: number, secondSize: number) => void;
+  className?: string;
+}
+
+export interface SplitViewInstance {
+  container: HTMLElement;
+  firstPane: HTMLElement;
+  secondPane: HTMLElement;
+  splitter: HTMLElement;
+  setSize: (size: number | string) => void;
+  getSize: () => number;
+  reset: () => void;
+  dispose: () => void;
+}
+
+export interface RowOptions {
+  children?: HTMLElement[];
+  gap?: number | string;
+  align?: 'start' | 'center' | 'end' | 'stretch' | 'baseline';
+  justify?: 'start' | 'center' | 'end' | 'space-between' | 'space-around';
+  wrap?: boolean;
+  className?: string;
+  style?: Partial<CSSStyleDeclaration>;
+}
+
+export interface ColumnOptions {
+  children?: HTMLElement[];
+  gap?: number | string;
+  align?: 'start' | 'center' | 'end' | 'stretch';
+  justify?: 'start' | 'center' | 'end' | 'space-between';
+  className?: string;
+  style?: Partial<CSSStyleDeclaration>;
+}
+
+export interface GridOptions {
+  columns?: number | string;
+  gap?: number | string;
+  children?: HTMLElement[];
+  className?: string;
+  style?: Partial<CSSStyleDeclaration>;
+}
+
+export interface DividerOptions {
+  vertical?: boolean;
+  margin?: number | string;
+  className?: string;
+}
+
+export interface ScrollContainerOptions {
+  content?: HTMLElement | HTMLElement[];
+  direction?: 'vertical' | 'horizontal' | 'both';
+  maxHeight?: number | string;
+  maxWidth?: number | string;
+  height?: number | string;
+  width?: number | string;
+  padding?: number | string;
+  className?: string;
+  autoScroll?: boolean;
+}
+
+export interface ScrollContainerInstance {
+  container: HTMLElement;
+  content: HTMLElement;
+  append: (...items: HTMLElement[]) => void;
+  clear: () => void;
+  scrollToTop: (smooth?: boolean) => void;
+  scrollToBottom: (smooth?: boolean) => void;
+  getScrollTop: () => number;
+  setScrollTop: (top: number) => void;
+}
 
 export type PluginUIBuilder = ReturnType<typeof createUIBuilder>;

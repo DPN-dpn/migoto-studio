@@ -263,7 +263,97 @@ context.ui.openRestoreModal('d:/mods/Character/merged.ini');
 
 ---
 
-### 3.8 키 바인딩 설정 모달 대화상자 (`context.ui.openKeyBindingModal`)
+### 3.8 스플릿 뷰 및 레이아웃 컨테이너 (`context.ui.*`)
+
+플러그인 탭이나 사이드바에서 복잡한 다분할 레이아웃을 손쉽게 구성할 수 있도록 분할 패널과 레이아웃 컴포넌트를 제공합니다.
+
+#### A. 리사이저블 스플릿 뷰 (`context.ui.createSplitView`)
+마우스 드래그로 실시간 크기를 조절할 수 있는 분할 뷰입니다. 가로(좌우) 및 세로(상하) 분할을 지원하며, 사용자가 조절한 크기를 `localStorage`에 자동 영구 보존할 수 있습니다.
+
+```typescript
+const split = context.ui.createSplitView({
+  direction: 'horizontal', // 'horizontal' (좌우 분할) | 'vertical' (상하 분할)
+  initialSize: 260,        // 초기 크기 (숫자 px, '260px', '40%' 등)
+  minFirstSize: 120,       // 첫 번째 패널 최소 크기 (px)
+  minSecondSize: 150,      // 두 번째 패널 최소 크기 (px)
+  resizable: true,         // 드래그 조절 지원 (더블 클릭 시 기본값 복원)
+  storageKey: 'my_plugin_split_width', // 사용자 조절 크기 자동 저장/복원
+  onResize: (firstSize, secondSize) => {
+    console.log(`패널 크기 변경됨: ${firstSize}px / ${secondSize}px`);
+  },
+});
+
+// 패널에 요소 추가
+split.firstPane.append(leftSidebarContent);
+split.secondPane.append(rightMainContent);
+
+// 프로그래밍 방식 크기 제어
+split.setSize(300);
+console.log('현재 크기:', split.getSize());
+// split.reset(); // 초기 크기로 복원
+
+container.append(split.container);
+```
+
+#### B. 가로/세로 Flexbox 컨테이너 (`context.ui.createRow`, `context.ui.createColumn`)
+복잡한 CSS 없이 일관된 간격(`gap`)과 정렬을 갖춘 유연한 레이아웃을 구성합니다.
+
+```typescript
+// 가로 배치 (Row)
+const toolbar = context.ui.createRow({
+  gap: 8,
+  align: 'center',         // 'start' | 'center' | 'end' | 'stretch'
+  justify: 'space-between', // 'start' | 'center' | 'end' | 'space-between'
+  wrap: true,              // flex-wrap
+  children: [btnRefresh, btnApply, searchInput],
+});
+
+// 세로 배치 (Column)
+const formCol = context.ui.createColumn({
+  gap: 12,
+  align: 'stretch',
+  children: [headerEl, card1, card2],
+});
+```
+
+#### C. 그리드 레이아웃 (`context.ui.createGrid`)
+다단 카드나 버튼 매트릭스를 구성할 때 사용합니다.
+
+```typescript
+const grid = context.ui.createGrid({
+  columns: 2, // 열 개수 (또는 'repeat(auto-fit, minmax(140px, 1fr))')
+  gap: 10,
+  children: [item1, item2, item3, item4],
+});
+```
+
+#### D. 구분선 (`context.ui.createDivider`)
+```typescript
+const hDivider = context.ui.createDivider(); // 가로 구분선
+const vDivider = context.ui.createDivider({ vertical: true, margin: 8 }); // 세로 구분선
+```
+
+#### E. 테마 일관 스크롤 컨테이너 (`context.ui.createScrollContainer`)
+미고토 스튜디오의 슬림한 다크/라이트 테마 스크롤바와 상/하단 스크롤 제어 메서드를 제공하는 스크롤 영역입니다.
+
+```typescript
+const scroll = context.ui.createScrollContainer({
+  direction: 'vertical', // 'vertical' | 'horizontal' | 'both'
+  maxHeight: 400,        // 최대 높이 (또는 height: '100%')
+  autoScroll: true,      // append 시 자동으로 스크롤 하단 이동
+});
+
+scroll.append(logItem1, logItem2);
+// scroll.scrollToTop(true);    // 부드러운 상단 스크롤
+// scroll.scrollToBottom(true); // 부드러운 하단 스크롤
+// scroll.clear();              // 내용 비우기
+
+container.append(scroll.container);
+```
+
+---
+
+### 3.9 키 바인딩 설정 모달 대화상자 (`context.ui.openKeyBindingModal`)
 
 3DMigoto 전용 키 입력 도우미 모달 대화상자를 호출하여 실시간 키보드 입력 감지, 필수/부정 수식키(`ctrl`, `no_ctrl`, `alt`, `no_alt` 등) 조합 및 전체 가상 키 목록 검색/선택을 제공합니다.
 사용자가 [확인]을 누르면 선택된 3DMigoto 단축키 문자열을 반환하고, 취소 시 `null`을 반환합니다.

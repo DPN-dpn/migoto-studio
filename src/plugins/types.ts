@@ -27,8 +27,31 @@ export function renderPluginIcon(icon: string | undefined | null, fallback = 'PL
   return trimmed;
 }
 
-import type { PluginUIBuilder, ConfirmOptions, PromptOptions } from './ui-builder.ts';
-export type { ConfirmOptions, PromptOptions };
+import type {
+  PluginUIBuilder,
+  ConfirmOptions,
+  PromptOptions,
+  SplitViewOptions,
+  SplitViewInstance,
+  RowOptions,
+  ColumnOptions,
+  GridOptions,
+  DividerOptions,
+  ScrollContainerOptions,
+  ScrollContainerInstance,
+} from './ui-builder.ts';
+export type {
+  ConfirmOptions,
+  PromptOptions,
+  SplitViewOptions,
+  SplitViewInstance,
+  RowOptions,
+  ColumnOptions,
+  GridOptions,
+  DividerOptions,
+  ScrollContainerOptions,
+  ScrollContainerInstance,
+};
 import type { KeyHelperModalOptions } from '../ui/modals/key-helper.ts';
 export type { KeyHelperModalOptions };
 import type { VkKeyItem, ModifierState, KeyBindingComponents } from '../core/ini/keys.ts';
