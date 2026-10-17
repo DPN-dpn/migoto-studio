@@ -159,6 +159,7 @@ const tab = context.ui.openTab({
 
 - **다중 탭 호환**: 다른 INI 탭들과 완벽히 호환되며, `Ctrl+W`로 닫거나 마우스 휠 클릭 닫기, 탭 간 전환이 자연스럽게 작동합니다.
 - **상태 보존**: 동일한 `id`로 `openTab` 또는 `openFormTab`을 다시 호출하면 새 탭을 중복 생성하지 않고 기존에 열려 있는 탭으로 즉시 전환됩니다.
+- **작업 상태 영구 보존**: 탭 간 전환 시(예: INI 에디터나 다른 플러그인 탭으로 이동했다 돌아올 때) DOM 트리를 파괴하지 않고 상태를 완벽히 유지하므로, 입력 중이던 텍스트/숫자 필드, 드롭다운 선택값, 스크롤 위치 및 에디터 커서가 휘발되지 않고 그대로 보존됩니다.
 
 ---
 
@@ -330,6 +331,20 @@ const slider = context.ui.createSlider({
   step: 5,
   onChange: (val) => console.log('값:', val),
 });
+
+// 스텝퍼 지원 숫자 입력 필드 (마우스 휠, 좌우 증감 버튼, 길게 누르기 연속 증감 지원)
+const numInput = context.ui.createNumberInput({
+  label: '투명도 (Alpha)',
+  value: 0.5,
+  min: 0,
+  max: 1,
+  step: 0.05,
+  precision: 2,
+  onChange: (val) => console.log('새 값:', val),
+});
+// numInput.getValue(); // 0.5
+// numInput.setValue(0.8);
+// numInput.setDisabled(true);
 ```
 
 #### 4) 상태 배지 및 진행률 표시 바 (`createBadge`, `createProgressBar`)
