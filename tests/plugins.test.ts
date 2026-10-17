@@ -1402,18 +1402,40 @@ test('Dynamic tabs reorder correctly by pluginId for custom plugins with differi
   assert.deepEqual(children.map((c) => c.id), ['btn-python', 'btn-ai', 'btn-toggle']);
 });
 
-test('Plugin UI Builder layout components (split, row, column, grid, divider, scroll) work as expected', () => {
+test('Plugin UI Builder layout components (split, row, column, grid, divider, scroll, numberInput) work as expected', () => {
   const createElement = (tag: string) => {
+    const listeners = new Map<string, Function[]>();
     const el: any = {
       tagName: tag.toUpperCase(),
       className: '',
       title: '',
+      value: '',
       style: {},
       children: [],
+      classList: {
+        add: (...cls: string[]) => { el.className = `${el.className} ${cls.join(' ')}`.trim(); },
+        remove: (...cls: string[]) => {
+          cls.forEach((c) => { el.className = el.className.replace(new RegExp(`\\b${c}\\b`, 'g'), '').trim(); });
+        },
+        contains: (c: string) => el.className.split(/\s+/).includes(c),
+      },
+      attributes: {} as Record<string, string>,
+      setAttribute: (k: string, v: string) => { el.attributes[k] = v; },
+      removeAttribute: (k: string) => { delete el.attributes[k]; },
       append: (...nodes: any[]) => el.children.push(...nodes),
       replaceChildren: (...nodes: any[]) => { el.children = [...nodes]; },
-      addEventListener: () => {},
-      removeEventListener: () => {},
+      addEventListener: (type: string, fn: Function) => {
+        if (!listeners.has(type)) listeners.set(type, []);
+        listeners.get(type)!.push(fn);
+      },
+      removeEventListener: (type: string, fn: Function) => {
+        const arr = listeners.get(type) || [];
+        listeners.set(type, arr.filter((f) => f !== fn));
+      },
+      dispatch: (type: string, evt: any = {}) => {
+        const arr = listeners.get(type) || [];
+        arr.forEach((fn) => fn(evt));
+      },
       getBoundingClientRect: () => ({ width: 400, height: 300 }),
       scrollTo: () => {},
     };
@@ -1434,6 +1456,7 @@ test('Plugin UI Builder layout components (split, row, column, grid, divider, sc
     assert.equal(typeof builder.createGrid, 'function');
     assert.equal(typeof builder.createDivider, 'function');
     assert.equal(typeof builder.createScrollContainer, 'function');
+    assert.equal(typeof builder.createNumberInput, 'function');
 
     // Test createSplitView horizontal
     const split = builder.createSplitView({ direction: 'horizontal', initialSize: 200 });
@@ -1483,6 +1506,69 @@ test('Plugin UI Builder layout components (split, row, column, grid, divider, sc
     assert.equal(scroll.content.children.length, 1);
     scroll.clear();
     assert.equal(scroll.content.children.length, 0);
+
+    // Test createNumberInput (stepper with left/right arrows, min/max, integerOnly, precision)
+    let lastChanged: number | null = null;
+    const num = builder.createNumberInput({
+      label: '상태 개수',
+      value: 2,
+      min: 1,
+      max: 5,
+      step: 1,
+      integerOnly: true,
+      onChange: (v) => { lastChanged = v; },
+    });
+    assert.equal(num.getValue(), 2);
+    assert.ok(num.container.className.includes('plugin-number-stepper'));
+    assert.ok(num.decBtn.className.includes('plugin-number-dec'));
+    assert.ok(num.incBtn.className.includes('plugin-number-inc'));
+
+    // Test createColumn fill option
+    const colFill = builder.createColumn({ fill: true });
+    assert.ok(colFill.className.includes('fill'));
+    assert.equal(colFill.style.flex, '1 1 0%');
+    assert.equal(colFill.style.minHeight, '0');
+    assert.equal(colFill.style.height, '100%');
+    assert.equal(colFill.style.overflow, 'hidden');
+
+    // Click dec button -> 2 - 1 = 1
+    (num.decBtn as any).dispatch('mousedown', { button: 0, preventDefault: () => {} });
+    (num.decBtn as any).dispatch('mouseup', {});
+    assert.equal(num.getValue(), 1);
+    assert.equal(num.decBtn.disabled, true); // min reached
+    assert.equal(lastChanged, 1);
+
+    // Click inc button twice -> 1 -> 2 -> 3
+    (num.incBtn as any).dispatch('mousedown', { button: 0, preventDefault: () => {} });
+    (num.incBtn as any).dispatch('mouseup', {});
+    assert.equal(num.getValue(), 2);
+    assert.equal(num.decBtn.disabled, false);
+    (num.incBtn as any).dispatch('mousedown', { button: 0, preventDefault: () => {} });
+    (num.incBtn as any).dispatch('mouseup', {});
+    assert.equal(num.getValue(), 3);
+
+    // Set value exceeding max -> should clamp to 5
+    num.setValue(10);
+    assert.equal(num.getValue(), 5);
+    assert.equal(num.incBtn.disabled, true);
+
+    // Test precision
+    const floatNum = builder.createNumberInput({
+      value: 0.25,
+      min: 0,
+      max: 1,
+      step: 0.05,
+      precision: 2,
+    });
+    assert.equal(floatNum.getValue(), 0.25);
+    assert.equal(floatNum.input.value, '0.25');
+    (floatNum.incBtn as any).dispatch('mousedown', { button: 0, preventDefault: () => {} });
+    (floatNum.incBtn as any).dispatch('mouseup', {});
+    assert.equal(floatNum.getValue(), 0.3);
+    assert.equal(floatNum.input.value, '0.30');
+
+    num.destroy?.();
+    floatNum.destroy?.();
   } finally {
     if (origDoc) (globalThis as any).document = origDoc;
     else delete (globalThis as any).document;

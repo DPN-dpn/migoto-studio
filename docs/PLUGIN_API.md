@@ -444,6 +444,7 @@ const toolbar = context.ui.createRow({
 const formCol = context.ui.createColumn({
   gap: 12,
   align: 'stretch',
+  fill: true, // 남은 세로 영역을 채우고 min-height: 0, overflow: hidden을 자동 적용하여 내부 createScrollContainer 및 createTabs의 스크롤바 작동 보장
   children: [headerEl, card1, card2],
 });
 ```
@@ -668,6 +669,39 @@ const dropZone = context.ui.createDropZone({
 
 container.append(dropZone.container);
 ```
+
+#### H. 숫자 입력 스텝퍼 (`context.ui.createNumberInput`)
+브라우저 기본의 미세한 스핀 버튼 대신 입력 필드 좌우 양쪽에 큼직한 조절 버튼(`◀`, `▶`)이 배치된 숫자 입력 위젯입니다.
+마우스 클릭 및 길게 누르기(Hold to step), 키보드 방향키(`↑`/`↓`), Shift(10배), Alt(0.1배) 조절을 완벽하게 지원하며, 정수 전용 제한(`integerOnly`) 및 소수점 자릿수 포맷팅(`precision`)을 제공합니다.
+
+```typescript
+const numStepper = context.ui.createNumberInput({
+  label: '상태 개수',
+  value: 2,
+  min: 1,
+  max: 10,
+  step: 1,
+  integerOnly: true,      // 정수 전용 제한 (소수점 입력 방지)
+  // precision: 2,        // 실수인 경우 소수점 자릿수 포맷팅 (예: 0.50)
+  clampOnBlur: true,      // 포커스 벗어날 시 min/max 범위로 자동 보정 (기본: true)
+  onChange: (val) => {
+    console.log('변경된 숫자값:', val);
+  },
+});
+
+container.append(numStepper.row); // label이 있으면 row, 없으면 container
+
+// 값 제어 및 변경
+numStepper.setValue(3);
+console.log('현재 값:', numStepper.getValue()); // 3
+numStepper.setMin(1);
+numStepper.setMax(8);
+numStepper.setDisabled(false);
+// numStepper.destroy();   // 컴포넌트 해제 시 타이머 정리 (선택 사항)
+```
+
+> [!TIP]
+> `context.ui.createForm`에서 `field.type: 'number'`를 정의할 때도 이 좌우 화살표 스텝퍼 위젯과 `integerOnly`, `precision`, `min`, `max`, `step` 제한이 자동으로 완벽히 연동됩니다.
 
 ---
 

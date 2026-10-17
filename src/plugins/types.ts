@@ -248,6 +248,40 @@ export interface FormFieldDef {
   min?: number;
   max?: number;
   step?: number;
+  integerOnly?: boolean;
+  precision?: number;
+}
+
+export interface NumberInputOptions {
+  label?: string;
+  value?: number;
+  min?: number;
+  max?: number;
+  step?: number;
+  integerOnly?: boolean;
+  precision?: number;
+  clampOnBlur?: boolean;
+  placeholder?: string;
+  disabled?: boolean;
+  className?: string;
+  style?: Partial<CSSStyleDeclaration>;
+  onChange?: (value: number) => void;
+  onInput?: (value: number) => void;
+}
+
+export interface NumberInputInstance {
+  row: HTMLElement;
+  container: HTMLElement;
+  input: HTMLInputElement;
+  decBtn: HTMLButtonElement;
+  incBtn: HTMLButtonElement;
+  getValue: () => number;
+  setValue: (value: number) => void;
+  setDisabled: (disabled: boolean) => void;
+  setMin: (min: number | undefined) => void;
+  setMax: (max: number | undefined) => void;
+  setStep: (step: number | undefined) => void;
+  destroy?: () => void;
 }
 
 export interface FormSectionDef {

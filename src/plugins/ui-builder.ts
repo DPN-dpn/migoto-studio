@@ -1,9 +1,9 @@
-import type { SelectOption, FormConfig, FormFieldDef, FormInstance } from './types.ts';
+import type { SelectOption, FormConfig, FormFieldDef, FormInstance, NumberInputOptions, NumberInputInstance } from './types.ts';
 import { CODE_TO_VK } from '../core/ini/keys.ts';
 import { openKeyHelperModal, type KeyHelperModalOptions } from '../ui/modals/key-helper.ts';
 import { openConfirmModal, openPromptModal, type ConfirmOptions, type PromptOptions } from '../ui/modals/confirm-ui.ts';
 import { platform } from '../platform/index.ts';
-export type { ConfirmOptions, PromptOptions };
+export type { ConfirmOptions, PromptOptions, NumberInputOptions, NumberInputInstance };
 
 /**
  * 플러그인 전용 고수준 UI 빌더 API 구현체
@@ -100,6 +100,254 @@ export function createUIBuilder() {
         getValue: () => input.value,
         setValue: (v: string) => {
           input.value = v;
+        },
+      };
+    },
+
+    /**
+     * 좌우 양쪽에 조절 화살표가 배치된 숫자 입력 필드를 생성합니다.
+     * 범위 제한(min/max), 정수 제한(integerOnly), 소수점 자릿수 제한(precision)을 완벽 지원합니다.
+     */
+    createNumberInput(options?: NumberInputOptions): NumberInputInstance {
+      const opts = options || {};
+      let currentMin = opts.min;
+      let currentMax = opts.max;
+      let currentIntegerOnly = Boolean(opts.integerOnly);
+      let currentPrecision = opts.precision;
+      let currentStep = opts.step !== undefined ? opts.step : (currentIntegerOnly ? 1 : (currentPrecision !== undefined ? Math.pow(10, -currentPrecision) : 1));
+      const clampOnBlur = opts.clampOnBlur !== false;
+
+      const sanitize = (val: number | string): number => {
+        let num = typeof val === 'number' ? val : parseFloat(val);
+        if (Number.isNaN(num)) {
+          num = currentMin !== undefined ? currentMin : 0;
+        }
+        if (currentIntegerOnly) {
+          num = Math.round(num);
+        } else if (currentPrecision !== undefined) {
+          const factor = Math.pow(10, currentPrecision);
+          num = Math.round(num * factor) / factor;
+        }
+        if (currentMin !== undefined && num < currentMin) {
+          num = currentMin;
+        }
+        if (currentMax !== undefined && num > currentMax) {
+          num = currentMax;
+        }
+        return num;
+      };
+
+      const formatDisplay = (num: number): string => {
+        if (currentIntegerOnly) {
+          return String(Math.round(num));
+        }
+        if (currentPrecision !== undefined) {
+          return num.toFixed(currentPrecision);
+        }
+        return String(num);
+      };
+
+      let currentVal = opts.value !== undefined ? sanitize(opts.value) : (currentMin !== undefined ? currentMin : 0);
+
+      const container = document.createElement('div');
+      container.className = `plugin-number-stepper${opts.className ? ` ${opts.className}` : ''}`;
+      if (opts.style) {
+        Object.assign(container.style, opts.style);
+      }
+
+      // 1. 좌측 감소 화살표 버튼 (◀)
+      const decBtn = document.createElement('button');
+      decBtn.type = 'button';
+      decBtn.className = 'plugin-number-btn plugin-number-dec';
+      decBtn.title = '감소 (누르고 있으면 연속 감소)';
+      decBtn.setAttribute('aria-label', '감소');
+      decBtn.innerHTML = `<svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13L5 8l5-5"/></svg>`;
+
+      // 2. 중앙 숫자 input
+      const input = document.createElement('input');
+      input.type = 'number';
+      input.className = 'plugin-input plugin-number-input';
+      if (opts.placeholder) input.placeholder = opts.placeholder;
+      if (currentMin !== undefined) input.min = String(currentMin);
+      if (currentMax !== undefined) input.max = String(currentMax);
+      input.step = String(currentStep);
+      input.value = formatDisplay(currentVal);
+
+      // 3. 우측 증가 화살표 버튼 (▶)
+      const incBtn = document.createElement('button');
+      incBtn.type = 'button';
+      incBtn.className = 'plugin-number-btn plugin-number-inc';
+      incBtn.title = '증가 (누르고 있으면 연속 증가)';
+      incBtn.setAttribute('aria-label', '증가');
+      incBtn.innerHTML = `<svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3l5 5-5 5"/></svg>`;
+
+      if (opts.disabled) {
+        input.disabled = true;
+        decBtn.disabled = true;
+        incBtn.disabled = true;
+      }
+
+      const updateBtnState = () => {
+        if (opts.disabled) return;
+        if (currentMin !== undefined && currentVal <= currentMin) {
+          decBtn.disabled = true;
+          decBtn.classList.add('disabled');
+        } else {
+          decBtn.disabled = false;
+          decBtn.classList.remove('disabled');
+        }
+
+        if (currentMax !== undefined && currentVal >= currentMax) {
+          incBtn.disabled = true;
+          incBtn.classList.add('disabled');
+        } else {
+          incBtn.disabled = false;
+          incBtn.classList.remove('disabled');
+        }
+      };
+
+      updateBtnState();
+
+      const applyNewValue = (newVal: number, triggerChange = true) => {
+        currentVal = sanitize(newVal);
+        input.value = formatDisplay(currentVal);
+        updateBtnState();
+        opts.onInput?.(currentVal);
+        if (triggerChange) {
+          opts.onChange?.(currentVal);
+        }
+      };
+
+      const adjust = (delta: number) => {
+        if (input.disabled) return;
+        const currentParsed = parseFloat(input.value);
+        const base = Number.isNaN(currentParsed) ? currentVal : currentParsed;
+        applyNewValue(base + delta, true);
+      };
+
+      // 연속 누름 핸들러
+      const bindHold = (btn: HTMLButtonElement, getDelta: () => number) => {
+        let timer: any = null;
+        let interval: any = null;
+
+        const stop = () => {
+          if (timer) clearTimeout(timer);
+          if (interval) clearInterval(interval);
+          timer = null;
+          interval = null;
+        };
+
+        btn.addEventListener('mousedown', (e: MouseEvent) => {
+          if (e.button !== 0 || btn.disabled) return;
+          e.preventDefault();
+          adjust(getDelta());
+          stop();
+          timer = setTimeout(() => {
+            interval = setInterval(() => {
+              if (btn.disabled) {
+                stop();
+                return;
+              }
+              adjust(getDelta());
+            }, 50);
+            if (interval && typeof interval.unref === 'function') {
+              interval.unref();
+            }
+          }, 350);
+          if (timer && typeof timer.unref === 'function') {
+            timer.unref();
+          }
+        });
+
+        btn.addEventListener('mouseup', stop);
+        btn.addEventListener('mouseleave', stop);
+        btn.addEventListener('blur', stop);
+        return stop;
+      };
+
+      const stopDec = bindHold(decBtn, () => -currentStep);
+      const stopInc = bindHold(incBtn, () => currentStep);
+
+      // 직접 입력 이벤트
+      input.addEventListener('input', () => {
+        let raw = input.value;
+        if (currentIntegerOnly && raw.includes('.')) {
+          raw = raw.split('.')[0];
+          input.value = raw;
+        }
+        const parsed = parseFloat(raw);
+        if (!Number.isNaN(parsed)) {
+          currentVal = parsed;
+          updateBtnState();
+          opts.onInput?.(parsed);
+        }
+      });
+
+      input.addEventListener('blur', () => {
+        if (clampOnBlur) {
+          applyNewValue(parseFloat(input.value) || 0, true);
+        } else {
+          opts.onChange?.(parseFloat(input.value) || 0);
+        }
+      });
+
+      input.addEventListener('keydown', (e: KeyboardEvent) => {
+        let multiplier = 1;
+        if (e.shiftKey) multiplier = 10;
+        else if (e.altKey) multiplier = 0.1;
+
+        if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          adjust(currentStep * multiplier);
+        } else if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          adjust(-currentStep * multiplier);
+        } else if (e.key === 'Enter') {
+          input.blur();
+        }
+      });
+
+      container.append(decBtn, input, incBtn);
+
+      const row = opts.label
+        ? this.createFormRow(opts.label, container)
+        : container;
+
+      return {
+        row,
+        container,
+        input,
+        decBtn,
+        incBtn,
+        getValue: () => currentVal,
+        setValue: (v: number) => {
+          applyNewValue(v, false);
+        },
+        setDisabled: (disabled: boolean) => {
+          input.disabled = disabled;
+          decBtn.disabled = disabled;
+          incBtn.disabled = disabled;
+          if (!disabled) updateBtnState();
+        },
+        setMin: (min: number | undefined) => {
+          currentMin = min;
+          if (min !== undefined) input.min = String(min);
+          else input.removeAttribute('min');
+          applyNewValue(currentVal, false);
+        },
+        setMax: (max: number | undefined) => {
+          currentMax = max;
+          if (max !== undefined) input.max = String(max);
+          else input.removeAttribute('max');
+          applyNewValue(currentVal, false);
+        },
+        setStep: (step: number | undefined) => {
+          currentStep = step !== undefined ? step : (currentIntegerOnly ? 1 : 1);
+          input.step = String(currentStep);
+        },
+        destroy: () => {
+          stopDec();
+          stopInc();
         },
       };
     },
@@ -818,6 +1066,24 @@ export function createUIBuilder() {
             setValue: (v) => txt.setValue(v),
           });
           controlRow = txt.container;
+        } else if (field.type === 'number') {
+          const numInput = this.createNumberInput({
+            label: field.label,
+            value: initialVal !== undefined && initialVal !== '' ? Number(initialVal) : (field.default !== undefined ? Number(field.default) : undefined),
+            min: field.min,
+            max: field.max,
+            step: field.step,
+            integerOnly: field.integerOnly,
+            precision: field.precision,
+            placeholder: field.placeholder,
+            onInput: updateValue,
+            onChange: updateValue,
+          });
+          fieldControls.set(field.id, {
+            getValue: () => numInput.getValue(),
+            setValue: (v) => numInput.setValue(Number(v)),
+          });
+          controlRow = numInput.row;
         } else {
           const inp = this.createInput({
             label: field.label,
@@ -825,8 +1091,7 @@ export function createUIBuilder() {
             value: initialVal !== undefined ? String(initialVal) : '',
             placeholder: field.placeholder,
             onInput: (val) => {
-              const parsed = field.type === 'number' ? Number(val) : val;
-              updateValue(parsed);
+              updateValue(val);
             },
           });
           if (field.min !== undefined) (inp.input as HTMLInputElement).min = String(field.min);
@@ -834,7 +1099,7 @@ export function createUIBuilder() {
           if (field.step !== undefined) (inp.input as HTMLInputElement).step = String(field.step);
 
           fieldControls.set(field.id, {
-            getValue: () => (field.type === 'number' ? Number(inp.getValue()) : inp.getValue()),
+            getValue: () => inp.getValue(),
             setValue: (v) => inp.setValue(String(v)),
           });
           controlRow = inp.row;
@@ -1187,7 +1452,24 @@ export function createUIBuilder() {
      */
     createColumn(options?: ColumnOptions): HTMLElement {
       const col = document.createElement('div');
-      col.className = `plugin-column${options?.className ? ` ${options.className}` : ''}`;
+      col.className = `plugin-column${options?.fill ? ' fill' : ''}${options?.className ? ` ${options.className}` : ''}`;
+      col.style.display = 'flex';
+      col.style.flexDirection = 'column';
+      col.style.minHeight = '0';
+      col.style.minWidth = '0';
+      col.style.boxSizing = 'border-box';
+
+      if (options?.fill) {
+        col.style.flex = '1 1 0%';
+        col.style.height = '100%';
+        col.style.width = '100%';
+        col.style.overflow = options.overflow || 'hidden';
+      } else if (options?.flex !== undefined) {
+        col.style.flex = typeof options.flex === 'number' ? `${options.flex} 1 0%` : options.flex;
+      }
+      if (options?.overflow) {
+        col.style.overflow = options.overflow;
+      }
       if (options?.gap !== undefined) {
         col.style.gap = typeof options.gap === 'number' ? `${options.gap}px` : options.gap;
       } else {
@@ -1969,6 +2251,9 @@ export interface ColumnOptions {
   gap?: number | string;
   align?: 'start' | 'center' | 'end' | 'stretch';
   justify?: 'start' | 'center' | 'end' | 'space-between';
+  fill?: boolean;
+  flex?: number | string;
+  overflow?: 'hidden' | 'auto' | 'visible' | 'scroll';
   className?: string;
   style?: Partial<CSSStyleDeclaration>;
 }

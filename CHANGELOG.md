@@ -3,10 +3,19 @@
 ## [다음 버전]
 
 ### 신규 기능
+- 플러그인 UI 빌더 숫자 입력 스텝퍼 위젯 (`context.ui.createNumberInput`):
+  - 브라우저 기본의 작은 스핀 버튼 대신 입력창 좌우 양쪽에 직관적인 큰 증감 버튼(`◀`, `▶`) 배치
+  - 마우스 클릭 및 누르고 있기(Hold to step) 연속 증감 지원
+  - `min`, `max` 범위 제한, `integerOnly` 정수 전용 제한, `precision` 소수점 자릿수 자동 포맷팅 지원
+  - `context.ui.createForm`의 `type: 'number'` 폼 필드와 완벽 자동 연동
 
 ### 기능 개선
+- 플러그인 UI 빌더 세로 컨테이너 (`context.ui.createColumn`) 높이 구속 및 화면 채움(`fill`) 지원:
+  - `.plugin-column` 기본 스타일에 `min-height: 0; min-width: 0;`을 내장하여 Flexbox 자식 크기로 인한 컨테이너 무한 팽창 방지
+  - `fill: true` 옵션(`flex: 1 1 0%; height: 100%; min-height: 0; overflow: hidden;`) 탑재로 툴바와 탭/스크롤 뷰를 세로로 묶을 때 플러그인 측의 수동 CSS나 인라인 스타일 주입 없이도 자식 `createScrollContainer`의 스크롤바가 완벽히 동작하도록 개선
 
 ### 버그 수정
+- `node --test` 환경에서 `createNumberInput` 마우스 연속 누름 타이머가 활성 상태로 남아 프로세스가 종료되지 않던 현상 수정 (`unref` 적용 및 `destroy` 정리 메서드 추가)
 
 ---
 
