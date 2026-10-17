@@ -261,21 +261,38 @@ export class MenuBar {
       {
         id: 'plugins',
         label: '플러그인',
-        visible: () => (this.cb.pluginManager?.getPluginMenuItems() ?? []).length > 0,
         items: () => {
-          const items: MenuItemDef[] = [];
-          const groups = this.cb.pluginManager?.getPluginMenuItems() ?? [];
-          for (const group of groups) {
-            items.push({
-              label: group.pluginName,
-              submenu: () => {
-                return group.items.map((subItem) => ({
-                  label: subItem.label,
-                  shortcut: subItem.shortcut,
-                  action: subItem.action,
-                }));
+          const items: MenuItemDef[] = [
+            {
+              label: '플러그인 관리…',
+              shortcut: 'Ctrl+Shift+X',
+              action: () => {
+                this.cb.activityBar.switchTo('plugins');
               },
-            });
+            },
+            {
+              label: '플러그인 폴더 열기…',
+              action: () => {
+                this.cb.pluginManager?.openPluginsFolder();
+              },
+            },
+          ];
+
+          const groups = this.cb.pluginManager?.getPluginMenuItems() ?? [];
+          if (groups.length > 0) {
+            items.push({ divider: true });
+            for (const group of groups) {
+              items.push({
+                label: group.pluginName,
+                submenu: () => {
+                  return group.items.map((subItem) => ({
+                    label: subItem.label,
+                    shortcut: subItem.shortcut,
+                    action: subItem.action,
+                  }));
+                },
+              });
+            }
           }
           return items;
         },
