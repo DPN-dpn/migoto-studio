@@ -11,9 +11,7 @@ export function isBuiltinResource(name: string): boolean {
     norm.startsWith('commandlist\\builtin') ||
     norm.startsWith('commandlist\\skintexture') ||
     norm === 'commandlistskintexture' ||
-    norm === 'builtin' ||
-    norm.startsWith('commandlist\\ttl') ||
-    norm.startsWith('resource\\ttl')
+    norm === 'builtin'
   );
 }
 

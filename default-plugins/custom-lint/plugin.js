@@ -25,7 +25,7 @@ function stripComments(line) {
 function isBuiltinResource(name) {
 	if (!name) return false;
 	const norm = name.toLowerCase().replace(/^[\\\/]+/, "");
-	return norm.startsWith("builtincommandlist") || norm.startsWith("builtin_commandlist") || norm.startsWith("builtin\\") || norm.startsWith("commandlist\\builtin") || norm.startsWith("commandlist\\skintexture") || norm === "commandlistskintexture" || norm === "builtin" || norm.startsWith("commandlist\\ttl") || norm.startsWith("resource\\ttl");
+	return norm.startsWith("builtincommandlist") || norm.startsWith("builtin_commandlist") || norm.startsWith("builtin\\") || norm.startsWith("commandlist\\builtin") || norm.startsWith("commandlist\\skintexture") || norm === "commandlistskintexture" || norm === "builtin";
 }
 function parseIniExports(text, filePath) {
 	const lines = text.split(/\r?\n/);
@@ -728,8 +728,6 @@ function registerLintRules(context, isActive, state) {
 					const isExplicitDecl = /\b(?:global|persist|local)\s*$/i.test(beforeMatch);
 					if (isDecl || isExplicitDecl) continue;
 					if (fullVar.includes("\\")) {
-						if (ctx.isAllowedVariable && ctx.isAllowedVariable(fullVar)) continue;
-						if (fullVar.replace(/^[\\$]+/, "").toLowerCase().startsWith("ttl\\")) continue;
 						const parts = fullVar.split("\\").filter(Boolean);
 						if (parts.length >= 2) {
 							const nsName = parts.slice(0, -1).join("\\");
