@@ -111,7 +111,7 @@ async function main() {
   try {
     const cargoLock = await readFile(CARGO_LOCK_PATH, 'utf8');
     const updatedCargoLock = cargoLock.replace(
-      /(\[\[package\]\]\s*name\s*=\s*"migoto-studio"\s*version\s*=\s*)"[^"]+"/m,
+      /(\[\[package\]\]\s*name\s*=\s*"(?:migoto-studio|app)"\s*version\s*=\s*)"[^"]+"/m,
       `$1"${newVersion}"`
     );
     await writeFile(CARGO_LOCK_PATH, updatedCargoLock);
