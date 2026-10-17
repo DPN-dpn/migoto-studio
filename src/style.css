@@ -2973,10 +2973,28 @@ body.ai-dock-resizing * {
 #custom-viewer-container {
   width: 100%;
   height: 100%;
+  flex: 1 1 0%;
+  min-height: 0;
+  min-width: 0;
   position: relative;
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  box-sizing: border-box;
+}
+
+.migoto-tab-editor-content,
+.plugin-tab-editor-content {
+  height: 100%;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+  box-sizing: border-box;
+  flex: 1 1 0%;
+  min-height: 0;
+  min-width: 0;
 }
 
 .image-viewer-container {
@@ -5119,27 +5137,37 @@ body.ai-dock-resizing * {
 /* ==========================================================================
    Plugin Layout & Splitter Components
    ========================================================================== */
-.plugin-split-container {
+.plugin-split-container,
+.migoto-split-view {
   display: flex;
   width: 100%;
   height: 100%;
+  flex: 1 1 0%;
+  min-height: 0;
+  min-width: 0;
   overflow: hidden;
   position: relative;
   box-sizing: border-box;
 }
 
-.plugin-split-container.plugin-split-horizontal {
+.plugin-split-container.plugin-split-horizontal,
+.migoto-split-view.plugin-split-horizontal {
   flex-direction: row;
 }
 
-.plugin-split-container.plugin-split-vertical {
+.plugin-split-container.plugin-split-vertical,
+.migoto-split-view.plugin-split-vertical {
   flex-direction: column;
 }
 
 .plugin-split-pane {
   position: relative;
-  overflow: auto;
+  overflow: hidden;
   box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
 }
 
 .plugin-split-first {
@@ -5246,23 +5274,58 @@ body.plugin-split-resizing-v * {
 }
 
 /* Scroll Container */
-.plugin-scroll-container {
+.plugin-scroll-container,
+.migoto-scroll-container {
   position: relative;
   box-sizing: border-box;
+  flex: 1 1 0%;
+  min-height: 0;
+  min-width: 0;
+  width: 100%;
+  height: 100%;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb, rgba(255, 255, 255, 0.25)) transparent;
 }
 
-.plugin-scroll-container.scroll-vertical {
+.plugin-scroll-container.scroll-vertical,
+.migoto-scroll-container.scroll-vertical {
   overflow-y: auto;
   overflow-x: hidden;
 }
 
-.plugin-scroll-container.scroll-horizontal {
+.plugin-scroll-container.scroll-horizontal,
+.migoto-scroll-container.scroll-horizontal {
   overflow-x: auto;
   overflow-y: hidden;
 }
 
-.plugin-scroll-container.scroll-both {
+.plugin-scroll-container.scroll-both,
+.migoto-scroll-container.scroll-both {
   overflow: auto;
+}
+
+.plugin-scroll-container::-webkit-scrollbar,
+.migoto-scroll-container::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+  display: block;
+}
+
+.plugin-scroll-container::-webkit-scrollbar-track,
+.migoto-scroll-container::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.plugin-scroll-container::-webkit-scrollbar-thumb,
+.migoto-scroll-container::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb, rgba(255, 255, 255, 0.25));
+  border-radius: 4px;
+}
+
+.plugin-scroll-container::-webkit-scrollbar-thumb:hover,
+.migoto-scroll-container::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover, rgba(255, 255, 255, 0.4));
 }
 
 .plugin-scroll-content {
@@ -5274,11 +5337,17 @@ body.plugin-split-resizing-v * {
    ========================================================================== */
 
 /* Tabs */
-.plugin-tabs-container {
+.plugin-tabs-container,
+.migoto-tabs-container {
   display: flex;
   flex-direction: column;
   width: 100%;
+  height: 100%;
+  flex: 1 1 0%;
+  min-height: 0;
+  overflow: hidden;
   box-sizing: border-box;
+  position: relative;
 }
 
 .plugin-tab-nav {
@@ -5287,9 +5356,10 @@ body.plugin-split-resizing-v * {
   gap: 2px;
   border-bottom: 1px solid var(--border);
   padding: 0 4px;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
   overflow-x: auto;
   box-sizing: border-box;
+  flex-shrink: 0;
 }
 
 .plugin-tab-btn {
@@ -5339,12 +5409,30 @@ body.plugin-split-resizing-v * {
 
 .plugin-tab-content {
   width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 0%;
+  min-height: 0;
+  overflow: hidden;
+  position: relative;
   box-sizing: border-box;
 }
 
 .plugin-tab-panel {
   width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 0%;
+  min-height: 0;
+  overflow: hidden;
+  position: relative;
   box-sizing: border-box;
+}
+
+.plugin-tab-panel[hidden] {
+  display: none !important;
 }
 
 /* Collapsible */

@@ -990,10 +990,32 @@ export function createUIBuilder() {
       const opts = options || {};
       const isHorizontal = (opts.direction || 'horizontal') === 'horizontal';
       const container = document.createElement('div');
-      container.className = `plugin-split-container plugin-split-${isHorizontal ? 'horizontal' : 'vertical'}${opts.className ? ` ${opts.className}` : ''}`;
+      container.className = `plugin-split-container migoto-split-view plugin-split-${isHorizontal ? 'horizontal' : 'vertical'}${opts.className ? ` ${opts.className}` : ''}`;
+      container.style.display = 'flex';
+      container.style.flex = '1 1 0%';
+      container.style.minHeight = '0';
+      container.style.minWidth = '0';
+      container.style.width = '100%';
+      container.style.height = '100%';
+      container.style.overflow = 'hidden';
+      container.style.position = 'relative';
+      container.style.boxSizing = 'border-box';
 
       const firstPane = document.createElement('div');
       firstPane.className = 'plugin-split-pane plugin-split-first';
+      firstPane.style.position = 'relative';
+      firstPane.style.boxSizing = 'border-box';
+      firstPane.style.display = 'flex';
+      firstPane.style.flexDirection = 'column';
+      firstPane.style.overflow = 'hidden';
+      firstPane.style.minHeight = '0';
+      firstPane.style.minWidth = '0';
+      firstPane.style.flexShrink = '0';
+      if (isHorizontal) {
+        firstPane.style.height = '100%';
+      } else {
+        firstPane.style.width = '100%';
+      }
       if (opts.first) firstPane.append(opts.first);
 
       const splitter = document.createElement('div');
@@ -1002,6 +1024,19 @@ export function createUIBuilder() {
 
       const secondPane = document.createElement('div');
       secondPane.className = 'plugin-split-pane plugin-split-second';
+      secondPane.style.position = 'relative';
+      secondPane.style.boxSizing = 'border-box';
+      secondPane.style.display = 'flex';
+      secondPane.style.flexDirection = 'column';
+      secondPane.style.overflow = 'hidden';
+      secondPane.style.minHeight = '0';
+      secondPane.style.minWidth = '0';
+      secondPane.style.flex = '1 1 0%';
+      if (isHorizontal) {
+        secondPane.style.height = '100%';
+      } else {
+        secondPane.style.width = '100%';
+      }
       if (opts.second) secondPane.append(opts.second);
 
       const minFirst = opts.minFirstSize ?? 50;
@@ -1202,7 +1237,16 @@ export function createUIBuilder() {
     createScrollContainer(options?: ScrollContainerOptions): ScrollContainerInstance {
       const container = document.createElement('div');
       const dir = options?.direction || 'vertical';
-      container.className = `plugin-scroll-container scroll-${dir}${options?.className ? ` ${options.className}` : ''}`;
+      container.className = `plugin-scroll-container migoto-scroll-container scroll-${dir}${options?.className ? ` ${options.className}` : ''}`;
+
+      container.style.flex = options?.flex !== undefined ? (typeof options.flex === 'number' ? `${options.flex} 1 0%` : options.flex) : '1 1 0%';
+      container.style.minHeight = '0';
+      container.style.minWidth = '0';
+      container.style.width = options?.width !== undefined ? (typeof options.width === 'number' ? `${options.width}px` : options.width) : '100%';
+      container.style.height = options?.height !== undefined ? (typeof options.height === 'number' ? `${options.height}px` : options.height) : '100%';
+      container.style.boxSizing = 'border-box';
+      container.style.scrollbarGutter = 'stable';
+      container.style.scrollbarWidth = 'thin';
 
       if (options?.maxHeight !== undefined) {
         container.style.maxHeight = typeof options.maxHeight === 'number' ? `${options.maxHeight}px` : options.maxHeight;
@@ -1210,18 +1254,30 @@ export function createUIBuilder() {
       if (options?.maxWidth !== undefined) {
         container.style.maxWidth = typeof options.maxWidth === 'number' ? `${options.maxWidth}px` : options.maxWidth;
       }
-      if (options?.height !== undefined) {
-        container.style.height = typeof options.height === 'number' ? `${options.height}px` : options.height;
-      }
-      if (options?.width !== undefined) {
-        container.style.width = typeof options.width === 'number' ? `${options.width}px` : options.width;
-      }
       if (options?.padding !== undefined) {
         container.style.padding = typeof options.padding === 'number' ? `${options.padding}px` : options.padding;
+      }
+      if (options?.style) {
+        Object.assign(container.style, options.style);
       }
 
       const content = document.createElement('div');
       content.className = 'plugin-scroll-content';
+      content.style.boxSizing = 'border-box';
+      if (dir === 'vertical') {
+        content.style.width = '100%';
+        content.style.minHeight = '100%';
+        content.style.display = 'flex';
+        content.style.flexDirection = 'column';
+      } else if (dir === 'horizontal') {
+        content.style.height = '100%';
+        content.style.minWidth = '100%';
+        content.style.display = 'flex';
+        content.style.flexDirection = 'row';
+      } else {
+        content.style.minWidth = '100%';
+        content.style.minHeight = '100%';
+      }
 
       if (options?.content) {
         const items = Array.isArray(options.content) ? options.content : [options.content];
@@ -1280,13 +1336,32 @@ export function createUIBuilder() {
      */
     createTabs(options: TabsOptions): TabsInstance {
       const container = document.createElement('div');
-      container.className = `plugin-tabs-container${options.className ? ` ${options.className}` : ''}`;
+      container.className = `plugin-tabs-container migoto-tabs-container${options.className ? ` ${options.className}` : ''}`;
+      container.style.display = 'flex';
+      container.style.flexDirection = 'column';
+      container.style.flex = '1 1 0%';
+      container.style.minHeight = '0';
+      container.style.height = '100%';
+      container.style.width = '100%';
+      container.style.overflow = 'hidden';
+      container.style.position = 'relative';
+      container.style.boxSizing = 'border-box';
 
       const tabNav = document.createElement('div');
       tabNav.className = 'plugin-tab-nav';
+      tabNav.style.flexShrink = '0';
 
       const tabContent = document.createElement('div');
       tabContent.className = 'plugin-tab-content';
+      tabContent.style.display = 'flex';
+      tabContent.style.flexDirection = 'column';
+      tabContent.style.flex = '1 1 0%';
+      tabContent.style.minHeight = '0';
+      tabContent.style.height = '100%';
+      tabContent.style.overflow = 'hidden';
+      tabContent.style.position = 'relative';
+      tabContent.style.width = '100%';
+      tabContent.style.boxSizing = 'border-box';
 
       const buttons = new Map<string, HTMLButtonElement>();
       const panels = new Map<string, HTMLElement>();
@@ -1348,6 +1423,15 @@ export function createUIBuilder() {
         const panel = document.createElement('div');
         panel.className = 'plugin-tab-panel';
         panel.setAttribute('role', 'tabpanel');
+        panel.style.display = 'flex';
+        panel.style.flexDirection = 'column';
+        panel.style.flex = '1 1 0%';
+        panel.style.minHeight = '0';
+        panel.style.height = '100%';
+        panel.style.overflow = 'hidden';
+        panel.style.position = 'relative';
+        panel.style.width = '100%';
+        panel.style.boxSizing = 'border-box';
         panel.hidden = tab.id !== activeTabId;
         panel.append(tab.content);
         panels.set(tab.id, panel);
@@ -1911,6 +1995,8 @@ export interface ScrollContainerOptions {
   height?: number | string;
   width?: number | string;
   padding?: number | string;
+  flex?: number | string;
+  style?: Partial<CSSStyleDeclaration>;
   className?: string;
   autoScroll?: boolean;
 }

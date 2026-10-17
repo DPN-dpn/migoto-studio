@@ -1558,7 +1558,14 @@ export default {
             id: tabId,
             title: options.title,
             icon: options.icon ?? manifest.icon,
-            render: options.render,
+            render: (rootContainer) => {
+              const tabBody = document.createElement('div');
+              tabBody.className = 'migoto-tab-editor-content plugin-tab-editor-content';
+              tabBody.style.cssText =
+                'height: 100%; width: 100%; display: flex; flex-direction: column; overflow: hidden; position: relative; box-sizing: border-box; flex: 1 1 0; min-height: 0; min-width: 0;';
+              rootContainer.replaceChildren(tabBody);
+              return options.render(tabBody);
+            },
           });
 
           const close = () => {

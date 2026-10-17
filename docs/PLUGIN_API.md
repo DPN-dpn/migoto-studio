@@ -466,11 +466,12 @@ const vDivider = context.ui.createDivider({ vertical: true, margin: 8 }); // 세
 
 #### E. 테마 일관 스크롤 컨테이너 (`context.ui.createScrollContainer`)
 미고토 스튜디오의 슬림한 다크/라이트 테마 스크롤바와 상/하단 스크롤 제어 메서드를 제공하는 스크롤 영역입니다.
+코어 차원에서 `flex: 1 1 0%`, `min-height: 0`, `height: 100%` 및 테마 WebKit 스크롤바가 기본 내장되어 있어, 별도의 보조 CSS나 `!important` 지정 없이도 탭/스플릿 뷰 내부에서 뷰포트에 맞추어 자연스럽게 스크롤바가 표시됩니다.
 
 ```typescript
 const scroll = context.ui.createScrollContainer({
-  direction: 'vertical', // 'vertical' | 'horizontal' | 'both'
-  maxHeight: 400,        // 최대 높이 (또는 height: '100%')
+  direction: 'vertical', // 'vertical' | 'horizontal' | 'both' (기본: 'vertical')
+  maxHeight: 400,        // 최대 높이 (생략 시 flex: 1 1 0% 및 height: 100% 자동 적용)
   autoScroll: true,      // append 시 자동으로 스크롤 하단 이동
 });
 
