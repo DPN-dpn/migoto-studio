@@ -251,6 +251,12 @@ const result = context.ini.merge(targetText, sourceText, { replaceInPlace: true 
 
 ---
 
+### 4.6 외부 프로세스 실행 (`context.system` - 데스크톱 전용)
+
+- `exec(command, args?, cwd?, stdin?)`: 외부 CLI 명령어/스크립트 실행 (`Promise<{ stdout, stderr, exitCode }>`)
+
+---
+
 ## 5. 표준 플러그인 템플릿 예제
 
 ### 템플릿 A: 선언형 폼 탭 기반 토글 키 마법사 플러그인 (가장 빈번한 요구)

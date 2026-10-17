@@ -304,7 +304,8 @@ context.storage.set('userConfig', { mode: 'precise' });
 데스크톱 앱 환경에서 외부 유틸리티나 도구를 실행할 수 있습니다.
 
 ```typescript
-const result = await context.system.exec('git', ['status'], context.workspace.getCurrentFolder());
+// command, args, cwd(선택), stdin(선택)
+const result = await context.system.exec('python', ['tool.py'], context.workspace.getCurrentFolder(), '사용자 입력\n');
 console.log('exitCode:', result.exitCode);
 console.log('stdout:', result.stdout);
 ```
