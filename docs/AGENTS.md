@@ -141,19 +141,22 @@ const tab = context.ui.openTab({
 ```
 
 #### 3) 상단 툴바 메뉴 등록 (`context.ui.registerMenuItem`)
-에디터 상단 메뉴바의 **[플러그인]** 메뉴에 항목을 등록합니다. 플러그인별 서브메뉴 그룹으로 자동 묶입니다.
+에디터 상단 메뉴바의 **[플러그인]** 메뉴에 항목을 등록합니다.
+- **1개 등록 시**: 상단 메뉴에 직접 1단 메뉴 항목으로 바로 연결됩니다.
+- **2개 이상 등록 시**: 플러그인 이름의 서브메뉴(▶)로 깔끔하게 자동 묶여 하위 항목으로 노출됩니다.
+
 ```typescript
 const unregister = context.ui.registerMenuItem({
   label: '토글 키 설정 열기…',
   shortcut: 'Ctrl+Shift+T', // 표시용 단축키
   action: () => {
-    // 실행할 동작
+    // 실행할 동작 (예: 설정 폼 탭 열기)
   }
 });
 ```
 
 #### 4) 사이드바 패널 등록 (`context.ui.registerSidebarView`)
-좌측 액티비티 바에 전용 탭 아이콘과 사이드바 패널을 등록합니다.
+좌측 액티비티 바에 전용 탭 아이콘과 사이드바 패널을 등록합니다. 플러그인 순서 변경 시에도 액티비티바 탭 위치가 매니페스트 순서대로 올바르게 동기화됩니다.
 ```typescript
 context.ui.registerSidebarView({
   id: 'my-sidebar',
@@ -165,20 +168,41 @@ context.ui.registerSidebarView({
 });
 ```
 
-#### 5) UI 빌더 팩토리 및 대화상자 API (`context.ui.*`)
-- `confirm(options: string | { title?, message, confirmText?, cancelText?, variant?: 'primary'|'danger' })`: 확인/취소 대화상자 (`Promise<boolean>`)
-- `prompt(options: string | { title?, message, placeholder?, defaultValue?, confirmText?, cancelText? })`: 텍스트 입력 프롬프트 (`Promise<string | null>`)
-- `openDiffTab({ title?, originalTitle, modifiedTitle, originalText, modifiedText, languageId? })`: Monaco 기반 Diff 비교 탭 열기 (`{ id, close(), focus() }` 반환)
-- `openRestoreModal(filePath?)`: 자동 보관 백업 목록 및 Diff 비교/복원 모달 호출
-- `openKeyBindingModal({ title?, initialKey?, onApply? })`: 3DMigoto 단축키 설정 대화상자를 비동기(`Promise<string | null>`)로 호출 (실시간 키 캡처, 수식키 조합, 가상키 목록 검색 제공)
-- `openKeyHelperModal(options)`: `openKeyBindingModal`의 별칭
-- `createKeyInput({ label?, value?, description?, onChange? })`: 실시간 키 캡처 및 [키 도우미] 모달 버튼이 포함된 단축키 입력 필드
-- `createSplitView({ direction?, first?, second?, initialSize?, minFirstSize?, minSecondSize?, resizable?, storageKey?, onResize? })`: 마우스 드래그 조절 스플릿 뷰 (`{ container, firstPane, secondPane, splitter, setSize(), getSize(), reset() }` 반환)
+#### 5) UI 빌더 팩토리 및 레이아웃 API (`context.ui.*`)
+- `createSplitView({ direction?, first?, second?, initialSize?, minFirstSize?, minSecondSize?, resizable?, storageKey?, onResize? })`: 마우스 드래그 조절 스플릿 뷰 생성 (`{ container, firstPane, secondPane, splitter, setSize(), getSize(), reset(), dispose() }` 반환)
+  ```typescript
+  // 좌우 리사이저블 분할 화면 생성
+  const split = context.ui.createSplitView({
+    direction: 'horizontal', // 'horizontal' (좌우) | 'vertical' (상하)
+    initialSize: 280,        // 초기 크기 (숫자 px, '280px', '40%' 등)
+    storageKey: 'my_plugin_split_width', // 사용자 조절 크기 자동 저장
+  });
+  split.firstPane.append(sidebarEl);
+  split.secondPane.append(contentEl);
+  container.append(split.container);
+  ```
 - `createRow({ children?, gap?, align?, justify?, wrap? })`: 가로 방향 Flexbox 레이아웃 컨테이너
+  ```typescript
+  const row = context.ui.createRow({ gap: 8, align: 'center', children: [btn1, btn2, inputEl] });
+  ```
 - `createColumn({ children?, gap?, align?, justify? })`: 세로 방향 Flexbox 레이아웃 컨테이너
+  ```typescript
+  const col = context.ui.createColumn({ gap: 12, children: [titleEl, formEl] });
+  ```
 - `createGrid({ columns?, gap?, children? })`: Grid 다단 레이아웃 컨테이너
 - `createDivider({ vertical?, margin? })`: 수평/수직 구분선 요소
 - `createScrollContainer({ content?, direction?, maxHeight?, height?, autoScroll? })`: 테마 스크롤바 컨테이너 (`{ container, content, append(), clear(), scrollToTop(), scrollToBottom() }` 반환)
+  ```typescript
+  const scroll = context.ui.createScrollContainer({ maxHeight: 350, autoScroll: true });
+  scroll.append(logItem1, logItem2);
+  ```
+- `openKeyBindingModal({ title?, initialKey?, onApply? })`: 3DMigoto 단축키 설정 대화상자를 비동기(`Promise<string | null>`)로 호출 (실시간 키 캡처, 수식키 조합, 가상키 목록 검색 제공)
+- `openKeyHelperModal(options)`: `openKeyBindingModal`의 별칭
+- `createKeyInput({ label?, value?, description?, onChange? })`: 실시간 키 캡처 및 [키 도우미] 모달 버튼이 포함된 단축키 입력 필드
+- `confirm(options)`: 확인/취소 대화상자 (`Promise<boolean>`)
+- `prompt(options)`: 텍스트 입력 프롬프트 (`Promise<string | null>`)
+- `openDiffTab({ title?, originalTitle, modifiedTitle, originalText, modifiedText, languageId? })`: Monaco 기반 Diff 비교 탭 열기 (`{ id, close(), focus() }` 반환)
+- `openRestoreModal(filePath?)`: 자동 보관 백업 목록 및 Diff 비교/복원 모달 호출
 - `createCard({ title?, subtitle?, badge?, content?, actions? })`: 스타일 카드
 - `createForm(formConfig)`: 선언형 폼 인스턴스 (`getValues()`, `setValues()`, `reset()`)
 - `createButton({ text, variant?: 'primary'|'secondary'|'danger'|'small', onClick })`
