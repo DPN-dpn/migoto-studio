@@ -1,27 +1,28 @@
 //#region default-plugins/python-runner/icon.ts
 var iconSvg = `<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M11.914 0C5.82 0 6.2 2.656 6.2 2.656l.006 2.752h5.803v.825H3.904S0 5.79 0 11.907c0 6.12 3.4 5.925 3.4 5.925h2.031v-2.846s-.11-3.4 3.344-3.4h5.753s3.238.053 3.238-3.187V2.656S18.17 0 11.914 0zm-3.23 1.838a1.05 1.05 0 1 1 0 2.1 1.05 1.05 0 0 1 0-2.1zm3.4 22.162c6.095 0 5.714-2.656 5.714-2.656l-.006-2.752H12v-.825h8.105s3.904.443 3.904-5.674c0-6.12-3.4-5.925-3.4-5.925h-2.031v2.846s.11 3.4-3.344 3.4H9.481s-3.238-.053-3.238 3.187v5.748s-.404 2.656 5.84 2.656zm3.23-1.838a1.05 1.05 0 1 1 0-2.1 1.05 1.05 0 0 1 0 2.1z"/></svg>`;
 //#endregion
-//#region default-plugins/python-runner/index.ts
-/**
-* Python 스크립트 실행기 플러그인
-* 파이썬 코드를 직접 입력하거나 외부 .py 파일을 불러와 실행하고,
-* 표준 출력 결과 확인 및 사용자 입력(stdin) 전달, 에디터 본문 삽입을 지원합니다.
-*/
-var plugin = {
-	activate(context) {
-		context.ui.registerSidebarView({
-			id: "python-runner",
-			title: "Python 실행기",
-			icon: iconSvg,
-			render(container) {
-				container.className = "sidebar-panel dynamic-plugin-panel plugin-subview python-runner-panel";
-				container.replaceChildren();
-				buildPythonRunnerView(context, container);
-			}
-		});
-	},
-	deactivate() {}
-};
+//#region default-plugins/python-runner/runner.ts
+async function executePythonScript(context, options) {
+	const extraArgs = options.extraArgsString.trim().split(/\s+/).filter(Boolean);
+	let args = [];
+	if (options.mode === "file") {
+		const scriptPath = options.filePath.trim();
+		if (!scriptPath) throw new Error("실행할 Python (.py) 파일 경로를 지정해주세요.");
+		args = [scriptPath, ...extraArgs];
+	} else args = [
+		"-c",
+		options.code,
+		...extraArgs
+	];
+	if (options.passCurrentFile) {
+		const cur = context.workspace.getCurrentFile();
+		if (cur?.path) args.push(cur.path);
+	}
+	const cwd = context.workspace.getCurrentFolder() || void 0;
+	return await context.system.exec(options.cmd, args, cwd, options.stdinText);
+}
+//#endregion
+//#region default-plugins/python-runner/ui.ts
 function buildPythonRunnerView(context, container) {
 	const header = context.ui.createPanelHeader("Python 실행기");
 	const cmdSelect = context.ui.createSelect({
@@ -120,31 +121,23 @@ function buildPythonRunnerView(context, container) {
 	async function executePython(stdinText) {
 		runBtn.disabled = true;
 		runBtn.textContent = "실행 중...";
-		const cmd = cmdSelect.getValue();
-		const extraArgs = argsInput.getValue().trim().split(/\s+/).filter(Boolean);
-		let args = [];
-		if (currentMode === "file") {
-			const scriptPath = filePathInput.getValue().trim();
-			if (!scriptPath) {
-				context.ui.showToast("실행할 Python (.py) 파일 경로를 지정해주세요.", "warn");
-				runBtn.disabled = false;
-				runBtn.textContent = "스크립트 실행";
-				return;
-			}
-			args = [scriptPath, ...extraArgs];
-		} else args = [
-			"-c",
-			codeEditor.getValue(),
-			...extraArgs
-		];
-		if (passFileCheck.isChecked()) {
-			const cur = context.workspace.getCurrentFile();
-			if (cur?.path) args.push(cur.path);
+		if (currentMode === "file" && !filePathInput.getValue().trim()) {
+			context.ui.showToast("실행할 Python (.py) 파일 경로를 지정해주세요.", "warn");
+			runBtn.disabled = false;
+			runBtn.textContent = "스크립트 실행";
+			return;
 		}
 		if (stdinText === void 0) consoleView.set("프로세스 시작...\n");
 		try {
-			const cwd = context.workspace.getCurrentFolder() || void 0;
-			const res = await context.system.exec(cmd, args, cwd, stdinText);
+			const res = await executePythonScript(context, {
+				cmd: cmdSelect.getValue(),
+				mode: currentMode,
+				code: codeEditor.getValue(),
+				filePath: filePathInput.getValue(),
+				extraArgsString: argsInput.getValue(),
+				passCurrentFile: passFileCheck.isChecked(),
+				stdinText
+			});
 			if (stdinText === void 0) consoleView.clear();
 			if (res.stdout) consoleView.append(res.stdout);
 			if (res.stderr) consoleView.append((res.stdout ? "\n" : "") + res.stderr);
@@ -186,4 +179,26 @@ function buildPythonRunnerView(context, container) {
 	container.append(header, cmdSelect.row, modeSelect.row, fileBox, codeEditor.container, argsInput.row, passFileCheck.row, actionRow, consoleView.container);
 }
 //#endregion
-export { plugin as default };
+//#region default-plugins/python-runner/index.ts
+/**
+* Python 스크립트 실행기 플러그인
+* 파이썬 코드를 직접 입력하거나 외부 .py 파일을 불러와 실행하고,
+* 표준 출력 결과 확인 및 사용자 입력(stdin) 전달, 에디터 본문 삽입을 지원합니다.
+*/
+var plugin = {
+	activate(context) {
+		context.ui.registerSidebarView({
+			id: "python-runner",
+			title: "Python 실행기",
+			icon: iconSvg,
+			render(container) {
+				container.className = "sidebar-panel dynamic-plugin-panel plugin-subview python-runner-panel";
+				container.replaceChildren();
+				buildPythonRunnerView(context, container);
+			}
+		});
+	},
+	deactivate() {}
+};
+//#endregion
+export { buildPythonRunnerView, plugin as default, executePythonScript };
