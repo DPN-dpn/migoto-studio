@@ -1648,12 +1648,27 @@ export function createUIBuilder() {
       const buttons = new Map<string, HTMLButtonElement>();
       const panels = new Map<string, HTMLElement>();
       const badges = new Map<string, HTMLElement>();
+      const scrollPositions = new Map<HTMLElement, { top: number; left: number }>();
 
       let activeTabId = options.defaultTab || options.tabs[0]?.id || '';
 
       const switchTab = (tabId: string) => {
         const targetTab = options.tabs.find((t) => t.id === tabId);
         if (!targetTab || targetTab.disabled) return;
+
+        // 1. 현재 패널 내부의 스크롤 위치 보존
+        const currentPanel = panels.get(activeTabId);
+        if (currentPanel && typeof currentPanel.querySelectorAll === 'function') {
+          const scrollables = currentPanel.querySelectorAll(
+            '.plugin-scroll-container, .migoto-scroll-container, [data-scrollable="true"]'
+          );
+          scrollables.forEach((el) => {
+            const h = el as HTMLElement;
+            if (h.scrollTop > 0 || h.scrollLeft > 0) {
+              scrollPositions.set(h, { top: h.scrollTop, left: h.scrollLeft });
+            }
+          });
+        }
 
         activeTabId = tabId;
 
@@ -1664,7 +1679,31 @@ export function createUIBuilder() {
         });
 
         panels.forEach((panel, id) => {
-          panel.hidden = id !== tabId;
+          const isAct = id === tabId;
+          panel.hidden = !isAct;
+          panel.style.display = isAct ? 'flex' : 'none';
+
+          if (isAct) {
+            const runRestore = () => {
+              if (typeof panel.querySelectorAll === 'function') {
+                const scrollables = panel.querySelectorAll(
+                  '.plugin-scroll-container, .migoto-scroll-container, [data-scrollable="true"]'
+                );
+                scrollables.forEach((el) => {
+                  const pos = scrollPositions.get(el as HTMLElement);
+                  if (pos) {
+                    (el as HTMLElement).scrollTop = pos.top;
+                    (el as HTMLElement).scrollLeft = pos.left;
+                  }
+                });
+              }
+            };
+            if (typeof requestAnimationFrame === 'function') {
+              requestAnimationFrame(runRestore);
+            } else {
+              runRestore();
+            }
+          }
         });
 
         options.onChange?.(tabId);
@@ -1705,7 +1744,7 @@ export function createUIBuilder() {
         const panel = document.createElement('div');
         panel.className = 'plugin-tab-panel';
         panel.setAttribute('role', 'tabpanel');
-        panel.style.display = 'flex';
+        panel.style.display = tab.id === activeTabId ? 'flex' : 'none';
         panel.style.flexDirection = 'column';
         panel.style.flex = '1 1 0%';
         panel.style.minHeight = '0';

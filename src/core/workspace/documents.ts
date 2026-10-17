@@ -67,6 +67,8 @@ export interface DocumentTab {
   customBytes?: Uint8Array;
   customCleanup?: (() => void) | void;
   customRenderer?: (container: HTMLElement) => void | (() => void);
+  customElement?: HTMLElement;
+  savedScrolls?: Map<HTMLElement, { top: number; left: number }>;
   diffInfo?: DiffTabInfo;
 }
 
@@ -217,11 +219,20 @@ export class DocumentManager {
 
     if (this.activeTab && this.activeTab.kind === 'text') {
       this.activeTab.viewState = this.editor.saveViewState();
-    } else if (this.activeTab && this.activeTab.kind === 'custom') {
-      if (typeof this.activeTab.customCleanup === 'function') {
-        try { this.activeTab.customCleanup(); } catch {}
+    } else if (this.activeTab && this.activeTab.kind === 'custom' && this.activeTab.customElement) {
+      if (typeof this.activeTab.customElement.querySelectorAll === 'function') {
+        const scrolls = new Map<HTMLElement, { top: number; left: number }>();
+        const scrollables = this.activeTab.customElement.querySelectorAll(
+          '.plugin-scroll-container, .migoto-scroll-container, [data-scrollable="true"]'
+        );
+        scrollables.forEach((el) => {
+          const h = el as HTMLElement;
+          if (h.scrollTop > 0 || h.scrollLeft > 0) {
+            scrolls.set(h, { top: h.scrollTop, left: h.scrollLeft });
+          }
+        });
+        this.activeTab.savedScrolls = scrolls;
       }
-      this.activeTab.customCleanup = undefined;
     }
 
     this.activeTabId = target.id;
@@ -239,41 +250,77 @@ export class DocumentManager {
       if (editorEl) editorEl.style.display = 'none';
       if (customContainer) {
         customContainer.hidden = false;
-        customContainer.replaceChildren();
 
-        if (target.customRenderer) {
-          try {
-            const cleanup = target.customRenderer(customContainer);
-            if (typeof cleanup === 'function') {
-              target.customCleanup = cleanup;
+        // 다른 커스텀 탭들의 엘리먼트는 숨김 처리(DOM 트리는 온전히 보존)
+        for (const t of this.tabs) {
+          if (t.id !== target.id && t.customElement) {
+            t.customElement.hidden = true;
+            t.customElement.style.display = 'none';
+          }
+        }
+
+        if (target.customElement) {
+          target.customElement.hidden = false;
+          target.customElement.style.display = 'flex';
+
+          if (target.savedScrolls && target.savedScrolls.size > 0) {
+            const restoreCustomScrolls = () => {
+              target.savedScrolls?.forEach((pos, el) => {
+                if (el) {
+                  el.scrollTop = pos.top;
+                  el.scrollLeft = pos.left;
+                }
+              });
+            };
+            if (typeof requestAnimationFrame === 'function') {
+              requestAnimationFrame(restoreCustomScrolls);
+            } else {
+              restoreCustomScrolls();
             }
-          } catch (err) {
-            console.error('Failed to render custom tab:', err);
           }
         } else {
-          const ext = target.file?.name.split('.').pop()?.toLowerCase() ?? '';
-          const viewer = this.viewerProvider?.getCustomViewer(ext);
-          if (viewer) {
-            target.customCleanup = viewer.render(customContainer, {
-              name: target.title,
-              path: target.file?.location ?? target.title,
-              bytes: target.customBytes ?? new Uint8Array(),
-            });
+          const wrapper = document.createElement('div');
+          wrapper.className = 'migoto-custom-tab-host';
+          wrapper.style.cssText =
+            'height: 100%; width: 100%; display: flex; flex-direction: column; overflow: hidden; position: relative; box-sizing: border-box; flex: 1 1 0; min-height: 0; min-width: 0;';
+
+          customContainer.appendChild(wrapper);
+          target.customElement = wrapper;
+
+          if (target.customRenderer) {
+            try {
+              const cleanup = target.customRenderer(wrapper);
+              if (typeof cleanup === 'function') {
+                target.customCleanup = cleanup;
+              }
+            } catch (err) {
+              console.error('Failed to render custom tab:', err);
+            }
           } else {
-            const placeholder = document.createElement('div');
-            placeholder.className = 'binary-file-placeholder';
-            placeholder.innerHTML = `
-              <div class="binary-placeholder-icon">
-                <svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
-                  <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
-                  <line x1="12" y1="22.08" x2="12" y2="12"></line>
-                </svg>
-              </div>
-              <div class="binary-placeholder-title">${target.title}</div>
-              <div class="binary-placeholder-desc">바이너리 파일이거나 열 수 있는 전용 뷰어가 없습니다.</div>
-            `;
-            customContainer.append(placeholder);
+            const ext = target.file?.name.split('.').pop()?.toLowerCase() ?? '';
+            const viewer = this.viewerProvider?.getCustomViewer(ext);
+            if (viewer) {
+              target.customCleanup = viewer.render(wrapper, {
+                name: target.title,
+                path: target.file?.location ?? target.title,
+                bytes: target.customBytes ?? new Uint8Array(),
+              });
+            } else {
+              const placeholder = document.createElement('div');
+              placeholder.className = 'binary-file-placeholder';
+              placeholder.innerHTML = `
+                <div class="binary-placeholder-icon">
+                  <svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                    <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+                    <line x1="12" y1="22.08" x2="12" y2="12"></line>
+                  </svg>
+                </div>
+                <div class="binary-placeholder-title">${target.title}</div>
+                <div class="binary-placeholder-desc">바이너리 파일이거나 열 수 있는 전용 뷰어가 없습니다.</div>
+              `;
+              wrapper.append(placeholder);
+            }
           }
         }
       }
@@ -281,15 +328,36 @@ export class DocumentManager {
       if (diffContainer) diffContainer.hidden = true;
       if (customContainer) {
         customContainer.hidden = true;
-        customContainer.replaceChildren();
+        for (const t of this.tabs) {
+          if (t.customElement) {
+            t.customElement.hidden = true;
+            t.customElement.style.display = 'none';
+          }
+        }
       }
-      if (editorEl) editorEl.style.display = 'block';
+      if (editorEl) {
+        editorEl.style.display = 'block';
+        this.editor.layout();
+      }
       this.editor.setModel(target.model);
       if (target.viewState) {
         this.editor.restoreViewState(target.viewState);
       }
       this.editor.focus();
-      this.editor.layout();
+
+      const syncEditorLayout = () => {
+        if (this.activeTabId === target.id) {
+          this.editor.layout();
+          if (target.viewState) {
+            this.editor.restoreViewState(target.viewState);
+          }
+        }
+      };
+      if (typeof requestAnimationFrame === 'function') {
+        requestAnimationFrame(syncEditorLayout);
+      } else {
+        syncEditorLayout();
+      }
     }
 
     this.emit();
@@ -336,9 +404,16 @@ export class DocumentManager {
       }
     }
 
-    if (target.kind === 'custom' && typeof target.customCleanup === 'function') {
-      try { target.customCleanup(); } catch {}
+    if (target.kind === 'custom') {
+      if (typeof target.customCleanup === 'function') {
+        try { target.customCleanup(); } catch {}
+      }
       target.customCleanup = undefined;
+      if (target.customElement) {
+        target.customElement.remove();
+        target.customElement = undefined;
+      }
+      target.savedScrolls = undefined;
     }
 
     if (target.kind === 'diff' && target.diffInfo) {
@@ -559,7 +634,6 @@ export class DocumentManager {
     if (existing) {
       existing.title = options.title;
       if (options.icon !== undefined) existing.icon = options.icon;
-      existing.customRenderer = options.render;
       this.switchTab(existing.id);
       return existing;
     }

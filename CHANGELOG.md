@@ -13,6 +13,11 @@
 - 플러그인 UI 빌더 세로 컨테이너 (`context.ui.createColumn`) 높이 구속 및 화면 채움(`fill`) 지원:
   - `.plugin-column` 기본 스타일에 `min-height: 0; min-width: 0;`을 내장하여 Flexbox 자식 크기로 인한 컨테이너 무한 팽창 방지
   - `fill: true` 옵션(`flex: 1 1 0%; height: 100%; min-height: 0; overflow: hidden;`) 탑재로 툴바와 탭/스크롤 뷰를 세로로 묶을 때 플러그인 측의 수동 CSS나 인라인 스타일 주입 없이도 자식 `createScrollContainer`의 스크롤바가 완벽히 동작하도록 개선
+- 탭 및 뷰 전환 시 작업 상태(스크롤 위치, 커서, 드롭다운/입력값) 보존:
+  - 플러그인 커스텀 탭(`kind: 'custom'`) 전환 시 DOM 트리를 파괴하지 않고 유지하도록 호스트 구조(`migoto-custom-tab-host`)를 개선하여, 다른 탭으로 이동했다가 복귀해도 드롭다운 선택값, 텍스트 입력값, 스크롤 위치가 휘발되지 않고 그대로 유지
+  - 커스텀 탭의 `customCleanup` 콜백이 탭 전환 시마다 잘못 실행되던 문제를 해결하여 탭이 실제로 닫힐 때(`closeTab`)만 정상 정리되도록 라이프사이클 분리
+  - Monaco 에디터 탭 복귀 시 뷰포트 레이아웃 계산과 `restoreViewState` 동기화를 보완하여 커서 및 스크롤 위치 복원 안정화
+  - `context.ui.createTabs` 서브 탭 전환 시에도 각 패널 내부의 스크롤 위치를 기록하고 복원하도록 개선
 
 ### 버그 수정
 - `node --test` 환경에서 `createNumberInput` 마우스 연속 누름 타이머가 활성 상태로 남아 프로세스가 종료되지 않던 현상 수정 (`unref` 적용 및 `destroy` 정리 메서드 추가)

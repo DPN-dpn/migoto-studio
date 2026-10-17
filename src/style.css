@@ -3060,7 +3060,8 @@ body.ai-dock-resizing * {
 }
 
 .migoto-tab-editor-content,
-.plugin-tab-editor-content {
+.plugin-tab-editor-content,
+.migoto-custom-tab-host {
   height: 100%;
   width: 100%;
   display: flex;
