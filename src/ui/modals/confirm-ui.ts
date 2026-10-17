@@ -41,14 +41,16 @@ export function openConfirmModal(options: ConfirmOptions): Promise<boolean> {
     body.style.display = 'flex';
     body.style.flexDirection = 'column';
     body.style.gap = '14px';
-    body.style.padding = '8px 0 4px';
+    body.style.padding = '14px 20px 16px';
+    body.style.boxSizing = 'border-box';
 
     const msg = document.createElement('div');
     msg.className = 'confirm-message';
-    msg.style.fontSize = '13px';
+    msg.style.fontSize = '13.5px';
     msg.style.lineHeight = '1.6';
     msg.style.color = 'var(--fg)';
     msg.style.whiteSpace = 'pre-wrap';
+    msg.style.padding = '4px 2px 8px';
     msg.textContent = opts.message;
     body.appendChild(msg);
 
@@ -123,15 +125,17 @@ export function openPromptModal(options: PromptOptions): Promise<string | null> 
     body.style.display = 'flex';
     body.style.flexDirection = 'column';
     body.style.gap = '12px';
-    body.style.padding = '8px 0 4px';
+    body.style.padding = '14px 20px 16px';
+    body.style.boxSizing = 'border-box';
 
     if (opts.message) {
       const msg = document.createElement('div');
       msg.className = 'prompt-message';
-      msg.style.fontSize = '13px';
+      msg.style.fontSize = '13.5px';
       msg.style.lineHeight = '1.6';
       msg.style.color = 'var(--fg)';
       msg.style.whiteSpace = 'pre-wrap';
+      msg.style.padding = '4px 2px 6px';
       msg.textContent = opts.message;
       body.appendChild(msg);
     }

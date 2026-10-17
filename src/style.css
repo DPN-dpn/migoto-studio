@@ -1299,7 +1299,20 @@ select.status-btn option { background: var(--bg-elev); color: var(--fg); }
 }
 .modal.modal-confirm-dialog,
 .modal.modal-prompt-dialog {
-  width: min(440px, 92vw);
+  width: min(460px, 92vw);
+}
+
+.confirm-dialog-body,
+.prompt-dialog-body {
+  padding: 14px 20px 18px !important;
+  box-sizing: border-box;
+}
+
+.confirm-message,
+.prompt-message {
+  padding: 4px 2px 10px;
+  font-size: 13.5px;
+  line-height: 1.6;
 }
 
 .update-release-notes,
@@ -3072,6 +3085,11 @@ body.ai-dock-resizing * {
   flex: 1 1 0%;
   min-height: 0;
   min-width: 0;
+}
+
+.migoto-tab-editor-content,
+.plugin-tab-editor-content {
+  padding: 16px 20px;
 }
 
 .image-viewer-container {
