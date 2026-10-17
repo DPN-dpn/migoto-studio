@@ -1,6 +1,6 @@
 # 릴리스 노트 (Release Notes)
 
-## [다음 버전]
+## [0.12.3] - 2026-10-17
 
 ### 신규 기능
 - 가상 모듈 링커(Virtual Module Linker) 기반 다중 파일 플러그인(Multi-File Plugins) 지원:
