@@ -6,6 +6,7 @@ export type ActivityPanel = 'explorer' | 'search' | 'outline' | 'templates' | 'p
 
 export interface DynamicTab {
   id: string;
+  pluginId?: string;
   icon: string;
   title: string;
   panelEl: HTMLElement;
@@ -115,9 +116,24 @@ export class ActivityBar {
   reorderDynamicTabs(order: string[]) {
     const container = this.barEl.querySelector<HTMLElement>('#act-plugins-custom');
     if (!container) return;
-    for (const id of order) {
-      const entry = this.dynamicTabs.get(id);
-      if (entry && entry.btnEl) {
+
+    const placedTabIds = new Set<string>();
+
+    for (const targetId of order) {
+      for (const [tabId, entry] of this.dynamicTabs.entries()) {
+        if (placedTabIds.has(tabId)) continue;
+        if (entry.pluginId === targetId || tabId === targetId) {
+          if (entry.btnEl) {
+            container.appendChild(entry.btnEl);
+          }
+          placedTabIds.add(tabId);
+        }
+      }
+    }
+
+    // Append any remaining tabs that were not matched in the order array
+    for (const [tabId, entry] of this.dynamicTabs.entries()) {
+      if (!placedTabIds.has(tabId) && entry.btnEl) {
         container.appendChild(entry.btnEl);
       }
     }

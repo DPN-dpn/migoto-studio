@@ -551,6 +551,7 @@ export class PluginManager {
       this.saveStoredPluginOrder(cleanedOrder);
     }
 
+    this.activityBar?.reorderDynamicTabs(this.getPluginOrder());
     this.notify();
   }
 
@@ -661,6 +662,7 @@ export class PluginManager {
 
           const reg = this.activityBar.registerDynamicTab({
             id: view.id,
+            pluginId: view.pluginId,
             icon: view.icon || 'PLG',
             title: view.title,
             panelEl,

@@ -1261,6 +1261,58 @@ test('Plugin UI API openDiffTab and openRestoreModal contracts work as expected'
   assert.ok(restoreOpened);
 });
 
+test('Dynamic tabs reorder correctly by pluginId for custom plugins with differing view ids', () => {
+  const dynamicTabs = new Map<string, { id: string; pluginId?: string; btn: { id: string } }>();
 
+  // Default plugins: id === pluginId
+  dynamicTabs.set('python-runner', { id: 'python-runner', pluginId: 'python-runner', btn: { id: 'btn-python' } });
+  dynamicTabs.set('ai-assistant', { id: 'ai-assistant', pluginId: 'ai-assistant', btn: { id: 'btn-ai' } });
 
+  // Custom plugin: id !== pluginId (e.g. view id 'xxmi-toggle-sidebar', manifest id 'xxmi-toggle-manager')
+  dynamicTabs.set('xxmi-toggle-sidebar', {
+    id: 'xxmi-toggle-sidebar',
+    pluginId: 'xxmi-toggle-manager',
+    btn: { id: 'btn-toggle' },
+  });
 
+  const children: Array<{ id: string }> = [];
+  const container = {
+    appendChild: (btn: { id: string }) => {
+      const idx = children.indexOf(btn);
+      if (idx !== -1) children.splice(idx, 1);
+      children.push(btn);
+    },
+  };
+
+  const reorder = (order: string[]) => {
+    const placedTabIds = new Set<string>();
+    for (const targetId of order) {
+      for (const [tabId, entry] of dynamicTabs.entries()) {
+        if (placedTabIds.has(tabId)) continue;
+        if (entry.pluginId === targetId || tabId === targetId) {
+          if (entry.btn) {
+            container.appendChild(entry.btn);
+          }
+          placedTabIds.add(tabId);
+        }
+      }
+    }
+    for (const [tabId, entry] of dynamicTabs.entries()) {
+      if (!placedTabIds.has(tabId) && entry.btn) {
+        container.appendChild(entry.btn);
+      }
+    }
+  };
+
+  // Move custom plugin to the top
+  reorder(['xxmi-toggle-manager', 'python-runner', 'ai-assistant']);
+  assert.deepEqual(children.map((c) => c.id), ['btn-toggle', 'btn-python', 'btn-ai']);
+
+  // Move custom plugin to the middle
+  reorder(['python-runner', 'xxmi-toggle-manager', 'ai-assistant']);
+  assert.deepEqual(children.map((c) => c.id), ['btn-python', 'btn-toggle', 'btn-ai']);
+
+  // Move custom plugin to the end
+  reorder(['python-runner', 'ai-assistant', 'xxmi-toggle-manager']);
+  assert.deepEqual(children.map((c) => c.id), ['btn-python', 'btn-ai', 'btn-toggle']);
+});
