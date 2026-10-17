@@ -3590,31 +3590,6 @@ var plugin = {
 				return () => viewer.dispose();
 			}
 		});
-		context.ui?.registerMenuItem?.({
-			label: "텍스처/DDS 이미지 열기…",
-			action: async () => {
-				try {
-					const filePath = await context.workspace.pickFile({
-						title: "텍스처/이미지 파일 선택",
-						filters: [{
-							name: "Textures & Images",
-							extensions: [
-								"dds",
-								"png",
-								"jpg",
-								"jpeg",
-								"bmp",
-								"webp",
-								"gif"
-							]
-						}]
-					});
-					if (filePath) await context.workspace.openFile(filePath);
-				} catch (err) {
-					context.ui.showToast(`이미지 열기 오류: ${err}`, "error");
-				}
-			}
-		});
 	},
 	deactivate() {}
 };

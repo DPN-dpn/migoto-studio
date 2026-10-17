@@ -15,34 +15,14 @@ var plugin = {
 			render(container) {
 				container.className = "sidebar-panel dynamic-plugin-panel plugin-subview python-runner-panel";
 				container.replaceChildren();
-				buildPythonRunnerView(context, container, false);
+				buildPythonRunnerView(context, container);
 			}
-		});
-		context.ui?.registerMenuItem?.({
-			label: "Python 실행기 열기 (에디터 탭)",
-			shortcut: "Ctrl+Shift+P",
-			action: () => openPythonTab(context)
 		});
 	},
 	deactivate() {}
 };
-function openPythonTab(context) {
-	context.ui.openTab({
-		id: "python-runner-tab",
-		title: "Python 스크립트 실행기",
-		icon: iconSvg,
-		render(container) {
-			container.className = "plugin-tab-view python-runner-tab-container";
-			container.style.cssText = "max-width: 960px; margin: 0 auto; padding: 24px; box-sizing: border-box; overflow-y: auto; height: 100%;";
-			buildPythonRunnerView(context, container, true);
-			return () => {
-				container.replaceChildren();
-			};
-		}
-	});
-}
-function buildPythonRunnerView(context, container, isTab) {
-	const header = context.ui.createPanelHeader(isTab ? "Python 스크립트 실행기 (전체 화면)" : "Python 실행기");
+function buildPythonRunnerView(context, container) {
+	const header = context.ui.createPanelHeader("Python 실행기");
 	const cmdSelect = context.ui.createSelect({
 		label: "실행 명령:",
 		options: [
@@ -60,7 +40,7 @@ function buildPythonRunnerView(context, container, isTab) {
 		onInput: (args) => context.storage.set("args", args)
 	});
 	const passFileCheck = context.ui.createCheckbox({
-		id: isTab ? "py-pass-file-tab" : "py-pass-file",
+		id: "py-pass-file",
 		label: "현재 열린 INI 파일 경로를 인자로 전달",
 		checked: context.storage.get("pass_file", true),
 		onChange: (checked) => context.storage.set("pass_file", checked)
@@ -76,7 +56,7 @@ function buildPythonRunnerView(context, container, isTab) {
 	});
 	const codeEditor = context.ui.createCodeEditor({
 		label: "실행할 Python 코드:",
-		rows: isTab ? 10 : 6,
+		rows: 6,
 		value: context.storage.get("code", `# Migoto Studio Python Runner\nimport sys\n\nprint("Python 실행 환경이 정상 작동 중입니다!")\nif len(sys.argv) > 1:\n    print(f"인자 파일: {sys.argv[1]}")\n`),
 		onInput: (code) => context.storage.set("code", code)
 	});
