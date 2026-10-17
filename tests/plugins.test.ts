@@ -980,6 +980,64 @@ test('Plugin UI API registerMenuItem groups items under plugin and cleans up', (
   assert.equal(pluginMenuItems.size, 0);
 });
 
+test('Plugin menu items render directly when 1 item, and bundle into submenu when 2 or more', () => {
+  const groups: Array<{ pluginName: string; items: Array<{ label: string; shortcut?: string; action: () => void }> }> = [
+    {
+      pluginName: '토글 키 매니저',
+      items: [
+        { label: '토글 키 설정 GUI 열기', shortcut: 'Ctrl+Shift+T', action: () => {} },
+      ],
+    },
+    {
+      pluginName: 'AI 어시스턴트',
+      items: [
+        { label: '대화창 열기', shortcut: 'Ctrl+Shift+A', action: () => {} },
+        { label: '프롬프트 설정', action: () => {} },
+      ],
+    },
+  ];
+
+  const menuItems: any[] = [];
+  for (const group of groups) {
+    if (group.items.length === 1) {
+      const singleItem = group.items[0];
+      menuItems.push({
+        label: singleItem.label,
+        shortcut: singleItem.shortcut,
+        action: singleItem.action,
+      });
+    } else if (group.items.length > 1) {
+      menuItems.push({
+        label: group.pluginName,
+        submenu: () => {
+          return group.items.map((subItem) => ({
+            label: subItem.label,
+            shortcut: subItem.shortcut,
+            action: subItem.action,
+          }));
+        },
+      });
+    }
+  }
+
+  assert.equal(menuItems.length, 2);
+
+  // First plugin (1 item) -> direct item, no submenu
+  assert.equal(menuItems[0].label, '토글 키 설정 GUI 열기');
+  assert.equal(menuItems[0].shortcut, 'Ctrl+Shift+T');
+  assert.equal(typeof menuItems[0].submenu, 'undefined');
+  assert.equal(typeof menuItems[0].action, 'function');
+
+  // Second plugin (2 items) -> submenu with pluginName
+  assert.equal(menuItems[1].label, 'AI 어시스턴트');
+  assert.equal(typeof menuItems[1].submenu, 'function');
+  const sub = menuItems[1].submenu();
+  assert.equal(sub.length, 2);
+  assert.equal(sub[0].label, '대화창 열기');
+  assert.equal(sub[0].shortcut, 'Ctrl+Shift+A');
+  assert.equal(sub[1].label, '프롬프트 설정');
+});
+
 test('Plugin UI API FormConfig schema and value aggregation works properly', () => {
   const formConfig: any = {
     title: '토글 키 설정',

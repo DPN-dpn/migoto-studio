@@ -282,16 +282,25 @@ export class MenuBar {
           if (groups.length > 0) {
             items.push({ divider: true });
             for (const group of groups) {
-              items.push({
-                label: group.pluginName,
-                submenu: () => {
-                  return group.items.map((subItem) => ({
-                    label: subItem.label,
-                    shortcut: subItem.shortcut,
-                    action: subItem.action,
-                  }));
-                },
-              });
+              if (group.items.length === 1) {
+                const singleItem = group.items[0];
+                items.push({
+                  label: singleItem.label,
+                  shortcut: singleItem.shortcut,
+                  action: singleItem.action,
+                });
+              } else if (group.items.length > 1) {
+                items.push({
+                  label: group.pluginName,
+                  submenu: () => {
+                    return group.items.map((subItem) => ({
+                      label: subItem.label,
+                      shortcut: subItem.shortcut,
+                      action: subItem.action,
+                    }));
+                  },
+                });
+              }
             }
           }
           return items;
