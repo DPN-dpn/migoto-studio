@@ -1,64 +1,97 @@
-//#region src/plugins/api.ts
-function e(e) {
-	return e;
-}
-//#endregion
 //#region default-plugins/ai-assistant/icon.ts
-var t = e({
-	activate(e) {
-		e.ui.registerSidebarView({
+var iconSvg = `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3z"></path></svg>`;
+//#endregion
+//#region default-plugins/ai-assistant/index.ts
+/**
+* AI 모딩 어시스턴트 플러그인
+* OpenAI 또는 Google Gemini, 로컬 Ollama 호환 API를 연동하여 INI 분석, 섹션 생성 및 질의응답을 수행합니다.
+*/
+var plugin = {
+	activate(context) {
+		context.ui.registerSidebarView({
 			id: "ai-assistant",
 			title: "AI 에이전트",
-			icon: "<svg viewBox=\"0 0 24 24\" width=\"18\" height=\"18\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3z\"></path></svg>",
-			render(t) {
-				t.className = "sidebar-panel dynamic-plugin-panel plugin-subview ai-assistant-panel", t.replaceChildren();
-				let n = document.createElement("div");
-				n.className = "ai-subtab-bar";
-				let r = document.createElement("button");
-				r.className = "ai-subtab-btn active", r.textContent = "에이전트";
-				let i = document.createElement("button");
-				i.className = "ai-subtab-btn", i.textContent = "설정", n.append(r, i);
-				let a = document.createElement("div");
-				a.className = "ai-pane ai-agent-view";
-				let o = document.createElement("div");
-				o.className = "ai-pane ai-settings-view", o.hidden = !0, r.onclick = () => {
-					r.classList.add("active"), i.classList.remove("active"), a.hidden = !1, o.hidden = !0;
-				}, i.onclick = () => {
-					i.classList.add("active"), r.classList.remove("active"), o.hidden = !1, a.hidden = !0;
+			icon: iconSvg,
+			render(container) {
+				container.className = "sidebar-panel dynamic-plugin-panel plugin-subview ai-assistant-panel";
+				container.replaceChildren();
+				const subtabBar = document.createElement("div");
+				subtabBar.className = "ai-subtab-bar";
+				const btnTabAgent = document.createElement("button");
+				btnTabAgent.className = "ai-subtab-btn active";
+				btnTabAgent.textContent = "에이전트";
+				const btnTabSettings = document.createElement("button");
+				btnTabSettings.className = "ai-subtab-btn";
+				btnTabSettings.textContent = "설정";
+				subtabBar.append(btnTabAgent, btnTabSettings);
+				const agentPane = document.createElement("div");
+				agentPane.className = "ai-pane ai-agent-view";
+				const settingsPane = document.createElement("div");
+				settingsPane.className = "ai-pane ai-settings-view";
+				settingsPane.hidden = true;
+				btnTabAgent.onclick = () => {
+					btnTabAgent.classList.add("active");
+					btnTabSettings.classList.remove("active");
+					agentPane.hidden = false;
+					settingsPane.hidden = true;
 				};
-				let s = e.ui.createInput({
+				btnTabSettings.onclick = () => {
+					btnTabSettings.classList.add("active");
+					btnTabAgent.classList.remove("active");
+					settingsPane.hidden = false;
+					agentPane.hidden = true;
+				};
+				const urlInput = context.ui.createInput({
 					label: "API URL:",
 					placeholder: "https://generativelanguage.googleapis.com/v1beta/openai 또는 https://api.openai.com/v1",
-					value: e.storage.get("api_url", "https://generativelanguage.googleapis.com/v1beta/openai"),
-					onInput: (t) => e.storage.set("api_url", t.trim())
-				}), c = document.createElement("div");
-				c.className = "form-row";
-				let l = document.createElement("label");
-				l.textContent = "API Key:";
-				let u = document.createElement("div");
-				u.className = "ai-key-input-wrap";
-				let d = document.createElement("input");
-				d.type = "password", d.className = "plugin-input ai-key-input", d.placeholder = "Gemini 또는 OpenAI API 키 (Ollama는 비워둠)", d.value = e.storage.get("api_key", ""), d.oninput = () => e.storage.set("api_key", d.value.trim());
-				let f = document.createElement("button");
-				f.type = "button", f.className = "ai-eye-btn", f.title = "API 키 보기/숨기기", f.setAttribute("aria-label", "API 키 보기/숨기기");
-				let p = "<svg viewBox=\"0 0 24 24\" width=\"14\" height=\"14\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z\"></path><circle cx=\"12\" cy=\"12\" r=\"3\"></circle></svg>";
-				f.innerHTML = p;
-				let m = !1;
-				f.onclick = () => {
-					m = !m, d.type = m ? "text" : "password", f.innerHTML = m ? "<svg viewBox=\"0 0 24 24\" width=\"14\" height=\"14\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24\"></path><line x1=\"1\" y1=\"1\" x2=\"23\" y2=\"23\"></line></svg>" : p;
-				}, u.append(d, f), c.append(l, u);
-				let h = e.storage.get("model", "gemini-flash-latest").trim();
-				(!h || h.startsWith("gemini-2.") || h.startsWith("gemini-1.") || h === "gemini-pro") && (h = "gemini-flash-latest", e.storage.set("model", h));
-				let g = e.ui.createInput({
+					value: context.storage.get("api_url", "https://generativelanguage.googleapis.com/v1beta/openai"),
+					onInput: (v) => context.storage.set("api_url", v.trim())
+				});
+				const keyRow = document.createElement("div");
+				keyRow.className = "form-row";
+				const keyLabel = document.createElement("label");
+				keyLabel.textContent = "API Key:";
+				const keyWrap = document.createElement("div");
+				keyWrap.className = "ai-key-input-wrap";
+				const keyInput = document.createElement("input");
+				keyInput.type = "password";
+				keyInput.className = "plugin-input ai-key-input";
+				keyInput.placeholder = "Gemini 또는 OpenAI API 키 (Ollama는 비워둠)";
+				keyInput.value = context.storage.get("api_key", "");
+				keyInput.oninput = () => context.storage.set("api_key", keyInput.value.trim());
+				const eyeBtn = document.createElement("button");
+				eyeBtn.type = "button";
+				eyeBtn.className = "ai-eye-btn";
+				eyeBtn.title = "API 키 보기/숨기기";
+				eyeBtn.setAttribute("aria-label", "API 키 보기/숨기기");
+				const eyeSvg = `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>`;
+				const eyeOffSvg = `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>`;
+				eyeBtn.innerHTML = eyeSvg;
+				let isKeyVisible = false;
+				eyeBtn.onclick = () => {
+					isKeyVisible = !isKeyVisible;
+					keyInput.type = isKeyVisible ? "text" : "password";
+					eyeBtn.innerHTML = isKeyVisible ? eyeOffSvg : eyeSvg;
+				};
+				keyWrap.append(keyInput, eyeBtn);
+				keyRow.append(keyLabel, keyWrap);
+				let initialModel = context.storage.get("model", "gemini-flash-latest").trim();
+				if (!initialModel || initialModel.startsWith("gemini-2.") || initialModel.startsWith("gemini-1.") || initialModel === "gemini-pro") {
+					initialModel = "gemini-flash-latest";
+					context.storage.set("model", initialModel);
+				}
+				const modelInput = context.ui.createInput({
 					label: "모델명:",
 					placeholder: "gemini-flash-latest, gpt-4o-mini 등",
-					value: h,
-					onInput: (t) => {
-						e.storage.set("model", t.trim()), y();
+					value: initialModel,
+					onInput: (v) => {
+						context.storage.set("model", v.trim());
+						renderChips();
 					}
-				}), _ = document.createElement("div");
-				_.className = "ai-model-chips";
-				let v = [
+				});
+				const modelChipsWrap = document.createElement("div");
+				modelChipsWrap.className = "ai-model-chips";
+				const availableModels = [
 					{
 						name: "gemini-flash-latest",
 						label: "gemini-flash-latest"
@@ -75,88 +108,149 @@ var t = e({
 						name: "gpt-4o",
 						label: "gpt-4o"
 					}
-				], y = () => {
-					_.replaceChildren();
-					let t = e.storage.get("model", "gemini-flash-latest").trim();
-					for (let n of v) {
-						let r = document.createElement("button");
-						r.type = "button", r.className = `ai-model-chip${t === n.name ? " active" : ""}`, r.textContent = n.label, r.onclick = () => {
-							g.setValue(n.name), e.storage.set("model", n.name), y();
-						}, _.append(r);
+				];
+				const renderChips = () => {
+					modelChipsWrap.replaceChildren();
+					const current = context.storage.get("model", "gemini-flash-latest").trim();
+					for (const m of availableModels) {
+						const chip = document.createElement("button");
+						chip.type = "button";
+						chip.className = `ai-model-chip${current === m.name ? " active" : ""}`;
+						chip.textContent = m.label;
+						chip.onclick = () => {
+							modelInput.setValue(m.name);
+							context.storage.set("model", m.name);
+							renderChips();
+						};
+						modelChipsWrap.append(chip);
 					}
 				};
-				y();
-				let S = document.createElement("div");
-				S.className = "ai-quick-actions";
-				let C = e.ui.createButton({
+				renderChips();
+				const presetRow = document.createElement("div");
+				presetRow.className = "ai-quick-actions";
+				const btnPresetGemini = context.ui.createButton({
 					text: "Google Gemini",
 					variant: "small",
 					onClick: () => {
-						let t = "https://generativelanguage.googleapis.com/v1beta/openai", n = "gemini-flash-latest";
-						s.setValue(t), g.setValue(n), e.storage.set("api_url", t), e.storage.set("model", n), y(), e.ui.showToast("Gemini 설정이 적용되었습니다. API Key를 입력하세요.", "info");
+						const u = "https://generativelanguage.googleapis.com/v1beta/openai";
+						const m = "gemini-flash-latest";
+						urlInput.setValue(u);
+						modelInput.setValue(m);
+						context.storage.set("api_url", u);
+						context.storage.set("model", m);
+						renderChips();
+						context.ui.showToast("Gemini 설정이 적용되었습니다. API Key를 입력하세요.", "info");
 					}
-				}), w = e.ui.createButton({
+				});
+				const btnPresetOpenAI = context.ui.createButton({
 					text: "OpenAI (ChatGPT)",
 					variant: "small",
 					onClick: () => {
-						let t = "https://api.openai.com/v1", n = "gpt-4o-mini";
-						s.setValue(t), g.setValue(n), e.storage.set("api_url", t), e.storage.set("model", n), y(), e.ui.showToast("OpenAI 설정이 적용되었습니다.", "info");
+						const u = "https://api.openai.com/v1";
+						const m = "gpt-4o-mini";
+						urlInput.setValue(u);
+						modelInput.setValue(m);
+						context.storage.set("api_url", u);
+						context.storage.set("model", m);
+						renderChips();
+						context.ui.showToast("OpenAI 설정이 적용되었습니다.", "info");
 					}
-				}), T = e.ui.createButton({
+				});
+				const btnPresetOllama = context.ui.createButton({
 					text: "로컬 Ollama",
 					variant: "small",
 					onClick: () => {
-						let t = "http://localhost:11434/v1", n = "qwen2.5-coder";
-						s.setValue(t), g.setValue(n), e.storage.set("api_url", t), e.storage.set("model", n), y(), e.ui.showToast("Ollama 설정이 적용되었습니다. (Key는 비워둠)", "info");
+						const u = "http://localhost:11434/v1";
+						const m = "qwen2.5-coder";
+						urlInput.setValue(u);
+						modelInput.setValue(m);
+						context.storage.set("api_url", u);
+						context.storage.set("model", m);
+						renderChips();
+						context.ui.showToast("Ollama 설정이 적용되었습니다. (Key는 비워둠)", "info");
 					}
 				});
-				S.append(C, w, T);
-				let b = e.ui.createCard({
+				presetRow.append(btnPresetGemini, btnPresetOpenAI, btnPresetOllama);
+				const presetCard = context.ui.createCard({
 					title: "빠른 프로바이더 설정",
-					content: S
+					content: presetRow
 				});
-				let E = e.ui.createCard({
+				const configCard = context.ui.createCard({
 					title: "연결 정보 입력",
-					content: [s.row, c, g.row, _]
+					content: [
+						urlInput.row,
+						keyRow,
+						modelInput.row,
+						modelChipsWrap
+					]
 				});
-				let O_div = document.createElement("div");
-				O_div.style.cssText = "font-size: 11px; color: var(--fg-dim); line-height: 1.5;";
-				O_div.innerHTML = "\n          <div>- Google Gemini: Google AI Studio 키(AQ...) 입력 시 gemini-flash-latest 모델이 기본 제공됩니다.</div>\n          <div>- OpenAI: platform.openai.com API 키 및 gpt-4o-mini 모델을 권장합니다.</div>\n          <div>- Ollama: 로컬 PC에서 실행 중인 경우 키 없이 바로 연결할 수 있습니다.</div>\n        ";
-				let O = e.ui.createCard({
+				const guideDiv = document.createElement("div");
+				guideDiv.style.cssText = "font-size: 11px; color: var(--fg-dim); line-height: 1.5;";
+				guideDiv.innerHTML = `
+          <div>- Google Gemini: Google AI Studio 키(AQ...) 입력 시 gemini-flash-latest 모델이 기본 제공됩니다.</div>
+          <div>- OpenAI: platform.openai.com API 키 및 gpt-4o-mini 모델을 권장합니다.</div>
+          <div>- Ollama: 로컬 PC에서 실행 중인 경우 키 없이 바로 연결할 수 있습니다.</div>
+        `;
+				const guideCard = context.ui.createCard({
 					title: "환경 및 모델 안내",
-					content: O_div
+					content: guideDiv
 				});
-				o.append(b, E, O);
-				let k = document.createElement("div");
-				k.className = "ai-chat-history";
-				let A = document.createElement("div");
-				A.className = "ai-empty-state", A.innerHTML = "\n          <div class=\"ai-empty-title\">3DMigoto / XXMI 모딩 어시스턴트</div>\n          <div class=\"ai-empty-desc\">INI 코드 분석이나 토글 키 생성 등 모딩 작업을 질문하거나<br>하단의 [템플릿 ▾] 버튼을 눌러 빠르게 요청해 보세요.</div>\n        ", k.append(A);
-				let j = document.createElement("div");
-				j.className = "ai-input-dock";
-				let M = document.createElement("div");
-				M.className = "ai-input-dock-top";
-				let N = document.createElement("div");
-				N.className = "ai-dock-options";
-				let P = document.createElement("div");
-				P.className = "ai-context-select-wrap";
-				let F = document.createElement("select");
-				F.className = "ai-context-select", F.title = "AI에게 전달할 컨텍스트 범위를 선택합니다.";
-				let I = document.createElement("option");
-				I.value = "smart", I.textContent = "스마트";
-				let L = document.createElement("option");
-				L.value = "full", L.textContent = "전체 파일";
-				let R = document.createElement("option");
-				R.value = "none", R.textContent = "코드 제외", F.append(I, L, R), F.value = e.storage.get("context_mode", "smart"), F.onchange = () => e.storage.set("context_mode", F.value), P.append(F);
-				let z = e.storage.get("auto_apply", !1), B = document.createElement("button");
-				B.type = "button", B.className = "ai-auto-apply-toggle" + (z ? " active" : ""), B.title = "답변 완료 시 현재 열린 파일의 해당 섹션을 스마트하게 자동 교체/반영합니다.", B.textContent = "자동 반영", B.onclick = () => {
-					z = !z, e.storage.set("auto_apply", z), B.classList.toggle("active", z), e.ui.showToast(`자동 반영이 ${z ? "활성화" : "비활성화"}되었습니다.`, z ? "info" : "warn");
-				}, N.append(P, B);
-				let V = document.createElement("div");
-				V.className = "ai-template-btn-wrap";
-				let H = document.createElement("button");
-				H.className = "small-btn", H.textContent = "템플릿 ▾";
-				let U = document.createElement("ul");
-				U.className = "ai-template-menu", U.hidden = !0, [
+				settingsPane.append(presetCard, configCard, guideCard);
+				const chatHistory = document.createElement("div");
+				chatHistory.className = "ai-chat-history";
+				const emptyState = document.createElement("div");
+				emptyState.className = "ai-empty-state";
+				emptyState.innerHTML = `
+          <div class="ai-empty-title">3DMigoto / XXMI 모딩 어시스턴트</div>
+          <div class="ai-empty-desc">INI 코드 분석이나 토글 키 생성 등 모딩 작업을 질문하거나<br>하단의 [템플릿 ▾] 버튼을 눌러 빠르게 요청해 보세요.</div>
+        `;
+				chatHistory.append(emptyState);
+				const inputDock = document.createElement("div");
+				inputDock.className = "ai-input-dock";
+				const dockTop = document.createElement("div");
+				dockTop.className = "ai-input-dock-top";
+				const dockOptions = document.createElement("div");
+				dockOptions.className = "ai-dock-options";
+				const contextSelectWrap = document.createElement("div");
+				contextSelectWrap.className = "ai-context-select-wrap";
+				const contextSelect = document.createElement("select");
+				contextSelect.className = "ai-context-select";
+				contextSelect.title = "AI에게 전달할 컨텍스트 범위를 선택합니다.";
+				const optSmart = document.createElement("option");
+				optSmart.value = "smart";
+				optSmart.textContent = "스마트";
+				const optFull = document.createElement("option");
+				optFull.value = "full";
+				optFull.textContent = "전체 파일";
+				const optNone = document.createElement("option");
+				optNone.value = "none";
+				optNone.textContent = "코드 제외";
+				contextSelect.append(optSmart, optFull, optNone);
+				contextSelect.value = context.storage.get("context_mode", "smart");
+				contextSelect.onchange = () => context.storage.set("context_mode", contextSelect.value);
+				contextSelectWrap.append(contextSelect);
+				let isAutoApply = context.storage.get("auto_apply", false);
+				const autoApplyToggle = document.createElement("button");
+				autoApplyToggle.type = "button";
+				autoApplyToggle.className = "ai-auto-apply-toggle" + (isAutoApply ? " active" : "");
+				autoApplyToggle.title = "답변 완료 시 현재 열린 파일의 해당 섹션을 스마트하게 자동 교체/반영합니다.";
+				autoApplyToggle.textContent = "자동 반영";
+				autoApplyToggle.onclick = () => {
+					isAutoApply = !isAutoApply;
+					context.storage.set("auto_apply", isAutoApply);
+					autoApplyToggle.classList.toggle("active", isAutoApply);
+					context.ui.showToast(`자동 반영이 ${isAutoApply ? "활성화" : "비활성화"}되었습니다.`, isAutoApply ? "info" : "warn");
+				};
+				dockOptions.append(contextSelectWrap, autoApplyToggle);
+				const templateWrap = document.createElement("div");
+				templateWrap.className = "ai-template-btn-wrap";
+				const templateBtn = document.createElement("button");
+				templateBtn.className = "small-btn";
+				templateBtn.textContent = "템플릿 ▾";
+				const templateMenu = document.createElement("ul");
+				templateMenu.className = "ai-template-menu";
+				templateMenu.hidden = true;
+				[
 					{
 						label: "[분석] 문법 및 오류 분석",
 						text: "현재 INI 파일의 문법적 오류나 권장되지 않는 작성 방식을 3DMigoto/XXMI 규격(elif 및 빌트인 키워드 지원) 기준으로 검사하고 개선안을 제시해 줘."
@@ -180,299 +274,551 @@ var t = e({
 					{ label: "---" },
 					{
 						label: "[지우기] 대화 내역 초기화",
-						isAction: !0
+						isAction: true
 					}
-				].forEach((t) => {
-					if (t.label === "---") {
-						let e = document.createElement("li");
-						e.className = "ai-template-menu-divider", U.append(e);
+				].forEach((item) => {
+					if (item.label === "---") {
+						const div = document.createElement("li");
+						div.className = "ai-template-menu-divider";
+						templateMenu.append(div);
 						return;
 					}
-					let n = document.createElement("li");
-					n.className = "ai-template-menu-item", n.textContent = t.label, n.onclick = (n) => {
-						if (n.stopPropagation(), U.hidden = !0, t.isAction) {
-							k.replaceChildren(A), e.ui.showToast("대화 내역이 초기화되었습니다.", "info");
+					const li = document.createElement("li");
+					li.className = "ai-template-menu-item";
+					li.textContent = item.label;
+					li.onclick = (e) => {
+						e.stopPropagation();
+						templateMenu.hidden = true;
+						if (item.isAction) {
+							chatHistory.replaceChildren(emptyState);
+							context.ui.showToast("대화 내역이 초기화되었습니다.", "info");
 							return;
 						}
-						t.text && (W.value = t.text, te(), W.focus());
-					}, U.append(n);
-				}), H.onclick = (e) => {
-					e.stopPropagation(), U.hidden = !U.hidden;
-				}, V.append(H, U), M.append(N, V);
-				let ee = document.createElement("div");
-				ee.className = "ai-input-dock-main";
-				let W = document.createElement("textarea");
-				W.className = "ai-dock-textarea", W.placeholder = "AI에게 질문이나 코드 작성을 요청하세요... (Enter로 전송, Shift+Enter 줄바꿈)", W.rows = 1;
-				let G = document.createElement("div");
-				G.className = "ai-dock-resizer", G.title = "드래그하여 입력창 높이 조절 (더블 클릭: 기본 크기 복원)";
-				let K = e.storage.get("dock_textarea_height", 0), q = K >= 38;
-				q && (W.style.height = `${K}px`, W.style.overflowY = "auto");
-				let te = () => {
-					if (q) {
-						W.style.overflowY = W.scrollHeight > W.clientHeight ? "auto" : "hidden";
+						if (item.text) {
+							dockTextarea.value = item.text;
+							adjustTextareaHeight();
+							dockTextarea.focus();
+						}
+					};
+					templateMenu.append(li);
+				});
+				templateBtn.onclick = (e) => {
+					e.stopPropagation();
+					templateMenu.hidden = !templateMenu.hidden;
+				};
+				templateWrap.append(templateBtn, templateMenu);
+				dockTop.append(dockOptions, templateWrap);
+				const dockMain = document.createElement("div");
+				dockMain.className = "ai-input-dock-main";
+				const dockTextarea = document.createElement("textarea");
+				dockTextarea.className = "ai-dock-textarea";
+				dockTextarea.placeholder = "AI에게 질문이나 코드 작성을 요청하세요... (Enter로 전송, Shift+Enter 줄바꿈)";
+				dockTextarea.rows = 1;
+				const dockResizer = document.createElement("div");
+				dockResizer.className = "ai-dock-resizer";
+				dockResizer.title = "드래그하여 입력창 높이 조절 (더블 클릭: 기본 크기 복원)";
+				let savedDockHeight = context.storage.get("dock_textarea_height", 0);
+				let isManuallyResized = savedDockHeight >= 38;
+				if (isManuallyResized) {
+					dockTextarea.style.height = `${savedDockHeight}px`;
+					dockTextarea.style.overflowY = "auto";
+				}
+				const adjustTextareaHeight = () => {
+					if (isManuallyResized) {
+						dockTextarea.style.overflowY = dockTextarea.scrollHeight > dockTextarea.clientHeight ? "auto" : "hidden";
 						return;
 					}
-					W.style.height = "auto";
-					let e = W.scrollHeight;
-					e > 120 ? (W.style.height = "120px", W.style.overflowY = "auto") : (W.style.height = `${Math.max(e, 38)}px`, W.style.overflowY = "hidden");
+					dockTextarea.style.height = "auto";
+					const scrollH = dockTextarea.scrollHeight;
+					const maxH = 120;
+					if (scrollH > maxH) {
+						dockTextarea.style.height = `${maxH}px`;
+						dockTextarea.style.overflowY = "auto";
+					} else {
+						dockTextarea.style.height = `${Math.max(scrollH, 38)}px`;
+						dockTextarea.style.overflowY = "hidden";
+					}
 				};
-				W.oninput = te;
-				let J = !1, ne = 0, re = 38, ie = (e) => {
-					if (!J) return;
-					let t = ne - e.clientY, n = a.clientHeight, r = Math.max(120, n - 120), i = Math.max(38, Math.min(r, re + t));
-					W.style.height = `${i}px`, W.style.overflowY = W.scrollHeight > i ? "auto" : "hidden", q = !0, K = i;
-				}, ae = () => {
-					J && (J = !1, G.classList.remove("dragging"), document.body.classList.remove("ai-dock-resizing"), window.removeEventListener("mousemove", ie), window.removeEventListener("mouseup", ae), K >= 38 && e.storage.set("dock_textarea_height", K));
+				dockTextarea.oninput = adjustTextareaHeight;
+				let isDraggingResizer = false;
+				let dragStartY = 0;
+				let dragStartHeight = 38;
+				const onResizerMouseMove = (e) => {
+					if (!isDraggingResizer) return;
+					const deltaY = dragStartY - e.clientY;
+					const paneHeight = agentPane.clientHeight;
+					const maxAllowed = Math.max(120, paneHeight - 120);
+					const newH = Math.max(38, Math.min(maxAllowed, dragStartHeight + deltaY));
+					dockTextarea.style.height = `${newH}px`;
+					dockTextarea.style.overflowY = dockTextarea.scrollHeight > newH ? "auto" : "hidden";
+					isManuallyResized = true;
+					savedDockHeight = newH;
 				};
-				G.onmousedown = (e) => {
-					e.preventDefault(), J = !0, ne = e.clientY, re = W.clientHeight || 38, G.classList.add("dragging"), document.body.classList.add("ai-dock-resizing"), window.addEventListener("mousemove", ie), window.addEventListener("mouseup", ae);
-				}, G.ondblclick = () => {
-					q = !1, K = 0, e.storage.set("dock_textarea_height", 0), W.style.height = "38px", W.style.overflowY = "hidden", e.ui.showToast("입력창 높이가 기본 크기로 초기화되었습니다.", "info");
+				const onResizerMouseUp = () => {
+					if (!isDraggingResizer) return;
+					isDraggingResizer = false;
+					dockResizer.classList.remove("dragging");
+					document.body.classList.remove("ai-dock-resizing");
+					window.removeEventListener("mousemove", onResizerMouseMove);
+					window.removeEventListener("mouseup", onResizerMouseUp);
+					if (savedDockHeight >= 38) context.storage.set("dock_textarea_height", savedDockHeight);
 				};
-				let Y = document.createElement("button");
-				Y.className = "primary ai-dock-send-btn", Y.textContent = "전송", W.onkeydown = (e) => {
-					e.key === "Enter" && !e.shiftKey && (e.preventDefault(), Q(W.value));
-				}, Y.onclick = () => Q(W.value), ee.append(W, Y), j.append(M, ee), a.append(k, G, j), t.append(n, a, o);
-				let oe = (e) => {
-					!U.hidden && !V.contains(e.target) && (U.hidden = !0);
+				dockResizer.onmousedown = (e) => {
+					e.preventDefault();
+					isDraggingResizer = true;
+					dragStartY = e.clientY;
+					dragStartHeight = dockTextarea.clientHeight || 38;
+					dockResizer.classList.add("dragging");
+					document.body.classList.add("ai-dock-resizing");
+					window.addEventListener("mousemove", onResizerMouseMove);
+					window.addEventListener("mouseup", onResizerMouseUp);
 				};
-				document.addEventListener("click", oe);
-				function se(t, n = !1) {
-					let r = e.editor.getText(), i = e.ini.merge(r, t);
-					e.editor.setText(i.newText);
-					let a = n ? "[자동 반영] " : "", o = i.replacedSections.length, s = i.addedSections.length;
-					return o > 0 && s > 0 ? e.ui.showToast(`${a}${o}개 섹션 교체 및 ${s}개 섹션이 추가되었습니다. (되돌리기: Ctrl+Z)`, "info") : o > 0 ? e.ui.showToast(`${a}${o}개 섹션이 스마트 교체되었습니다. (되돌리기: Ctrl+Z)`, "info") : s > 0 ? e.ui.showToast(`${a}${s}개 섹션이 파일에 추가되었습니다. (되돌리기: Ctrl+Z)`, "info") : e.ui.showToast(`${a}파일 내용이 갱신되었습니다. (되돌리기: Ctrl+Z)`, "info"), !0;
+				dockResizer.ondblclick = () => {
+					isManuallyResized = false;
+					savedDockHeight = 0;
+					context.storage.set("dock_textarea_height", 0);
+					dockTextarea.style.height = "38px";
+					dockTextarea.style.overflowY = "hidden";
+					context.ui.showToast("입력창 높이가 기본 크기로 초기화되었습니다.", "info");
+				};
+				const sendBtn = document.createElement("button");
+				sendBtn.className = "primary ai-dock-send-btn";
+				sendBtn.textContent = "전송";
+				dockTextarea.onkeydown = (e) => {
+					if (e.key === "Enter" && !e.shiftKey) {
+						e.preventDefault();
+						sendMessage(dockTextarea.value);
+					}
+				};
+				sendBtn.onclick = () => sendMessage(dockTextarea.value);
+				dockMain.append(dockTextarea, sendBtn);
+				inputDock.append(dockTop, dockMain);
+				agentPane.append(chatHistory, dockResizer, inputDock);
+				container.append(subtabBar, agentPane, settingsPane);
+				const onDocClick = (e) => {
+					if (!templateMenu.hidden && !templateWrap.contains(e.target)) templateMenu.hidden = true;
+				};
+				document.addEventListener("click", onDocClick);
+				function executeSmartApply(codeContent, isAuto = false) {
+					const currentText = context.editor.getText();
+					const mergeResult = context.ini.merge(currentText, codeContent);
+					context.editor.setText(mergeResult.newText);
+					const prefix = isAuto ? "[자동 반영] " : "";
+					const replacedCount = mergeResult.replacedSections.length;
+					const addedCount = mergeResult.addedSections.length;
+					if (replacedCount > 0 && addedCount > 0) context.ui.showToast(`${prefix}${replacedCount}개 섹션 교체 및 ${addedCount}개 섹션이 추가되었습니다. (되돌리기: Ctrl+Z)`, "info");
+					else if (replacedCount > 0) context.ui.showToast(`${prefix}${replacedCount}개 섹션이 스마트 교체되었습니다. (되돌리기: Ctrl+Z)`, "info");
+					else if (addedCount > 0) context.ui.showToast(`${prefix}${addedCount}개 섹션이 파일에 추가되었습니다. (되돌리기: Ctrl+Z)`, "info");
+					else context.ui.showToast(`${prefix}파일 내용이 갱신되었습니다. (되돌리기: Ctrl+Z)`, "info");
+					return true;
 				}
-				function ce(e) {
-					return e.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+				function escapeHtml(str) {
+					return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 				}
-				function X(e) {
-					let t = ce(e), n = [], r = t.replace(/`([^`]+)`/g, (e, t) => {
-						let r = n.length;
-						return n.push(`<code class="ai-inline-code">${t}</code>`), `\uFFF0CODE_${r}\uFFF1`;
+				function formatInlineMarkdown(text) {
+					const safe = escapeHtml(text);
+					const codeTokens = [];
+					let formatted = safe.replace(/`([^`]+)`/g, (_match, codeContent) => {
+						const idx = codeTokens.length;
+						codeTokens.push(`<code class="ai-inline-code">${codeContent}</code>`);
+						return `\uFFF0CODE_${idx}\uFFF1`;
 					}).replace(/(\*\*\*|___)(.*?)\1/g, "<strong><em>$2</em></strong>");
-					return r = r.replace(/(\*\*|__)(.*?)\1/g, "<strong>$2</strong>"), r = r.replace(/(?<!\w)(\*|_)(.*?)\1(?!\w)/g, "<em>$2</em>"), r = r.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, "<a href=\"$2\" target=\"_blank\" rel=\"noopener noreferrer\" class=\"ai-link\">$1</a>"), r = r.replace(/\uFFF0CODE_(\d+)\uFFF1/g, (e, t) => n[parseInt(t, 10)] || ""), r;
+					formatted = formatted.replace(/(\*\*|__)(.*?)\1/g, "<strong>$2</strong>");
+					formatted = formatted.replace(/(?<!\w)(\*|_)(.*?)\1(?!\w)/g, "<em>$2</em>");
+					formatted = formatted.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, "<a href=\"$2\" target=\"_blank\" rel=\"noopener noreferrer\" class=\"ai-link\">$1</a>");
+					formatted = formatted.replace(/\uFFF0CODE_(\d+)\uFFF1/g, (_m, idxStr) => {
+						return codeTokens[parseInt(idxStr, 10)] || "";
+					});
+					return formatted;
 				}
-				function le(e) {
-					let t = e.split(/\r?\n/), n = [], r = !1, i = !1, a = !1, o = !1, s = [], c = [], l = [], u = () => {
-						if (l.length > 0) {
-							let e = l.map((e) => X(e)).join("<br>");
-							n.push(`<p class="ai-md-p">${e}</p>`), l = [];
+				function parseMarkdownToHtml(mdText) {
+					const lines = mdText.split(/\r?\n/);
+					const out = [];
+					let inUl = false;
+					let inOl = false;
+					let inBlockquote = false;
+					let inTable = false;
+					let tableHeaders = [];
+					let tableRows = [];
+					let paraLines = [];
+					const flushPara = () => {
+						if (paraLines.length > 0) {
+							const content = paraLines.map((l) => formatInlineMarkdown(l)).join("<br>");
+							out.push(`<p class="ai-md-p">${content}</p>`);
+							paraLines = [];
 						}
-					}, d = () => {
-						if (!o) return;
-						let e = "<table class=\"ai-md-table\">";
-						if (s.length > 0) {
-							e += "<thead><tr>";
-							for (let t of s) e += `<th>${X(t)}</th>`;
-							e += "</tr></thead>";
-						}
-						if (c.length > 0) {
-							e += "<tbody>";
-							for (let t of c) {
-								e += "<tr>";
-								for (let n of t) e += `<td>${X(n)}</td>`;
-								e += "</tr>";
-							}
-							e += "</tbody>";
-						}
-						e += "</table>", n.push(e), o = !1, s = [], c = [];
-					}, f = () => {
-						u(), d(), r &&= (n.push("</ul>"), !1), i &&= (n.push("</ol>"), !1), a &&= (n.push("</blockquote>"), !1);
 					};
-					for (let e = 0; e < t.length; e++) {
-						let p = t[e], m = p.trim();
-						if (!m) {
-							f();
+					const flushTable = () => {
+						if (!inTable) return;
+						let html = "<table class=\"ai-md-table\">";
+						if (tableHeaders.length > 0) {
+							html += "<thead><tr>";
+							for (const th of tableHeaders) html += `<th>${formatInlineMarkdown(th)}</th>`;
+							html += "</tr></thead>";
+						}
+						if (tableRows.length > 0) {
+							html += "<tbody>";
+							for (const row of tableRows) {
+								html += "<tr>";
+								for (const cell of row) html += `<td>${formatInlineMarkdown(cell)}</td>`;
+								html += "</tr>";
+							}
+							html += "</tbody>";
+						}
+						html += "</table>";
+						out.push(html);
+						inTable = false;
+						tableHeaders = [];
+						tableRows = [];
+					};
+					const closeBlocks = () => {
+						flushPara();
+						flushTable();
+						if (inUl) {
+							out.push("</ul>");
+							inUl = false;
+						}
+						if (inOl) {
+							out.push("</ol>");
+							inOl = false;
+						}
+						if (inBlockquote) {
+							out.push("</blockquote>");
+							inBlockquote = false;
+						}
+					};
+					for (let i = 0; i < lines.length; i++) {
+						const rawLine = lines[i];
+						const trimmed = rawLine.trim();
+						if (!trimmed) {
+							closeBlocks();
 							continue;
 						}
-						if (m.startsWith("|") && m.endsWith("|") && m.length > 2) {
-							if (u(), r &&= (n.push("</ul>"), !1), i &&= (n.push("</ol>"), !1), a &&= (n.push("</blockquote>"), !1), /^\|?(\s*:?-{2,}:?\s*\|)+\s*$/.test(m)) continue;
-							let e = m.slice(1, -1).split("|").map((e) => e.trim());
-							o ? c.push(e) : (o = !0, s = e);
+						if (trimmed.startsWith("|") && trimmed.endsWith("|") && trimmed.length > 2) {
+							flushPara();
+							if (inUl) {
+								out.push("</ul>");
+								inUl = false;
+							}
+							if (inOl) {
+								out.push("</ol>");
+								inOl = false;
+							}
+							if (inBlockquote) {
+								out.push("</blockquote>");
+								inBlockquote = false;
+							}
+							if (/^\|?(\s*:?-{2,}:?\s*\|)+\s*$/.test(trimmed)) continue;
+							const cells = trimmed.slice(1, -1).split("|").map((c) => c.trim());
+							if (!inTable) {
+								inTable = true;
+								tableHeaders = cells;
+							} else tableRows.push(cells);
+							continue;
+						} else if (inTable) flushTable();
+						if (/^(\-{3,}|\*{3,}|_{3,})$/.test(trimmed)) {
+							closeBlocks();
+							out.push("<hr class=\"ai-md-hr\">");
 							continue;
 						}
-						if (o && d(), /^(\-{3,}|\*{3,}|_{3,})$/.test(m)) {
-							f(), n.push("<hr class=\"ai-md-hr\">");
+						const headerMatch = trimmed.match(/^(#{1,6})\s+(.+)$/);
+						if (headerMatch) {
+							closeBlocks();
+							const level = Math.min(headerMatch[1].length + 2, 6);
+							out.push(`<h${level} class="ai-md-h ai-md-h${level}">${formatInlineMarkdown(headerMatch[2])}</h${level}>`);
 							continue;
 						}
-						let h = m.match(/^(#{1,6})\s+(.+)$/);
-						if (h) {
-							f();
-							let e = Math.min(h[1].length + 2, 6);
-							n.push(`<h${e} class="ai-md-h ai-md-h${e}">${X(h[2])}</h${e}>`);
+						const quoteMatch = trimmed.match(/^>\s?(.*)$/);
+						if (quoteMatch) {
+							flushPara();
+							if (inUl) {
+								out.push("</ul>");
+								inUl = false;
+							}
+							if (inOl) {
+								out.push("</ol>");
+								inOl = false;
+							}
+							if (!inBlockquote) {
+								out.push("<blockquote class=\"ai-md-quote\">");
+								inBlockquote = true;
+							}
+							out.push(`<p>${formatInlineMarkdown(quoteMatch[1])}</p>`);
 							continue;
+						} else if (inBlockquote) {
+							out.push("</blockquote>");
+							inBlockquote = false;
 						}
-						let g = m.match(/^>\s?(.*)$/);
-						if (g) {
-							u(), r &&= (n.push("</ul>"), !1), i &&= (n.push("</ol>"), !1), a ||= (n.push("<blockquote class=\"ai-md-quote\">"), !0), n.push(`<p>${X(g[1])}</p>`);
+						const ulMatch = trimmed.match(/^[-*+]\s+(.+)$/);
+						if (ulMatch) {
+							flushPara();
+							if (inOl) {
+								out.push("</ol>");
+								inOl = false;
+							}
+							if (!inUl) {
+								out.push("<ul class=\"ai-md-ul\">");
+								inUl = true;
+							}
+							out.push(`<li>${formatInlineMarkdown(ulMatch[1])}</li>`);
 							continue;
+						} else if (inUl && !rawLine.startsWith("  ") && !rawLine.startsWith("	")) {
+							out.push("</ul>");
+							inUl = false;
 						}
-						a &&= (n.push("</blockquote>"), !1);
-						let _ = m.match(/^[-*+]\s+(.+)$/);
-						if (_) {
-							u(), i &&= (n.push("</ol>"), !1), r ||= (n.push("<ul class=\"ai-md-ul\">"), !0), n.push(`<li>${X(_[1])}</li>`);
+						const olMatch = trimmed.match(/^\d+\.\s+(.+)$/);
+						if (olMatch) {
+							flushPara();
+							if (inUl) {
+								out.push("</ul>");
+								inUl = false;
+							}
+							if (!inOl) {
+								out.push("<ol class=\"ai-md-ol\">");
+								inOl = true;
+							}
+							out.push(`<li>${formatInlineMarkdown(olMatch[1])}</li>`);
 							continue;
+						} else if (inOl && !rawLine.startsWith("  ") && !rawLine.startsWith("	")) {
+							out.push("</ol>");
+							inOl = false;
 						}
-						r && !p.startsWith("  ") && !p.startsWith("	") && (n.push("</ul>"), r = !1);
-						let v = m.match(/^\d+\.\s+(.+)$/);
-						if (v) {
-							u(), r &&= (n.push("</ul>"), !1), i ||= (n.push("<ol class=\"ai-md-ol\">"), !0), n.push(`<li>${X(v[1])}</li>`);
-							continue;
-						}
-						i && !p.startsWith("  ") && !p.startsWith("	") && (n.push("</ol>"), i = !1), l.push(p);
+						paraLines.push(rawLine);
 					}
-					return f(), n.join("");
+					closeBlocks();
+					return out.join("");
 				}
-				function ue(t, n) {
-					t.replaceChildren();
-					let r = /```(?:[a-zA-Z0-9_-]+)?([\s\S]*?)```/g, i = 0, a;
-					for (; (a = r.exec(n)) !== null;) {
-						let r = n.slice(i, a.index);
-						if (r.trim()) {
-							let e = document.createElement("div");
-							e.className = "ai-md-content", e.innerHTML = le(r.trim()), t.append(e);
+				function renderAssistantContent(targetEl, text) {
+					targetEl.replaceChildren();
+					const codeBlockRegex = /```(?:[a-zA-Z0-9_-]+)?([\s\S]*?)```/g;
+					let lastIdx = 0;
+					let match;
+					while ((match = codeBlockRegex.exec(text)) !== null) {
+						const textBefore = text.slice(lastIdx, match.index);
+						if (textBefore.trim()) {
+							const mdDiv = document.createElement("div");
+							mdDiv.className = "ai-md-content";
+							mdDiv.innerHTML = parseMarkdownToHtml(textBefore.trim());
+							targetEl.append(mdDiv);
 						}
-						let o = a[1].trim(), s = document.createElement("div");
-						s.className = "ai-code-block";
-						let c = document.createElement("pre");
-						c.textContent = o, s.append(c);
-						let l = document.createElement("div");
-						l.className = "ai-code-bar";
-						let u = document.createElement("button");
-						u.className = "small-btn ai-apply-btn", u.textContent = "스마트 적용", u.title = "현재 열린 파일의 해당 섹션을 찾아 스마트하게 교체/반영합니다", u.onclick = () => {
-							se(o, !1);
+						const codeContent = match[1].trim();
+						const codeBox = document.createElement("div");
+						codeBox.className = "ai-code-block";
+						const pre = document.createElement("pre");
+						pre.textContent = codeContent;
+						codeBox.append(pre);
+						const btnBar = document.createElement("div");
+						btnBar.className = "ai-code-bar";
+						const applyBtn = document.createElement("button");
+						applyBtn.className = "small-btn ai-apply-btn";
+						applyBtn.textContent = "스마트 적용";
+						applyBtn.title = "현재 열린 파일의 해당 섹션을 찾아 스마트하게 교체/반영합니다";
+						applyBtn.onclick = () => {
+							executeSmartApply(codeContent, false);
 						};
-						let d = document.createElement("button");
-						d.className = "small-btn", d.textContent = "커서 삽입", d.title = "현재 에디터 커서 위치에 코드를 삽입합니다", d.onclick = () => {
-							e.editor.insertText(o + "\n"), e.ui.showToast("에디터 커서에 코드가 삽입되었습니다.", "info");
+						const insertBtn = document.createElement("button");
+						insertBtn.className = "small-btn";
+						insertBtn.textContent = "커서 삽입";
+						insertBtn.title = "현재 에디터 커서 위치에 코드를 삽입합니다";
+						insertBtn.onclick = () => {
+							context.editor.insertText(codeContent + "\n");
+							context.ui.showToast("에디터 커서에 코드가 삽입되었습니다.", "info");
 						};
-						let f = document.createElement("button");
-						f.className = "small-btn", f.textContent = "복사", f.onclick = () => {
-							navigator.clipboard.writeText(o), e.ui.showToast("클립보드에 복사되었습니다.", "info");
-						}, l.append(u, d, f), s.append(l), t.append(s), i = a.index + a[0].length;
+						const copyBtn = document.createElement("button");
+						copyBtn.className = "small-btn";
+						copyBtn.textContent = "복사";
+						copyBtn.onclick = () => {
+							navigator.clipboard.writeText(codeContent);
+							context.ui.showToast("클립보드에 복사되었습니다.", "info");
+						};
+						btnBar.append(applyBtn, insertBtn, copyBtn);
+						codeBox.append(btnBar);
+						targetEl.append(codeBox);
+						lastIdx = match.index + match[0].length;
 					}
-					let o = n.slice(i);
-					if (o.trim()) {
-						let e = document.createElement("div");
-						e.className = "ai-md-content", e.innerHTML = le(o.trim()), t.append(e);
+					const remaining = text.slice(lastIdx);
+					if (remaining.trim()) {
+						const mdDiv = document.createElement("div");
+						mdDiv.className = "ai-md-content";
+						mdDiv.innerHTML = parseMarkdownToHtml(remaining.trim());
+						targetEl.append(mdDiv);
 					}
 				}
-				let Z = null;
-				function de(e = "USER") {
-					Z &&= (Z.abort(e), null);
+				let activeAbortController = null;
+				function abortActiveRequest(reason = "USER") {
+					if (activeAbortController) {
+						activeAbortController.abort(reason);
+						activeAbortController = null;
+					}
 				}
-				function fe(e, t) {
-					return new Promise((n, r) => {
-						if (t?.aborted) return r(new DOMException("Aborted", "AbortError"));
-						let i = setTimeout(() => {
-							n();
-						}, e);
-						t?.addEventListener("abort", () => {
-							clearTimeout(i), r(new DOMException("Aborted", "AbortError"));
-						}, { once: !0 });
+				function delayWithAbort(ms, signal) {
+					return new Promise((resolve, reject) => {
+						if (signal?.aborted) return reject(new DOMException("Aborted", "AbortError"));
+						const timer = setTimeout(() => {
+							resolve();
+						}, ms);
+						signal?.addEventListener("abort", () => {
+							clearTimeout(timer);
+							reject(new DOMException("Aborted", "AbortError"));
+						}, { once: true });
 					});
 				}
-				function pe(t, n) {
-					if (n === "none") return {
-						promptText: t,
+				function buildPromptContext(userPrompt, mode) {
+					if (mode === "none") return {
+						promptText: userPrompt,
 						detail: "단독 질의 모드 (에디터 코드 제외)"
 					};
-					let r = e.workspace.getCurrentFile()?.name || "document.ini", i = e.editor.getText(), a = i.split("\n").length;
-					if (n === "full") return {
-						promptText: `${t}\n\n[현재 열린 파일: ${r} (전체 코드가 전달되었습니다)]\n\`\`\`ini\n${i}\n\`\`\``,
-						detail: `${r} (${a}줄 전체 첨부)`
+					const currentFileName = context.workspace.getCurrentFile()?.name || "document.ini";
+					const fullText = context.editor.getText();
+					const totalLines = fullText.split("\n").length;
+					if (mode === "full") return {
+						promptText: `${userPrompt}\n\n[현재 열린 파일: ${currentFileName} (전체 코드가 전달되었습니다)]\n\`\`\`ini\n${fullText}\n\`\`\``,
+						detail: `${currentFileName} (${totalLines}줄 전체 첨부)`
 					};
-					let o = e.ini.parse(i), s = e.editor.getCursor()?.lineNumber || 1, c = o.sections.find((e) => s >= e.startLine && s <= e.endLine), l = t.toLowerCase(), u = [];
-					for (let e of o.sections) {
-						if (c && e.name === c.name) continue;
-						let t = e.name.toLowerCase(), n = l.includes(t), r = (l.includes("hair") || l.includes("헤어")) && t.includes("hair") || (l.includes("face") || l.includes("얼굴")) && t.includes("face") || (l.includes("body") || l.includes("바디") || l.includes("몸")) && t.includes("body") || (l.includes("skirt") || l.includes("치마")) && t.includes("skirt") || (l.includes("dress") || l.includes("드레스") || l.includes("옷")) && (t.includes("dress") || t.includes("body")) || (l.includes("toggle") || l.includes("토글") || l.includes("키")) && (t.startsWith("key") || t.startsWith("constants")) || (l.includes("command") || l.includes("커맨드")) && t.startsWith("commandlist");
-						if ((n || r) && (u.push(e), u.length >= 3)) break;
+					const doc = context.ini.parse(fullText);
+					const cursorLine = context.editor.getCursor()?.lineNumber || 1;
+					const cursorSection = doc.sections.find((s) => cursorLine >= s.startLine && cursorLine <= s.endLine);
+					const lowerPrompt = userPrompt.toLowerCase();
+					const matchedSections = [];
+					for (const s of doc.sections) {
+						if (cursorSection && s.name === cursorSection.name) continue;
+						const lowerName = s.name.toLowerCase();
+						const hasNameMatch = lowerPrompt.includes(lowerName);
+						const hasPartMatch = (lowerPrompt.includes("hair") || lowerPrompt.includes("헤어")) && lowerName.includes("hair") || (lowerPrompt.includes("face") || lowerPrompt.includes("얼굴")) && lowerName.includes("face") || (lowerPrompt.includes("body") || lowerPrompt.includes("바디") || lowerPrompt.includes("몸")) && lowerName.includes("body") || (lowerPrompt.includes("skirt") || lowerPrompt.includes("치마")) && lowerName.includes("skirt") || (lowerPrompt.includes("dress") || lowerPrompt.includes("드레스") || lowerPrompt.includes("옷")) && (lowerName.includes("dress") || lowerName.includes("body")) || (lowerPrompt.includes("toggle") || lowerPrompt.includes("토글") || lowerPrompt.includes("키")) && (lowerName.startsWith("key") || lowerName.startsWith("constants")) || (lowerPrompt.includes("command") || lowerPrompt.includes("커맨드")) && lowerName.startsWith("commandlist");
+						if (hasNameMatch || hasPartMatch) {
+							matchedSections.push(s);
+							if (matchedSections.length >= 3) break;
+						}
 					}
-					if (l.includes("토글") || l.includes("toggle") || l.includes("키") || l.includes("key") || l.includes("변수") || l.includes("$")) {
-						let e = o.getSection("Constants");
-						e && e !== c && !u.includes(e) && u.unshift(e);
+					if (lowerPrompt.includes("토글") || lowerPrompt.includes("toggle") || lowerPrompt.includes("키") || lowerPrompt.includes("key") || lowerPrompt.includes("변수") || lowerPrompt.includes("$")) {
+						const constSec = doc.getSection("Constants");
+						if (constSec && constSec !== cursorSection && !matchedSections.includes(constSec)) matchedSections.unshift(constSec);
 					}
-					let d = [];
-					d.push(`[문서 구조 요약 - 총 ${o.sections.length}개 섹션 선언됨]`);
-					for (let t of o.sections) {
-						let n = e.ini.classifySection(t.name), r = t.properties.hash ? `hash=${t.properties.hash}` : t.properties.key ? `key=${t.properties.key}` : t.properties.type ? `type=${t.properties.type}` : "";
-						d.push(`- [${t.name}] (${n}${r ? `, ${r}` : ""}, 라인 ${t.startLine}~${t.endLine})`);
+					const outlineLines = [];
+					outlineLines.push(`[문서 구조 요약 - 총 ${doc.sections.length}개 섹션 선언됨]`);
+					for (const s of doc.sections) {
+						const grp = context.ini.classifySection(s.name);
+						const keyProp = s.properties["hash"] ? `hash=${s.properties["hash"]}` : s.properties["key"] ? `key=${s.properties["key"]}` : s.properties["type"] ? `type=${s.properties["type"]}` : "";
+						outlineLines.push(`- [${s.name}] (${grp}${keyProp ? `, ${keyProp}` : ""}, 라인 ${s.startLine}~${s.endLine})`);
 					}
-					let f = o.getSection("Constants"), p = f ? Object.keys(f.variables) : [];
-					p.length > 0 && d.push(`- 선언된 전역 변수: ${p.slice(0, 10).join(", ")}${p.length > 10 ? " 외..." : ""}`);
-					let m = [];
-					c && m.push(`; [현재 에디터 커서 위치 섹션 (${c.name})]\n${c.fullText}`);
-					for (let e of u) m.push(`; [질문과 연관된 참고 섹션 (${e.name})]\n${e.fullText}`);
-					if (m.length === 0 && o.sections.length > 0) {
-						let e = o.sections[0];
-						m.push(`; [파일 첫 번째 섹션 (${e.name})]\n${e.fullText}`);
+					const constSecForVars = doc.getSection("Constants");
+					const varNames = constSecForVars ? Object.keys(constSecForVars.variables) : [];
+					if (varNames.length > 0) outlineLines.push(`- 선언된 전역 변수: ${varNames.slice(0, 10).join(", ")}${varNames.length > 10 ? " 외..." : ""}`);
+					const excerptBlocks = [];
+					if (cursorSection) excerptBlocks.push(`; [현재 에디터 커서 위치 섹션 (${cursorSection.name})]\n${cursorSection.fullText}`);
+					for (const ms of matchedSections) excerptBlocks.push(`; [질문과 연관된 참고 섹션 (${ms.name})]\n${ms.fullText}`);
+					if (excerptBlocks.length === 0 && doc.sections.length > 0) {
+						const firstSec = doc.sections[0];
+						excerptBlocks.push(`; [파일 첫 번째 섹션 (${firstSec.name})]\n${firstSec.fullText}`);
 					}
-					let h = [
-						`[현재 열린 파일: ${r} - 스마트 요약 및 발췌 컨텍스트]`,
-						d.join("\n"),
+					const smartContextBody = [
+						`[현재 열린 파일: ${currentFileName} - 스마트 요약 및 발췌 컨텍스트]`,
+						outlineLines.join("\n"),
 						"",
 						"[수정 및 질문과 관련된 주요 섹션 본문 발췌]",
-						m.join("\n\n")
-					].join("\n"), g = h.split("\n").length, _ = a > 0 ? Math.max(0, Math.round((a - g) / a * 100)) : 0, v = [];
-					c && v.push(`커서:[${c.name}]`), u.forEach((e) => v.push(`연관:[${e.name}]`));
-					let y = `${r} (스마트 발췌: ${g}줄 전달, 원본 ${a}줄 대비 ${_}% 토큰 절감, ${v.join(", ") || "개요 전송"})`;
+						excerptBlocks.join("\n\n")
+					].join("\n");
+					const sentLines = smartContextBody.split("\n").length;
+					const savingsPercent = totalLines > 0 ? Math.max(0, Math.round((totalLines - sentLines) / totalLines * 100)) : 0;
+					const targetNames = [];
+					if (cursorSection) targetNames.push(`커서:[${cursorSection.name}]`);
+					matchedSections.forEach((m) => targetNames.push(`연관:[${m.name}]`));
+					const detail = `${currentFileName} (스마트 발췌: ${sentLines}줄 전달, 원본 ${totalLines}줄 대비 ${savingsPercent}% 토큰 절감, ${targetNames.join(", ") || "개요 전송"})`;
 					return {
-						promptText: `${t}\n\n${h}`,
-						detail: y
+						promptText: `${userPrompt}\n\n${smartContextBody}`,
+						detail
 					};
 				}
-				async function Q(t) {
-					let n = t.trim();
-					if (!n) return;
-					Z && de("NEW_REQUEST");
-					let r = new AbortController();
-					Z = r, A.parentElement && A.remove(), W.value = "", q || (W.style.height = "38px"), W.style.overflowY = "hidden";
-					let i = document.createElement("div");
-					i.className = "ai-turn-group";
-					let a = document.createElement("div");
-					a.className = "ai-turn-header";
-					let o = document.createElement("div");
-					o.className = "ai-turn-header-top";
-					let s = document.createElement("span");
-					s.className = "ai-turn-badge", s.textContent = "질문", o.append(s);
-					let c = n.length > 80 || n.includes("\n"), l = null;
-					c && (l = document.createElement("button"), l.className = "ai-turn-toggle-btn", l.textContent = "더보기", o.append(l));
-					let u = document.createElement("div");
-					if (u.className = `ai-turn-prompt-text${c ? " truncated" : ""}`, u.textContent = n, l) {
-						let e = !1, t = (t) => {
-							t.stopPropagation(), e = !e, e ? (u.classList.remove("truncated"), l.textContent = "접기") : (u.classList.add("truncated"), l.textContent = "더보기");
+				async function sendMessage(userPrompt) {
+					const trimmedPrompt = userPrompt.trim();
+					if (!trimmedPrompt) return;
+					if (activeAbortController) abortActiveRequest("NEW_REQUEST");
+					const abortController = new AbortController();
+					activeAbortController = abortController;
+					if (emptyState.parentElement) emptyState.remove();
+					dockTextarea.value = "";
+					if (!isManuallyResized) {
+						dockTextarea.style.height = "38px";
+						dockTextarea.style.overflowY = "hidden";
+					} else dockTextarea.style.overflowY = "hidden";
+					const turnGroup = document.createElement("div");
+					turnGroup.className = "ai-turn-group";
+					const userBubble = document.createElement("div");
+					userBubble.className = "ai-turn-header";
+					const userHeaderTop = document.createElement("div");
+					userHeaderTop.className = "ai-turn-header-top";
+					const badge = document.createElement("span");
+					badge.className = "ai-turn-badge";
+					badge.textContent = "질문";
+					userHeaderTop.append(badge);
+					const isLong = trimmedPrompt.length > 80 || trimmedPrompt.includes("\n");
+					let toggleBtn = null;
+					if (isLong) {
+						toggleBtn = document.createElement("button");
+						toggleBtn.className = "ai-turn-toggle-btn";
+						toggleBtn.textContent = "더보기";
+						userHeaderTop.append(toggleBtn);
+					}
+					const promptTextEl = document.createElement("div");
+					promptTextEl.className = `ai-turn-prompt-text${isLong ? " truncated" : ""}`;
+					promptTextEl.textContent = trimmedPrompt;
+					if (toggleBtn) {
+						let expanded = false;
+						const toggleHandler = (e) => {
+							e.stopPropagation();
+							expanded = !expanded;
+							if (expanded) {
+								promptTextEl.classList.remove("truncated");
+								toggleBtn.textContent = "접기";
+							} else {
+								promptTextEl.classList.add("truncated");
+								toggleBtn.textContent = "더보기";
+							}
 						};
-						l.onclick = t, a.onclick = (e) => {
-							e.target.tagName !== "BUTTON" && t(e);
+						toggleBtn.onclick = toggleHandler;
+						userBubble.onclick = (e) => {
+							if (e.target.tagName !== "BUTTON") toggleHandler(e);
 						};
 					}
-					a.append(o, u), i.append(a);
-					let d = document.createElement("div");
-					d.className = "ai-assistant-bubble";
-					let f = document.createElement("div");
-					f.className = "ai-status-card";
-					let p = document.createElement("div");
-					p.className = "ai-status-header";
-					let m = document.createElement("div");
-					m.className = "ai-status-header-left";
-					let h = document.createElement("span");
-					h.className = "ai-status-spinner";
-					let _ = document.createElement("span");
-					_.className = "ai-status-title", _.textContent = "요청 처리 준비 중...", m.append(h, _);
-					let v = document.createElement("span");
-					v.className = "ai-status-timer", v.textContent = "0.0s", p.append(m, v);
-					let b = document.createElement("div");
-					b.className = "ai-status-steps";
-					let x = document.createElement("div");
-					x.className = "ai-status-actions";
-					let S = document.createElement("span");
-					S.className = "ai-status-info";
-					let C = document.createElement("button");
-					C.className = "small-btn ai-status-abort-btn", C.textContent = "요청 중단", C.onclick = () => {
-						de("USER");
-					}, x.append(S, C), f.append(p, b, x), d.append(f), i.append(d), k.append(i), k.scrollTop = k.scrollHeight;
-					let w = [
+					userBubble.append(userHeaderTop, promptTextEl);
+					turnGroup.append(userBubble);
+					const assistantBubble = document.createElement("div");
+					assistantBubble.className = "ai-assistant-bubble";
+					const statusCard = document.createElement("div");
+					statusCard.className = "ai-status-card";
+					const statusHeader = document.createElement("div");
+					statusHeader.className = "ai-status-header";
+					const statusHeaderLeft = document.createElement("div");
+					statusHeaderLeft.className = "ai-status-header-left";
+					const spinner = document.createElement("span");
+					spinner.className = "ai-status-spinner";
+					const statusTitle = document.createElement("span");
+					statusTitle.className = "ai-status-title";
+					statusTitle.textContent = "요청 처리 준비 중...";
+					statusHeaderLeft.append(spinner, statusTitle);
+					const timerEl = document.createElement("span");
+					timerEl.className = "ai-status-timer";
+					timerEl.textContent = "0.0s";
+					statusHeader.append(statusHeaderLeft, timerEl);
+					const stepsContainer = document.createElement("div");
+					stepsContainer.className = "ai-status-steps";
+					const statusActions = document.createElement("div");
+					statusActions.className = "ai-status-actions";
+					const statusInfo = document.createElement("span");
+					statusInfo.className = "ai-status-info";
+					const abortBtn = document.createElement("button");
+					abortBtn.className = "small-btn ai-status-abort-btn";
+					abortBtn.textContent = "요청 중단";
+					abortBtn.onclick = () => {
+						abortActiveRequest("USER");
+					};
+					statusActions.append(statusInfo, abortBtn);
+					statusCard.append(statusHeader, stepsContainer, statusActions);
+					assistantBubble.append(statusCard);
+					turnGroup.append(assistantBubble);
+					chatHistory.append(turnGroup);
+					chatHistory.scrollTop = chatHistory.scrollHeight;
+					const steps = [
 						{
 							label: "요청 컨텍스트 분석 및 준비",
 							status: "pending"
@@ -490,138 +836,275 @@ var t = e({
 							status: "pending"
 						}
 					];
-					function T(e, t, n, r) {
-						w[e] && (w[e].status = t, n && (w[e].label = n), r !== void 0 && (w[e].detail = r)), E();
+					function updateStep(idx, status, label, detail) {
+						if (steps[idx]) {
+							steps[idx].status = status;
+							if (label) steps[idx].label = label;
+							if (detail !== void 0) steps[idx].detail = detail;
+						}
+						renderSteps();
 					}
-					function E() {
-						b.replaceChildren();
-						for (let e of w) {
-							if (e.status === "pending") continue;
-							let t = document.createElement("div");
-							t.className = `ai-status-step ${e.status}`;
-							let n = document.createElement("span");
-							n.className = "ai-status-step-dot", n.textContent = e.status === "completed" ? "[완료]" : e.status === "error" ? "[오류]" : e.status === "retry" ? "[재시도]" : "[진행]";
-							let r = document.createElement("div");
-							r.className = "ai-status-step-text-wrap";
-							let i = document.createElement("span");
-							if (i.className = "ai-status-step-label", i.textContent = e.label, r.append(i), e.detail) {
-								let t = document.createElement("span");
-								t.className = "ai-status-step-detail", t.textContent = e.detail, r.append(t);
+					function renderSteps() {
+						stepsContainer.replaceChildren();
+						for (const step of steps) {
+							if (step.status === "pending") continue;
+							const row = document.createElement("div");
+							row.className = `ai-status-step ${step.status}`;
+							const dot = document.createElement("span");
+							dot.className = "ai-status-step-dot";
+							dot.textContent = step.status === "completed" ? "[완료]" : step.status === "error" ? "[오류]" : step.status === "retry" ? "[재시도]" : "[진행]";
+							const textWrap = document.createElement("div");
+							textWrap.className = "ai-status-step-text-wrap";
+							const labelSpan = document.createElement("span");
+							labelSpan.className = "ai-status-step-label";
+							labelSpan.textContent = step.label;
+							textWrap.append(labelSpan);
+							if (step.detail) {
+								const detailSpan = document.createElement("span");
+								detailSpan.className = "ai-status-step-detail";
+								detailSpan.textContent = step.detail;
+								textWrap.append(detailSpan);
 							}
-							t.append(n, r), b.append(t);
+							row.append(dot, textWrap);
+							stepsContainer.append(row);
 						}
 					}
-					let D = Date.now(), O = setInterval(() => {
-						let e = ((Date.now() - D) / 1e3).toFixed(1);
-						v.textContent = `${e}s`;
-					}, 100), j = setTimeout(() => {
-						r.abort("TIMEOUT");
+					const startTime = Date.now();
+					const timerInterval = setInterval(() => {
+						const elapsed = ((Date.now() - startTime) / 1e3).toFixed(1);
+						timerEl.textContent = `${elapsed}s`;
+					}, 100);
+					const timeoutTimer = setTimeout(() => {
+						abortController.abort("TIMEOUT");
 					}, 45e3);
-					T(0, "active", "컨텍스트 분석 중...");
-					let M = e.storage.get("api_url", "https://generativelanguage.googleapis.com/v1beta/openai").replace(/\/+$/, ""), N = e.storage.get("api_key", "").trim(), P = e.storage.get("model", "gemini-flash-latest").trim();
-					M.includes("generativelanguage.googleapis.com") && (M.endsWith("/openai") || (M = `${M}/openai`), (!P || P.startsWith("gemini-2.") || P.startsWith("gemini-1.") || P === "gemini-pro") && (P = "gemini-flash-latest", e.storage.set("model", "gemini-flash-latest"), g.setValue("gemini-flash-latest"), y()));
-					let I = M.includes("generativelanguage.googleapis.com") ? "Google Gemini" : M.includes("api.openai.com") ? "OpenAI" : M.includes("localhost:11434") ? "로컬 Ollama" : "사용자 지정 API";
-					S.textContent = `${I} / ${P}`;
-					let L = pe(n, F.value || "smart"), R = L.promptText;
-					T(0, "completed", "컨텍스트 준비 완료", L.detail), T(1, "completed", "AI API 연결 준비 완료", `${I} (${P})`), Y.textContent = "중단", Y.classList.remove("primary"), Y.classList.add("danger"), Y.onclick = () => de("USER"), _.textContent = "답변 생성 중...", T(2, "active", "서버 응답 대기 중...", "AI 서버에 질의를 전송하고 답변 수신을 대기하고 있습니다.");
+					updateStep(0, "active", "컨텍스트 분석 중...");
+					let apiUrl = context.storage.get("api_url", "https://generativelanguage.googleapis.com/v1beta/openai").replace(/\/+$/, "");
+					const apiKey = context.storage.get("api_key", "").trim();
+					let model = context.storage.get("model", "gemini-flash-latest").trim();
+					if (apiUrl.includes("generativelanguage.googleapis.com")) {
+						if (!apiUrl.endsWith("/openai")) apiUrl = `${apiUrl}/openai`;
+						if (!model || model.startsWith("gemini-2.") || model.startsWith("gemini-1.") || model === "gemini-pro") {
+							model = "gemini-flash-latest";
+							context.storage.set("model", "gemini-flash-latest");
+							modelInput.setValue("gemini-flash-latest");
+							renderChips();
+						}
+					}
+					const providerName = apiUrl.includes("generativelanguage.googleapis.com") ? "Google Gemini" : apiUrl.includes("api.openai.com") ? "OpenAI" : apiUrl.includes("localhost:11434") ? "로컬 Ollama" : "사용자 지정 API";
+					statusInfo.textContent = `${providerName} / ${model}`;
+					const systemPrompt = `당신은 3DMigoto 및 XXMI (.ini) 모딩 전문 개발 도우미입니다.
+사용자가 제공한 [문서 구조 요약] 및 [관련 섹션 본문]을 바탕으로 질문의 의도를 분석하고 정확한 INI 코드를 작성하세요.
+
+[3DMigoto / XXMI 문법 및 시스템 키워드 규칙]
+1. 빌트인 시스템 변수 (중요):
+   - 3DMigoto 및 XXMI 엔진에서 자체 제공하는 시스템 변수 및 상수들은 '$' 접두사를 붙이지 않는 정식 내장 키워드입니다:
+     * 드로우 및 파이프라인: draw_type (또는 DRAW_TYPE), vertex_count, index_count, instance_count, first_vertex, first_index, first_instance, indirect_offset
+     * 화면 및 해상도: rt_width, rt_height, res_width, res_height, window_width, window_height, scissor_left, scissor_top, scissor_right, scissor_bottom
+     * 상태 및 시간: time, frame_time, fps, frame_number, draw_number, dispatch_number, hunting, sli, frame_analysis, cursor_showing, cursor_x, cursor_y, separation, convergence
+   - 예시: 'if draw_type == 1' 또는 'if DRAW_TYPE == 1'은 3DMigoto/XXMI의 완전한 표준 정식 문법입니다.
+   - 절대 이 키워드들을 사용자 변수로 오인하여 '$'를 붙이도록 하거나 [Constants]에 'global $DRAW_TYPE = 0' 등으로 선언하라고 잘못 지적하지 마십시오.
+2. 사용자 정의 변수:
+   - 모더가 정의하는 상태 변수나 토글 변수는 '$'로 시작합니다 (예: '$toggle', '$active', 'global $costume = 0').
+   - 사용자 변수는 [Constants] 섹션에 선언되거나 [KeyToggle] 등에서 정의됩니다.
+3. 조건문 문법 및 elif 지원 (매우 중요):
+   - 3DMigoto 및 XXMI 파서는 'if', 'elif', 'else if', 'else', 'endif'를 공식적으로 완전하게 지원합니다.
+   - 예시 구조:
+     if <조건1>
+         ...
+     elif <조건2>
+         ...
+     else if <조건3>
+         ...
+     else
+         ...
+     endif
+   - 'elif'와 'else if'는 3DMigoto/XXMI 파서가 지원하는 정식 표준 문법입니다. 절대로 'elif가 지원되지 않는다'고 잘못 답변하거나, 이를 별도의 개별 'if' 문으로 강제 분리하라고 안내하지 마십시오.
+   - 조건 비교 연산자: '==', '!=', '>=', '<=', '>', '<' 등을 지원합니다 (단독 '='는 할당이므로 조건식에서는 '==' 사용).
+   - 모든 조건 분기 블록('if ... elif ... else')은 마지막에 단 하나의 'endif'로 닫힙니다.
+
+[중요 작성 규칙]
+1. 파일 전체 코드를 처음부터 끝까지 다시 작성하지 마십시오.
+2. 사용자의 요청에 따라 새로 생성하거나 수정해야 할 특정 섹션([KeyToggle], [TextureOverride], [Constants], [CommandList] 등) 단위만 마크다운 \`\`\`ini 코드 \`\`\` 블록으로 작성하십시오.
+3. 에디터가 해당 섹션만 찾아 제자리(in-place)에 스마트 교체하므로, 변경이 필요한 섹션들만 온전하게 작성하면 됩니다.
+4. 코드 블록 외의 추가 설명이나 가이드는 명확하고 간결하게 작성하십시오.`;
+					const ctxResult = buildPromptContext(trimmedPrompt, contextSelect.value || "smart");
+					const promptWithContext = ctxResult.promptText;
+					updateStep(0, "completed", "컨텍스트 준비 완료", ctxResult.detail);
+					updateStep(1, "completed", "AI API 연결 준비 완료", `${providerName} (${model})`);
+					sendBtn.textContent = "중단";
+					sendBtn.classList.remove("primary");
+					sendBtn.classList.add("danger");
+					sendBtn.onclick = () => abortActiveRequest("USER");
+					statusTitle.textContent = "답변 생성 중...";
+					updateStep(2, "active", "서버 응답 대기 중...", "AI 서버에 질의를 전송하고 답변 수신을 대기하고 있습니다.");
 					try {
-						let t = { "Content-Type": "application/json" };
-						N && (t.Authorization = `Bearer ${N}`, M.includes("generativelanguage.googleapis.com") && (t["x-goog-api-key"] = N));
-						let n = 0, i = null;
-						for (; n <= 2;) {
-							n++;
+						const headers = { "Content-Type": "application/json" };
+						if (apiKey) {
+							headers["Authorization"] = `Bearer ${apiKey}`;
+							if (apiUrl.includes("generativelanguage.googleapis.com")) headers["x-goog-api-key"] = apiKey;
+						}
+						const maxRetries = 2;
+						let attempt = 0;
+						let replyData = null;
+						while (attempt <= maxRetries) {
+							attempt++;
 							try {
-								let a = await e.fetch(`${M}/chat/completions`, {
+								const res = await context.fetch(`${apiUrl}/chat/completions`, {
 									method: "POST",
-									headers: t,
-									signal: r.signal,
+									headers,
+									signal: abortController.signal,
 									body: JSON.stringify({
-										model: P,
+										model,
 										messages: [{
 											role: "system",
-											content: "당신은 3DMigoto 및 XXMI (.ini) 모딩 전문 개발 도우미입니다.\n사용자가 제공한 [문서 구조 요약] 및 [관련 섹션 본문]을 바탕으로 질문의 의도를 분석하고 정확한 INI 코드를 작성하세요.\n\n[3DMigoto / XXMI 문법 및 시스템 키워드 규칙]\n1. 빌트인 시스템 변수 (중요):\n   - 3DMigoto 및 XXMI 엔진에서 자체 제공하는 시스템 변수 및 상수들은 '$' 접두사를 붙이지 않는 정식 내장 키워드입니다:\n     * 드로우 및 파이프라인: draw_type (또는 DRAW_TYPE), vertex_count, index_count, instance_count, first_vertex, first_index, first_instance, indirect_offset\n     * 화면 및 해상도: rt_width, rt_height, res_width, res_height, window_width, window_height, scissor_left, scissor_top, scissor_right, scissor_bottom\n     * 상태 및 시간: time, frame_time, fps, frame_number, draw_number, dispatch_number, hunting, sli, frame_analysis, cursor_showing, cursor_x, cursor_y, separation, convergence\n   - 예시: 'if draw_type == 1' 또는 'if DRAW_TYPE == 1'은 3DMigoto/XXMI의 완전한 표준 정식 문법입니다.\n   - 절대 이 키워드들을 사용자 변수로 오인하여 '$'를 붙이도록 하거나 [Constants]에 'global $DRAW_TYPE = 0' 등으로 선언하라고 잘못 지적하지 마십시오.\n2. 사용자 정의 변수:\n   - 모더가 정의하는 상태 변수나 토글 변수는 '$'로 시작합니다 (예: '$toggle', '$active', 'global $costume = 0').\n   - 사용자 변수는 [Constants] 섹션에 선언되거나 [KeyToggle] 등에서 정의됩니다.\n3. 조건문 문법 및 elif 지원 (매우 중요):\n   - 3DMigoto 및 XXMI 파서는 'if', 'elif', 'else if', 'else', 'endif'를 공식적으로 완전하게 지원합니다.\n   - 예시 구조:\n     if <조건1>\n         ...\n     elif <조건2>\n         ...\n     else if <조건3>\n         ...\n     else\n         ...\n     endif\n   - 'elif'와 'else if'는 3DMigoto/XXMI 파서가 지원하는 정식 표준 문법입니다. 절대로 'elif가 지원되지 않는다'고 잘못 답변하거나, 이를 별도의 개별 'if' 문으로 강제 분리하라고 안내하지 마십시오.\n   - 조건 비교 연산자: '==', '!=', '>=', '<=', '>', '<' 등을 지원합니다 (단독 '='는 할당이므로 조건식에서는 '==' 사용).\n   - 모든 조건 분기 블록('if ... elif ... else')은 마지막에 단 하나의 'endif'로 닫힙니다.\n\n[중요 작성 규칙]\n1. 파일 전체 코드를 처음부터 끝까지 다시 작성하지 마십시오.\n2. 사용자의 요청에 따라 새로 생성하거나 수정해야 할 특정 섹션([KeyToggle], [TextureOverride], [Constants], [CommandList] 등) 단위만 마크다운 ```ini 코드 ``` 블록으로 작성하십시오.\n3. 에디터가 해당 섹션만 찾아 제자리(in-place)에 스마트 교체하므로, 변경이 필요한 섹션들만 온전하게 작성하면 됩니다.\n4. 코드 블록 외의 추가 설명이나 가이드는 명확하고 간결하게 작성하십시오."
+											content: systemPrompt
 										}, {
 											role: "user",
-											content: R
+											content: promptWithContext
 										}],
 										temperature: .3
 									})
 								});
-								if (!a.ok) {
-									let e = await a.text(), t = e;
+								if (!res.ok) {
+									const errText = await res.text();
+									let cleanErr = errText;
 									try {
-										let n = JSON.parse(e);
-										Array.isArray(n) && n[0]?.error?.message ? t = n[0].error.message : n?.error?.message && (t = n.error.message);
+										const parsed = JSON.parse(errText);
+										if (Array.isArray(parsed) && parsed[0]?.error?.message) cleanErr = parsed[0].error.message;
+										else if (parsed?.error?.message) cleanErr = parsed.error.message;
 									} catch {}
-									if ((a.status === 503 || a.status === 429) && n <= 2) {
-										let e = n === 1 ? 2 : 3.5;
-										T(2, "retry", `서버 일시 과부하 (${a.status}) 감지`, `트래픽 급증으로 인해 ${e}초 후 자동으로 재시도합니다... (시도: ${n}/2회)`), await fe(e * 1e3, r.signal), T(2, "active", "서버 재요청 전송 중...", `재시도 (${n}/2) 응답 대기 중`);
+									if ((res.status === 503 || res.status === 429) && attempt <= maxRetries) {
+										const waitSec = attempt === 1 ? 2 : 3.5;
+										updateStep(2, "retry", `서버 일시 과부하 (${res.status}) 감지`, `트래픽 급증으로 인해 ${waitSec}초 후 자동으로 재시도합니다... (시도: ${attempt}/${maxRetries}회)`);
+										await delayWithAbort(waitSec * 1e3, abortController.signal);
+										updateStep(2, "active", "서버 재요청 전송 중...", `재시도 (${attempt}/${maxRetries}) 응답 대기 중`);
 										continue;
 									}
-									throw Error(`API 오류 (${a.status}): ${t}`);
+									throw new Error(`API 오류 (${res.status}): ${cleanErr}`);
 								}
-								i = await a.json();
+								replyData = await res.json();
 								break;
-							} catch (e) {
-								if (r.signal.aborted || n > 2) throw e;
-								T(2, "retry", "네트워크 응답 지연", "2초 후 다시 연결을 시도합니다..."), await fe(2e3, r.signal);
+							} catch (err) {
+								if (abortController.signal.aborted) throw err;
+								if (attempt > maxRetries) throw err;
+								const waitSec = 2;
+								updateStep(2, "retry", "네트워크 응답 지연", `${waitSec}초 후 다시 연결을 시도합니다...`);
+								await delayWithAbort(waitSec * 1e3, abortController.signal);
 							}
 						}
-						clearInterval(O), clearTimeout(j);
-						let a = ((Date.now() - D) / 1e3).toFixed(1);
-						T(2, "completed", "서버 응답 수신 완료", `응답 수신 (소요: ${a}s)`), T(3, "active", "마크다운 렌더링 중...");
-						let o = i.choices?.[0]?.message?.content || "(응답 없음)";
-						f.remove();
-						let s = document.createElement("div");
-						s.className = "ai-completion-meta", s.innerHTML = `<span>답변 생성 완료 (${a}s 소요)</span><span>${I} / ${P}</span>`, d.append(s);
-						let c = document.createElement("div");
-						if (c.className = "ai-reply-body", ue(c, o), d.append(c), z) {
-							let e = [], t = /```(?:[a-zA-Z0-9_-]+)?([\s\S]*?)```/g, n;
-							for (; (n = t.exec(o)) !== null;) n[1].trim() && e.push(n[1].trim());
-							e.length > 0 && se(e.join("\n\n"), !0);
+						clearInterval(timerInterval);
+						clearTimeout(timeoutTimer);
+						const totalSec = ((Date.now() - startTime) / 1e3).toFixed(1);
+						updateStep(2, "completed", "서버 응답 수신 완료", `응답 수신 (소요: ${totalSec}s)`);
+						updateStep(3, "active", "마크다운 렌더링 중...");
+						const reply = replyData.choices?.[0]?.message?.content || "(응답 없음)";
+						statusCard.remove();
+						const metaHeader = document.createElement("div");
+						metaHeader.className = "ai-completion-meta";
+						metaHeader.innerHTML = `<span>답변 생성 완료 (${totalSec}s 소요)</span><span>${providerName} / ${model}</span>`;
+						assistantBubble.append(metaHeader);
+						const replyBody = document.createElement("div");
+						replyBody.className = "ai-reply-body";
+						renderAssistantContent(replyBody, reply);
+						assistantBubble.append(replyBody);
+						if (isAutoApply) {
+							const codeBlocks = [];
+							const regex = /```(?:[a-zA-Z0-9_-]+)?([\s\S]*?)```/g;
+							let m;
+							while ((m = regex.exec(reply)) !== null) if (m[1].trim()) codeBlocks.push(m[1].trim());
+							if (codeBlocks.length > 0) executeSmartApply(codeBlocks.join("\n\n"), true);
 						}
-					} catch (e) {
-						if (clearInterval(O), clearTimeout(j), h.style.display = "none", C.style.display = "none", r.signal.aborted) r.signal.reason === "TIMEOUT" ? (_.textContent = "서버 응답 시간 초과 (45초)", _.style.color = "#f87171", T(2, "error", "응답 대기 시간 초과 (45초)", "AI 서버가 지정된 시간 내에 응답하지 못했습니다. 트래픽 과부하 상태일 수 있습니다."), $(d, n, P, "TIMEOUT")) : (_.textContent = "요청이 중단되었습니다", _.style.color = "var(--fg-dim)", T(2, "error", "사용자에 의해 생성이 중단됨", "취소 버튼을 클릭하여 요청을 취소했습니다."));
-						else {
-							let t = e.message || String(e);
-							_.textContent = "오류 발생", _.style.color = "#ef4444";
-							let r = t.includes("503"), i = t.includes("404");
-							r ? (T(2, "error", "Google AI 서버 일시적 과부하 (503)", "무료 티어 트래픽 집중으로 인해 현재 모델이 일시 지연되었습니다."), $(d, n, P, "503")) : i ? (T(2, "error", "모델 또는 엔드포인트를 찾을 수 없음 (404)", t), $(d, n, P, "404")) : (T(2, "error", "요청 처리 실패", t), $(d, n, P, "GENERAL"));
+					} catch (err) {
+						clearInterval(timerInterval);
+						clearTimeout(timeoutTimer);
+						spinner.style.display = "none";
+						abortBtn.style.display = "none";
+						if (abortController.signal.aborted) {
+							if (abortController.signal.reason === "TIMEOUT") {
+								statusTitle.textContent = "서버 응답 시간 초과 (45초)";
+								statusTitle.style.color = "#f87171";
+								updateStep(2, "error", "응답 대기 시간 초과 (45초)", "AI 서버가 지정된 시간 내에 응답하지 못했습니다. 트래픽 과부하 상태일 수 있습니다.");
+								renderErrorActions(assistantBubble, trimmedPrompt, model, "TIMEOUT");
+							} else {
+								statusTitle.textContent = "요청이 중단되었습니다";
+								statusTitle.style.color = "var(--fg-dim)";
+								updateStep(2, "error", "사용자에 의해 생성이 중단됨", "취소 버튼을 클릭하여 요청을 취소했습니다.");
+							}
+						} else {
+							const errMsg = err.message || String(err);
+							statusTitle.textContent = "오류 발생";
+							statusTitle.style.color = "#ef4444";
+							const is503 = errMsg.includes("503");
+							const is404 = errMsg.includes("404");
+							if (is503) {
+								updateStep(2, "error", "Google AI 서버 일시적 과부하 (503)", "무료 티어 트래픽 집중으로 인해 현재 모델이 일시 지연되었습니다.");
+								renderErrorActions(assistantBubble, trimmedPrompt, model, "503");
+							} else if (is404) {
+								updateStep(2, "error", "모델 또는 엔드포인트를 찾을 수 없음 (404)", errMsg);
+								renderErrorActions(assistantBubble, trimmedPrompt, model, "404");
+							} else {
+								updateStep(2, "error", "요청 처리 실패", errMsg);
+								renderErrorActions(assistantBubble, trimmedPrompt, model, "GENERAL");
+							}
 						}
 					} finally {
-						Z === r && (Z = null), Y.textContent = "전송", Y.classList.remove("danger"), Y.classList.add("primary"), Y.onclick = () => Q(W.value), k.scrollTop = k.scrollHeight;
+						if (activeAbortController === abortController) activeAbortController = null;
+						sendBtn.textContent = "전송";
+						sendBtn.classList.remove("danger");
+						sendBtn.classList.add("primary");
+						sendBtn.onclick = () => sendMessage(dockTextarea.value);
+						chatHistory.scrollTop = chatHistory.scrollHeight;
 					}
 				}
-				function $(t, n, r, i) {
-					let a = document.createElement("div");
-					a.className = "ai-error-actions-box";
-					let o = document.createElement("div");
-					o.className = "ai-error-actions-desc", o.textContent = i === "503" ? "Google Gemini 무료 티어 트래픽 집중으로 인해 요청이 일시 지연되었습니다. 잠시 후 다시 시도하시거나 다른 모델로 변경해 보세요." : i === "TIMEOUT" ? "서버 응답이 45초 동안 지연되었습니다. 네트워크 상태를 확인하시거나 다시 시도해 보세요." : i === "404" ? "지정된 모델 또는 엔드포인트를 찾을 수 없습니다 (404). Google Gemini 공식 별칭인 gemini-flash-latest 또는 gemini-pro-latest를 사용하세요." : "요청 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해 보세요.";
-					let s = document.createElement("div");
-					s.className = "ai-error-actions-btn-row";
-					let c = r === "gemini-flash-latest" ? "gemini-pro-latest" : "gemini-flash-latest", l = document.createElement("button");
-					l.className = "small-btn", l.textContent = `${c} 모델로 전환 후 재시도`, l.onclick = () => {
-						e.storage.set("model", c), g.setValue(c), y(), e.ui.showToast(`모델이 ${c}(으)로 변경되었습니다.`, "info"), Q(n);
+				function renderErrorActions(container, prompt, currentModel, reason) {
+					const box = document.createElement("div");
+					box.className = "ai-error-actions-box";
+					const desc = document.createElement("div");
+					desc.className = "ai-error-actions-desc";
+					if (reason === "503") desc.textContent = "Google Gemini 무료 티어 트래픽 집중으로 인해 요청이 일시 지연되었습니다. 잠시 후 다시 시도하시거나 다른 모델로 변경해 보세요.";
+					else if (reason === "TIMEOUT") desc.textContent = "서버 응답이 45초 동안 지연되었습니다. 네트워크 상태를 확인하시거나 다시 시도해 보세요.";
+					else if (reason === "404") desc.textContent = "지정된 모델 또는 엔드포인트를 찾을 수 없습니다 (404). Google Gemini 공식 별칭인 gemini-flash-latest 또는 gemini-pro-latest를 사용하세요.";
+					else desc.textContent = "요청 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해 보세요.";
+					const btnRow = document.createElement("div");
+					btnRow.className = "ai-error-actions-btn-row";
+					const altModel = currentModel === "gemini-flash-latest" ? "gemini-pro-latest" : "gemini-flash-latest";
+					const switchBtn = document.createElement("button");
+					switchBtn.className = "small-btn";
+					switchBtn.textContent = `${altModel} 모델로 전환 후 재시도`;
+					switchBtn.onclick = () => {
+						context.storage.set("model", altModel);
+						modelInput.setValue(altModel);
+						renderChips();
+						context.ui.showToast(`모델이 ${altModel}(으)로 변경되었습니다.`, "info");
+						sendMessage(prompt);
 					};
-					let u = document.createElement("button");
-					u.className = "small-btn", u.textContent = "동일 모델로 다시 시도", u.onclick = () => {
-						Q(n);
-					}, s.append(l, u), a.append(o, s), t.append(a);
+					const retryBtn = document.createElement("button");
+					retryBtn.className = "small-btn";
+					retryBtn.textContent = "동일 모델로 다시 시도";
+					retryBtn.onclick = () => {
+						sendMessage(prompt);
+					};
+					btnRow.append(switchBtn, retryBtn);
+					box.append(desc, btnRow);
+					container.append(box);
 				}
 				return () => {
-					Z && Z.abort("UNMOUNT"), window.removeEventListener("mousemove", ie), window.removeEventListener("mouseup", ae), document.removeEventListener("click", oe);
+					if (activeAbortController) activeAbortController.abort("UNMOUNT");
+					window.removeEventListener("mousemove", onResizerMouseMove);
+					window.removeEventListener("mouseup", onResizerMouseUp);
+					document.removeEventListener("click", onDocClick);
 				};
 			}
 		});
-		e.ui.registerMenuItem({
+		context.ui?.registerMenuItem?.({
 			label: "AI 모딩 에이전트 열기",
 			shortcut: "Ctrl+Shift+A",
 			action: () => {
-				e.ui.showToast("좌측 액티비티 바에서 [AI 에이전트] 탭을 엽니다.", "info");
+				context.ui.showToast("좌측 액티비티 바에서 [AI 에이전트] 탭을 엽니다.", "info");
 			}
 		});
 	},
 	deactivate() {}
-});
+};
 //#endregion
-export { t as default };
+export { plugin as default };

@@ -1,6 +1,6 @@
-import { definePlugin, type PluginContext } from '../../src/plugins/api.ts';
+import type { PluginContext, MigotoPlugin } from '../../src/plugins/types.ts';
 
-export default definePlugin({
+const plugin: MigotoPlugin = {
   activate(context: PluginContext) {
     // 1. ZZMI 전용 린트 규칙: run = CommandList\ZZMI\SetTextures 및 관련 네임스페이스를 정상 구문으로 인식
     context.linter.registerAllowedResource(/^commandlist\\zzmi\\/i);
@@ -26,14 +26,16 @@ export default definePlugin({
     });
 
     // 3. 상단 [플러그인] 메뉴: 고수준 선언형 폼 탭으로 슬롯픽스 마법사 제공
-    context.ui.registerMenuItem({
+    context.ui?.registerMenuItem?.({
       label: 'ZZMI 슬롯픽스(SlotFix) 생성기…',
       shortcut: 'Ctrl+Shift+Z',
       action: () => openSlotFixWizard(context),
     });
   },
   deactivate() {},
-});
+};
+
+export default plugin;
 
 function openSlotFixWizard(context: PluginContext) {
   context.ui.openFormTab({

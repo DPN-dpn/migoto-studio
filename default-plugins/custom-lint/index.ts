@@ -1,6 +1,5 @@
-import { definePlugin } from '../../src/plugins/api.ts';
 import { stripComments } from '../../src/core/ini/lint.ts';
-import type { DirEntry, LintDiagnostic, SymbolLocation, CustomDefinitionProvider, CustomReferenceProvider } from '../../src/plugins/types.ts';
+import type { DirEntry, LintDiagnostic, SymbolLocation, CustomDefinitionProvider, CustomReferenceProvider, MigotoPlugin } from '../../src/plugins/types.ts';
 
 export interface SymbolLocationRecord {
   name: string;        // Lowercase name or clean name
@@ -447,7 +446,7 @@ let unregisterAllowedUsedResources: (() => void) | null = null;
 let unregisterDefProvider: (() => void) | null = null;
 let unregisterRefProvider: (() => void) | null = null;
 
-export default definePlugin({
+const plugin: MigotoPlugin = {
   activate(context) {
     isPluginActive = true;
 
@@ -1110,7 +1109,7 @@ export default definePlugin({
     }
 
     // 상단 [플러그인] 메뉴: 린터 상태 확인
-    context.ui.registerMenuItem({
+    context.ui?.registerMenuItem?.({
       label: '모드 리소스 및 네임스페이스 린트 상태 확인',
       action: () => {
         const cur = context.workspace.getCurrentFile();
@@ -1158,5 +1157,7 @@ export default definePlugin({
       unregisterRefProvider = null;
     }
   },
-});
+};
+
+export default plugin;
 

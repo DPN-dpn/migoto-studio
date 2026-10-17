@@ -1,11 +1,11 @@
-import { definePlugin, type PluginContext } from '../../src/plugins/api.ts';
+import type { PluginContext, MigotoPlugin } from '../../src/plugins/types.ts';
 import { ImageViewer } from './image-viewer.ts';
 
 /**
  * DDS 및 이미지 에셋 뷰어 플러그인
  * 탐색기에서 지원되는 이미지 확장자 클릭 시 에디터 탭 내에서 인터랙티브 캔버스 뷰어로 엽니다.
  */
-export default definePlugin({
+const plugin: MigotoPlugin = {
   activate(context: PluginContext) {
     // 1. 에디터 커스텀 뷰어 등록
     context.editor.registerCustomViewer({
@@ -24,7 +24,7 @@ export default definePlugin({
     });
 
     // 2. 상단 [플러그인] 메뉴: 파일 선택기를 통한 텍스처 열기
-    context.ui.registerMenuItem({
+    context.ui?.registerMenuItem?.({
       label: '텍스처/DDS 이미지 열기…',
       action: async () => {
         try {
@@ -44,4 +44,6 @@ export default definePlugin({
     });
   },
   deactivate() {},
-});
+};
+
+export default plugin;

@@ -1,11 +1,11 @@
-import { definePlugin, type PluginContext } from '../../src/plugins/api.ts';
+import type { PluginContext, MigotoPlugin } from '../../src/plugins/types.ts';
 import iconSvg from './icon.ts';
 
 /**
  * AI 모딩 어시스턴트 플러그인
  * OpenAI 또는 Google Gemini, 로컬 Ollama 호환 API를 연동하여 INI 분석, 섹션 생성 및 질의응답을 수행합니다.
  */
-export default definePlugin({
+const plugin: MigotoPlugin = {
   activate(context: PluginContext) {
     context.ui.registerSidebarView({
       id: 'ai-assistant',
@@ -1493,7 +1493,7 @@ export default definePlugin({
     });
 
     // 2. 상단 [플러그인] 메뉴: AI 에이전트 바로가기
-    context.ui.registerMenuItem({
+    context.ui?.registerMenuItem?.({
       label: 'AI 모딩 에이전트 열기',
       shortcut: 'Ctrl+Shift+A',
       action: () => {
@@ -1501,5 +1501,7 @@ export default definePlugin({
       },
     });
   },
-  deactivate() { },
-});
+  deactivate() {},
+};
+
+export default plugin;

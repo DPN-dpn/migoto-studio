@@ -40,7 +40,7 @@ async function buildDefaultPlugins() {
     }
     manifest.main = 'plugin.js';
 
-    // Bundle standalone ES module with Vite
+    // Bundle standalone ES module with Vite (keep readable without minification for reference)
     const tempOutDir = resolve(rootDir, '.toolchain/tmp/plugins', id);
     await build({
       configFile: false,
@@ -48,6 +48,7 @@ async function buildDefaultPlugins() {
       build: {
         outDir: tempOutDir,
         emptyOutDir: true,
+        minify: false,
         lib: {
           entry: entryFile,
           formats: ['es'],

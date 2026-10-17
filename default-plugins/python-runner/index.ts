@@ -1,11 +1,11 @@
-import { definePlugin, type PluginContext } from '../../src/plugins/api.ts';
+import type { PluginContext, MigotoPlugin } from '../../src/plugins/types.ts';
 import iconSvg from './icon.ts';
 
 /**
  * Python 스크립트 실행기 플러그인
  * 파이썬 코드를 에디터 내에서 실행하고 표준 출력 결과를 확인하거나 에디터에 삽입할 수 있습니다.
  */
-export default definePlugin({
+const plugin: MigotoPlugin = {
   activate(context: PluginContext) {
     // 1. 좌측 사이드바 뷰 등록
     context.ui.registerSidebarView({
@@ -20,14 +20,16 @@ export default definePlugin({
     });
 
     // 2. 상단 [플러그인] 메뉴에 등록 (넓은 에디터 탭으로 실행기 열기)
-    context.ui.registerMenuItem({
+    context.ui?.registerMenuItem?.({
       label: 'Python 실행기 열기 (에디터 탭)',
       shortcut: 'Ctrl+Shift+P',
       action: () => openPythonTab(context),
     });
   },
   deactivate() {},
-});
+};
+
+export default plugin;
 
 function openPythonTab(context: PluginContext) {
   context.ui.openTab({

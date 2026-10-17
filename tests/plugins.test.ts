@@ -97,7 +97,7 @@ test('BUILTIN_PLUGINS registers 5 default plugins with unique IDs', () => {
   }
 
   const asset = BUILTIN_PLUGINS.find((p) => p.manifest.id === 'asset-viewer')!;
-  assert.equal(asset.manifest.version, '1.1.1');
+  assert.equal(asset.manifest.version, '1.2.0');
 });
 
 test('decodeDDS throws on invalid magic buffer', () => {

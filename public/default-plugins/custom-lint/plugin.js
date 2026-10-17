@@ -1,642 +1,884 @@
-//#region src/plugins/api.ts
-function e(e) {
-	return e;
-}
-//#endregion
 //#region src/core/ini/lint.ts
-function t(e) {
-	let t = null;
-	for (let n = 0; n < e.length; n++) {
-		let r = e[n];
-		if (t) r === t && (t = null);
-		else if (r === "\"" || r === "'") t = r;
-		else if (r === ";" || r === "/" && e[n + 1] === "/") return {
-			code: e.slice(0, n),
-			commentIndex: n
+/**
+* Strips comments from a line while respecting single and double quotes.
+* Returns the code part and the 0-based index where the comment started (or line.length if none).
+*/
+function stripComments(line) {
+	let inQuote = null;
+	for (let i = 0; i < line.length; i++) {
+		const ch = line[i];
+		if (inQuote) {
+			if (ch === inQuote) inQuote = null;
+		} else if (ch === "\"" || ch === "'") inQuote = ch;
+		else if (ch === ";" || ch === "/" && line[i + 1] === "/") return {
+			code: line.slice(0, i),
+			commentIndex: i
 		};
 	}
 	return {
-		code: e,
-		commentIndex: e.length
+		code: line,
+		commentIndex: line.length
 	};
 }
 //#endregion
 //#region default-plugins/custom-lint/index.ts
-function n(e, n) {
-	let r = e.split(/\r?\n/), i = "", a = "", o = /* @__PURE__ */ new Set(), s = /* @__PURE__ */ new Set(), c = /* @__PURE__ */ new Set(), l = /* @__PURE__ */ new Set(), u = [], d = [];
-	for (let e = 0; e < r.length; e++) {
-		let { code: n } = t(r[e]), a = n.trim();
-		if (!a) continue;
-		if (a.startsWith("[")) break;
-		let o = /^\s*namespace\s*=\s*([^;\r\n#]*)/i.exec(n);
-		if (o) {
-			let e = o[1].trim();
-			(e.startsWith("\"") && e.endsWith("\"") || e.startsWith("'") && e.endsWith("'")) && (e = e.slice(1, -1).trim()), i = e;
+function parseIniExports(text, filePath) {
+	const lines = text.split(/\r?\n/);
+	let currentNamespace = "";
+	let currentSection = "";
+	const variables = /* @__PURE__ */ new Set();
+	const sections = /* @__PURE__ */ new Set();
+	const usedVariables = /* @__PURE__ */ new Set();
+	const usedSections = /* @__PURE__ */ new Set();
+	const declarations = [];
+	const usages = [];
+	for (let i = 0; i < lines.length; i++) {
+		const { code } = stripComments(lines[i]);
+		const trimmed = code.trim();
+		if (!trimmed) continue;
+		if (trimmed.startsWith("[")) break;
+		const nsMatch = /^\s*namespace\s*=\s*([^;\r\n#]*)/i.exec(code);
+		if (nsMatch) {
+			let ns = nsMatch[1].trim();
+			if (ns.startsWith("\"") && ns.endsWith("\"") || ns.startsWith("'") && ns.endsWith("'")) ns = ns.slice(1, -1).trim();
+			currentNamespace = ns;
 			break;
 		}
 	}
-	for (let e = 0; e < r.length; e++) {
-		let f = r[e], { code: p } = t(f);
-		if (!p.trim()) continue;
-		let m = /^\s*namespace\s*=\s*([^;\r\n#]*)/i.exec(p);
-		if (m) {
-			let e = m[1].trim();
-			(e.startsWith("\"") && e.endsWith("\"") || e.startsWith("'") && e.endsWith("'")) && (e = e.slice(1, -1).trim()), i = e;
+	for (let i = 0; i < lines.length; i++) {
+		const raw = lines[i];
+		const { code } = stripComments(raw);
+		if (!code.trim()) continue;
+		const nsMatch = /^\s*namespace\s*=\s*([^;\r\n#]*)/i.exec(code);
+		if (nsMatch) {
+			let ns = nsMatch[1].trim();
+			if (ns.startsWith("\"") && ns.endsWith("\"") || ns.startsWith("'") && ns.endsWith("'")) ns = ns.slice(1, -1).trim();
+			currentNamespace = ns;
 		}
-		let h = /^\s*\[([^\]]+)\]/.exec(p);
-		if (h) {
-			a = h[1].trim();
-			let t = a.toLowerCase();
-			s.add(t);
-			let r = f.indexOf("["), o = r === -1 ? 1 : r + 2, c = o + a.length;
-			if (u.push({
-				name: t,
-				rawName: a,
+		const secMatch = /^\s*\[([^\]]+)\]/.exec(code);
+		if (secMatch) {
+			currentSection = secMatch[1].trim();
+			const secLower = currentSection.toLowerCase();
+			sections.add(secLower);
+			const bracketIdx = raw.indexOf("[");
+			const startCol = bracketIdx !== -1 ? bracketIdx + 2 : 1;
+			const endCol = startCol + currentSection.length;
+			declarations.push({
+				name: secLower,
+				rawName: currentSection,
 				kind: "section",
-				line: e + 1,
-				startCol: o,
-				endCol: c,
-				lineContent: f,
-				section: `[${a}]`,
-				filePath: n,
-				namespace: i
-			}), i) {
-				let r = i.toLowerCase();
-				if (t.startsWith("commandlist") && t.length > 11) {
-					let l = `commandlist\\${r}\\${t.slice(11)}`;
-					s.add(l), u.push({
-						name: l,
-						rawName: `CommandList\\${i}\\${a.slice(11)}`,
+				line: i + 1,
+				startCol,
+				endCol,
+				lineContent: raw,
+				section: `[${currentSection}]`,
+				filePath,
+				namespace: currentNamespace
+			});
+			if (currentNamespace) {
+				const nsLower = currentNamespace.toLowerCase();
+				if (secLower.startsWith("commandlist") && secLower.length > 11) {
+					const alias = `commandlist\\${nsLower}\\${secLower.slice(11)}`;
+					sections.add(alias);
+					declarations.push({
+						name: alias,
+						rawName: `CommandList\\${currentNamespace}\\${currentSection.slice(11)}`,
 						kind: "section",
-						line: e + 1,
-						startCol: o,
-						endCol: c,
-						lineContent: f,
-						section: `[${a}]`,
-						filePath: n,
-						namespace: i
+						line: i + 1,
+						startCol,
+						endCol,
+						lineContent: raw,
+						section: `[${currentSection}]`,
+						filePath,
+						namespace: currentNamespace
 					});
-				} else if (t.startsWith("resource") && t.length > 8) {
-					let l = `resource\\${r}\\${t.slice(8)}`;
-					s.add(l), u.push({
-						name: l,
-						rawName: `Resource\\${i}\\${a.slice(8)}`,
+				} else if (secLower.startsWith("resource") && secLower.length > 8) {
+					const alias = `resource\\${nsLower}\\${secLower.slice(8)}`;
+					sections.add(alias);
+					declarations.push({
+						name: alias,
+						rawName: `Resource\\${currentNamespace}\\${currentSection.slice(8)}`,
 						kind: "section",
-						line: e + 1,
-						startCol: o,
-						endCol: c,
-						lineContent: f,
-						section: `[${a}]`,
-						filePath: n,
-						namespace: i
+						line: i + 1,
+						startCol,
+						endCol,
+						lineContent: raw,
+						section: `[${currentSection}]`,
+						filePath,
+						namespace: currentNamespace
 					});
-				} else if (t.startsWith("customshader") && t.length > 12) {
-					let l = `customshader\\${r}\\${t.slice(12)}`;
-					s.add(l), u.push({
-						name: l,
-						rawName: `CustomShader\\${i}\\${a.slice(12)}`,
+				} else if (secLower.startsWith("customshader") && secLower.length > 12) {
+					const alias = `customshader\\${nsLower}\\${secLower.slice(12)}`;
+					sections.add(alias);
+					declarations.push({
+						name: alias,
+						rawName: `CustomShader\\${currentNamespace}\\${currentSection.slice(12)}`,
 						kind: "section",
-						line: e + 1,
-						startCol: o,
-						endCol: c,
-						lineContent: f,
-						section: `[${a}]`,
-						filePath: n,
-						namespace: i
+						line: i + 1,
+						startCol,
+						endCol,
+						lineContent: raw,
+						section: `[${currentSection}]`,
+						filePath,
+						namespace: currentNamespace
 					});
 				}
 			}
 			continue;
 		}
-		let g = /\b(?:global|persist|local)\s+\$([a-zA-Z0-9_\\]+)/gi, _, v = !1;
-		for (; (_ = g.exec(p)) !== null;) {
-			v = !0;
-			let t = _[1].toLowerCase(), r = t.split("\\").filter(Boolean), s = r[r.length - 1];
-			s && o.add(s), o.add(t);
-			let c = f.indexOf(_[0]), l = _[0].indexOf("$"), d = c !== -1 && l !== -1 ? c + l + 1 : c === -1 ? 1 : c + 1, p = d + _[1].length + 1;
-			u.push({
-				name: s ? s.toLowerCase() : t,
-				rawName: `$${_[1]}`,
+		const varDeclRe = /\b(?:global|persist|local)\s+\$([a-zA-Z0-9_\\]+)/gi;
+		let vm;
+		let foundExplicit = false;
+		while ((vm = varDeclRe.exec(code)) !== null) {
+			foundExplicit = true;
+			const vName = vm[1].toLowerCase();
+			const parts = vName.split("\\").filter(Boolean);
+			const simpleName = parts[parts.length - 1];
+			if (simpleName) variables.add(simpleName);
+			variables.add(vName);
+			const rawIdx = raw.indexOf(vm[0]);
+			const dollarRel = vm[0].indexOf("$");
+			const startCol = rawIdx !== -1 && dollarRel !== -1 ? rawIdx + dollarRel + 1 : rawIdx !== -1 ? rawIdx + 1 : 1;
+			const endCol = startCol + vm[1].length + 1;
+			declarations.push({
+				name: simpleName ? simpleName.toLowerCase() : vName,
+				rawName: `$${vm[1]}`,
 				kind: "variable",
-				line: e + 1,
-				startCol: d,
-				endCol: p,
-				lineContent: f,
-				section: a ? `[${a}]` : "",
-				filePath: n,
-				namespace: i
-			}), t.includes("\\") && u.push({
-				name: t,
-				rawName: `$${_[1]}`,
+				line: i + 1,
+				startCol,
+				endCol,
+				lineContent: raw,
+				section: currentSection ? `[${currentSection}]` : "",
+				filePath,
+				namespace: currentNamespace
+			});
+			if (vName.includes("\\")) declarations.push({
+				name: vName,
+				rawName: `$${vm[1]}`,
 				kind: "variable",
-				line: e + 1,
-				startCol: d,
-				endCol: p,
-				lineContent: f,
-				section: a ? `[${a}]` : "",
-				filePath: n,
-				namespace: i
+				line: i + 1,
+				startCol,
+				endCol,
+				lineContent: raw,
+				section: currentSection ? `[${currentSection}]` : "",
+				filePath,
+				namespace: currentNamespace
 			});
 		}
-		let y = a.toLowerCase() === "constants";
-		if (y && !v) {
-			let t = /^\s*(?:persist\s+|global\s+|local\s+)*\$([a-zA-Z0-9_\\]+)/i.exec(p);
-			if (t) {
-				let r = t[1].toLowerCase(), s = r.split("\\").filter(Boolean), c = s[s.length - 1];
-				c && o.add(c), o.add(r);
-				let l = f.indexOf(`$${t[1]}`), d = l === -1 ? 1 : l + 1, p = d + t[1].length + 1;
-				u.push({
-					name: c ? c.toLowerCase() : r,
-					rawName: `$${t[1]}`,
+		const isConstants = currentSection.toLowerCase() === "constants";
+		if (isConstants && !foundExplicit) {
+			const constLineMatch = /^\s*(?:persist\s+|global\s+|local\s+)*\$([a-zA-Z0-9_\\]+)/i.exec(code);
+			if (constLineMatch) {
+				const vName = constLineMatch[1].toLowerCase();
+				const parts = vName.split("\\").filter(Boolean);
+				const simpleName = parts[parts.length - 1];
+				if (simpleName) variables.add(simpleName);
+				variables.add(vName);
+				const rawIdx = raw.indexOf(`$${constLineMatch[1]}`);
+				const startCol = rawIdx !== -1 ? rawIdx + 1 : 1;
+				const endCol = startCol + constLineMatch[1].length + 1;
+				declarations.push({
+					name: simpleName ? simpleName.toLowerCase() : vName,
+					rawName: `$${constLineMatch[1]}`,
 					kind: "variable",
-					line: e + 1,
-					startCol: d,
-					endCol: p,
-					lineContent: f,
-					section: `[${a}]`,
-					filePath: n,
-					namespace: i
-				}), r.includes("\\") && u.push({
-					name: r,
-					rawName: `$${t[1]}`,
+					line: i + 1,
+					startCol,
+					endCol,
+					lineContent: raw,
+					section: `[${currentSection}]`,
+					filePath,
+					namespace: currentNamespace
+				});
+				if (vName.includes("\\")) declarations.push({
+					name: vName,
+					rawName: `$${constLineMatch[1]}`,
 					kind: "variable",
-					line: e + 1,
-					startCol: d,
-					endCol: p,
-					lineContent: f,
-					section: `[${a}]`,
-					filePath: n,
-					namespace: i
+					line: i + 1,
+					startCol,
+					endCol,
+					lineContent: raw,
+					section: `[${currentSection}]`,
+					filePath,
+					namespace: currentNamespace
 				});
 			}
 		}
-		let b = p.indexOf("="), x = /\$([a-zA-Z0-9_\\]+)/g, S;
-		for (; (S = x.exec(p)) !== null;) {
-			if (b !== -1 && S.index < b) {
-				if (v || y) continue;
-			} else if (b === -1 && (v || y)) continue;
-			let t = S[1].toLowerCase();
-			c.add(t);
-			let r = t.startsWith("\\") ? t.slice(1) : t;
-			c.add(r);
-			let o = r.split("\\").filter(Boolean), s = i, l = r;
-			o.length > 1 && (s = o[0], l = o.slice(1).join("\\"), c.add(o[o.length - 1]));
-			let u = S.index + 1, p = u + S[0].length;
-			d.push({
-				name: l.toLowerCase(),
-				rawName: S[0],
+		const eqIdx = code.indexOf("=");
+		const varRefRe = /\$([a-zA-Z0-9_\\]+)/g;
+		let vum;
+		while ((vum = varRefRe.exec(code)) !== null) {
+			if (eqIdx !== -1 && vum.index < eqIdx) {
+				if (foundExplicit || isConstants) continue;
+			} else if (eqIdx === -1 && (foundExplicit || isConstants)) continue;
+			const vName = vum[1].toLowerCase();
+			usedVariables.add(vName);
+			const clean = vName.startsWith("\\") ? vName.slice(1) : vName;
+			usedVariables.add(clean);
+			const parts = clean.split("\\").filter(Boolean);
+			let targetNs = currentNamespace;
+			let leafName = clean;
+			if (parts.length > 1) {
+				targetNs = parts[0];
+				leafName = parts.slice(1).join("\\");
+				usedVariables.add(parts[parts.length - 1]);
+			}
+			const startCol = vum.index + 1;
+			const endCol = startCol + vum[0].length;
+			usages.push({
+				name: leafName.toLowerCase(),
+				rawName: vum[0],
 				kind: "variable",
-				line: e + 1,
-				startCol: u,
-				endCol: p,
-				lineContent: f,
-				section: a ? `[${a}]` : "",
-				filePath: n,
-				namespace: s
-			}), o.length > 1 && d.push({
-				name: r.toLowerCase(),
-				rawName: S[0],
+				line: i + 1,
+				startCol,
+				endCol,
+				lineContent: raw,
+				section: currentSection ? `[${currentSection}]` : "",
+				filePath,
+				namespace: targetNs
+			});
+			if (parts.length > 1) usages.push({
+				name: clean.toLowerCase(),
+				rawName: vum[0],
 				kind: "variable",
-				line: e + 1,
-				startCol: u,
-				endCol: p,
-				lineContent: f,
-				section: a ? `[${a}]` : "",
-				filePath: n,
-				namespace: s
+				line: i + 1,
+				startCol,
+				endCol,
+				lineContent: raw,
+				section: currentSection ? `[${currentSection}]` : "",
+				filePath,
+				namespace: targetNs
 			});
 		}
-		let C = /^\s*(?:(?:pre\s+|post\s+)?run|this|vb\d+|ib|[a-z]{2}-(?:[tu]|cb)\d+|Resource(?:\\[a-zA-Z0-9_]+)*|(?:cs|vs|ps|hs|ds|gs))\s*=\s*(?:ref\s+|copy\s+)?([a-zA-Z0-9_\\]+)/i.exec(p);
-		if (C) {
-			let t = C[1].trim(), r = t.toLowerCase();
+		const resRefMatch = /^\s*(?:(?:pre\s+|post\s+)?run|this|vb\d+|ib|[a-z]{2}-(?:[tu]|cb)\d+|Resource(?:\\[a-zA-Z0-9_]+)*|(?:cs|vs|ps|hs|ds|gs))\s*=\s*(?:ref\s+|copy\s+)?([a-zA-Z0-9_\\]+)/i.exec(code);
+		if (resRefMatch) {
+			const target = resRefMatch[1].trim();
+			const targetLower = target.toLowerCase();
 			if (![
 				"null",
 				"skip",
 				"auto",
 				"default"
-			].includes(r)) {
-				l.add(r);
-				let o = r.startsWith("\\") ? r.slice(1) : r;
-				l.add(o);
-				let s = o.split("\\").filter(Boolean), c = i, u = o;
-				s.length >= 3 ? (c = s[1], u = `${s[0]}${s[s.length - 1]}`.toLowerCase(), l.add(s[s.length - 1])) : s.length > 1 && l.add(s[s.length - 1]);
-				let p = f.indexOf(C[1]), m = p === -1 ? 1 : p + 1, h = m + C[1].length;
-				d.push({
-					name: u.toLowerCase(),
-					rawName: t,
+			].includes(targetLower)) {
+				usedSections.add(targetLower);
+				const clean = targetLower.startsWith("\\") ? targetLower.slice(1) : targetLower;
+				usedSections.add(clean);
+				const parts = clean.split("\\").filter(Boolean);
+				let targetNs = currentNamespace;
+				let actionName = clean;
+				if (parts.length >= 3) {
+					targetNs = parts[1];
+					actionName = `${parts[0]}${parts[parts.length - 1]}`.toLowerCase();
+					usedSections.add(parts[parts.length - 1]);
+				} else if (parts.length > 1) usedSections.add(parts[parts.length - 1]);
+				const matchIdx = raw.indexOf(resRefMatch[1]);
+				const startCol = matchIdx !== -1 ? matchIdx + 1 : 1;
+				const endCol = startCol + resRefMatch[1].length;
+				usages.push({
+					name: actionName.toLowerCase(),
+					rawName: target,
 					kind: "section",
-					line: e + 1,
-					startCol: m,
-					endCol: h,
-					lineContent: f,
-					section: a ? `[${a}]` : "",
-					filePath: n,
-					namespace: c
-				}), o !== u && d.push({
-					name: o.toLowerCase(),
-					rawName: t,
+					line: i + 1,
+					startCol,
+					endCol,
+					lineContent: raw,
+					section: currentSection ? `[${currentSection}]` : "",
+					filePath,
+					namespace: targetNs
+				});
+				if (clean !== actionName) usages.push({
+					name: clean.toLowerCase(),
+					rawName: target,
 					kind: "section",
-					line: e + 1,
-					startCol: m,
-					endCol: h,
-					lineContent: f,
-					section: a ? `[${a}]` : "",
-					filePath: n,
-					namespace: c
+					line: i + 1,
+					startCol,
+					endCol,
+					lineContent: raw,
+					section: currentSection ? `[${currentSection}]` : "",
+					filePath,
+					namespace: targetNs
 				});
 			}
 		}
-		let w = /\b(?:ref|copy)\s+([a-zA-Z0-9_\\]+)/gi, T;
-		for (; (T = w.exec(p)) !== null;) {
-			let t = T[1].trim(), r = t.toLowerCase();
+		const refCopyRe = /\b(?:ref|copy)\s+([a-zA-Z0-9_\\]+)/gi;
+		let rcm;
+		while ((rcm = refCopyRe.exec(code)) !== null) {
+			const target = rcm[1].trim();
+			const targetLower = target.toLowerCase();
 			if (![
 				"null",
 				"skip",
 				"auto",
 				"default"
-			].includes(r)) {
-				l.add(r);
-				let o = r.startsWith("\\") ? r.slice(1) : r;
-				l.add(o);
-				let s = o.split("\\").filter(Boolean), c = i, u = o;
-				s.length >= 3 ? (c = s[1], u = `${s[0]}${s[s.length - 1]}`.toLowerCase(), l.add(s[s.length - 1])) : s.length > 1 && l.add(s[s.length - 1]);
-				let p = T.index + 1, m = p + T[0].length;
-				d.push({
-					name: u.toLowerCase(),
-					rawName: t,
+			].includes(targetLower)) {
+				usedSections.add(targetLower);
+				const clean = targetLower.startsWith("\\") ? targetLower.slice(1) : targetLower;
+				usedSections.add(clean);
+				const parts = clean.split("\\").filter(Boolean);
+				let targetNs = currentNamespace;
+				let actionName = clean;
+				if (parts.length >= 3) {
+					targetNs = parts[1];
+					actionName = `${parts[0]}${parts[parts.length - 1]}`.toLowerCase();
+					usedSections.add(parts[parts.length - 1]);
+				} else if (parts.length > 1) usedSections.add(parts[parts.length - 1]);
+				const startCol = rcm.index + 1;
+				const endCol = startCol + rcm[0].length;
+				usages.push({
+					name: actionName.toLowerCase(),
+					rawName: target,
 					kind: "section",
-					line: e + 1,
-					startCol: p,
-					endCol: m,
-					lineContent: f,
-					section: a ? `[${a}]` : "",
-					filePath: n,
-					namespace: c
-				}), o !== u && d.push({
-					name: o.toLowerCase(),
-					rawName: t,
+					line: i + 1,
+					startCol,
+					endCol,
+					lineContent: raw,
+					section: currentSection ? `[${currentSection}]` : "",
+					filePath,
+					namespace: targetNs
+				});
+				if (clean !== actionName) usages.push({
+					name: clean.toLowerCase(),
+					rawName: target,
 					kind: "section",
-					line: e + 1,
-					startCol: p,
-					endCol: m,
-					lineContent: f,
-					section: a ? `[${a}]` : "",
-					filePath: n,
-					namespace: c
+					line: i + 1,
+					startCol,
+					endCol,
+					lineContent: raw,
+					section: currentSection ? `[${currentSection}]` : "",
+					filePath,
+					namespace: targetNs
 				});
 			}
 		}
 	}
 	return {
-		namespace: i,
-		filePath: n,
-		variables: o,
-		sections: s,
-		usedVariables: c,
-		usedSections: l,
-		declarations: u,
-		usages: d
+		namespace: currentNamespace,
+		filePath,
+		variables,
+		sections,
+		usedVariables,
+		usedSections,
+		declarations,
+		usages
 	};
 }
-function r(e) {
-	if (!e) return !1;
-	let t = e.toLowerCase().replace(/^[\\\/]+/, "");
-	return t.startsWith("builtincommandlist") || t.startsWith("builtin_commandlist") || t.startsWith("builtin\\") || t.startsWith("commandlist\\builtin") || t.startsWith("commandlist\\skintexture") || t === "commandlistskintexture" || t === "builtin";
+function isBuiltinResource(name) {
+	if (!name) return false;
+	const norm = name.toLowerCase().replace(/^[\\\/]+/, "");
+	return norm.startsWith("builtincommandlist") || norm.startsWith("builtin_commandlist") || norm.startsWith("builtin\\") || norm.startsWith("commandlist\\builtin") || norm.startsWith("commandlist\\skintexture") || norm === "commandlistskintexture" || norm === "builtin";
 }
-var i = !1, a = [], o = null, s = null, c = null, l = null, u = null, d = null, f = e({
-	activate(e) {
-		if (i = !0, e.linter?.registerAllowedResource) {
-			let t = e.linter.registerAllowedResource((e) => r(e)), n = e.linter.registerAllowedResource(/^builtincommandlist/i), i = e.linter.registerAllowedResource("CommandListSkinTexture"), o = e.linter.registerAllowedResource(/^(?:builtin\\)?commandlistskintexture$/i), s = e.linter.registerAllowedResource(/^commandlist\\(?:builtin\\)?skintexture$/i), c = e.linter.registerAllowedResource(/^builtin\\skintexture$/i), l = e.linter.registerAllowedResource(/^(?:commandlist\\)?builtin\\/i), u = e.linter.registerAllowedResource(/^builtin\\/i);
-			a.push(t, n, i, o, s, c, l, u);
+var isPluginActive = false;
+var unregisterBuiltinResources = [];
+var unregisterAllowedVars = null;
+var unregisterAllowedGroupResources = null;
+var unregisterAllowedUsedVars = null;
+var unregisterAllowedUsedResources = null;
+var unregisterDefProvider = null;
+var unregisterRefProvider = null;
+var plugin = {
+	activate(context) {
+		isPluginActive = true;
+		if (context.linter?.registerAllowedResource) {
+			const u1 = context.linter.registerAllowedResource((name) => isBuiltinResource(name));
+			const u2 = context.linter.registerAllowedResource(/^builtincommandlist/i);
+			const u3 = context.linter.registerAllowedResource("CommandListSkinTexture");
+			const u4 = context.linter.registerAllowedResource(/^(?:builtin\\)?commandlistskintexture$/i);
+			const u5 = context.linter.registerAllowedResource(/^commandlist\\(?:builtin\\)?skintexture$/i);
+			const u6 = context.linter.registerAllowedResource(/^builtin\\skintexture$/i);
+			const u7 = context.linter.registerAllowedResource(/^(?:commandlist\\)?builtin\\/i);
+			const u8 = context.linter.registerAllowedResource(/^builtin\\/i);
+			unregisterBuiltinResources.push(u1, u2, u3, u4, u5, u6, u7, u8);
 		}
-		if (e.linter?.registerAllowedUsedResource) {
-			let t = e.linter.registerAllowedUsedResource((e) => r(e)), n = e.linter.registerAllowedUsedResource(/^builtincommandlist/i), i = e.linter.registerAllowedUsedResource("CommandListSkinTexture"), o = e.linter.registerAllowedUsedResource(/^(?:builtin\\)?commandlistskintexture$/i), s = e.linter.registerAllowedUsedResource(/^commandlist\\(?:builtin\\)?skintexture$/i), c = e.linter.registerAllowedUsedResource(/^builtin\\skintexture$/i), l = e.linter.registerAllowedUsedResource(/^(?:commandlist\\)?builtin\\/i), u = e.linter.registerAllowedUsedResource(/^builtin\\/i);
-			a.push(t, n, i, o, s, c, l, u);
+		if (context.linter?.registerAllowedUsedResource) {
+			const u1 = context.linter.registerAllowedUsedResource((name) => isBuiltinResource(name));
+			const u2 = context.linter.registerAllowedUsedResource(/^builtincommandlist/i);
+			const u3 = context.linter.registerAllowedUsedResource("CommandListSkinTexture");
+			const u4 = context.linter.registerAllowedUsedResource(/^(?:builtin\\)?commandlistskintexture$/i);
+			const u5 = context.linter.registerAllowedUsedResource(/^commandlist\\(?:builtin\\)?skintexture$/i);
+			const u6 = context.linter.registerAllowedUsedResource(/^builtin\\skintexture$/i);
+			const u7 = context.linter.registerAllowedUsedResource(/^(?:commandlist\\)?builtin\\/i);
+			const u8 = context.linter.registerAllowedUsedResource(/^builtin\\/i);
+			unregisterBuiltinResources.push(u1, u2, u3, u4, u5, u6, u7, u8);
 		}
-		let f = async (t) => {
-			if (t.getAllFiles) {
-				let e = t.getAllFiles();
-				if (e && e.length > 0) return e.filter((e) => /\.(ini|3dm|migoto)$/i.test(e));
+		const collectIniFiles = async (ctx) => {
+			if (ctx.getAllFiles) {
+				const files = ctx.getAllFiles();
+				if (files && files.length > 0) return files.filter((f) => /\.(ini|3dm|migoto)$/i.test(f));
 			}
 			try {
-				let t = await e.workspace.readDirectory(), n = [], r = (e, t = "") => {
-					for (let i of e) {
-						let e = t ? `${t}/${i.name}` : i.name;
-						i.isDir && i.children ? r(i.children, e) : !i.isDir && /\.(ini|3dm|migoto)$/i.test(i.name) && n.push(e);
+				const entries = await context.workspace.readDirectory();
+				const list = [];
+				const traverse = (items, prefix = "") => {
+					for (const item of items) {
+						const rel = prefix ? `${prefix}/${item.name}` : item.name;
+						if (item.isDir && item.children) traverse(item.children, rel);
+						else if (!item.isDir && /\.(ini|3dm|migoto)$/i.test(item.name)) list.push(rel);
 					}
 				};
-				return r(t), n;
+				traverse(entries);
+				return list;
 			} catch {
 				return [];
 			}
-		}, p = async (t, n) => {
-			let r = t.file?.path || t.file?.name;
-			if (r && (r === n || r.endsWith(`/${n}`) || r.endsWith(`\\${n}`))) return t.model.getValue();
-			if (t.readTextFile) try {
-				return await t.readTextFile(n);
+		};
+		const readIniText = async (ctx, path) => {
+			const curPath = ctx.file?.path || ctx.file?.name;
+			if (curPath && (curPath === path || curPath.endsWith(`/${path}`) || curPath.endsWith(`\\${path}`))) return ctx.model.getValue();
+			if (ctx.readTextFile) try {
+				return await ctx.readTextFile(path);
 			} catch {}
 			try {
-				return await e.workspace.readTextFile(n);
+				return await context.workspace.readTextFile(path);
 			} catch {
 				return "";
 			}
-		}, m = async (e) => {
-			let t = await f(e), r = /* @__PURE__ */ new Map(), i = /* @__PURE__ */ new Set(), a = [];
-			for (let o of t) {
-				let t = await p(e, o);
-				if (!t) continue;
-				let s = n(t, o);
-				if (a.push(s), s.namespace) {
-					let e = s.namespace.toLowerCase(), t = r.get(e);
-					t || (t = {
-						namespace: s.namespace,
-						files: [],
-						variables: /* @__PURE__ */ new Set(),
-						sections: /* @__PURE__ */ new Set()
-					}, r.set(e, t)), t.files.push(o);
-					for (let n of s.variables) t.variables.add(n), i.add(`\\${e}\\${n}`), i.add(`${e}\\${n}`);
-					for (let e of s.sections) t.sections.add(e);
+		};
+		const buildWorkspaceIndex = async (ctx) => {
+			const iniPaths = await collectIniFiles(ctx);
+			const namespaceMap = /* @__PURE__ */ new Map();
+			const allKnownVariables = /* @__PURE__ */ new Set();
+			const allSummaries = [];
+			for (const iniPath of iniPaths) {
+				const content = await readIniText(ctx, iniPath);
+				if (!content) continue;
+				const exp = parseIniExports(content, iniPath);
+				allSummaries.push(exp);
+				if (exp.namespace) {
+					const nsKey = exp.namespace.toLowerCase();
+					let group = namespaceMap.get(nsKey);
+					if (!group) {
+						group = {
+							namespace: exp.namespace,
+							files: [],
+							variables: /* @__PURE__ */ new Set(),
+							sections: /* @__PURE__ */ new Set()
+						};
+						namespaceMap.set(nsKey, group);
+					}
+					group.files.push(iniPath);
+					for (const v of exp.variables) {
+						group.variables.add(v);
+						allKnownVariables.add(`\\${nsKey}\\${v}`);
+						allKnownVariables.add(`${nsKey}\\${v}`);
+					}
+					for (const s of exp.sections) group.sections.add(s);
 				}
 			}
 			return {
-				allSummaries: a,
-				namespaceMap: r,
-				allKnownVariables: i
+				allSummaries,
+				namespaceMap,
+				allKnownVariables
 			};
 		};
-		e.linter.registerRule({
+		context.linter.registerRule({
 			id: "missing-resource-files",
 			name: "모드 리소스 파일 실재성 검사",
-			check: async (e) => {
-				if (!e.folder) return [];
-				let n = [], r = e.model.getLineCount();
-				for (let i = 1; i <= r; i++) {
-					let r = e.model.getLineContent(i), { code: a } = t(r);
-					if (!a.trim()) continue;
-					let o = /^\s*filename\s*=\s*(.+)$/i.exec(a);
-					if (!o) continue;
-					let s = o[1].trim();
-					if ((s.startsWith("\"") && s.endsWith("\"") || s.startsWith("'") && s.endsWith("'")) && (s = s.slice(1, -1).trim()), s && !await e.fileExists(s)) {
-						let e = r.indexOf(o[1]), t = e === -1 ? 1 : e + 1, a = t + o[1].length;
-						n.push({
+			check: async (ctx) => {
+				if (!ctx.folder) return [];
+				const diagnostics = [];
+				const count = ctx.model.getLineCount();
+				for (let line = 1; line <= count; line++) {
+					const raw = ctx.model.getLineContent(line);
+					const { code } = stripComments(raw);
+					if (!code.trim()) continue;
+					const match = /^\s*filename\s*=\s*(.+)$/i.exec(code);
+					if (!match) continue;
+					let target = match[1].trim();
+					if (target.startsWith("\"") && target.endsWith("\"") || target.startsWith("'") && target.endsWith("'")) target = target.slice(1, -1).trim();
+					if (!target) continue;
+					if (!await ctx.fileExists(target)) {
+						const rawIdx = raw.indexOf(match[1]);
+						const startCol = rawIdx !== -1 ? rawIdx + 1 : 1;
+						const endCol = startCol + match[1].length;
+						diagnostics.push({
 							severity: "warning",
-							message: `참조된 파일 "${s}"을(를) 모드 폴더에서 찾을 수 없습니다. (파일명 및 확장자 확인 필요)`,
-							startLineNumber: i,
-							startColumn: t,
-							endLineNumber: i,
-							endColumn: a
+							message: `참조된 파일 "${target}"을(를) 모드 폴더에서 찾을 수 없습니다. (파일명 및 확장자 확인 필요)`,
+							startLineNumber: line,
+							startColumn: startCol,
+							endLineNumber: line,
+							endColumn: endCol
 						});
 					}
 				}
-				return n;
-			}
-		}), e.linter.registerRule({
-			id: "xxmi-namespace-check",
-			name: "XXMI 네임스페이스 및 변수 검사",
-			check: async (a) => {
-				if (!i || !a.folder) return [];
-				let u = [], { allSummaries: d, namespaceMap: f, allKnownVariables: p } = await m(a);
-				if (!i) return [];
-				let h = n(a.model.getValue(), a.file?.path || a.file?.name || ""), g = h.namespace ? h.namespace.toLowerCase() : "", _ = g ? f.get(g) : null, v = (a.file?.path || a.file?.name || "").toLowerCase();
-				o &&= (o(), null), s &&= (s(), null), c &&= (c(), null), l &&= (l(), null);
-				let y = _ ? _.variables : null, b = _ ? _.sections : null, x = /* @__PURE__ */ new Set(), S = /* @__PURE__ */ new Set();
-				for (let e of d) {
-					let t = e.filePath.toLowerCase();
-					if (t && v && (t === v || t.endsWith(`/${v}`) || t.endsWith(`\\${v}`) || v.endsWith(`/${t}`) || v.endsWith(`\\${t}`))) continue;
-					let n = e.namespace ? e.namespace.toLowerCase() : "";
-					if (g && n === g) {
-						for (let t of e.usedVariables) x.add(t);
-						for (let t of e.usedSections) S.add(t);
-					} else if (!g && !n) {
-						for (let t of e.usedVariables) x.add(t);
-						for (let t of e.usedSections) S.add(t);
-					} else if (g) {
-						for (let t of e.usedVariables) {
-							let e = t.startsWith("\\") ? t.slice(1) : t;
-							if (e.startsWith(`${g}\\`)) {
-								let t = e.slice(g.length + 1);
-								x.add(t);
-							}
-						}
-						for (let t of e.usedSections) {
-							let e = t.startsWith("\\") ? t.slice(1) : t, n = e.split("\\");
-							if (n.length >= 3 && n[1] === g) {
-								let t = n[0], r = n.slice(2).join("\\");
-								S.add(`${t}${r}`.toLowerCase()), S.add(e);
-							}
-						}
-					}
-				}
-				e.linter?.registerAllowedVariable && (o = e.linter.registerAllowedVariable((e) => {
-					let t = e.toLowerCase().replace(/^\/+/, ""), n = t.startsWith("\\") ? t.slice(1) : t;
-					return !!(p.has(`\\${n}`) || p.has(n) || y && y.has(n));
-				})), b && b.size > 0 && e.linter?.registerAllowedResource && (s = e.linter.registerAllowedResource((e) => b.has(e.toLowerCase()))), x.size > 0 && e.linter?.registerAllowedUsedVariable && (c = e.linter.registerAllowedUsedVariable((e) => {
-					let t = e.toLowerCase().replace(/^[\\$]+/, "");
-					return x.has(t);
-				})), S.size > 0 && e.linter?.registerAllowedUsedResource && (l = e.linter.registerAllowedUsedResource((e) => {
-					let t = e.toLowerCase().replace(/^[\\\/]+/, "");
-					if (S.has(t)) return !0;
-					let n = t.split("\\").filter(Boolean);
-					return !!(n.length > 1 && S.has(n[n.length - 1]));
-				}));
-				let C = a.model.getLineCount(), w = "";
-				for (let e = 1; e <= C; e++) {
-					let n = a.model.getLineContent(e), { code: i } = t(n);
-					if (!i.trim()) continue;
-					let o = /^\s*\[([^\]]+)\]/.exec(i);
-					if (o) {
-						w = o[1].trim();
-						continue;
-					}
-					let s = /\$([a-zA-Z0-9_\\]+)/g, c;
-					for (; (c = s.exec(i)) !== null;) {
-						let t = c[1], n = c.index + 1, r = n + c[0].length, a = w.toLowerCase() === "constants", o = i.slice(0, c.index), s = a && /^\s*(?:persist\s+|global\s+|local\s+)*$/i.test(o), l = /\b(?:global|persist|local)\s*$/i.test(o);
-						if (!(s || l) && t.includes("\\")) {
-							let i = t.split("\\").filter(Boolean);
-							if (i.length >= 2) {
-								let t = i.slice(0, -1).join("\\"), a = i[i.length - 1], o = f.get(t.toLowerCase());
-								o ? o.variables.has(a.toLowerCase()) || u.push({
-									severity: "warning",
-									message: `네임스페이스 '${t}'에 선언되지 않은 변수 '$${a}'입니다. (${t}의 [Constants] 섹션을 확인하세요)`,
-									startLineNumber: e,
-									startColumn: n,
-									endLineNumber: e,
-									endColumn: r
-								}) : u.push({
-									severity: "warning",
-									message: `모드 폴더 내에서 네임스페이스 '${t}'을(를) 찾을 수 없습니다. (해당 ini 파일에 'namespace = ${t}' 선언이 있는지 확인하세요)`,
-									startLineNumber: e,
-									startColumn: n,
-									endLineNumber: e,
-									endColumn: r
-								});
-							}
-						}
-					}
-					let l = /^\s*(?:(?:pre\s+|post\s+)?run)\s*=\s*(?:ref\s+)?([a-zA-Z0-9_\\]+)/i.exec(i);
-					if (l) {
-						let t = l[1].trim();
-						if (t.includes("\\")) {
-							let i = t.split("\\").filter(Boolean), o = i[0];
-							if (!(r(t) || o.toLowerCase().startsWith("builtin") || a.isAllowedResource && a.isAllowedResource(t)) && i.length >= 3) {
-								let r = i.slice(1, -1).join("\\"), a = i[i.length - 1], s = f.get(r.toLowerCase()), c = n.indexOf(l[1]), d = c === -1 ? 1 : c + 1, p = d + l[1].length;
-								s ? [
-									`${o}${a}`.toLowerCase(),
-									t.toLowerCase(),
-									a.toLowerCase(),
-									`${o}\\${r.toLowerCase()}\\${a.toLowerCase()}`
-								].some((e) => s.sections.has(e)) || u.push({
-									severity: "warning",
-									message: `네임스페이스 '${r}'에 정의된 ${o} '${a}'을(를) 찾을 수 없습니다.`,
-									startLineNumber: e,
-									startColumn: d,
-									endLineNumber: e,
-									endColumn: p
-								}) : u.push({
-									severity: "warning",
-									message: `모드 폴더 내에서 네임스페이스 '${r}'을(를) 찾을 수 없습니다.`,
-									startLineNumber: e,
-									startColumn: d,
-									endLineNumber: e,
-									endColumn: p
-								});
-							}
-						}
-					}
-				}
-				return u;
+				return diagnostics;
 			}
 		});
-		let h = { provideDefinition: async (e, t) => {
-			if (!i || !e) return null;
-			let { allSummaries: r } = await m(t);
-			if (!i || r.length === 0) return null;
-			let a = (t.file?.path || t.file?.name || "").toLowerCase(), o = e.namespace ? e.namespace.toLowerCase() : "";
-			if (!o) {
-				let e = n(t.model.getValue(), t.file?.path || t.file?.name || "");
-				if (e.namespace) o = e.namespace.toLowerCase();
+		context.linter.registerRule({
+			id: "xxmi-namespace-check",
+			name: "XXMI 네임스페이스 및 변수 검사",
+			check: async (ctx) => {
+				if (!isPluginActive) return [];
+				if (!ctx.folder) return [];
+				const diagnostics = [];
+				const { allSummaries, namespaceMap, allKnownVariables } = await buildWorkspaceIndex(ctx);
+				if (!isPluginActive) return [];
+				const currentModelExp = parseIniExports(ctx.model.getValue(), ctx.file?.path || ctx.file?.name || "");
+				const currentNsKey = currentModelExp.namespace ? currentModelExp.namespace.toLowerCase() : "";
+				const currentNsGroup = currentNsKey ? namespaceMap.get(currentNsKey) : null;
+				const currentFilePath = (ctx.file?.path || ctx.file?.name || "").toLowerCase();
+				if (unregisterAllowedVars) {
+					unregisterAllowedVars();
+					unregisterAllowedVars = null;
+				}
+				if (unregisterAllowedGroupResources) {
+					unregisterAllowedGroupResources();
+					unregisterAllowedGroupResources = null;
+				}
+				if (unregisterAllowedUsedVars) {
+					unregisterAllowedUsedVars();
+					unregisterAllowedUsedVars = null;
+				}
+				if (unregisterAllowedUsedResources) {
+					unregisterAllowedUsedResources();
+					unregisterAllowedUsedResources = null;
+				}
+				const sharedVars = currentNsGroup ? currentNsGroup.variables : null;
+				const sharedSections = currentNsGroup ? currentNsGroup.sections : null;
+				const externallyUsedVars = /* @__PURE__ */ new Set();
+				const externallyUsedResources = /* @__PURE__ */ new Set();
+				for (const other of allSummaries) {
+					const otherPath = other.filePath.toLowerCase();
+					if (otherPath && currentFilePath && (otherPath === currentFilePath || otherPath.endsWith(`/${currentFilePath}`) || otherPath.endsWith(`\\${currentFilePath}`) || currentFilePath.endsWith(`/${otherPath}`) || currentFilePath.endsWith(`\\${otherPath}`))) continue;
+					const otherNsKey = other.namespace ? other.namespace.toLowerCase() : "";
+					if (currentNsKey && otherNsKey === currentNsKey) {
+						for (const uv of other.usedVariables) externallyUsedVars.add(uv);
+						for (const us of other.usedSections) externallyUsedResources.add(us);
+					} else if (!currentNsKey && !otherNsKey) {
+						for (const uv of other.usedVariables) externallyUsedVars.add(uv);
+						for (const us of other.usedSections) externallyUsedResources.add(us);
+					} else if (currentNsKey) {
+						for (const uv of other.usedVariables) {
+							const clean = uv.startsWith("\\") ? uv.slice(1) : uv;
+							if (clean.startsWith(`${currentNsKey}\\`)) {
+								const varName = clean.slice(currentNsKey.length + 1);
+								externallyUsedVars.add(varName);
+							}
+						}
+						for (const us of other.usedSections) {
+							const clean = us.startsWith("\\") ? us.slice(1) : us;
+							const parts = clean.split("\\");
+							if (parts.length >= 3 && parts[1] === currentNsKey) {
+								const type = parts[0];
+								const action = parts.slice(2).join("\\");
+								externallyUsedResources.add(`${type}${action}`.toLowerCase());
+								externallyUsedResources.add(clean);
+							}
+						}
+					}
+				}
+				if (context.linter?.registerAllowedVariable) unregisterAllowedVars = context.linter.registerAllowedVariable((name) => {
+					const norm = name.toLowerCase().replace(/^\/+/, "");
+					const clean = norm.startsWith("\\") ? norm.slice(1) : norm;
+					if (allKnownVariables.has(`\\${clean}`) || allKnownVariables.has(clean)) return true;
+					if (sharedVars && sharedVars.has(clean)) return true;
+					return false;
+				});
+				if (sharedSections && sharedSections.size > 0 && context.linter?.registerAllowedResource) unregisterAllowedGroupResources = context.linter.registerAllowedResource((name) => {
+					return sharedSections.has(name.toLowerCase());
+				});
+				if (externallyUsedVars.size > 0 && context.linter?.registerAllowedUsedVariable) unregisterAllowedUsedVars = context.linter.registerAllowedUsedVariable((name) => {
+					const clean = name.toLowerCase().replace(/^[\\$]+/, "");
+					return externallyUsedVars.has(clean);
+				});
+				if (externallyUsedResources.size > 0 && context.linter?.registerAllowedUsedResource) unregisterAllowedUsedResources = context.linter.registerAllowedUsedResource((name) => {
+					const clean = name.toLowerCase().replace(/^[\\\/]+/, "");
+					if (externallyUsedResources.has(clean)) return true;
+					const parts = clean.split("\\").filter(Boolean);
+					if (parts.length > 1 && externallyUsedResources.has(parts[parts.length - 1])) return true;
+					return false;
+				});
+				const count = ctx.model.getLineCount();
+				let activeSection = "";
+				for (let line = 1; line <= count; line++) {
+					const raw = ctx.model.getLineContent(line);
+					const { code } = stripComments(raw);
+					if (!code.trim()) continue;
+					const secMatch = /^\s*\[([^\]]+)\]/.exec(code);
+					if (secMatch) {
+						activeSection = secMatch[1].trim();
+						continue;
+					}
+					const varRefRe = /\$([a-zA-Z0-9_\\]+)/g;
+					let vm;
+					while ((vm = varRefRe.exec(code)) !== null) {
+						const fullVar = vm[1];
+						const startCol = vm.index + 1;
+						const endCol = startCol + vm[0].length;
+						const isConstantsSec = activeSection.toLowerCase() === "constants";
+						const beforeMatch = code.slice(0, vm.index);
+						const isDecl = isConstantsSec && /^\s*(?:persist\s+|global\s+|local\s+)*$/i.test(beforeMatch);
+						const isExplicitDecl = /\b(?:global|persist|local)\s*$/i.test(beforeMatch);
+						if (isDecl || isExplicitDecl) continue;
+						if (fullVar.includes("\\")) {
+							const parts = fullVar.split("\\").filter(Boolean);
+							if (parts.length >= 2) {
+								const nsName = parts.slice(0, -1).join("\\");
+								const varName = parts[parts.length - 1];
+								const nsData = namespaceMap.get(nsName.toLowerCase());
+								if (!nsData) diagnostics.push({
+									severity: "warning",
+									message: `모드 폴더 내에서 네임스페이스 '${nsName}'을(를) 찾을 수 없습니다. (해당 ini 파일에 'namespace = ${nsName}' 선언이 있는지 확인하세요)`,
+									startLineNumber: line,
+									startColumn: startCol,
+									endLineNumber: line,
+									endColumn: endCol
+								});
+								else if (!nsData.variables.has(varName.toLowerCase())) diagnostics.push({
+									severity: "warning",
+									message: `네임스페이스 '${nsName}'에 선언되지 않은 변수 '$${varName}'입니다. (${nsName}의 [Constants] 섹션을 확인하세요)`,
+									startLineNumber: line,
+									startColumn: startCol,
+									endLineNumber: line,
+									endColumn: endCol
+								});
+							}
+						}
+					}
+					const runMatch = /^\s*(?:(?:pre\s+|post\s+)?run)\s*=\s*(?:ref\s+)?([a-zA-Z0-9_\\]+)/i.exec(code);
+					if (runMatch) {
+						const target = runMatch[1].trim();
+						if (target.includes("\\")) {
+							const parts = target.split("\\").filter(Boolean);
+							const prefix = parts[0];
+							if (!(isBuiltinResource(target) || prefix.toLowerCase().startsWith("builtin") || (ctx.isAllowedResource ? ctx.isAllowedResource(target) : false)) && parts.length >= 3) {
+								const nsName = parts.slice(1, -1).join("\\");
+								const actionName = parts[parts.length - 1];
+								const nsData = namespaceMap.get(nsName.toLowerCase());
+								const rawIdx = raw.indexOf(runMatch[1]);
+								const startCol = rawIdx !== -1 ? rawIdx + 1 : 1;
+								const endCol = startCol + runMatch[1].length;
+								if (!nsData) diagnostics.push({
+									severity: "warning",
+									message: `모드 폴더 내에서 네임스페이스 '${nsName}'을(를) 찾을 수 없습니다.`,
+									startLineNumber: line,
+									startColumn: startCol,
+									endLineNumber: line,
+									endColumn: endCol
+								});
+								else if (![
+									`${prefix}${actionName}`.toLowerCase(),
+									target.toLowerCase(),
+									actionName.toLowerCase(),
+									`${prefix}\\${nsName.toLowerCase()}\\${actionName.toLowerCase()}`
+								].some((p) => nsData.sections.has(p))) diagnostics.push({
+									severity: "warning",
+									message: `네임스페이스 '${nsName}'에 정의된 ${prefix} '${actionName}'을(를) 찾을 수 없습니다.`,
+									startLineNumber: line,
+									startColumn: startCol,
+									endLineNumber: line,
+									endColumn: endCol
+								});
+							}
+						}
+					}
+				}
+				return diagnostics;
+			}
+		});
+		const definitionProvider = { provideDefinition: async (target, ctx) => {
+			if (!isPluginActive || !target) return null;
+			const { allSummaries } = await buildWorkspaceIndex(ctx);
+			if (!isPluginActive || allSummaries.length === 0) return null;
+			const curPath = (ctx.file?.path || ctx.file?.name || "").toLowerCase();
+			let currentNs = target.namespace ? target.namespace.toLowerCase() : "";
+			if (!currentNs) {
+				const curExp = parseIniExports(ctx.model.getValue(), ctx.file?.path || ctx.file?.name || "");
+				if (curExp.namespace) currentNs = curExp.namespace.toLowerCase();
 				else {
-					let e = r.find((e) => {
-						let t = e.filePath.toLowerCase();
-						return t === a || t.endsWith(`/${a}`) || a.endsWith(`/${t}`);
+					const currentSummary = allSummaries.find((s) => {
+						const p = s.filePath.toLowerCase();
+						return p === curPath || p.endsWith(`/${curPath}`) || curPath.endsWith(`/${p}`);
 					});
-					e && e.namespace && (o = e.namespace.toLowerCase());
+					if (currentSummary && currentSummary.namespace) currentNs = currentSummary.namespace.toLowerCase();
 				}
 			}
-			let s = (e.cleanName || e.name || "").replace(/^[\[\]\$]+|[\[\]\$]+$/g, "").toLowerCase(), c = s.includes("\\") ? s.split("\\").pop() : s, l = (t) => {
-				let n = t.name.toLowerCase(), r = t.rawName.toLowerCase();
-				if (e.kind === "variable" && t.kind === "variable") {
-					if (n === s || n === c) return !0;
-					let e = n.replace(/^[\\\$]+/, "");
-					return !!(e === s || e === c || e.endsWith(`\\${s}`) || e.endsWith(`\\${c}`));
+			const targetNameClean = (target.cleanName || target.name || "").replace(/^[\[\]\$]+|[\[\]\$]+$/g, "").toLowerCase();
+			const targetBase = targetNameClean.includes("\\") ? targetNameClean.split("\\").pop() : targetNameClean;
+			const matchesDecl = (decl) => {
+				const declName = decl.name.toLowerCase();
+				const declRaw = decl.rawName.toLowerCase();
+				if (target.kind === "variable" && decl.kind === "variable") {
+					if (declName === targetNameClean || declName === targetBase) return true;
+					const cleanDecl = declName.replace(/^[\\\$]+/, "");
+					if (cleanDecl === targetNameClean || cleanDecl === targetBase) return true;
+					if (cleanDecl.endsWith(`\\${targetNameClean}`) || cleanDecl.endsWith(`\\${targetBase}`)) return true;
+					return false;
+				} else if (target.kind === "section" && decl.kind === "section") {
+					if (declName === targetNameClean || declRaw === targetNameClean || declName === targetBase || declRaw === targetBase) return true;
+					if (declName === `[${targetNameClean}]` || declName === `[${targetBase}]`) return true;
+					if (declName.endsWith(`\\${targetNameClean}`) || declName.endsWith(`\\${targetBase}`)) return true;
+					if (declName.startsWith("commandlist") && (declName.slice(11) === targetNameClean || declName.slice(11) === targetBase)) return true;
+					if (declName.startsWith("builtincommandlist") && (declName.slice(18) === targetNameClean || declName.slice(18) === targetBase)) return true;
+					if (targetNameClean.startsWith("builtincommandlist") && (declName === targetNameClean.slice(18) || declName === targetBase)) return true;
+					if (targetNameClean.startsWith("builtincommandlist") && declName === `commandlist${targetNameClean.slice(18)}`) return true;
+					if (declName.startsWith("builtincommandlist") && targetNameClean === `commandlist${declName.slice(18)}`) return true;
+					if (declName.startsWith("resource") && (declName.slice(8) === targetNameClean || declName.slice(8) === targetBase)) return true;
+					if (declName.startsWith("customshader") && (declName.slice(12) === targetNameClean || declName.slice(12) === targetBase)) return true;
+					return false;
 				}
-				return e.kind === "section" && t.kind === "section" && !!(n === s || r === s || n === c || r === c || n === `[${s}]` || n === `[${c}]` || n.endsWith(`\\${s}`) || n.endsWith(`\\${c}`) || n.startsWith("commandlist") && (n.slice(11) === s || n.slice(11) === c) || n.startsWith("builtincommandlist") && (n.slice(18) === s || n.slice(18) === c) || s.startsWith("builtincommandlist") && (n === s.slice(18) || n === c) || s.startsWith("builtincommandlist") && n === `commandlist${s.slice(18)}` || n.startsWith("builtincommandlist") && s === `commandlist${n.slice(18)}` || n.startsWith("resource") && (n.slice(8) === s || n.slice(8) === c) || n.startsWith("customshader") && (n.slice(12) === s || n.slice(12) === c));
+				return false;
 			};
-			if (o) {
-				for (let e of r) if (e.namespace && e.namespace.toLowerCase() === o) {
-					let t = e.declarations.find(l);
-					if (t) return {
-						filePath: t.filePath,
-						lineNumber: t.line,
-						startColumn: t.startCol,
-						endColumn: t.endCol,
-						lineContent: t.lineContent,
-						section: t.section,
-						isDefinition: !0
+			if (currentNs) {
+				for (const s of allSummaries) if (s.namespace && s.namespace.toLowerCase() === currentNs) {
+					const found = s.declarations.find(matchesDecl);
+					if (found) return {
+						filePath: found.filePath,
+						lineNumber: found.line,
+						startColumn: found.startCol,
+						endColumn: found.endCol,
+						lineContent: found.lineContent,
+						section: found.section,
+						isDefinition: true
 					};
 				}
 			}
-			if (e.namespace) {
-				let t = e.namespace.toLowerCase();
-				for (let e of r) if (e.namespace && e.namespace.toLowerCase() === t) {
-					let t = e.declarations.find(l);
-					if (t) return {
-						filePath: t.filePath,
-						lineNumber: t.line,
-						startColumn: t.startCol,
-						endColumn: t.endCol,
-						lineContent: t.lineContent,
-						section: t.section,
-						isDefinition: !0
+			if (target.namespace) {
+				const targetNsLower = target.namespace.toLowerCase();
+				for (const s of allSummaries) if (s.namespace && s.namespace.toLowerCase() === targetNsLower) {
+					const found = s.declarations.find(matchesDecl);
+					if (found) return {
+						filePath: found.filePath,
+						lineNumber: found.line,
+						startColumn: found.startCol,
+						endColumn: found.endCol,
+						lineContent: found.lineContent,
+						section: found.section,
+						isDefinition: true
 					};
 				}
 			}
-			for (let e of r) {
-				let t = e.declarations.find(l);
-				if (t) return {
-					filePath: t.filePath,
-					lineNumber: t.line,
-					startColumn: t.startCol,
-					endColumn: t.endCol,
-					lineContent: t.lineContent,
-					section: t.section,
-					isDefinition: !0
+			for (const s of allSummaries) {
+				const found = s.declarations.find(matchesDecl);
+				if (found) return {
+					filePath: found.filePath,
+					lineNumber: found.line,
+					startColumn: found.startCol,
+					endColumn: found.endCol,
+					lineContent: found.lineContent,
+					section: found.section,
+					isDefinition: true
 				};
 			}
 			return null;
-		} }, g = { provideReferences: async (e, t) => {
-			if (!i || !e) return [];
-			let { allSummaries: a } = await m(t);
-			if (!i || a.length === 0) return [];
-			let o = (t.file?.path || t.file?.name || "").toLowerCase(), s = e.namespace ? e.namespace.toLowerCase() : "";
-			if (!s) {
-				let e = n(t.model.getValue(), t.file?.path || t.file?.name || "");
-				if (e.namespace) s = e.namespace.toLowerCase();
-				else {
-					let e = a.find((e) => {
-						let t = e.filePath.toLowerCase();
-						return t === o || t.endsWith(`/${o}`) || o.endsWith(`/${t}`);
-					});
-					e && e.namespace && (s = e.namespace.toLowerCase());
-				}
-			}
-			let c = (e.cleanName || e.name || "").replace(/^[\[\]\$]+|[\[\]\$]+$/g, "").toLowerCase(), l = c.includes("\\") && c.split("\\").pop() || c, u = (t) => {
-				let n = t.name.toLowerCase(), r = t.rawName.toLowerCase();
-				if (e.kind === "variable" && t.kind === "variable") {
-					if (n === c || n === l) return !0;
-					let e = n.replace(/^[\\\$]+/, "");
-					return !!(e === c || e === l || e.endsWith(`\\${c}`) || e.endsWith(`\\${l}`));
-				}
-				return e.kind === "section" && t.kind === "section" && !!(n === c || r === c || n === l || r === l || n === `[${c}]` || n === `[${l}]` || n.endsWith(`\\${c}`) || n.endsWith(`\\${l}`) || n.startsWith("commandlist") && (n.slice(11) === c || n.slice(11) === l) || n.startsWith("builtincommandlist") && (n.slice(18) === c || n.slice(18) === l) || c.startsWith("builtincommandlist") && n === c.slice(18) || c.startsWith("builtincommandlist") && n === `commandlist${c.slice(18)}` || n.startsWith("builtincommandlist") && c === `commandlist${n.slice(18)}` || n.startsWith("resource") && (n.slice(8) === c || n.slice(8) === l) || n.startsWith("customshader") && (n.slice(12) === c || n.slice(12) === l));
-			}, d = [], f = /* @__PURE__ */ new Set(), p = (e, t) => {
-				let n = `${e.filePath}:${e.line}:${e.startCol}`;
-				f.has(n) || (f.add(n), d.push({
-					filePath: e.filePath,
-					lineNumber: e.line,
-					startColumn: e.startCol,
-					endColumn: e.endCol,
-					lineContent: e.lineContent,
-					section: e.section,
-					isDefinition: t
-				}));
-			}, h = r(c);
-			for (let e of a) {
-				let t = e.namespace ? e.namespace.toLowerCase() : "";
-				if (h || (s ? t === s : !t)) {
-					for (let t of e.declarations) u(t) && p(t, !0);
-					for (let t of e.usages) u(t) && p(t, !1);
-				} else if (s) for (let t of e.usages) (t.namespace ? t.namespace.toLowerCase() : "") === s && u(t) && p(t, !1);
-			}
-			return d;
 		} };
-		e.editor?.registerDefinitionProvider ? u = e.editor.registerDefinitionProvider(h) : e.linter?.registerDefinitionProvider && (u = e.linter.registerDefinitionProvider(h)), e.editor?.registerReferenceProvider ? d = e.editor.registerReferenceProvider(g) : e.linter?.registerReferenceProvider && (d = e.linter.registerReferenceProvider(g));
-		e.ui.registerMenuItem({
+		const referenceProvider = { provideReferences: async (target, ctx) => {
+			if (!isPluginActive || !target) return [];
+			const { allSummaries } = await buildWorkspaceIndex(ctx);
+			if (!isPluginActive || allSummaries.length === 0) return [];
+			const curPath = (ctx.file?.path || ctx.file?.name || "").toLowerCase();
+			let currentNs = target.namespace ? target.namespace.toLowerCase() : "";
+			if (!currentNs) {
+				const curExp = parseIniExports(ctx.model.getValue(), ctx.file?.path || ctx.file?.name || "");
+				if (curExp.namespace) currentNs = curExp.namespace.toLowerCase();
+				else {
+					const currentSummary = allSummaries.find((s) => {
+						const p = s.filePath.toLowerCase();
+						return p === curPath || p.endsWith(`/${curPath}`) || curPath.endsWith(`/${p}`);
+					});
+					if (currentSummary && currentSummary.namespace) currentNs = currentSummary.namespace.toLowerCase();
+				}
+			}
+			const targetNameClean = (target.cleanName || target.name || "").replace(/^[\[\]\$]+|[\[\]\$]+$/g, "").toLowerCase();
+			const targetBase = targetNameClean.includes("\\") ? targetNameClean.split("\\").pop() || targetNameClean : targetNameClean;
+			const matchesRecord = (rec) => {
+				const recName = rec.name.toLowerCase();
+				const recRaw = rec.rawName.toLowerCase();
+				if (target.kind === "variable" && rec.kind === "variable") {
+					if (recName === targetNameClean || recName === targetBase) return true;
+					const cleanRec = recName.replace(/^[\\\$]+/, "");
+					if (cleanRec === targetNameClean || cleanRec === targetBase) return true;
+					if (cleanRec.endsWith(`\\${targetNameClean}`) || cleanRec.endsWith(`\\${targetBase}`)) return true;
+					return false;
+				} else if (target.kind === "section" && rec.kind === "section") {
+					if (recName === targetNameClean || recRaw === targetNameClean || recName === targetBase || recRaw === targetBase) return true;
+					if (recName === `[${targetNameClean}]` || recName === `[${targetBase}]`) return true;
+					if (recName.endsWith(`\\${targetNameClean}`) || recName.endsWith(`\\${targetBase}`)) return true;
+					if (recName.startsWith("commandlist") && (recName.slice(11) === targetNameClean || recName.slice(11) === targetBase)) return true;
+					if (recName.startsWith("builtincommandlist") && (recName.slice(18) === targetNameClean || recName.slice(18) === targetBase)) return true;
+					if (targetNameClean.startsWith("builtincommandlist") && recName === targetNameClean.slice(18)) return true;
+					if (targetNameClean.startsWith("builtincommandlist") && recName === `commandlist${targetNameClean.slice(18)}`) return true;
+					if (recName.startsWith("builtincommandlist") && targetNameClean === `commandlist${recName.slice(18)}`) return true;
+					if (recName.startsWith("resource") && (recName.slice(8) === targetNameClean || recName.slice(8) === targetBase)) return true;
+					if (recName.startsWith("customshader") && (recName.slice(12) === targetNameClean || recName.slice(12) === targetBase)) return true;
+					return false;
+				}
+				return false;
+			};
+			const results = [];
+			const seen = /* @__PURE__ */ new Set();
+			const addLocation = (rec, isDef) => {
+				const key = `${rec.filePath}:${rec.line}:${rec.startCol}`;
+				if (seen.has(key)) return;
+				seen.add(key);
+				results.push({
+					filePath: rec.filePath,
+					lineNumber: rec.line,
+					startColumn: rec.startCol,
+					endColumn: rec.endCol,
+					lineContent: rec.lineContent,
+					section: rec.section,
+					isDefinition: isDef
+				});
+			};
+			const isBuiltinTarget = isBuiltinResource(targetNameClean);
+			for (const s of allSummaries) {
+				const fileNs = s.namespace ? s.namespace.toLowerCase() : "";
+				if (isBuiltinTarget || (currentNs ? fileNs === currentNs : !fileNs)) {
+					for (const d of s.declarations) if (matchesRecord(d)) addLocation(d, true);
+					for (const u of s.usages) if (matchesRecord(u)) addLocation(u, false);
+				} else if (currentNs) {
+					for (const u of s.usages) if ((u.namespace ? u.namespace.toLowerCase() : "") === currentNs && matchesRecord(u)) addLocation(u, false);
+				}
+			}
+			return results;
+		} };
+		if (context.editor?.registerDefinitionProvider) unregisterDefProvider = context.editor.registerDefinitionProvider(definitionProvider);
+		else if (context.linter?.registerDefinitionProvider) unregisterDefProvider = context.linter.registerDefinitionProvider(definitionProvider);
+		if (context.editor?.registerReferenceProvider) unregisterRefProvider = context.editor.registerReferenceProvider(referenceProvider);
+		else if (context.linter?.registerReferenceProvider) unregisterRefProvider = context.linter.registerReferenceProvider(referenceProvider);
+		context.ui?.registerMenuItem?.({
 			label: "모드 리소스 및 네임스페이스 린트 상태 확인",
 			action: () => {
-				let t = e.workspace.getCurrentFile(), n = e.workspace.getCurrentFolder();
-				n ? e.ui.showToast(`커스텀 린터가 정상 동작 중입니다. (모드 폴더: ${n})`, "info") : t ? e.ui.showToast(`커스텀 린터가 정상 동작 중입니다. (파일: ${t.name})`, "info") : e.ui.showToast("커스텀 린터가 활성화되어 있습니다.", "info");
+				const cur = context.workspace.getCurrentFile();
+				const folder = context.workspace.getCurrentFolder();
+				if (folder) context.ui.showToast(`커스텀 린터가 정상 동작 중입니다. (모드 폴더: ${folder})`, "info");
+				else if (cur) context.ui.showToast(`커스텀 린터가 정상 동작 중입니다. (파일: ${cur.name})`, "info");
+				else context.ui.showToast("커스텀 린터가 활성화되어 있습니다.", "info");
 			}
 		});
 	},
 	deactivate() {
-		if (i = !1, a.length > 0) {
-			for (let e of a) try {
-				e();
+		isPluginActive = false;
+		if (unregisterBuiltinResources.length > 0) {
+			for (const cleanup of unregisterBuiltinResources) try {
+				cleanup();
 			} catch {}
-			a = [];
+			unregisterBuiltinResources = [];
 		}
-		o &&= (o(), null), s &&= (s(), null), c &&= (c(), null), l &&= (l(), null), u &&= (u(), null), d &&= (d(), null);
+		if (unregisterAllowedVars) {
+			unregisterAllowedVars();
+			unregisterAllowedVars = null;
+		}
+		if (unregisterAllowedGroupResources) {
+			unregisterAllowedGroupResources();
+			unregisterAllowedGroupResources = null;
+		}
+		if (unregisterAllowedUsedVars) {
+			unregisterAllowedUsedVars();
+			unregisterAllowedUsedVars = null;
+		}
+		if (unregisterAllowedUsedResources) {
+			unregisterAllowedUsedResources();
+			unregisterAllowedUsedResources = null;
+		}
+		if (unregisterDefProvider) {
+			unregisterDefProvider();
+			unregisterDefProvider = null;
+		}
+		if (unregisterRefProvider) {
+			unregisterRefProvider();
+			unregisterRefProvider = null;
+		}
 	}
-});
+};
 //#endregion
-export { f as default, r as isBuiltinResource };
+export { plugin as default, isBuiltinResource };

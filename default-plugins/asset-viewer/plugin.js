@@ -1,177 +1,340 @@
-//#region src/plugins/api.ts
-function e(e) {
-	return e;
-}
-function t(e) {
-	let t = e instanceof Uint8Array ? e : new Uint8Array(e);
-	if (t.byteLength < 4) throw Error("유효한 DDS 파일이 아닙니다 (데이터 크기 부족).");
-	let s = new DataView(t.buffer, t.byteOffset, Math.min(t.byteLength, 148));
-	if (s.getUint32(0, !0) !== 542327876) throw Error("유효한 DDS 파일이 아닙니다 (Magic 불일치).");
-	if (t.byteLength < 128) throw Error("유효한 DDS 파일이 아닙니다 (헤더 크기 128바이트 미만).");
-	let c = s.getUint32(12, !0), l = s.getUint32(16, !0), u = s.getUint32(80, !0), d = s.getUint32(84, !0), f = s.getUint32(88, !0), p = s.getUint32(92, !0);
-	s.getUint32(96, !0);
-	let m = s.getUint32(100, !0);
-	s.getUint32(104, !0);
-	let h = 128, g, _ = !1, v = "RGBA";
-	d === 808540228 && t.byteLength >= 148 && (h = 148, g = s.getUint32(128, !0));
-	let y = new Uint8ClampedArray(l * c * 4);
-	if (g !== void 0) switch (g) {
+//#region default-plugins/asset-viewer/dds-decoder.ts
+var DDS_MAGIC = 542327876;
+var FOURCC_DXT1 = 827611204;
+var FOURCC_DXT2 = 844388420;
+var FOURCC_DXT3 = 861165636;
+var FOURCC_DXT4 = 877942852;
+var FOURCC_DXT5 = 894720068;
+var FOURCC_ATI1 = 826889281;
+var FOURCC_BC4U = 1429488450;
+var FOURCC_BC4S = 1395934018;
+var FOURCC_ATI2 = 843666497;
+var FOURCC_BC5U = 1429553986;
+var FOURCC_BC5S = 1395999554;
+var FOURCC_DX10 = 808540228;
+var FOURCC_BC7 = 540492610;
+var FOURCC_BC7_ALT = 3621698;
+function decodeDDS(buffer) {
+	const bytes = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
+	if (bytes.byteLength < 4) throw new Error("유효한 DDS 파일이 아닙니다 (데이터 크기 부족).");
+	const header = new DataView(bytes.buffer, bytes.byteOffset, Math.min(bytes.byteLength, 148));
+	if (header.getUint32(0, true) !== DDS_MAGIC) throw new Error("유효한 DDS 파일이 아닙니다 (Magic 불일치).");
+	if (bytes.byteLength < 128) throw new Error("유효한 DDS 파일이 아닙니다 (헤더 크기 128바이트 미만).");
+	const height = header.getUint32(12, true);
+	const width = header.getUint32(16, true);
+	const pfFlags = header.getUint32(80, true);
+	const fourCC = header.getUint32(84, true);
+	const rgbBitCount = header.getUint32(88, true);
+	const rMask = header.getUint32(92, true);
+	header.getUint32(96, true);
+	const bMask = header.getUint32(100, true);
+	header.getUint32(104, true);
+	let dataOffset = 128;
+	let dxgiFormat;
+	let isSRGB = false;
+	let formatName = "RGBA";
+	if (fourCC === FOURCC_DX10 && bytes.byteLength >= 148) {
+		dataOffset = 148;
+		dxgiFormat = header.getUint32(128, true);
+	}
+	const rgba = new Uint8ClampedArray(width * height * 4);
+	if (dxgiFormat !== void 0) switch (dxgiFormat) {
 		case 98:
-			v = "BC7 (Linear)", _ = !1, x(t, h, l, c, y);
+			formatName = "BC7 (Linear)";
+			isSRGB = false;
+			decodeBC7(bytes, dataOffset, width, height, rgba);
 			break;
 		case 99:
 		case 97:
-			v = "BC7 (sRGB)", _ = !0, x(t, h, l, c, y);
+			formatName = "BC7 (sRGB)";
+			isSRGB = true;
+			decodeBC7(bytes, dataOffset, width, height, rgba);
 			break;
 		case 71:
 		case 70:
-			v = "BC1 (Linear)", _ = !1, n(t, h, l, c, y);
+			formatName = "BC1 (Linear)";
+			isSRGB = false;
+			decodeDXT1(bytes, dataOffset, width, height, rgba);
 			break;
 		case 72:
-			v = "BC1 (sRGB)", _ = !0, n(t, h, l, c, y);
+			formatName = "BC1 (sRGB)";
+			isSRGB = true;
+			decodeDXT1(bytes, dataOffset, width, height, rgba);
 			break;
 		case 74:
 		case 73:
-			v = "BC2 (Linear)", _ = !1, r(t, h, l, c, y);
+			formatName = "BC2 (Linear)";
+			isSRGB = false;
+			decodeDXT3(bytes, dataOffset, width, height, rgba);
 			break;
 		case 75:
-			v = "BC2 (sRGB)", _ = !0, r(t, h, l, c, y);
+			formatName = "BC2 (sRGB)";
+			isSRGB = true;
+			decodeDXT3(bytes, dataOffset, width, height, rgba);
 			break;
 		case 77:
 		case 76:
-			v = "BC3 (Linear)", _ = !1, i(t, h, l, c, y);
+			formatName = "BC3 (Linear)";
+			isSRGB = false;
+			decodeDXT5(bytes, dataOffset, width, height, rgba);
 			break;
 		case 78:
-			v = "BC3 (sRGB)", _ = !0, i(t, h, l, c, y);
+			formatName = "BC3 (sRGB)";
+			isSRGB = true;
+			decodeDXT5(bytes, dataOffset, width, height, rgba);
 			break;
 		case 80:
 		case 81:
 		case 79:
-			v = "BC4 (Linear)", _ = !1, a(t, h, l, c, y);
+			formatName = "BC4 (Linear)";
+			isSRGB = false;
+			decodeBC4(bytes, dataOffset, width, height, rgba);
 			break;
 		case 83:
 		case 84:
 		case 82:
-			v = "BC5 (Linear)", _ = !1, o(t, h, l, c, y);
+			formatName = "BC5 (Linear)";
+			isSRGB = false;
+			decodeBC5(bytes, dataOffset, width, height, rgba);
 			break;
 		case 28:
-			v = "RGBA32 (Linear)", _ = !1, D(t, h, l, c, y);
+			formatName = "RGBA32 (Linear)";
+			isSRGB = false;
+			decodeRGBA32(bytes, dataOffset, width, height, rgba);
 			break;
 		case 29:
-			v = "RGBA32 (sRGB)", _ = !0, D(t, h, l, c, y);
+			formatName = "RGBA32 (sRGB)";
+			isSRGB = true;
+			decodeRGBA32(bytes, dataOffset, width, height, rgba);
 			break;
 		case 87:
 		case 88:
-			v = "BGRA32 (Linear)", _ = !1, O(t, h, l, c, y);
+			formatName = "BGRA32 (Linear)";
+			isSRGB = false;
+			decodeBGRA32(bytes, dataOffset, width, height, rgba);
 			break;
 		case 91:
 		case 93:
-			v = "BGRA32 (sRGB)", _ = !0, O(t, h, l, c, y);
+			formatName = "BGRA32 (sRGB)";
+			isSRGB = true;
+			decodeBGRA32(bytes, dataOffset, width, height, rgba);
 			break;
-		default: v = `DXGI Format ${g}`, x(t, h, l, c, y);
+		default:
+			formatName = `DXGI Format ${dxgiFormat}`;
+			decodeBC7(bytes, dataOffset, width, height, rgba);
 	}
-	else d === 827611204 ? (v = "DXT1 (BC1)", _ = !1, n(t, h, l, c, y)) : d === 844388420 || d === 861165636 ? (v = "DXT3 (BC2)", _ = !1, r(t, h, l, c, y)) : d === 877942852 || d === 894720068 ? (v = "DXT5 (BC3)", _ = !1, i(t, h, l, c, y)) : d === 540492610 || d === 3621698 ? (v = "BC7", _ = !1, x(t, h, l, c, y)) : d === 826889281 || d === 1429488450 || d === 1395934018 ? (v = "BC4", _ = !1, a(t, h, l, c, y)) : d === 843666497 || d === 1429553986 || d === 1395999554 ? (v = "BC5", _ = !1, o(t, h, l, c, y)) : u & 64 || f === 32 || f === 24 ? f === 32 ? p === 255 && m === 16711680 ? (v = "RGBA32", D(t, h, l, c, y)) : (v = "BGRA32", O(t, h, l, c, y)) : f === 24 ? (v = "BGR24", k(t, h, l, c, y)) : (v = `RGB ${f}bpp`, O(t, h, l, c, y)) : (v = `FourCC 0x${d.toString(16)}`, n(t, h, l, c, y));
+	else if (fourCC === FOURCC_DXT1) {
+		formatName = "DXT1 (BC1)";
+		isSRGB = false;
+		decodeDXT1(bytes, dataOffset, width, height, rgba);
+	} else if (fourCC === FOURCC_DXT2 || fourCC === FOURCC_DXT3) {
+		formatName = "DXT3 (BC2)";
+		isSRGB = false;
+		decodeDXT3(bytes, dataOffset, width, height, rgba);
+	} else if (fourCC === FOURCC_DXT4 || fourCC === FOURCC_DXT5) {
+		formatName = "DXT5 (BC3)";
+		isSRGB = false;
+		decodeDXT5(bytes, dataOffset, width, height, rgba);
+	} else if (fourCC === FOURCC_BC7 || fourCC === FOURCC_BC7_ALT) {
+		formatName = "BC7";
+		isSRGB = false;
+		decodeBC7(bytes, dataOffset, width, height, rgba);
+	} else if (fourCC === FOURCC_ATI1 || fourCC === FOURCC_BC4U || fourCC === FOURCC_BC4S) {
+		formatName = "BC4";
+		isSRGB = false;
+		decodeBC4(bytes, dataOffset, width, height, rgba);
+	} else if (fourCC === FOURCC_ATI2 || fourCC === FOURCC_BC5U || fourCC === FOURCC_BC5S) {
+		formatName = "BC5";
+		isSRGB = false;
+		decodeBC5(bytes, dataOffset, width, height, rgba);
+	} else if ((pfFlags & 64) !== 0 || rgbBitCount === 32 || rgbBitCount === 24) {
+		if (rgbBitCount === 32) {
+			if (rMask === 255 && bMask === 16711680) {
+				formatName = "RGBA32";
+				decodeRGBA32(bytes, dataOffset, width, height, rgba);
+			} else {
+				formatName = "BGRA32";
+				decodeBGRA32(bytes, dataOffset, width, height, rgba);
+			}
+		} else if (rgbBitCount === 24) {
+			formatName = "BGR24";
+			decodeBGR24(bytes, dataOffset, width, height, rgba);
+		} else {
+			formatName = `RGB ${rgbBitCount}bpp`;
+			decodeBGRA32(bytes, dataOffset, width, height, rgba);
+		}
+	} else {
+		formatName = `FourCC 0x${fourCC.toString(16)}`;
+		decodeDXT1(bytes, dataOffset, width, height, rgba);
+	}
 	return {
-		width: l,
-		height: c,
-		format: v,
-		rgba: y,
-		isSRGB: _,
-		dxgiFormat: g
+		width,
+		height,
+		format: formatName,
+		rgba,
+		isSRGB,
+		dxgiFormat
 	};
 }
-function n(e, t, n, r, i) {
-	let a = Math.ceil(n / 4), o = Math.ceil(r / 4), s = t;
-	for (let t = 0; t < o; t++) for (let o = 0; o < a; o++) {
-		if (s + 8 > e.length) return;
-		let a = e[s] | e[s + 1] << 8, c = e[s + 2] | e[s + 3] << 8, l = e[s + 4] | e[s + 5] << 8 | e[s + 6] << 16 | e[s + 7] << 24;
-		s += 8;
-		let u = A(a, c, !0);
-		for (let e = 0; e < 4; e++) for (let a = 0; a < 4; a++) {
-			let s = o * 4 + a, c = t * 4 + e;
-			if (s < n && c < r) {
-				let t = l >> (e * 4 + a) * 2 & 3, r = (c * n + s) * 4, o = u[t];
-				i[r] = o[0], i[r + 1] = o[1], i[r + 2] = o[2], i[r + 3] = o[3];
+function decodeDXT1(src, offset, width, height, dest) {
+	const numBlocksWide = Math.ceil(width / 4);
+	const numBlocksHigh = Math.ceil(height / 4);
+	let srcPos = offset;
+	for (let by = 0; by < numBlocksHigh; by++) for (let bx = 0; bx < numBlocksWide; bx++) {
+		if (srcPos + 8 > src.length) return;
+		const c0 = src[srcPos] | src[srcPos + 1] << 8;
+		const c1 = src[srcPos + 2] | src[srcPos + 3] << 8;
+		const code = src[srcPos + 4] | src[srcPos + 5] << 8 | src[srcPos + 6] << 16 | src[srcPos + 7] << 24;
+		srcPos += 8;
+		const colors = unpackRGB565Table(c0, c1, true);
+		for (let y = 0; y < 4; y++) for (let x = 0; x < 4; x++) {
+			const px = bx * 4 + x;
+			const py = by * 4 + y;
+			if (px < width && py < height) {
+				const colorIdx = code >> (y * 4 + x) * 2 & 3;
+				const dIdx = (py * width + px) * 4;
+				const c = colors[colorIdx];
+				dest[dIdx] = c[0];
+				dest[dIdx + 1] = c[1];
+				dest[dIdx + 2] = c[2];
+				dest[dIdx + 3] = c[3];
 			}
 		}
 	}
 }
-function r(e, t, n, r, i) {
-	let a = Math.ceil(n / 4), o = Math.ceil(r / 4), s = t;
-	for (let t = 0; t < o; t++) for (let o = 0; o < a; o++) {
-		if (s + 16 > e.length) return;
-		let a = e.subarray(s, s + 8);
-		s += 8;
-		let c = e[s] | e[s + 1] << 8, l = e[s + 2] | e[s + 3] << 8, u = e[s + 4] | e[s + 5] << 8 | e[s + 6] << 16 | e[s + 7] << 24;
-		s += 8;
-		let d = A(c, l, !1);
-		for (let e = 0; e < 4; e++) for (let s = 0; s < 4; s++) {
-			let c = o * 4 + s, l = t * 4 + e;
-			if (c < n && l < r) {
-				let t = e * 2 + Math.floor(s / 2), r = s % 2 * 4, o = (a[t] >> r & 15) * 17, f = u >> (e * 4 + s) * 2 & 3, p = (l * n + c) * 4, m = d[f];
-				i[p] = m[0], i[p + 1] = m[1], i[p + 2] = m[2], i[p + 3] = o;
+function decodeDXT3(src, offset, width, height, dest) {
+	const numBlocksWide = Math.ceil(width / 4);
+	const numBlocksHigh = Math.ceil(height / 4);
+	let srcPos = offset;
+	for (let by = 0; by < numBlocksHigh; by++) for (let bx = 0; bx < numBlocksWide; bx++) {
+		if (srcPos + 16 > src.length) return;
+		const alphaTable = src.subarray(srcPos, srcPos + 8);
+		srcPos += 8;
+		const c0 = src[srcPos] | src[srcPos + 1] << 8;
+		const c1 = src[srcPos + 2] | src[srcPos + 3] << 8;
+		const code = src[srcPos + 4] | src[srcPos + 5] << 8 | src[srcPos + 6] << 16 | src[srcPos + 7] << 24;
+		srcPos += 8;
+		const colors = unpackRGB565Table(c0, c1, false);
+		for (let y = 0; y < 4; y++) for (let x = 0; x < 4; x++) {
+			const px = bx * 4 + x;
+			const py = by * 4 + y;
+			if (px < width && py < height) {
+				const aIdx = y * 2 + Math.floor(x / 2);
+				const aShift = x % 2 * 4;
+				const alpha = (alphaTable[aIdx] >> aShift & 15) * 17;
+				const colorIdx = code >> (y * 4 + x) * 2 & 3;
+				const dIdx = (py * width + px) * 4;
+				const c = colors[colorIdx];
+				dest[dIdx] = c[0];
+				dest[dIdx + 1] = c[1];
+				dest[dIdx + 2] = c[2];
+				dest[dIdx + 3] = alpha;
 			}
 		}
 	}
 }
-function i(e, t, n, r, i) {
-	let a = Math.ceil(n / 4), o = Math.ceil(r / 4), s = t;
-	for (let t = 0; t < o; t++) for (let o = 0; o < a; o++) {
-		if (s + 16 > e.length) return;
-		let a = e[s], c = e[s + 1], l = BigInt(e[s + 2]) | BigInt(e[s + 3]) << 8n | BigInt(e[s + 4]) << 16n | BigInt(e[s + 5]) << 24n | BigInt(e[s + 6]) << 32n | BigInt(e[s + 7]) << 40n;
-		s += 8;
-		let u = e[s] | e[s + 1] << 8, d = e[s + 2] | e[s + 3] << 8, f = e[s + 4] | e[s + 5] << 8 | e[s + 6] << 16 | e[s + 7] << 24;
-		s += 8;
-		let p = j(a, c), m = A(u, d, !1);
-		for (let e = 0; e < 4; e++) for (let a = 0; a < 4; a++) {
-			let s = o * 4 + a, c = t * 4 + e;
-			if (s < n && c < r) {
-				let t = BigInt((e * 4 + a) * 3), r = p[Number(l >> t & 7n)], o = f >> (e * 4 + a) * 2 & 3, u = (c * n + s) * 4, d = m[o];
-				i[u] = d[0], i[u + 1] = d[1], i[u + 2] = d[2], i[u + 3] = r;
+function decodeDXT5(src, offset, width, height, dest) {
+	const numBlocksWide = Math.ceil(width / 4);
+	const numBlocksHigh = Math.ceil(height / 4);
+	let srcPos = offset;
+	for (let by = 0; by < numBlocksHigh; by++) for (let bx = 0; bx < numBlocksWide; bx++) {
+		if (srcPos + 16 > src.length) return;
+		const a0 = src[srcPos];
+		const a1 = src[srcPos + 1];
+		const aBits = BigInt(src[srcPos + 2]) | BigInt(src[srcPos + 3]) << 8n | BigInt(src[srcPos + 4]) << 16n | BigInt(src[srcPos + 5]) << 24n | BigInt(src[srcPos + 6]) << 32n | BigInt(src[srcPos + 7]) << 40n;
+		srcPos += 8;
+		const c0 = src[srcPos] | src[srcPos + 1] << 8;
+		const c1 = src[srcPos + 2] | src[srcPos + 3] << 8;
+		const code = src[srcPos + 4] | src[srcPos + 5] << 8 | src[srcPos + 6] << 16 | src[srcPos + 7] << 24;
+		srcPos += 8;
+		const alphaTable = unpackAlphaTable(a0, a1);
+		const colors = unpackRGB565Table(c0, c1, false);
+		for (let y = 0; y < 4; y++) for (let x = 0; x < 4; x++) {
+			const px = bx * 4 + x;
+			const py = by * 4 + y;
+			if (px < width && py < height) {
+				const bitOffset = BigInt((y * 4 + x) * 3);
+				const alpha = alphaTable[Number(aBits >> bitOffset & 7n)];
+				const colorIdx = code >> (y * 4 + x) * 2 & 3;
+				const dIdx = (py * width + px) * 4;
+				const c = colors[colorIdx];
+				dest[dIdx] = c[0];
+				dest[dIdx + 1] = c[1];
+				dest[dIdx + 2] = c[2];
+				dest[dIdx + 3] = alpha;
 			}
 		}
 	}
 }
-function a(e, t, n, r, i) {
-	let a = Math.ceil(n / 4), o = Math.ceil(r / 4), s = t;
-	for (let t = 0; t < o; t++) for (let o = 0; o < a; o++) {
-		if (s + 8 > e.length) return;
-		let a = e[s], c = e[s + 1], l = BigInt(e[s + 2]) | BigInt(e[s + 3]) << 8n | BigInt(e[s + 4]) << 16n | BigInt(e[s + 5]) << 24n | BigInt(e[s + 6]) << 32n | BigInt(e[s + 7]) << 40n;
-		s += 8;
-		let u = j(a, c);
-		for (let e = 0; e < 4; e++) for (let a = 0; a < 4; a++) {
-			let s = o * 4 + a, c = t * 4 + e;
-			if (s < n && c < r) {
-				let t = BigInt((e * 4 + a) * 3), r = u[Number(l >> t & 7n)], o = (c * n + s) * 4;
-				i[o] = r, i[o + 1] = r, i[o + 2] = r, i[o + 3] = 255;
+function decodeBC4(src, offset, width, height, dest) {
+	const numBlocksWide = Math.ceil(width / 4);
+	const numBlocksHigh = Math.ceil(height / 4);
+	let srcPos = offset;
+	for (let by = 0; by < numBlocksHigh; by++) for (let bx = 0; bx < numBlocksWide; bx++) {
+		if (srcPos + 8 > src.length) return;
+		const r0 = src[srcPos];
+		const r1 = src[srcPos + 1];
+		const rBits = BigInt(src[srcPos + 2]) | BigInt(src[srcPos + 3]) << 8n | BigInt(src[srcPos + 4]) << 16n | BigInt(src[srcPos + 5]) << 24n | BigInt(src[srcPos + 6]) << 32n | BigInt(src[srcPos + 7]) << 40n;
+		srcPos += 8;
+		const rTable = unpackAlphaTable(r0, r1);
+		for (let y = 0; y < 4; y++) for (let x = 0; x < 4; x++) {
+			const px = bx * 4 + x;
+			const py = by * 4 + y;
+			if (px < width && py < height) {
+				const bitOffset = BigInt((y * 4 + x) * 3);
+				const val = rTable[Number(rBits >> bitOffset & 7n)];
+				const dIdx = (py * width + px) * 4;
+				dest[dIdx] = val;
+				dest[dIdx + 1] = val;
+				dest[dIdx + 2] = val;
+				dest[dIdx + 3] = 255;
 			}
 		}
 	}
 }
-function o(e, t, n, r, i) {
-	let a = Math.ceil(n / 4), o = Math.ceil(r / 4), s = t;
-	for (let t = 0; t < o; t++) for (let o = 0; o < a; o++) {
-		if (s + 16 > e.length) return;
-		let a = e[s], c = e[s + 1], l = BigInt(e[s + 2]) | BigInt(e[s + 3]) << 8n | BigInt(e[s + 4]) << 16n | BigInt(e[s + 5]) << 24n | BigInt(e[s + 6]) << 32n | BigInt(e[s + 7]) << 40n;
-		s += 8;
-		let u = e[s], d = e[s + 1], f = BigInt(e[s + 2]) | BigInt(e[s + 3]) << 8n | BigInt(e[s + 4]) << 16n | BigInt(e[s + 5]) << 24n | BigInt(e[s + 6]) << 32n | BigInt(e[s + 7]) << 40n;
-		s += 8;
-		let p = j(a, c), m = j(u, d);
-		for (let e = 0; e < 4; e++) for (let a = 0; a < 4; a++) {
-			let s = o * 4 + a, c = t * 4 + e;
-			if (s < n && c < r) {
-				let t = BigInt((e * 4 + a) * 3), r = p[Number(l >> t & 7n)], o = m[Number(f >> t & 7n)], u = r / 255 * 2 - 1, d = o / 255 * 2 - 1, h = Math.sqrt(Math.max(0, 1 - u * u - d * d)), g = Math.round((h + 1) / 2 * 255), _ = (c * n + s) * 4;
-				i[_] = r, i[_ + 1] = o, i[_ + 2] = g, i[_ + 3] = 255;
+function decodeBC5(src, offset, width, height, dest) {
+	const numBlocksWide = Math.ceil(width / 4);
+	const numBlocksHigh = Math.ceil(height / 4);
+	let srcPos = offset;
+	for (let by = 0; by < numBlocksHigh; by++) for (let bx = 0; bx < numBlocksWide; bx++) {
+		if (srcPos + 16 > src.length) return;
+		const r0 = src[srcPos];
+		const r1 = src[srcPos + 1];
+		const rBits = BigInt(src[srcPos + 2]) | BigInt(src[srcPos + 3]) << 8n | BigInt(src[srcPos + 4]) << 16n | BigInt(src[srcPos + 5]) << 24n | BigInt(src[srcPos + 6]) << 32n | BigInt(src[srcPos + 7]) << 40n;
+		srcPos += 8;
+		const g0 = src[srcPos];
+		const g1 = src[srcPos + 1];
+		const gBits = BigInt(src[srcPos + 2]) | BigInt(src[srcPos + 3]) << 8n | BigInt(src[srcPos + 4]) << 16n | BigInt(src[srcPos + 5]) << 24n | BigInt(src[srcPos + 6]) << 32n | BigInt(src[srcPos + 7]) << 40n;
+		srcPos += 8;
+		const rTable = unpackAlphaTable(r0, r1);
+		const gTable = unpackAlphaTable(g0, g1);
+		for (let y = 0; y < 4; y++) for (let x = 0; x < 4; x++) {
+			const px = bx * 4 + x;
+			const py = by * 4 + y;
+			if (px < width && py < height) {
+				const bitOffset = BigInt((y * 4 + x) * 3);
+				const rVal = rTable[Number(rBits >> bitOffset & 7n)];
+				const gVal = gTable[Number(gBits >> bitOffset & 7n)];
+				const nx = rVal / 255 * 2 - 1;
+				const ny = gVal / 255 * 2 - 1;
+				const nz = Math.sqrt(Math.max(0, 1 - nx * nx - ny * ny));
+				const bVal = Math.round((nz + 1) / 2 * 255);
+				const dIdx = (py * width + px) * 4;
+				dest[dIdx] = rVal;
+				dest[dIdx + 1] = gVal;
+				dest[dIdx + 2] = bVal;
+				dest[dIdx + 3] = 255;
 			}
 		}
 	}
 }
-var s = [
+var BC7_WEIGHTS2 = [
 	0,
 	21,
 	43,
 	64
-], c = [
+];
+var BC7_WEIGHTS3 = [
 	0,
 	9,
 	18,
@@ -180,7 +343,8 @@ var s = [
 	46,
 	55,
 	64
-], l = [
+];
+var BC7_WEIGHTS4 = [
 	0,
 	4,
 	9,
@@ -197,7 +361,8 @@ var s = [
 	55,
 	60,
 	64
-], u = new Uint8Array([
+];
+var BC7_PARTITION2 = new Uint8Array([
 	0,
 	0,
 	1,
@@ -1222,7 +1387,8 @@ var s = [
 	1,
 	1,
 	1
-]), d = new Uint8Array([
+]);
+var BC7_PARTITION3 = new Uint8Array([
 	0,
 	0,
 	1,
@@ -2247,7 +2413,8 @@ var s = [
 	2,
 	2,
 	0
-]), f = new Uint8Array([
+]);
+var BC7_ANCHOR2 = new Uint8Array([
 	15,
 	15,
 	15,
@@ -2312,7 +2479,8 @@ var s = [
 	2,
 	2,
 	15
-]), p = new Uint8Array([
+]);
+var BC7_ANCHOR3_1 = new Uint8Array([
 	3,
 	3,
 	15,
@@ -2377,7 +2545,8 @@ var s = [
 	12,
 	3,
 	3
-]), m = new Uint8Array([
+]);
+var BC7_ANCHOR3_2 = new Uint8Array([
 	15,
 	8,
 	8,
@@ -2443,91 +2612,123 @@ var s = [
 	15,
 	8
 ]);
-function h(e) {
-	if (e === 0) return 8;
-	for (let t = 0; t < 8; t++) if (e & 1 << t) return t;
+function getBC7Mode(firstByte) {
+	if (firstByte === 0) return 8;
+	for (let m = 0; m < 8; m++) if ((firstByte & 1 << m) !== 0) return m;
 	return 8;
 }
-function g(e, t, n) {
-	let r = (1n << BigInt(t * (n + 1) - 1)) - 1n;
-	return (e & ~r) << 1n | e & r;
+function insertWeightZero(indexBits, bitsPerIndex, offset) {
+	const lowBitMask = (1n << BigInt(bitsPerIndex * (offset + 1) - 1)) - 1n;
+	return (indexBits & ~lowBitMask) << 1n | indexBits & lowBitMask;
 }
-function _(e, t, n) {
-	let r = n + 1, i = (e << 1 | t) & 255;
-	return i = i << 8 - r & 255, i |= i >> r, i & 255;
+function bc7DequantWithPBit(val, pbit, valBits) {
+	const totalBits = valBits + 1;
+	let v = (val << 1 | pbit) & 255;
+	v = v << 8 - totalBits & 255;
+	v |= v >> totalBits;
+	return v & 255;
 }
-function v(e, t) {
-	if (t >= 8) return e & 255;
-	let n = e << 8 - t & 255;
-	return n |= n >> t, n & 255;
+function bc7DequantNoPBit(val, valBits) {
+	if (valBits >= 8) return val & 255;
+	let v = val << 8 - valBits & 255;
+	v |= v >> valBits;
+	return v & 255;
 }
-function y(e, t, n, r) {
-	let i = r[n];
-	return e * (64 - i) + t * i + 32 >> 6;
+function bc7Interp(l, h, w, weights) {
+	const weight = weights[w];
+	return l * (64 - weight) + h * weight + 32 >> 6;
 }
-function b(e, t) {
-	let n = BigInt(e[t] | e[t + 1] << 8 | e[t + 2] << 16 | e[t + 3] << 24 >>> 0);
-	return BigInt(e[t + 4] | e[t + 5] << 8 | e[t + 6] << 16 | e[t + 7] << 24 >>> 0) << 32n | n & 4294967295n;
+function readUint64LE(bytes, offset) {
+	const b0 = BigInt(bytes[offset] | bytes[offset + 1] << 8 | bytes[offset + 2] << 16 | bytes[offset + 3] << 24 >>> 0);
+	return BigInt(bytes[offset + 4] | bytes[offset + 5] << 8 | bytes[offset + 6] << 16 | bytes[offset + 7] << 24 >>> 0) << 32n | b0 & 4294967295n;
 }
-function x(e, t, n, r, i) {
-	let a = Math.ceil(n / 4), o = Math.ceil(r / 4), s = t, c = /* @__PURE__ */ new Uint8Array(64);
-	for (let t = 0; t < o; t++) for (let o = 0; o < a; o++) {
-		if (s + 16 > e.length) return;
-		S(e, s, c), s += 16;
-		for (let e = 0; e < 4; e++) for (let a = 0; a < 4; a++) {
-			let s = o * 4 + a, l = t * 4 + e;
-			if (s < n && l < r) {
-				let t = (e * 4 + a) * 4, r = (l * n + s) * 4;
-				i[r] = c[t], i[r + 1] = c[t + 1], i[r + 2] = c[t + 2], i[r + 3] = c[t + 3];
+function decodeBC7(src, offset, width, height, dest) {
+	const numBlocksWide = Math.ceil(width / 4);
+	const numBlocksHigh = Math.ceil(height / 4);
+	let srcPos = offset;
+	const blockPixels = /* @__PURE__ */ new Uint8Array(64);
+	for (let by = 0; by < numBlocksHigh; by++) for (let bx = 0; bx < numBlocksWide; bx++) {
+		if (srcPos + 16 > src.length) return;
+		decodeBC7Block(src, srcPos, blockPixels);
+		srcPos += 16;
+		for (let y = 0; y < 4; y++) for (let x = 0; x < 4; x++) {
+			const px = bx * 4 + x;
+			const py = by * 4 + y;
+			if (px < width && py < height) {
+				const sIdx = (y * 4 + x) * 4;
+				const dIdx = (py * width + px) * 4;
+				dest[dIdx] = blockPixels[sIdx];
+				dest[dIdx + 1] = blockPixels[sIdx + 1];
+				dest[dIdx + 2] = blockPixels[sIdx + 2];
+				dest[dIdx + 3] = blockPixels[sIdx + 3];
 			}
 		}
 	}
 }
-function S(e, t, n) {
-	let r = h(e[t]);
-	if (r > 7) {
-		n.fill(0);
+function decodeBC7Block(src, offset, outPixels) {
+	const mode = getBC7Mode(src[offset]);
+	if (mode > 7) {
+		outPixels.fill(0);
 		return;
 	}
-	let i = b(e, t), a = b(e, t + 8);
-	switch (r) {
+	const lowChunk = readUint64LE(src, offset);
+	const highChunk = readUint64LE(src, offset + 8);
+	switch (mode) {
 		case 0:
 		case 2:
-			C(r, i, a, n);
+			unpackBC7Mode0_2(mode, lowChunk, highChunk, outPixels);
 			break;
 		case 1:
 		case 3:
 		case 7:
-			w(r, i, a, n);
+			unpackBC7Mode1_3_7(mode, lowChunk, highChunk, outPixels);
 			break;
 		case 4:
 		case 5:
-			T(r, i, a, n);
+			unpackBC7Mode4_5(mode, lowChunk, highChunk, outPixels);
 			break;
 		case 6:
-			E(i, a, n);
+			unpackBC7Mode6(lowChunk, highChunk, outPixels);
 			break;
-		default: n.fill(0);
+		default: outPixels.fill(0);
 	}
 }
-function C(e, t, n, r) {
-	let i = e === 0 ? 3 : 2, a = (1 << i) - 1, o = e === 0 ? 4 : 5, l = (1 << o) - 1, u = e === 0 ? 6 : 0, f = (1 << (e === 0 ? 4 : 6)) - 1, h = Number(t >> BigInt(e + 1) & BigInt(f)), b = [
+function unpackBC7Mode0_2(mode, lowChunk, highChunk, outPixels) {
+	const weightBits = mode === 0 ? 3 : 2;
+	const weightMask = (1 << weightBits) - 1;
+	const endpointBits = mode === 0 ? 4 : 5;
+	const endpointMask = (1 << endpointBits) - 1;
+	const pBits = mode === 0 ? 6 : 0;
+	const partMask = (1 << (mode === 0 ? 4 : 6)) - 1;
+	const part = Number(lowChunk >> BigInt(mode + 1) & BigInt(partMask));
+	const channelReadChunks = [
 		0n,
 		0n,
 		0n
 	];
-	e === 0 ? (b[0] = t >> 5n, b[1] = t >> 29n, b[2] = t >> 53n | n << 11n) : (b[0] = t >> 9n, b[1] = t >> 39n | n << 25n, b[2] = n >> 5n);
-	let x = Array.from({ length: 6 }, () => [
+	if (mode === 0) {
+		channelReadChunks[0] = lowChunk >> 5n;
+		channelReadChunks[1] = lowChunk >> 29n;
+		channelReadChunks[2] = lowChunk >> 53n | highChunk << 11n;
+	} else {
+		channelReadChunks[0] = lowChunk >> 9n;
+		channelReadChunks[1] = lowChunk >> 39n | highChunk << 25n;
+		channelReadChunks[2] = highChunk >> 5n;
+	}
+	const endpoints = Array.from({ length: 6 }, () => [
 		0,
 		0,
 		0,
 		255
 	]);
-	for (let e = 0; e < 3; e++) {
-		let t = b[e];
-		for (let n = 0; n < 6; n++) x[n][e] = Number(t & BigInt(l)), t >>= BigInt(o);
+	for (let c = 0; c < 3; c++) {
+		let chunk = channelReadChunks[c];
+		for (let e = 0; e < 6; e++) {
+			endpoints[e][c] = Number(chunk & BigInt(endpointMask));
+			chunk >>= BigInt(endpointBits);
+		}
 	}
-	let S = [
+	const pbits = [
 		0,
 		0,
 		0,
@@ -2535,74 +2736,137 @@ function C(e, t, n, r) {
 		0,
 		0
 	];
-	if (e === 0) {
-		let e = Number(n >> 13n & 63n);
-		for (let t = 0; t < u; t++) S[t] = e >> t & 1;
+	if (mode === 0) {
+		const pBitsChunk = Number(highChunk >> 13n & 63n);
+		for (let p = 0; p < pBits; p++) pbits[p] = pBitsChunk >> p & 1;
 	}
-	let C = n >> BigInt(67 - 16 * i), w = Math.min(p[h], m[h]), T = Math.max(p[h], m[h]);
-	C = g(C, i, 0), C = g(C, i, w), C = g(C, i, T);
-	let E = Array(16);
-	for (let e = 0; e < 16; e++) E[e] = Number(C & BigInt(a)), C >>= BigInt(i);
-	for (let e = 0; e < 6; e++) for (let t = 0; t < 3; t++) x[e][t] = u ? _(x[e][t], S[e], o) : v(x[e][t], o);
-	let D = i === 2 ? s : c, O = 1 << i, k = Array.from({ length: 3 }, () => Array.from({ length: O }, () => [
+	let weightsReadChunk = highChunk >> BigInt(67 - 16 * weightBits);
+	const anchor1 = Math.min(BC7_ANCHOR3_1[part], BC7_ANCHOR3_2[part]);
+	const anchor2 = Math.max(BC7_ANCHOR3_1[part], BC7_ANCHOR3_2[part]);
+	weightsReadChunk = insertWeightZero(weightsReadChunk, weightBits, 0);
+	weightsReadChunk = insertWeightZero(weightsReadChunk, weightBits, anchor1);
+	weightsReadChunk = insertWeightZero(weightsReadChunk, weightBits, anchor2);
+	const weights = new Array(16);
+	for (let i = 0; i < 16; i++) {
+		weights[i] = Number(weightsReadChunk & BigInt(weightMask));
+		weightsReadChunk >>= BigInt(weightBits);
+	}
+	for (let e = 0; e < 6; e++) for (let c = 0; c < 3; c++) endpoints[e][c] = pBits ? bc7DequantWithPBit(endpoints[e][c], pbits[e], endpointBits) : bc7DequantNoPBit(endpoints[e][c], endpointBits);
+	const weightsTable = weightBits === 2 ? BC7_WEIGHTS2 : BC7_WEIGHTS3;
+	const numWeights = 1 << weightBits;
+	const blockColors = Array.from({ length: 3 }, () => Array.from({ length: numWeights }, () => [
 		0,
 		0,
 		0,
 		255
 	]));
-	for (let e = 0; e < 3; e++) for (let t = 0; t < O; t++) for (let n = 0; n < 3; n++) k[e][t][n] = y(x[e * 2][n], x[e * 2 + 1][n], t, D);
-	for (let e = 0; e < 16; e++) {
-		let t = k[d[h * 16 + e]][E[e]], n = e * 4;
-		r[n] = t[0], r[n + 1] = t[1], r[n + 2] = t[2], r[n + 3] = 255;
+	for (let s = 0; s < 3; s++) for (let i = 0; i < numWeights; i++) for (let c = 0; c < 3; c++) blockColors[s][i][c] = bc7Interp(endpoints[s * 2][c], endpoints[s * 2 + 1][c], i, weightsTable);
+	for (let i = 0; i < 16; i++) {
+		const color = blockColors[BC7_PARTITION3[part * 16 + i]][weights[i]];
+		const dIdx = i * 4;
+		outPixels[dIdx] = color[0];
+		outPixels[dIdx + 1] = color[1];
+		outPixels[dIdx + 2] = color[2];
+		outPixels[dIdx + 3] = 255;
 	}
 }
-function w(e, t, n, r) {
-	let i = e === 7 ? 4 : 3, a = e === 1 ? 3 : 2, o = (1 << a) - 1, l = e === 7 ? 5 : e === 1 ? 6 : 7, d = (1 << l) - 1, p = e === 1 ? 2 : 4, m = e === 1, h = Number(t >> BigInt(e + 1) & 63n), v = Array.from({ length: 4 }, () => [
+function unpackBC7Mode1_3_7(mode, lowChunk, highChunk, outPixels) {
+	const comps = mode === 7 ? 4 : 3;
+	const weightBits = mode === 1 ? 3 : 2;
+	const weightMask = (1 << weightBits) - 1;
+	const endpointBits = mode === 7 ? 5 : mode === 1 ? 6 : 7;
+	const endpointMask = (1 << endpointBits) - 1;
+	const pBits = mode === 1 ? 2 : 4;
+	const sharedPBits = mode === 1;
+	const part = Number(lowChunk >> BigInt(mode + 1) & 63n);
+	const endpoints = Array.from({ length: 4 }, () => [
 		0,
 		0,
 		0,
 		255
-	]), b = [
+	]);
+	const channelReadChunks = [
 		0n,
 		0n,
 		0n,
 		0n
 	];
-	b[0] = t >> BigInt(e + 7);
-	let x = 0n, S = 0n;
-	e === 1 ? (b[1] = t >> 32n, b[2] = t >> 56n | n << 8n, x = n >> 16n, S = n >> 18n) : e === 3 ? (b[1] = t >> 38n | n << 26n, b[2] = n >> 2n, x = n >> 30n, S = n >> 34n) : (b[1] = t >> 34n, b[2] = t >> 54n | n << 10n, b[3] = n >> 10n, x = n >> 30n, S = n >> 34n);
-	for (let e = 0; e < i; e++) {
-		let t = b[e];
-		for (let n = 0; n < 4; n++) v[n][e] = Number(t & BigInt(d)), t >>= BigInt(l);
+	channelReadChunks[0] = lowChunk >> BigInt(mode + 7);
+	let pReadChunk = 0n;
+	let weightReadChunk = 0n;
+	if (mode === 1) {
+		channelReadChunks[1] = lowChunk >> 32n;
+		channelReadChunks[2] = lowChunk >> 56n | highChunk << 8n;
+		pReadChunk = highChunk >> 16n;
+		weightReadChunk = highChunk >> 18n;
+	} else if (mode === 3) {
+		channelReadChunks[1] = lowChunk >> 38n | highChunk << 26n;
+		channelReadChunks[2] = highChunk >> 2n;
+		pReadChunk = highChunk >> 30n;
+		weightReadChunk = highChunk >> 34n;
+	} else {
+		channelReadChunks[1] = lowChunk >> 34n;
+		channelReadChunks[2] = lowChunk >> 54n | highChunk << 10n;
+		channelReadChunks[3] = highChunk >> 10n;
+		pReadChunk = highChunk >> 30n;
+		weightReadChunk = highChunk >> 34n;
 	}
-	let C = [
+	for (let c = 0; c < comps; c++) {
+		let chunk = channelReadChunks[c];
+		for (let e = 0; e < 4; e++) {
+			endpoints[e][c] = Number(chunk & BigInt(endpointMask));
+			chunk >>= BigInt(endpointBits);
+		}
+	}
+	const pbits = [
 		0,
 		0,
 		0,
 		0
 	];
-	for (let e = 0; e < p; e++) C[e] = Number(x >> BigInt(e) & 1n);
-	S = g(S, a, 0), S = g(S, a, f[h]);
-	let w = Array(16);
-	for (let e = 0; e < 16; e++) w[e] = Number(S & BigInt(o)), S >>= BigInt(a);
-	for (let e = 0; e < 4; e++) {
-		let t = C[m ? e >> 1 : e];
-		for (let n = 0; n < i; n++) v[e][n] = _(v[e][n], t, l);
+	for (let p = 0; p < pBits; p++) pbits[p] = Number(pReadChunk >> BigInt(p) & 1n);
+	weightReadChunk = insertWeightZero(weightReadChunk, weightBits, 0);
+	weightReadChunk = insertWeightZero(weightReadChunk, weightBits, BC7_ANCHOR2[part]);
+	const weights = new Array(16);
+	for (let i = 0; i < 16; i++) {
+		weights[i] = Number(weightReadChunk & BigInt(weightMask));
+		weightReadChunk >>= BigInt(weightBits);
 	}
-	let T = a === 2 ? s : c, E = 1 << a, D = Array.from({ length: 2 }, () => Array.from({ length: E }, () => [
+	for (let e = 0; e < 4; e++) {
+		const pbit = pbits[sharedPBits ? e >> 1 : e];
+		for (let c = 0; c < comps; c++) endpoints[e][c] = bc7DequantWithPBit(endpoints[e][c], pbit, endpointBits);
+	}
+	const weightsTable = weightBits === 2 ? BC7_WEIGHTS2 : BC7_WEIGHTS3;
+	const numWeights = 1 << weightBits;
+	const blockColors = Array.from({ length: 2 }, () => Array.from({ length: numWeights }, () => [
 		0,
 		0,
 		0,
 		255
 	]));
-	for (let e = 0; e < 2; e++) for (let t = 0; t < E; t++) for (let n = 0; n < i; n++) D[e][t][n] = y(v[e * 2][n], v[e * 2 + 1][n], t, T);
-	for (let e = 0; e < 16; e++) {
-		let t = D[u[h * 16 + e]][w[e]], n = e * 4;
-		r[n] = t[0], r[n + 1] = t[1], r[n + 2] = t[2], r[n + 3] = i === 4 ? t[3] : 255;
+	for (let s = 0; s < 2; s++) for (let i = 0; i < numWeights; i++) for (let c = 0; c < comps; c++) blockColors[s][i][c] = bc7Interp(endpoints[s * 2][c], endpoints[s * 2 + 1][c], i, weightsTable);
+	for (let i = 0; i < 16; i++) {
+		const color = blockColors[BC7_PARTITION2[part * 16 + i]][weights[i]];
+		const dIdx = i * 4;
+		outPixels[dIdx] = color[0];
+		outPixels[dIdx + 1] = color[1];
+		outPixels[dIdx + 2] = color[2];
+		outPixels[dIdx + 3] = comps === 4 ? color[3] : 255;
 	}
 }
-function T(e, t, n, r) {
-	let i = e === 4 ? 3 : 2, a = (1 << i) - 1, o = e === 4 ? 5 : 7, l = (1 << o) - 1, u = e === 4 ? 6 : 8, d = (1 << u) - 1, f = Number(t >> BigInt(e + 1) & 3n), p = e === 4 ? Number(t >> 7n & 1n) : 0, m = t >> 8n, h = [[
+function unpackBC7Mode4_5(mode, lowChunk, highChunk, outPixels) {
+	const weightBits = 2;
+	const weightMask = 3;
+	const aWeightBits = mode === 4 ? 3 : 2;
+	const aWeightMask = (1 << aWeightBits) - 1;
+	const endpointBits = mode === 4 ? 5 : 7;
+	const endpointMask = (1 << endpointBits) - 1;
+	const aEndpointBits = mode === 4 ? 6 : 8;
+	const aEndpointMask = (1 << aEndpointBits) - 1;
+	const compRot = Number(lowChunk >> BigInt(mode + 1) & 3n);
+	const indexMode = mode === 4 ? Number(lowChunk >> 7n & 1n) : 0;
+	let colorReadBits = lowChunk >> 8n;
+	const endpoints = [[
 		0,
 		0,
 		0,
@@ -2613,103 +2877,194 @@ function T(e, t, n, r) {
 		0,
 		0
 	]];
-	for (let e = 0; e < 3; e++) for (let t = 0; t < 2; t++) h[t][e] = Number(m & BigInt(l)), m >>= BigInt(o);
-	let _ = 0n, b = 0n;
-	e === 4 ? (h[0][3] = Number(m & BigInt(d)), h[1][3] = Number(m >> BigInt(u) & BigInt(d)), _ = t >> 50n | n << 14n, b = n >> 17n) : (h[0][3] = Number(m & BigInt(d)), h[1][3] = Number((t >> 58n | n << 6n) & BigInt(d)), _ = n >> 2n, b = n >> 33n), _ = g(_, 2, 0), b = g(b, i, 0);
-	let x = [p ? i : 2, p ? 2 : i], S = [p ? a : 3, p ? 3 : a];
-	if (p) {
-		let e = _;
-		_ = b, b = e;
+	for (let c = 0; c < 3; c++) for (let e = 0; e < 2; e++) {
+		endpoints[e][c] = Number(colorReadBits & BigInt(endpointMask));
+		colorReadBits >>= BigInt(endpointBits);
 	}
-	let C = Array(16), w = Array(16);
-	for (let e = 0; e < 16; e++) C[e] = Number(_ & BigInt(S[0])), _ >>= BigInt(x[0]);
-	for (let e = 0; e < 16; e++) w[e] = Number(b & BigInt(S[1])), b >>= BigInt(x[1]);
+	let rgbWeightsChunk = 0n;
+	let aWeightsChunk = 0n;
+	if (mode === 4) {
+		endpoints[0][3] = Number(colorReadBits & BigInt(aEndpointMask));
+		endpoints[1][3] = Number(colorReadBits >> BigInt(aEndpointBits) & BigInt(aEndpointMask));
+		rgbWeightsChunk = lowChunk >> 50n | highChunk << 14n;
+		aWeightsChunk = highChunk >> 17n;
+	} else {
+		endpoints[0][3] = Number(colorReadBits & BigInt(aEndpointMask));
+		endpoints[1][3] = Number((lowChunk >> 58n | highChunk << 6n) & BigInt(aEndpointMask));
+		rgbWeightsChunk = highChunk >> 2n;
+		aWeightsChunk = highChunk >> 33n;
+	}
+	rgbWeightsChunk = insertWeightZero(rgbWeightsChunk, weightBits, 0);
+	aWeightsChunk = insertWeightZero(aWeightsChunk, aWeightBits, 0);
+	const effWeightBits = [indexMode ? aWeightBits : weightBits, indexMode ? weightBits : aWeightBits];
+	const effWeightMask = [indexMode ? aWeightMask : weightMask, indexMode ? weightMask : aWeightMask];
+	if (indexMode) {
+		const tmp = rgbWeightsChunk;
+		rgbWeightsChunk = aWeightsChunk;
+		aWeightsChunk = tmp;
+	}
+	const weights = new Array(16);
+	const aWeights = new Array(16);
+	for (let i = 0; i < 16; i++) {
+		weights[i] = Number(rgbWeightsChunk & BigInt(effWeightMask[0]));
+		rgbWeightsChunk >>= BigInt(effWeightBits[0]);
+	}
+	for (let i = 0; i < 16; i++) {
+		aWeights[i] = Number(aWeightsChunk & BigInt(effWeightMask[1]));
+		aWeightsChunk >>= BigInt(effWeightBits[1]);
+	}
 	for (let e = 0; e < 2; e++) {
-		for (let t = 0; t < 3; t++) h[e][t] = v(h[e][t], o);
-		h[e][3] = v(h[e][3], u);
+		for (let c = 0; c < 3; c++) endpoints[e][c] = bc7DequantNoPBit(endpoints[e][c], endpointBits);
+		endpoints[e][3] = bc7DequantNoPBit(endpoints[e][3], aEndpointBits);
 	}
-	let T = x[0] === 3 ? c : s, E = x[1] === 3 ? c : s, D = 1 << x[0], O = 1 << x[1], k = Array.from({ length: D }, () => [
+	const rgbTable = effWeightBits[0] === 3 ? BC7_WEIGHTS3 : BC7_WEIGHTS2;
+	const aTable = effWeightBits[1] === 3 ? BC7_WEIGHTS3 : BC7_WEIGHTS2;
+	const numRgbWeights = 1 << effWeightBits[0];
+	const numAWeights = 1 << effWeightBits[1];
+	const blockColorsRgb = Array.from({ length: numRgbWeights }, () => [
 		0,
 		0,
 		0
 	]);
-	for (let e = 0; e < D; e++) for (let t = 0; t < 3; t++) k[e][t] = y(h[0][t], h[1][t], e, T);
-	let A = Array(O);
-	for (let e = 0; e < O; e++) A[e] = y(h[0][3], h[1][3], e, E);
-	for (let e = 0; e < 16; e++) {
-		let t = k[C[e]], n = t[0], i = t[1], a = t[2], o = A[w[e]];
-		if (f === 1) {
-			let e = o;
-			o = n, n = e;
-		} else if (f === 2) {
-			let e = o;
-			o = i, i = e;
-		} else if (f === 3) {
-			let e = o;
-			o = a, a = e;
+	for (let i = 0; i < numRgbWeights; i++) for (let c = 0; c < 3; c++) blockColorsRgb[i][c] = bc7Interp(endpoints[0][c], endpoints[1][c], i, rgbTable);
+	const blockColorsA = new Array(numAWeights);
+	for (let i = 0; i < numAWeights; i++) blockColorsA[i] = bc7Interp(endpoints[0][3], endpoints[1][3], i, aTable);
+	for (let i = 0; i < 16; i++) {
+		const rgb = blockColorsRgb[weights[i]];
+		let r = rgb[0];
+		let g = rgb[1];
+		let b = rgb[2];
+		let a = blockColorsA[aWeights[i]];
+		if (compRot === 1) {
+			const tmp = a;
+			a = r;
+			r = tmp;
+		} else if (compRot === 2) {
+			const tmp = a;
+			a = g;
+			g = tmp;
+		} else if (compRot === 3) {
+			const tmp = a;
+			a = b;
+			b = tmp;
 		}
-		let s = e * 4;
-		r[s] = n, r[s + 1] = i, r[s + 2] = a, r[s + 3] = o;
+		const dIdx = i * 4;
+		outPixels[dIdx] = r;
+		outPixels[dIdx + 1] = g;
+		outPixels[dIdx + 2] = b;
+		outPixels[dIdx + 3] = a;
 	}
 }
-function E(e, t, n) {
-	let r = Number(e >> 7n & 127n), i = Number(e >> 14n & 127n), a = Number(e >> 21n & 127n), o = Number(e >> 28n & 127n), s = Number(e >> 35n & 127n), c = Number(e >> 42n & 127n), u = Number(e >> 49n & 127n), d = Number(e >> 56n & 127n), f = Number(e >> 63n & 1n), p = Number(t & 1n), m = [
-		r << 1 | f,
-		a << 1 | f,
-		s << 1 | f,
-		u << 1 | f
-	], h = [
-		i << 1 | p,
-		o << 1 | p,
-		c << 1 | p,
-		d << 1 | p
-	], g = Array.from({ length: 16 }, () => [
+function unpackBC7Mode6(lowChunk, highChunk, outPixels) {
+	const r0 = Number(lowChunk >> 7n & 127n);
+	const r1 = Number(lowChunk >> 14n & 127n);
+	const g0 = Number(lowChunk >> 21n & 127n);
+	const g1 = Number(lowChunk >> 28n & 127n);
+	const b0 = Number(lowChunk >> 35n & 127n);
+	const b1 = Number(lowChunk >> 42n & 127n);
+	const a0 = Number(lowChunk >> 49n & 127n);
+	const a1 = Number(lowChunk >> 56n & 127n);
+	const p0 = Number(lowChunk >> 63n & 1n);
+	const p1 = Number(highChunk & 1n);
+	const ep0 = [
+		r0 << 1 | p0,
+		g0 << 1 | p0,
+		b0 << 1 | p0,
+		a0 << 1 | p0
+	];
+	const ep1 = [
+		r1 << 1 | p1,
+		g1 << 1 | p1,
+		b1 << 1 | p1,
+		a1 << 1 | p1
+	];
+	const tableColors = Array.from({ length: 16 }, () => [
 		0,
 		0,
 		0,
 		0
 	]);
-	for (let e = 0; e < 16; e++) {
-		let t = l[e], n = 64 - t;
-		g[e][0] = m[0] * n + h[0] * t + 32 >> 6, g[e][1] = m[1] * n + h[1] * t + 32 >> 6, g[e][2] = m[2] * n + h[2] * t + 32 >> 6, g[e][3] = m[3] * n + h[3] * t + 32 >> 6;
+	for (let i = 0; i < 16; i++) {
+		const w = BC7_WEIGHTS4[i];
+		const iw = 64 - w;
+		tableColors[i][0] = ep0[0] * iw + ep1[0] * w + 32 >> 6;
+		tableColors[i][1] = ep0[1] * iw + ep1[1] * w + 32 >> 6;
+		tableColors[i][2] = ep0[2] * iw + ep1[2] * w + 32 >> 6;
+		tableColors[i][3] = ep0[3] * iw + ep1[3] * w + 32 >> 6;
 	}
-	let _ = g[Number(t >> 1n & 7n)];
-	n[0] = _[0], n[1] = _[1], n[2] = _[2], n[3] = _[3];
-	for (let e = 1; e < 16; e++) {
-		let r = BigInt(4 + (e - 1) * 4), i = g[Number(t >> r & 15n)], a = e * 4;
-		n[a] = i[0], n[a + 1] = i[1], n[a + 2] = i[2], n[a + 3] = i[3];
-	}
-}
-function D(e, t, n, r, i) {
-	let a = t, o = 0, s = n * r;
-	for (let t = 0; t < s && a + 4 <= e.length; t++) i[o++] = e[a++], i[o++] = e[a++], i[o++] = e[a++], i[o++] = e[a++];
-}
-function O(e, t, n, r, i) {
-	let a = t, o = 0, s = n * r;
-	for (let t = 0; t < s && a + 4 <= e.length; t++) {
-		let t = e[a++], n = e[a++], r = e[a++], s = e[a++];
-		i[o++] = r, i[o++] = n, i[o++] = t, i[o++] = s;
-	}
-}
-function k(e, t, n, r, i) {
-	let a = t, o = 0, s = n * r;
-	for (let t = 0; t < s && a + 3 <= e.length; t++) {
-		let t = e[a++], n = e[a++], r = e[a++];
-		i[o++] = r, i[o++] = n, i[o++] = t, i[o++] = 255;
+	const c0 = tableColors[Number(highChunk >> 1n & 7n)];
+	outPixels[0] = c0[0];
+	outPixels[1] = c0[1];
+	outPixels[2] = c0[2];
+	outPixels[3] = c0[3];
+	for (let i = 1; i < 16; i++) {
+		const shift = BigInt(4 + (i - 1) * 4);
+		const ci = tableColors[Number(highChunk >> shift & 15n)];
+		const dIdx = i * 4;
+		outPixels[dIdx] = ci[0];
+		outPixels[dIdx + 1] = ci[1];
+		outPixels[dIdx + 2] = ci[2];
+		outPixels[dIdx + 3] = ci[3];
 	}
 }
-function A(e, t, n) {
-	let r = Math.round((e >> 11 & 31) * 255 / 31), i = Math.round((e >> 5 & 63) * 255 / 63), a = Math.round((e & 31) * 255 / 31), o = Math.round((t >> 11 & 31) * 255 / 31), s = Math.round((t >> 5 & 63) * 255 / 63), c = Math.round((t & 31) * 255 / 31), l = [
+function decodeRGBA32(src, offset, width, height, dest) {
+	let s = offset;
+	let d = 0;
+	const total = width * height;
+	for (let i = 0; i < total && s + 4 <= src.length; i++) {
+		dest[d++] = src[s++];
+		dest[d++] = src[s++];
+		dest[d++] = src[s++];
+		dest[d++] = src[s++];
+	}
+}
+function decodeBGRA32(src, offset, width, height, dest) {
+	let s = offset;
+	let d = 0;
+	const total = width * height;
+	for (let i = 0; i < total && s + 4 <= src.length; i++) {
+		const b = src[s++];
+		const g = src[s++];
+		const r = src[s++];
+		const a = src[s++];
+		dest[d++] = r;
+		dest[d++] = g;
+		dest[d++] = b;
+		dest[d++] = a;
+	}
+}
+function decodeBGR24(src, offset, width, height, dest) {
+	let s = offset;
+	let d = 0;
+	const total = width * height;
+	for (let i = 0; i < total && s + 3 <= src.length; i++) {
+		const b = src[s++];
+		const g = src[s++];
+		const r = src[s++];
+		dest[d++] = r;
+		dest[d++] = g;
+		dest[d++] = b;
+		dest[d++] = 255;
+	}
+}
+function unpackRGB565Table(c0, c1, isDxt1) {
+	const r0 = Math.round((c0 >> 11 & 31) * 255 / 31);
+	const g0 = Math.round((c0 >> 5 & 63) * 255 / 63);
+	const b0 = Math.round((c0 & 31) * 255 / 31);
+	const r1 = Math.round((c1 >> 11 & 31) * 255 / 31);
+	const g1 = Math.round((c1 >> 5 & 63) * 255 / 63);
+	const b1 = Math.round((c1 & 31) * 255 / 31);
+	const table = [
 		[
-			r,
-			i,
-			a,
+			r0,
+			g0,
+			b0,
 			255
 		],
 		[
-			o,
-			s,
-			c,
+			r1,
+			g1,
+			b1,
 			255
 		],
 		[
@@ -2725,49 +3080,81 @@ function A(e, t, n) {
 			255
 		]
 	];
-	return !n || e > t ? (l[2] = [
-		Math.round((2 * r + o) / 3),
-		Math.round((2 * i + s) / 3),
-		Math.round((2 * a + c) / 3),
-		255
-	], l[3] = [
-		Math.round((r + 2 * o) / 3),
-		Math.round((i + 2 * s) / 3),
-		Math.round((a + 2 * c) / 3),
-		255
-	]) : (l[2] = [
-		Math.round((r + o) / 2),
-		Math.round((i + s) / 2),
-		Math.round((a + c) / 2),
-		255
-	], l[3] = [
-		0,
-		0,
-		0,
-		0
-	]), l;
+	if (!isDxt1 || c0 > c1) {
+		table[2] = [
+			Math.round((2 * r0 + r1) / 3),
+			Math.round((2 * g0 + g1) / 3),
+			Math.round((2 * b0 + b1) / 3),
+			255
+		];
+		table[3] = [
+			Math.round((r0 + 2 * r1) / 3),
+			Math.round((g0 + 2 * g1) / 3),
+			Math.round((b0 + 2 * b1) / 3),
+			255
+		];
+	} else {
+		table[2] = [
+			Math.round((r0 + r1) / 2),
+			Math.round((g0 + g1) / 2),
+			Math.round((b0 + b1) / 2),
+			255
+		];
+		table[3] = [
+			0,
+			0,
+			0,
+			0
+		];
+	}
+	return table;
 }
-function j(e, t) {
-	let n = Array(8);
-	return n[0] = e, n[1] = t, e > t ? (n[2] = Math.round((6 * e + 1 * t) / 7), n[3] = Math.round((5 * e + 2 * t) / 7), n[4] = Math.round((4 * e + 3 * t) / 7), n[5] = Math.round((3 * e + 4 * t) / 7), n[6] = Math.round((2 * e + 5 * t) / 7), n[7] = Math.round((1 * e + 6 * t) / 7)) : (n[2] = Math.round((4 * e + 1 * t) / 5), n[3] = Math.round((3 * e + 2 * t) / 5), n[4] = Math.round((2 * e + 3 * t) / 5), n[5] = Math.round((1 * e + 4 * t) / 5), n[6] = 0, n[7] = 255), n;
+function unpackAlphaTable(a0, a1) {
+	const table = new Array(8);
+	table[0] = a0;
+	table[1] = a1;
+	if (a0 > a1) {
+		table[2] = Math.round((6 * a0 + 1 * a1) / 7);
+		table[3] = Math.round((5 * a0 + 2 * a1) / 7);
+		table[4] = Math.round((4 * a0 + 3 * a1) / 7);
+		table[5] = Math.round((3 * a0 + 4 * a1) / 7);
+		table[6] = Math.round((2 * a0 + 5 * a1) / 7);
+		table[7] = Math.round((1 * a0 + 6 * a1) / 7);
+	} else {
+		table[2] = Math.round((4 * a0 + 1 * a1) / 5);
+		table[3] = Math.round((3 * a0 + 2 * a1) / 5);
+		table[4] = Math.round((2 * a0 + 3 * a1) / 5);
+		table[5] = Math.round((1 * a0 + 4 * a1) / 5);
+		table[6] = 0;
+		table[7] = 255;
+	}
+	return table;
 }
 //#endregion
 //#region default-plugins/asset-viewer/image-viewer.ts
-var M = /* @__PURE__ */ new Uint8Array(256), N = /* @__PURE__ */ new Uint8Array(256);
-for (let e = 0; e < 256; e++) {
-	let t = e / 255, n = t <= .04045 ? t / 12.92 : ((t + .055) / 1.055) ** 2.4;
-	M[e] = Math.round(Math.min(1, Math.max(0, n)) * 255);
-	let r = t <= .0031308 ? t * 12.92 : 1.055 * t ** (1 / 2.4) - .055;
-	N[e] = Math.round(Math.min(1, Math.max(0, r)) * 255);
+var SRGB_TO_LINEAR_LUT = /* @__PURE__ */ new Uint8Array(256);
+var LINEAR_TO_SRGB_LUT = /* @__PURE__ */ new Uint8Array(256);
+for (let i = 0; i < 256; i++) {
+	const c = i / 255;
+	const lin = c <= .04045 ? c / 12.92 : Math.pow((c + .055) / 1.055, 2.4);
+	SRGB_TO_LINEAR_LUT[i] = Math.round(Math.min(1, Math.max(0, lin)) * 255);
+	const srgb = c <= .0031308 ? c * 12.92 : 1.055 * Math.pow(c, 1 / 2.4) - .055;
+	LINEAR_TO_SRGB_LUT[i] = Math.round(Math.min(1, Math.max(0, srgb)) * 255);
 }
-var P = class {
+/**
+* Interactive Image / Texture Viewer component for plugins (e.g. asset-viewer).
+* Supports DDS (BC1, BC2, BC3, BC4, BC5, BC7, RGBA) and standard web images (PNG, JPG, BMP, WebP).
+* Features color space modes (sRGB, Linear, Raw), channel inspection (RGBA, RGB, R, G, B, A),
+* checkerboard transparency, smooth pan/drag, zoom (wheel & buttons), and format metadata.
+*/
+var ImageViewer = class {
 	container;
 	el;
 	currentBlobUrl = null;
 	zoom = 1;
 	panX = 0;
 	panY = 0;
-	isDragging = !1;
+	isDragging = false;
 	dragStartX = 0;
 	dragStartY = 0;
 	canvasWrapper;
@@ -2776,57 +3163,83 @@ var P = class {
 	rawRgba = null;
 	imageWidth = 0;
 	imageHeight = 0;
-	sourceIsSRGB = !0;
+	sourceIsSRGB = true;
 	colorSpaceMode = "sRGB";
 	channelMode = "RGBA";
 	colorSpaceBtns = /* @__PURE__ */ new Map();
 	channelBtns = /* @__PURE__ */ new Map();
 	cleanups = [];
-	constructor(e) {
-		this.container = e, this.el = document.createElement("div"), this.el.className = "image-viewer-container", this.container.appendChild(this.el);
+	constructor(container) {
+		this.container = container;
+		this.el = document.createElement("div");
+		this.el.className = "image-viewer-container";
+		this.container.appendChild(this.el);
 	}
-	show(e) {
-		this.dispose(), this.el.replaceChildren(), this.zoom = 1, this.panX = 0, this.panY = 0, this.colorSpaceBtns.clear(), this.channelBtns.clear();
-		let n = /\.dds$/i.test(e.name), r = n ? "DDS" : e.name.split(".").pop()?.toUpperCase() ?? "IMAGE", i = e.bytes.byteLength, a = document.createElement("div");
-		a.className = "image-viewer-toolbar";
-		let o = document.createElement("div");
-		o.className = "image-viewer-file-info";
-		let s = document.createElement("span");
-		s.className = "image-viewer-icon", s.textContent = n ? "DDS" : "IMG";
-		let c = document.createElement("span");
-		c.className = "image-viewer-filename", c.textContent = e.name, c.title = e.path || e.name;
-		let l = document.createElement("span");
-		l.className = "image-badge format-badge", l.textContent = r;
-		let u = document.createElement("span");
-		u.className = "image-badge dim-badge", u.textContent = "로딩 중...";
-		let d = document.createElement("span");
-		d.className = "image-badge size-badge", d.textContent = this.formatSize(i), o.append(s, c, l, u, d);
-		let f = document.createElement("div");
-		f.className = "image-viewer-toolbar-controls";
-		let p = document.createElement("div");
-		p.className = "image-viewer-toolbar-section";
-		let m = document.createElement("span");
-		m.className = "image-viewer-group-label", m.textContent = "색공간:";
-		let h = document.createElement("div");
-		h.className = "image-viewer-toolbar-group";
-		for (let e of [
+	show(info) {
+		this.dispose();
+		this.el.replaceChildren();
+		this.zoom = 1;
+		this.panX = 0;
+		this.panY = 0;
+		this.colorSpaceBtns.clear();
+		this.channelBtns.clear();
+		const isDds = /\.dds$/i.test(info.name);
+		let format = isDds ? "DDS" : info.name.split(".").pop()?.toUpperCase() ?? "IMAGE";
+		const sizeBytes = info.bytes.byteLength;
+		const toolbar = document.createElement("div");
+		toolbar.className = "image-viewer-toolbar";
+		const fileInfo = document.createElement("div");
+		fileInfo.className = "image-viewer-file-info";
+		const iconSpan = document.createElement("span");
+		iconSpan.className = "image-viewer-icon";
+		iconSpan.textContent = isDds ? "DDS" : "IMG";
+		const nameSpan = document.createElement("span");
+		nameSpan.className = "image-viewer-filename";
+		nameSpan.textContent = info.name;
+		nameSpan.title = info.path || info.name;
+		const formatBadge = document.createElement("span");
+		formatBadge.className = "image-badge format-badge";
+		formatBadge.textContent = format;
+		const dimBadge = document.createElement("span");
+		dimBadge.className = "image-badge dim-badge";
+		dimBadge.textContent = "로딩 중...";
+		const sizeBadge = document.createElement("span");
+		sizeBadge.className = "image-badge size-badge";
+		sizeBadge.textContent = this.formatSize(sizeBytes);
+		fileInfo.append(iconSpan, nameSpan, formatBadge, dimBadge, sizeBadge);
+		const toolbarControls = document.createElement("div");
+		toolbarControls.className = "image-viewer-toolbar-controls";
+		const csSection = document.createElement("div");
+		csSection.className = "image-viewer-toolbar-section";
+		const csLabel = document.createElement("span");
+		csLabel.className = "image-viewer-group-label";
+		csLabel.textContent = "색공간:";
+		const csGroup = document.createElement("div");
+		csGroup.className = "image-viewer-toolbar-group";
+		for (const mode of [
 			"sRGB",
 			"Linear",
 			"Raw"
 		]) {
-			let t = document.createElement("button");
-			t.className = "img-tool-btn", t.textContent = e, t.title = e === "sRGB" ? "sRGB 감마 곡선 뷰" : e === "Linear" ? "선형 공간(감마 미적용) 뷰" : "원시 바이트 원본 뷰", t.addEventListener("click", () => {
-				this.setColorSpaceMode(e);
-			}), h.appendChild(t), this.colorSpaceBtns.set(e, t);
+			const btn = document.createElement("button");
+			btn.className = "img-tool-btn";
+			btn.textContent = mode;
+			btn.title = mode === "sRGB" ? "sRGB 감마 곡선 뷰" : mode === "Linear" ? "선형 공간(감마 미적용) 뷰" : "원시 바이트 원본 뷰";
+			btn.addEventListener("click", () => {
+				this.setColorSpaceMode(mode);
+			});
+			csGroup.appendChild(btn);
+			this.colorSpaceBtns.set(mode, btn);
 		}
-		p.append(m, h);
-		let g = document.createElement("div");
-		g.className = "image-viewer-toolbar-section";
-		let _ = document.createElement("span");
-		_.className = "image-viewer-group-label", _.textContent = "채널:";
-		let v = document.createElement("div");
-		v.className = "image-viewer-toolbar-group";
-		for (let e of [
+		csSection.append(csLabel, csGroup);
+		const chSection = document.createElement("div");
+		chSection.className = "image-viewer-toolbar-section";
+		const chLabel = document.createElement("span");
+		chLabel.className = "image-viewer-group-label";
+		chLabel.textContent = "채널:";
+		const chGroup = document.createElement("div");
+		chGroup.className = "image-viewer-toolbar-group";
+		for (const ch of [
 			"RGBA",
 			"RGB",
 			"R",
@@ -2834,152 +3247,328 @@ var P = class {
 			"B",
 			"A"
 		]) {
-			let t = document.createElement("button");
-			t.className = "img-tool-btn", t.textContent = e, t.title = `${e} 채널 보기`, t.addEventListener("click", () => {
-				this.setChannelMode(e);
-			}), v.appendChild(t), this.channelBtns.set(e, t);
+			const btn = document.createElement("button");
+			btn.className = "img-tool-btn";
+			btn.textContent = ch;
+			btn.title = `${ch} 채널 보기`;
+			btn.addEventListener("click", () => {
+				this.setChannelMode(ch);
+			});
+			chGroup.appendChild(btn);
+			this.channelBtns.set(ch, btn);
 		}
-		g.append(_, v);
-		let y = document.createElement("div");
-		y.className = "image-viewer-zoom-controls";
-		let b = document.createElement("button");
-		b.className = "img-tool-btn", b.textContent = "화면맞춤", b.title = "화면에 맞추기 (단축키: 더블클릭)", b.addEventListener("click", () => this.fitToViewport(this.imageWidth, this.imageHeight));
-		let x = document.createElement("button");
-		x.className = "img-tool-btn", x.textContent = "100%", x.title = "실제 크기 (1:1)", x.addEventListener("click", () => this.resetTo100());
-		let S = document.createElement("button");
-		S.className = "img-tool-btn", S.textContent = "−", S.title = "축소", S.addEventListener("click", () => this.zoomBy(1 / 1.25)), this.zoomLabel = document.createElement("span"), this.zoomLabel.className = "image-zoom-label", this.zoomLabel.textContent = "100%";
-		let C = document.createElement("button");
-		C.className = "img-tool-btn", C.textContent = "+", C.title = "확대", C.addEventListener("click", () => this.zoomBy(1.25)), y.append(b, x, S, this.zoomLabel, C), f.append(p, g, y), a.append(o, f), this.el.append(a);
-		let w = document.createElement("div");
-		w.className = "image-viewer-viewport", this.canvasWrapper = document.createElement("div"), this.canvasWrapper.className = "image-canvas-wrapper checkerboard", this.canvasEl = document.createElement("canvas"), this.canvasWrapper.append(this.canvasEl), w.append(this.canvasWrapper), this.el.append(w), this.bindViewportEvents(w);
+		chSection.append(chLabel, chGroup);
+		const zoomControls = document.createElement("div");
+		zoomControls.className = "image-viewer-zoom-controls";
+		const btnFit = document.createElement("button");
+		btnFit.className = "img-tool-btn";
+		btnFit.textContent = "화면맞춤";
+		btnFit.title = "화면에 맞추기 (단축키: 더블클릭)";
+		btnFit.addEventListener("click", () => this.fitToViewport(this.imageWidth, this.imageHeight));
+		const btn100 = document.createElement("button");
+		btn100.className = "img-tool-btn";
+		btn100.textContent = "100%";
+		btn100.title = "실제 크기 (1:1)";
+		btn100.addEventListener("click", () => this.resetTo100());
+		const btnZoomOut = document.createElement("button");
+		btnZoomOut.className = "img-tool-btn";
+		btnZoomOut.textContent = "−";
+		btnZoomOut.title = "축소";
+		btnZoomOut.addEventListener("click", () => this.zoomBy(1 / 1.25));
+		this.zoomLabel = document.createElement("span");
+		this.zoomLabel.className = "image-zoom-label";
+		this.zoomLabel.textContent = "100%";
+		const btnZoomIn = document.createElement("button");
+		btnZoomIn.className = "img-tool-btn";
+		btnZoomIn.textContent = "+";
+		btnZoomIn.title = "확대";
+		btnZoomIn.addEventListener("click", () => this.zoomBy(1.25));
+		zoomControls.append(btnFit, btn100, btnZoomOut, this.zoomLabel, btnZoomIn);
+		toolbarControls.append(csSection, chSection, zoomControls);
+		toolbar.append(fileInfo, toolbarControls);
+		this.el.append(toolbar);
+		const viewport = document.createElement("div");
+		viewport.className = "image-viewer-viewport";
+		this.canvasWrapper = document.createElement("div");
+		this.canvasWrapper.className = "image-canvas-wrapper checkerboard";
+		this.canvasEl = document.createElement("canvas");
+		this.canvasWrapper.append(this.canvasEl);
+		viewport.append(this.canvasWrapper);
+		this.el.append(viewport);
+		this.bindViewportEvents(viewport);
 		try {
-			if (n) {
-				let n = t(e.bytes);
-				this.imageWidth = n.width, this.imageHeight = n.height, this.rawRgba = new Uint8ClampedArray(n.rgba), this.sourceIsSRGB = n.isSRGB, this.colorSpaceMode = n.format.startsWith("BC5") || n.format.startsWith("BC4") ? "Linear" : n.isSRGB ? "sRGB" : n.format.includes("Linear") ? "Linear" : "sRGB", l.textContent = `DDS (${n.format})`, u.textContent = `${this.imageWidth} × ${this.imageHeight} px`, this.canvasEl.width = this.imageWidth, this.canvasEl.height = this.imageHeight, this.updateButtonsUI(), this.renderFilteredImage(), this.fitToViewport(this.imageWidth, this.imageHeight);
+			if (isDds) {
+				const decoded = decodeDDS(info.bytes);
+				this.imageWidth = decoded.width;
+				this.imageHeight = decoded.height;
+				this.rawRgba = new Uint8ClampedArray(decoded.rgba);
+				this.sourceIsSRGB = decoded.isSRGB;
+				if (decoded.format.startsWith("BC5") || decoded.format.startsWith("BC4")) this.colorSpaceMode = "Linear";
+				else if (decoded.isSRGB) this.colorSpaceMode = "sRGB";
+				else this.colorSpaceMode = decoded.format.includes("Linear") ? "Linear" : "sRGB";
+				formatBadge.textContent = `DDS (${decoded.format})`;
+				dimBadge.textContent = `${this.imageWidth} × ${this.imageHeight} px`;
+				this.canvasEl.width = this.imageWidth;
+				this.canvasEl.height = this.imageHeight;
+				this.updateButtonsUI();
+				this.renderFilteredImage();
+				this.fitToViewport(this.imageWidth, this.imageHeight);
 			} else {
-				let t = e.name.split(".").pop()?.toLowerCase() ?? "png", n = t === "jpg" || t === "jpeg" ? "image/jpeg" : `image/${t}`, r = new Blob([e.bytes], { type: n });
-				this.currentBlobUrl = URL.createObjectURL(r);
-				let i = new Image();
-				i.onload = () => {
-					this.imageWidth = i.naturalWidth, this.imageHeight = i.naturalHeight, this.sourceIsSRGB = !0, this.colorSpaceMode = "sRGB", l.textContent = t.toUpperCase(), u.textContent = `${this.imageWidth} × ${this.imageHeight} px`, this.canvasEl.width = this.imageWidth, this.canvasEl.height = this.imageHeight;
-					let e = this.canvasEl.getContext("2d");
-					if (e) {
-						e.drawImage(i, 0, 0);
-						let t = e.getImageData(0, 0, this.imageWidth, this.imageHeight);
-						this.rawRgba = new Uint8ClampedArray(t.data);
+				const ext = info.name.split(".").pop()?.toLowerCase() ?? "png";
+				const mime = ext === "jpg" || ext === "jpeg" ? "image/jpeg" : `image/${ext}`;
+				const blob = new Blob([info.bytes], { type: mime });
+				this.currentBlobUrl = URL.createObjectURL(blob);
+				const img = new Image();
+				img.onload = () => {
+					this.imageWidth = img.naturalWidth;
+					this.imageHeight = img.naturalHeight;
+					this.sourceIsSRGB = true;
+					this.colorSpaceMode = "sRGB";
+					formatBadge.textContent = ext.toUpperCase();
+					dimBadge.textContent = `${this.imageWidth} × ${this.imageHeight} px`;
+					this.canvasEl.width = this.imageWidth;
+					this.canvasEl.height = this.imageHeight;
+					const ctx = this.canvasEl.getContext("2d");
+					if (ctx) {
+						ctx.drawImage(img, 0, 0);
+						const imgData = ctx.getImageData(0, 0, this.imageWidth, this.imageHeight);
+						this.rawRgba = new Uint8ClampedArray(imgData.data);
 					}
-					this.updateButtonsUI(), this.fitToViewport(this.imageWidth, this.imageHeight);
-				}, i.onerror = (e) => {
-					u.textContent = "이미지 로드 오류", console.error("[ImageViewer] Failed to load image:", e);
-				}, i.src = this.currentBlobUrl;
+					this.updateButtonsUI();
+					this.fitToViewport(this.imageWidth, this.imageHeight);
+				};
+				img.onerror = (e) => {
+					dimBadge.textContent = "이미지 로드 오류";
+					console.error("[ImageViewer] Failed to load image:", e);
+				};
+				img.src = this.currentBlobUrl;
 			}
-		} catch (e) {
-			u.textContent = "디코딩 실패";
-			let t = document.createElement("div");
-			t.className = "image-error-notice", t.textContent = `텍스처 미리보기 오류: ${String(e)}`, w.append(t);
+		} catch (err) {
+			dimBadge.textContent = "디코딩 실패";
+			const errMsg = document.createElement("div");
+			errMsg.className = "image-error-notice";
+			errMsg.textContent = `텍스처 미리보기 오류: ${String(err)}`;
+			viewport.append(errMsg);
 		}
 	}
-	setColorSpaceMode(e) {
-		this.colorSpaceMode !== e && (this.colorSpaceMode = e, this.updateButtonsUI(), this.renderFilteredImage());
+	setColorSpaceMode(mode) {
+		if (this.colorSpaceMode === mode) return;
+		this.colorSpaceMode = mode;
+		this.updateButtonsUI();
+		this.renderFilteredImage();
 	}
-	setChannelMode(e) {
-		this.channelMode !== e && (this.channelMode = e, this.updateButtonsUI(), this.renderFilteredImage());
+	setChannelMode(mode) {
+		if (this.channelMode === mode) return;
+		this.channelMode = mode;
+		this.updateButtonsUI();
+		this.renderFilteredImage();
 	}
 	updateButtonsUI() {
-		for (let [e, t] of this.colorSpaceBtns.entries()) e === this.colorSpaceMode ? t.classList.add("active") : t.classList.remove("active");
-		for (let [e, t] of this.channelBtns.entries()) e === this.channelMode ? t.classList.add("active") : t.classList.remove("active");
+		for (const [mode, btn] of this.colorSpaceBtns.entries()) if (mode === this.colorSpaceMode) btn.classList.add("active");
+		else btn.classList.remove("active");
+		for (const [mode, btn] of this.channelBtns.entries()) if (mode === this.channelMode) btn.classList.add("active");
+		else btn.classList.remove("active");
 	}
 	renderFilteredImage() {
 		if (!this.rawRgba || !this.imageWidth || !this.imageHeight) return;
-		let e = this.canvasEl.getContext("2d");
-		if (!e) return;
-		let t = e.createImageData(this.imageWidth, this.imageHeight), n = t.data, r = this.rawRgba, i = this.imageWidth * this.imageHeight, a = this.colorSpaceMode === "Linear", o = this.colorSpaceMode === "sRGB" && !this.sourceIsSRGB, s = a && this.sourceIsSRGB, c = this.channelMode;
-		for (let e = 0; e < i; e++) {
-			let t = e * 4, i = r[t], a = r[t + 1], l = r[t + 2], u = r[t + 3];
-			switch (o ? (i = N[i], a = N[a], l = N[l]) : s && (i = M[i], a = M[a], l = M[l]), c) {
+		const ctx = this.canvasEl.getContext("2d");
+		if (!ctx) return;
+		const imgData = ctx.createImageData(this.imageWidth, this.imageHeight);
+		const dest = imgData.data;
+		const src = this.rawRgba;
+		const totalPixels = this.imageWidth * this.imageHeight;
+		const isLinearTarget = this.colorSpaceMode === "Linear";
+		const convertLinearToSRGB = this.colorSpaceMode === "sRGB" && !this.sourceIsSRGB;
+		const convertSRGBToLinear = isLinearTarget && this.sourceIsSRGB;
+		const ch = this.channelMode;
+		for (let i = 0; i < totalPixels; i++) {
+			const idx = i * 4;
+			let r = src[idx];
+			let g = src[idx + 1];
+			let b = src[idx + 2];
+			const a = src[idx + 3];
+			if (convertLinearToSRGB) {
+				r = LINEAR_TO_SRGB_LUT[r];
+				g = LINEAR_TO_SRGB_LUT[g];
+				b = LINEAR_TO_SRGB_LUT[b];
+			} else if (convertSRGBToLinear) {
+				r = SRGB_TO_LINEAR_LUT[r];
+				g = SRGB_TO_LINEAR_LUT[g];
+				b = SRGB_TO_LINEAR_LUT[b];
+			}
+			switch (ch) {
 				case "RGBA":
-					n[t] = i, n[t + 1] = a, n[t + 2] = l, n[t + 3] = u;
+					dest[idx] = r;
+					dest[idx + 1] = g;
+					dest[idx + 2] = b;
+					dest[idx + 3] = a;
 					break;
 				case "RGB":
-					n[t] = i, n[t + 1] = a, n[t + 2] = l, n[t + 3] = 255;
+					dest[idx] = r;
+					dest[idx + 1] = g;
+					dest[idx + 2] = b;
+					dest[idx + 3] = 255;
 					break;
 				case "R":
-					n[t] = i, n[t + 1] = i, n[t + 2] = i, n[t + 3] = 255;
+					dest[idx] = r;
+					dest[idx + 1] = r;
+					dest[idx + 2] = r;
+					dest[idx + 3] = 255;
 					break;
 				case "G":
-					n[t] = a, n[t + 1] = a, n[t + 2] = a, n[t + 3] = 255;
+					dest[idx] = g;
+					dest[idx + 1] = g;
+					dest[idx + 2] = g;
+					dest[idx + 3] = 255;
 					break;
 				case "B":
-					n[t] = l, n[t + 1] = l, n[t + 2] = l, n[t + 3] = 255;
+					dest[idx] = b;
+					dest[idx + 1] = b;
+					dest[idx + 2] = b;
+					dest[idx + 3] = 255;
 					break;
-				case "A": n[t] = u, n[t + 1] = u, n[t + 2] = u, n[t + 3] = 255;
+				case "A":
+					dest[idx] = a;
+					dest[idx + 1] = a;
+					dest[idx + 2] = a;
+					dest[idx + 3] = 255;
 			}
 		}
-		e.putImageData(t, 0, 0);
+		ctx.putImageData(imgData, 0, 0);
 	}
 	getViewportRect() {
-		let e = this.el.querySelector(".image-viewer-viewport");
-		return e ? e.getBoundingClientRect() : null;
+		const vp = this.el.querySelector(".image-viewer-viewport");
+		return vp ? vp.getBoundingClientRect() : null;
 	}
-	fitToViewport(e = this.imageWidth, t = this.imageHeight) {
-		if (!e || !t) return;
-		let n = this.getViewportRect();
-		if (!n || n.width <= 0 || n.height <= 0) {
-			requestAnimationFrame(() => this.fitToViewport(e, t));
+	fitToViewport(w = this.imageWidth, h = this.imageHeight) {
+		if (!w || !h) return;
+		const rect = this.getViewportRect();
+		if (!rect || rect.width <= 0 || rect.height <= 0) {
+			requestAnimationFrame(() => this.fitToViewport(w, h));
 			return;
 		}
-		let r = Math.max(20, n.width - 40), i = Math.max(20, n.height - 40), a = r / e, o = i / t, s = Math.min(a, o);
-		s = Math.min(32, Math.max(.01, s)), this.zoom = s, this.panX = Math.round((n.width - e * this.zoom) / 2), this.panY = Math.round((n.height - t * this.zoom) / 2), this.updateTransform();
+		const pad = 40;
+		const availW = Math.max(20, rect.width - pad);
+		const availH = Math.max(20, rect.height - pad);
+		const scaleX = availW / w;
+		const scaleY = availH / h;
+		let fitScale = Math.min(scaleX, scaleY);
+		fitScale = Math.min(32, Math.max(.01, fitScale));
+		this.zoom = fitScale;
+		this.panX = Math.round((rect.width - w * this.zoom) / 2);
+		this.panY = Math.round((rect.height - h * this.zoom) / 2);
+		this.updateTransform();
 	}
 	resetTo100() {
 		this.zoom = 1;
-		let e = this.getViewportRect();
-		e && e.width > 0 && e.height > 0 ? (this.panX = Math.round((e.width - this.imageWidth) / 2), this.panY = Math.round((e.height - this.imageHeight) / 2)) : (this.panX = 0, this.panY = 0), this.updateTransform();
+		const rect = this.getViewportRect();
+		if (rect && rect.width > 0 && rect.height > 0) {
+			this.panX = Math.round((rect.width - this.imageWidth) / 2);
+			this.panY = Math.round((rect.height - this.imageHeight) / 2);
+		} else {
+			this.panX = 0;
+			this.panY = 0;
+		}
+		this.updateTransform();
 	}
-	zoomBy(e) {
-		let t = this.getViewportRect(), n = t ? t.width / 2 : 0, r = t ? t.height / 2 : 0, i = (n - this.panX) / this.zoom, a = (r - this.panY) / this.zoom, o = Math.min(64, Math.max(.01, this.zoom * e));
-		this.panX = Math.round(n - i * o), this.panY = Math.round(r - a * o), this.zoom = o, this.updateTransform();
+	zoomBy(factor) {
+		const rect = this.getViewportRect();
+		const centerX = rect ? rect.width / 2 : 0;
+		const centerY = rect ? rect.height / 2 : 0;
+		const imgX = (centerX - this.panX) / this.zoom;
+		const imgY = (centerY - this.panY) / this.zoom;
+		const newZoom = Math.min(64, Math.max(.01, this.zoom * factor));
+		this.panX = Math.round(centerX - imgX * newZoom);
+		this.panY = Math.round(centerY - imgY * newZoom);
+		this.zoom = newZoom;
+		this.updateTransform();
 	}
 	updateTransform() {
-		this.canvasWrapper && (this.canvasWrapper.style.transform = `translate(${this.panX}px, ${this.panY}px) scale(${this.zoom})`, this.zoomLabel && (this.zoomLabel.textContent = `${Math.round(this.zoom * 100)}%`));
+		if (!this.canvasWrapper) return;
+		this.canvasWrapper.style.transform = `translate(${this.panX}px, ${this.panY}px) scale(${this.zoom})`;
+		if (this.zoomLabel) this.zoomLabel.textContent = `${Math.round(this.zoom * 100)}%`;
 	}
-	bindViewportEvents(e) {
-		e.addEventListener("wheel", (t) => {
-			t.preventDefault();
-			let n = e.getBoundingClientRect(), r = t.clientX - n.left, i = t.clientY - n.top, a = (r - this.panX) / this.zoom, o = (i - this.panY) / this.zoom, s = t.deltaY < 0 ? 1.15 : 1 / 1.15, c = Math.min(64, Math.max(.01, this.zoom * s));
-			this.panX = Math.round(r - a * c), this.panY = Math.round(i - o * c), this.zoom = c, this.updateTransform();
-		}, { passive: !1 }), e.addEventListener("mousedown", (t) => {
-			(t.button === 0 || t.button === 1) && (this.isDragging = !0, this.dragStartX = t.clientX - this.panX, this.dragStartY = t.clientY - this.panY, e.style.cursor = "grabbing", t.preventDefault());
+	bindViewportEvents(viewport) {
+		viewport.addEventListener("wheel", (e) => {
+			e.preventDefault();
+			const rect = viewport.getBoundingClientRect();
+			const mouseX = e.clientX - rect.left;
+			const mouseY = e.clientY - rect.top;
+			const imgX = (mouseX - this.panX) / this.zoom;
+			const imgY = (mouseY - this.panY) / this.zoom;
+			const zoomFactor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
+			const newZoom = Math.min(64, Math.max(.01, this.zoom * zoomFactor));
+			this.panX = Math.round(mouseX - imgX * newZoom);
+			this.panY = Math.round(mouseY - imgY * newZoom);
+			this.zoom = newZoom;
+			this.updateTransform();
+		}, { passive: false });
+		viewport.addEventListener("mousedown", (e) => {
+			if (e.button !== 0 && e.button !== 1) return;
+			this.isDragging = true;
+			this.dragStartX = e.clientX - this.panX;
+			this.dragStartY = e.clientY - this.panY;
+			viewport.style.cursor = "grabbing";
+			e.preventDefault();
 		});
-		let t = (e) => {
-			this.isDragging && (this.panX = Math.round(e.clientX - this.dragStartX), this.panY = Math.round(e.clientY - this.dragStartY), this.updateTransform());
-		}, n = () => {
-			this.isDragging && (this.isDragging = !1, e.style.cursor = "grab");
+		const onMouseMove = (e) => {
+			if (!this.isDragging) return;
+			this.panX = Math.round(e.clientX - this.dragStartX);
+			this.panY = Math.round(e.clientY - this.dragStartY);
+			this.updateTransform();
 		};
-		if (window.addEventListener("mousemove", t), window.addEventListener("mouseup", n), this.cleanups.push(() => {
-			window.removeEventListener("mousemove", t), window.removeEventListener("mouseup", n);
-		}), e.addEventListener("dblclick", () => {
+		const onMouseUp = () => {
+			if (this.isDragging) {
+				this.isDragging = false;
+				viewport.style.cursor = "grab";
+			}
+		};
+		window.addEventListener("mousemove", onMouseMove);
+		window.addEventListener("mouseup", onMouseUp);
+		this.cleanups.push(() => {
+			window.removeEventListener("mousemove", onMouseMove);
+			window.removeEventListener("mouseup", onMouseUp);
+		});
+		viewport.addEventListener("dblclick", () => {
 			this.fitToViewport(this.imageWidth, this.imageHeight);
-		}), typeof ResizeObserver < "u") {
-			let t = new ResizeObserver(() => {
-				this.imageWidth && this.imageHeight && !this.isDragging && this.fitToViewport(this.imageWidth, this.imageHeight);
+		});
+		if (typeof ResizeObserver !== "undefined") {
+			const ro = new ResizeObserver(() => {
+				if (this.imageWidth && this.imageHeight && !this.isDragging) this.fitToViewport(this.imageWidth, this.imageHeight);
 			});
-			t.observe(e), this.cleanups.push(() => t.disconnect());
+			ro.observe(viewport);
+			this.cleanups.push(() => ro.disconnect());
 		}
 	}
-	formatSize(e) {
-		return e < 1024 ? `${e} B` : e < 1048576 ? `${(e / 1024).toFixed(1)} KB` : `${(e / 1048576).toFixed(2)} MB`;
+	formatSize(bytes) {
+		if (bytes < 1024) return `${bytes} B`;
+		if (bytes < 1048576) return `${(bytes / 1024).toFixed(1)} KB`;
+		return `${(bytes / 1048576).toFixed(2)} MB`;
 	}
 	dispose() {
-		this.cleanups.forEach((e) => {
+		this.cleanups.forEach((fn) => {
 			try {
-				e();
+				fn();
 			} catch {}
-		}), this.cleanups = [], this.currentBlobUrl &&= (URL.revokeObjectURL(this.currentBlobUrl), null), this.rawRgba = null, this.el.replaceChildren();
+		});
+		this.cleanups = [];
+		if (this.currentBlobUrl) {
+			URL.revokeObjectURL(this.currentBlobUrl);
+			this.currentBlobUrl = null;
+		}
+		this.rawRgba = null;
+		this.el.replaceChildren();
 	}
-}, F = e({
-	activate(e) {
-		e.editor.registerCustomViewer({
+};
+//#endregion
+//#region default-plugins/asset-viewer/index.ts
+/**
+* DDS 및 이미지 에셋 뷰어 플러그인
+* 탐색기에서 지원되는 이미지 확장자 클릭 시 에디터 탭 내에서 인터랙티브 캔버스 뷰어로 엽니다.
+*/
+var plugin = {
+	activate(context) {
+		context.editor.registerCustomViewer({
 			id: "asset-viewer",
 			name: "DDS / 텍스처 뷰어",
 			extensions: [
@@ -2991,31 +3580,43 @@ var P = class {
 				"webp",
 				"gif"
 			],
-			render(e, t) {
-				let n = new P(e);
-				return n.show({
-					name: t.name,
-					path: t.path,
-					bytes: t.bytes
-				}), () => n.dispose();
+			render(container, file) {
+				const viewer = new ImageViewer(container);
+				viewer.show({
+					name: file.name,
+					path: file.path,
+					bytes: file.bytes
+				});
+				return () => viewer.dispose();
 			}
 		});
-		e.ui.registerMenuItem({
+		context.ui?.registerMenuItem?.({
 			label: "텍스처/DDS 이미지 열기…",
 			action: async () => {
 				try {
-					let t = await e.workspace.pickFile({
+					const filePath = await context.workspace.pickFile({
 						title: "텍스처/이미지 파일 선택",
-						filters: [{ name: "Textures & Images", extensions: ["dds", "png", "jpg", "jpeg", "bmp", "webp", "gif"] }]
+						filters: [{
+							name: "Textures & Images",
+							extensions: [
+								"dds",
+								"png",
+								"jpg",
+								"jpeg",
+								"bmp",
+								"webp",
+								"gif"
+							]
+						}]
 					});
-					t && await e.workspace.openFile(t);
-				} catch (t) {
-					e.ui.showToast(`이미지 열기 오류: ${t}`, "error");
+					if (filePath) await context.workspace.openFile(filePath);
+				} catch (err) {
+					context.ui.showToast(`이미지 열기 오류: ${err}`, "error");
 				}
 			}
 		});
 	},
 	deactivate() {}
-});
+};
 //#endregion
-export { F as default };
+export { plugin as default };
