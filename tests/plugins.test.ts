@@ -20,6 +20,11 @@ import { validatePluginZip } from '../src/plugins/zip.ts';
 import { definePlugin } from '../src/plugins/api.ts';
 import { createUIBuilder } from '../src/plugins/ui-builder.ts';
 import { renderPluginIcon } from '../src/plugins/types.ts';
+import {
+  normalizePluginPath,
+  resolveRelativeSpecifier,
+  linkPluginModules,
+} from '../src/plugins/module-linker.ts';
 import { zipSync, strToU8 } from 'fflate';
 import {
   isAllowedResource,
@@ -1619,4 +1624,81 @@ test('Plugin UI Builder extended components (tabs, collapsible, segmented, searc
     else delete (globalThis as any).document;
   }
 });
+
+test('normalizePluginPath handles Windows paths, segments and dots correctly', () => {
+  assert.equal(normalizePluginPath('foo\\\\bar\\\\baz.js'), 'foo/bar/baz.js');
+  assert.equal(normalizePluginPath('./components/../utils/helpers.js'), 'utils/helpers.js');
+  assert.equal(normalizePluginPath('/src//sub/index.js'), 'src/sub/index.js');
+});
+
+test('resolveRelativeSpecifier resolves relative files with or without extensions and indices', () => {
+  const files = new Set([
+    'ui/button.js',
+    'constants/colors.json',
+    'styles/main.css',
+    'components/header/index.js',
+  ]);
+
+  assert.equal(resolveRelativeSpecifier('ui/view.js', './button.js', files), 'ui/button.js');
+  assert.equal(resolveRelativeSpecifier('ui/view.js', './button', files), 'ui/button.js');
+  assert.equal(resolveRelativeSpecifier('ui/view.js', '../constants/colors', files), 'constants/colors.json');
+  assert.equal(resolveRelativeSpecifier('ui/view.js', '../styles/main.css', files), 'styles/main.css');
+  assert.equal(resolveRelativeSpecifier('ui/view.js', '../components/header', files), 'components/header/index.js');
+  assert.equal(resolveRelativeSpecifier('ui/view.js', 'external-lib', files), null);
+});
+
+test('linkPluginModules links multi-file plugin and executes correctly via dynamic import', async () => {
+  const entryScript = `
+    import { formatGreeting } from './sub/helper.js';
+    import config from './data.json';
+    import './style.css';
+
+    export default {
+      activate(ctx) {
+        return formatGreeting(config.name);
+      }
+    };
+  `;
+
+  const files = {
+    'sub/helper.js': `
+      import { PREFIX } from './constants.js';
+      export function formatGreeting(name) {
+        return PREFIX + ' ' + name;
+      }
+    `,
+    'sub/constants.js': `
+      export const PREFIX = 'Migoto';
+    `,
+    'data.json': JSON.stringify({ name: 'Studio' }),
+    'style.css': '.my-plugin-btn { color: red; }',
+  };
+
+  const linked = linkPluginModules(entryScript, 'index.js', files);
+  assert.ok(linked.entryUrl.startsWith('blob:') || linked.entryUrl.startsWith('data:'));
+  assert.equal(linked.blobUrls.length, 5); // constants, data.json, style.css, helper, index
+
+  const mod = await import(linked.entryUrl);
+  const plugin = mod.default;
+  assert.equal(typeof plugin.activate, 'function');
+  const result = plugin.activate({});
+  assert.equal(result, 'Migoto Studio');
+
+  linked.dispose();
+});
+
+test('validatePluginZip extracts multi-file plugin with index.js as entry point', () => {
+  const zipBytes = zipSync({
+    'plugin.json': strToU8(JSON.stringify({ id: 'multi-file-plugin', name: 'Multi File Plugin', version: '1.0.0' })),
+    'index.js': strToU8('import { greet } from "./ui.js"; export default { activate() {} };'),
+    'ui.js': strToU8('export function greet() { return "hello"; }'),
+  });
+
+  const extracted = validatePluginZip(zipBytes);
+  assert.equal(extracted.manifest.id, 'multi-file-plugin');
+  assert.equal(extracted.entryPath, 'index.js');
+  assert.ok(extracted.files['ui.js']);
+  assert.ok(extracted.files['index.js']);
+});
+
 

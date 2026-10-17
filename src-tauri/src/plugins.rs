@@ -16,6 +16,10 @@ pub struct PluginDiskInfo {
   pub path: String,
   pub manifest_json: String,
   pub script_content: String,
+  #[serde(default)]
+  pub entry_path: Option<String>,
+  #[serde(default)]
+  pub files: std::collections::HashMap<String, String>,
 }
 
 pub fn plugins_dir() -> PathBuf {
@@ -192,6 +196,33 @@ pub fn exec_process(
   }
 }
 
+fn collect_plugin_files(base_dir: &Path, current_dir: &Path, files: &mut std::collections::HashMap<String, String>) {
+  if let Ok(entries) = fs::read_dir(current_dir) {
+    for entry in entries.flatten() {
+      let path = entry.path();
+      let file_name = path.file_name().unwrap_or_default().to_string_lossy();
+      if file_name.starts_with('.') || file_name == "node_modules" || file_name == "__pycache__" {
+        continue;
+      }
+      if path.is_dir() {
+        collect_plugin_files(base_dir, &path, files);
+      } else if path.is_file() {
+        // Read text files up to 5MB
+        if let Ok(meta) = path.metadata() {
+          if meta.len() <= 5 * 1024 * 1024 {
+            if let Ok(content) = fs::read_to_string(&path) {
+              if let Ok(rel) = path.strip_prefix(base_dir) {
+                let rel_str = rel.to_string_lossy().replace('\\', "/");
+                files.insert(rel_str, content);
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
 /// Reads all plugin folders under `%APPDATA%\MigotoStudio\plugins`
 #[tauri::command]
 pub fn list_disk_plugins() -> Result<Vec<PluginDiskInfo>, String> {
@@ -203,32 +234,66 @@ pub fn list_disk_plugins() -> Result<Vec<PluginDiskInfo>, String> {
       let p = entry.path();
       if p.is_dir() {
         let manifest_path = if p.join("manifest.json").exists() {
-          p.join("manifest.json")
+          Some(p.join("manifest.json"))
+        } else if p.join("plugin.json").exists() {
+          Some(p.join("plugin.json"))
         } else {
-          p.join("plugin.json")
+          None
         };
-        let script_path = if p.join("plugin.js").exists() {
-          p.join("plugin.js")
-        } else {
-          p.join("main.js")
+
+        let Some(manifest_file) = manifest_path else {
+          continue;
         };
-        if manifest_path.exists() && script_path.exists() {
-          if let (Ok(manifest_json), Ok(script_content)) = (
-            fs::read_to_string(&manifest_path),
-            fs::read_to_string(&script_path),
-          ) {
-            let id = p.file_name().unwrap_or_default().to_string_lossy().to_string();
-            if id == "resource-checker" {
-              continue;
+
+        let Ok(manifest_json) = fs::read_to_string(&manifest_file) else {
+          continue;
+        };
+
+        // Try reading manifest.main if specified
+        let mut entry_rel_path: Option<String> = None;
+        if let Ok(val) = serde_json::from_str::<serde_json::Value>(&manifest_json) {
+          if let Some(main_str) = val.get("main").and_then(|v| v.as_str()) {
+            let candidate = p.join(main_str.trim_start_matches("./"));
+            if candidate.exists() && candidate.is_file() {
+              entry_rel_path = Some(main_str.trim_start_matches("./").replace('\\', "/"));
             }
-            list.push(PluginDiskInfo {
-              id,
-              path: p.to_string_lossy().to_string(),
-              manifest_json,
-              script_content,
-            });
           }
         }
+
+        if entry_rel_path.is_none() {
+          let candidates = ["index.js", "plugin.js", "main.js", "index.mjs"];
+          for c in candidates {
+            if p.join(c).exists() {
+              entry_rel_path = Some(c.to_string());
+              break;
+            }
+          }
+        }
+
+        let Some(entry_rel) = entry_rel_path else {
+          continue;
+        };
+
+        let Ok(script_content) = fs::read_to_string(p.join(&entry_rel)) else {
+          continue;
+        };
+
+        let id = p.file_name().unwrap_or_default().to_string_lossy().to_string();
+        if id == "resource-checker" {
+          continue;
+        }
+
+        let mut files = std::collections::HashMap::new();
+        collect_plugin_files(&p, &p, &mut files);
+
+        list.push(PluginDiskInfo {
+          id,
+          path: p.to_string_lossy().to_string(),
+          manifest_json,
+          script_content,
+          entry_path: Some(entry_rel),
+          files,
+        });
       }
     }
   }
@@ -238,10 +303,26 @@ pub fn list_disk_plugins() -> Result<Vec<PluginDiskInfo>, String> {
 
 /// Write or create a plugin folder on disk
 #[tauri::command]
-pub fn save_disk_plugin(id: String, manifest_json: String, script_content: String) -> Result<(), String> {
+pub fn save_disk_plugin(
+  id: String,
+  manifest_json: String,
+  script_content: String,
+  files: Option<std::collections::HashMap<String, String>>,
+) -> Result<(), String> {
   let dir = plugins_dir().join(&id);
   fs::create_dir_all(&dir).map_err(|e| format!("플러그인 폴더 생성 실패: {e}"))?;
-  fs::write(dir.join("plugin.json"), manifest_json).map_err(|e| format!("plugin.json 저장 실패: {e}"))?;
-  fs::write(dir.join("main.js"), script_content).map_err(|e| format!("main.js 저장 실패: {e}"))?;
+
+  if let Some(f_map) = files {
+    for (rel_path, content) in f_map {
+      let file_path = dir.join(&rel_path);
+      if let Some(parent) = file_path.parent() {
+        let _ = fs::create_dir_all(parent);
+      }
+      let _ = fs::write(file_path, content);
+    }
+  } else {
+    fs::write(dir.join("plugin.json"), manifest_json).map_err(|e| format!("plugin.json 저장 실패: {e}"))?;
+    fs::write(dir.join("main.js"), script_content).map_err(|e| format!("main.js 저장 실패: {e}"))?;
+  }
   Ok(())
 }

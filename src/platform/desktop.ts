@@ -164,10 +164,12 @@ export const desktop: Platform = {
       path: p.path,
       manifestJson: p.manifest_json,
       scriptContent: p.script_content,
+      entryPath: p.entry_path,
+      files: p.files,
     }));
   },
-  saveDiskPlugin: (id: string, manifestJson: string, scriptContent: string) =>
-    invoke('save_disk_plugin', { id, manifestJson, scriptContent }),
+  saveDiskPlugin: (id: string, manifestJson: string, scriptContent: string, files?: Record<string, string>) =>
+    invoke('save_disk_plugin', { id, manifestJson, scriptContent, files }),
   pickPluginZip: async () => {
     const picked = await open({
       multiple: false,

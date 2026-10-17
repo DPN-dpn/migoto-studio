@@ -1,6 +1,7 @@
 import { monaco } from '../core/editor/monaco';
 import { platform } from '../platform';
 import { validatePluginZip, type ExtractedPlugin } from './zip';
+import { linkPluginModules } from './module-linker';
 import type { DocumentManager } from '../core/workspace/documents';
 import type { FileExplorer } from '../ui/panels/explorer';
 import { openModal } from '../ui/modals/modal';
@@ -604,6 +605,8 @@ export class PluginManager {
           isBuiltin: false,
           path: disk.path,
           scriptContent: disk.scriptContent,
+          entryPath: disk.entryPath,
+          files: disk.files,
         };
         this.plugins.set(manifest.id, instance);
 
@@ -620,22 +623,30 @@ export class PluginManager {
     instance: PluginInstance,
     scriptContent: string,
   ): Promise<void> {
+    let linkedDisposer: (() => void) | undefined;
     try {
-      // Dynamic ES module evaluation via Blob URL
-      const blob = new Blob([scriptContent], { type: 'application/javascript' });
-      const url = URL.createObjectURL(blob);
-      const mod = await import(/* @vite-ignore */ url);
-      URL.revokeObjectURL(url);
+      // Dynamic ES module evaluation via Virtual Module Linker
+      const entryName = instance.entryPath || instance.manifest.main || 'index.js';
+      const linked = linkPluginModules(scriptContent, entryName, instance.files);
+      linkedDisposer = linked.dispose;
 
+      const mod = await import(/* @vite-ignore */ linked.entryUrl);
       const plugin: MigotoPlugin = mod.default || mod;
-      await this.activatePlugin(instance, plugin);
+      await this.activatePlugin(instance, plugin, linked.dispose);
     } catch (err: any) {
+      if (linkedDisposer) {
+        try { linkedDisposer(); } catch {}
+      }
       instance.error = err.message || String(err);
       console.error(`[plugins] Failed to activate plugin "${instance.manifest.name}":`, err);
     }
   }
 
-  private async activatePlugin(instance: PluginInstance, plugin: MigotoPlugin): Promise<void> {
+  private async activatePlugin(
+    instance: PluginInstance,
+    plugin: MigotoPlugin,
+    moduleDisposer?: () => void,
+  ): Promise<void> {
     const unregisterViews: string[] = [];
     const unregisterStatusItems: string[] = [];
     const unregisterCustomViewers: string[] = [];
@@ -726,6 +737,11 @@ export class PluginManager {
         unregisterCustomViewers.forEach((ext) => {
           this.customViewers.delete(ext);
         });
+        if (moduleDisposer) {
+          try {
+            moduleDisposer();
+          } catch {}
+        }
       };
     } catch (err: any) {
       instance.error = err.message || String(err);
@@ -832,6 +848,14 @@ export class PluginManager {
 
     const { manifest, files, manifestJson, scriptContent } = extracted;
 
+    const textFiles: Record<string, string> = {};
+    const textDecoder = new TextDecoder('utf-8');
+    for (const [relPath, fileData] of Object.entries(files)) {
+      try {
+        textFiles[relPath] = textDecoder.decode(fileData);
+      } catch {}
+    }
+
     if (platform().kind === 'desktop' && platform().getPluginsDir && platform().writeBinaryFile) {
       try {
         const pluginsDir = await platform().getPluginsDir!();
@@ -847,7 +871,7 @@ export class PluginManager {
       }
     } else if (platform().saveDiskPlugin) {
       try {
-        await platform().saveDiskPlugin!(manifest.id, manifestJson, scriptContent);
+        await platform().saveDiskPlugin!(manifest.id, manifestJson, scriptContent, textFiles);
       } catch (err) {
         this.showToast(`플러그인 저장 실패: ${err}`, 'error');
         return false;

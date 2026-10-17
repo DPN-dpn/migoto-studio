@@ -757,6 +757,8 @@ export const web: Platform = {
             path: p.path || key,
             manifestJson: p.manifestJson,
             scriptContent: p.scriptContent,
+            entryPath: p.entryPath,
+            files: p.files,
           });
         }
 
@@ -825,7 +827,12 @@ export const web: Platform = {
 
     return [...defaultPlugins, ...customPlugins];
   },
-  saveDiskPlugin: async (id: string, manifestJson: string, scriptContent: string) => {
+  saveDiskPlugin: async (
+    id: string,
+    manifestJson: string,
+    scriptContent: string,
+    files?: Record<string, string>,
+  ) => {
     try {
       // If user installs or reinstalls a default plugin, restore it from deleted list
       const deletedDefaults: string[] = JSON.parse(
@@ -839,7 +846,7 @@ export const web: Platform = {
       // If custom plugin, persist to localStorage
       if (!DEFAULT_WEB_PLUGINS.includes(id)) {
         const stored = JSON.parse(localStorage.getItem(STORAGE_WEB_PLUGINS) || '{}');
-        stored[id] = { id, path: id, manifestJson, scriptContent };
+        stored[id] = { id, path: id, manifestJson, scriptContent, files };
         localStorage.setItem(STORAGE_WEB_PLUGINS, JSON.stringify(stored));
       }
     } catch {}

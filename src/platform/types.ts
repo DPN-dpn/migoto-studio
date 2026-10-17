@@ -102,7 +102,7 @@ export interface Platform {
   launchInstallerAndExit?(path: string): Promise<void>;
   execProcess?(command: string, args: string[], cwd?: string, stdin?: string): Promise<ProcessOutput>;
   listDiskPlugins?(): Promise<DiskPlugin[]>;
-  saveDiskPlugin?(id: string, manifestJson: string, scriptContent: string): Promise<void>;
+  saveDiskPlugin?(id: string, manifestJson: string, scriptContent: string, files?: Record<string, string>): Promise<void>;
   pickPluginZip?(): Promise<Uint8Array | null>;
 }
 
@@ -117,5 +117,7 @@ export interface DiskPlugin {
   path: string;
   manifestJson: string;
   scriptContent: string;
+  entryPath?: string;
+  files?: Record<string, string>;
 }
 

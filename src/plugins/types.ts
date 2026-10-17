@@ -472,6 +472,8 @@ export interface PluginInstance {
   isBuiltin: boolean;
   path?: string;
   scriptContent?: string;
+  entryPath?: string;
+  files?: Record<string, string>;
   instance?: MigotoPlugin;
   cleanup?: () => void;
   error?: string;

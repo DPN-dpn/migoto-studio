@@ -5,12 +5,13 @@ export interface ExtractedPlugin {
   manifest: PluginManifest;
   manifestJson: string;
   scriptContent: string;
+  entryPath: string;
   files: Record<string, Uint8Array>;
 }
 
 /**
  * Validates and extracts a plugin .zip archive.
- * Expects manifest.json (or plugin.json) and plugin.js (or main.js).
+ * Expects manifest.json (or plugin.json) and index.js (or plugin.js, main.js).
  * Handles both flat archives and nested root-folder archives.
  */
 export function validatePluginZip(bytes: Uint8Array): ExtractedPlugin {
@@ -64,16 +65,24 @@ export function validatePluginZip(bytes: Uint8Array): ExtractedPlugin {
   }
 
   if (!scriptPath) {
-    scriptPath = fileNames.find((name) => {
-      const rel = manifestDir ? name.replace(manifestDir, '') : name;
-      return /^(?:plugin|main)\.js$/i.test(rel);
-    });
+    const candidates = ['index.js', 'plugin.js', 'main.js', 'index.mjs'];
+    for (const c of candidates) {
+      const found = fileNames.find((name) => {
+        const rel = manifestDir ? name.replace(manifestDir, '') : name;
+        return rel.toLowerCase() === c;
+      });
+      if (found) {
+        scriptPath = found;
+        break;
+      }
+    }
   }
 
   if (!scriptPath) {
-    throw new Error('압축 파일 내에 플러그인 실행 스크립트(plugin.js 또는 main.js)가 없습니다.');
+    throw new Error('압축 파일 내에 플러그인 실행 스크립트(index.js, plugin.js 또는 main.js)가 없습니다.');
   }
 
+  const entryPath = manifestDir ? scriptPath.replace(manifestDir, '') : scriptPath;
   const scriptContent = new TextDecoder('utf-8').decode(unzipped[scriptPath]);
 
   // Normalize files relative to manifestDir
@@ -96,12 +105,15 @@ export function validatePluginZip(bytes: Uint8Array): ExtractedPlugin {
   }
 
   normalizedFiles['plugin.json'] = new TextEncoder().encode(JSON.stringify(manifest, null, 2));
-  normalizedFiles['main.js'] = unzipped[scriptPath];
+  if (!normalizedFiles['main.js'] && !normalizedFiles['index.js']) {
+    normalizedFiles['main.js'] = unzipped[scriptPath];
+  }
 
   return {
     manifest,
     manifestJson: JSON.stringify(manifest, null, 2),
     scriptContent,
+    entryPath,
     files: normalizedFiles,
   };
 }

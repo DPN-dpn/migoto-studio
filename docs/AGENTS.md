@@ -14,6 +14,8 @@
 
 ### [필수 준수 규칙]
 1. 플러그인은 번들러 없이 에디터에서 직접 로드되는 순수 ES Module(ESM) 규격입니다.
+   - 단일 파일(`index.js`)뿐만 아니라, 여러 파일(`ui.js`, `constants.js`, `style.css`, `config.json` 등)로 분할하여 작성할 수 있습니다.
+   - Migoto Studio의 내장 가상 모듈 링커가 상대 경로 `import ... from './ui.js'`를 자동 해석하므로 번들러(Vite/esbuild) 빌드 과정이 필요 없습니다.
    - Node.js 전용 모듈(`fs`, `path`, `child_process` 등)을 import하지 마세요.
    - 파일 I/O와 시스템 실행은 오직 `context.workspace`와 `context.system`을 사용하세요.
 2. 메인 스크립트(`index.js`)는 반드시 `export default { activate(context), deactivate() }` 형태여야 합니다.
@@ -40,12 +42,23 @@
 
 ## 2. 플러그인 구조 및 매니페스트 (`plugin.json`)
 
-플러그인은 독립된 하나의 폴더로 구성되며 최소 2개의 파일이 필요합니다:
+플러그인은 독립된 하나의 폴더로 구성되며 단일 파일 또는 다중 파일 구조를 지원합니다:
 
+### 단일 파일 구조
 ```
 my-plugin/
 ├── plugin.json       # 메타데이터 매니페스트 (필수)
 └── index.js          # 플러그인 엔트리 스크립트 (필수, ES Module)
+```
+
+### 다중 파일 분할 구조 (권장 - 번들러 불필요)
+```
+my-plugin/
+├── plugin.json       # 메타데이터 매니페스트 (필수)
+├── index.js          # 플러그인 메인 엔트리
+├── ui.js             # UI 빌더 컴포넌트 분리
+├── constants.js      # 상수 및 기본값 정의
+└── style.css         # 전용 스타일시트
 ```
 
 ### `plugin.json` 규격
