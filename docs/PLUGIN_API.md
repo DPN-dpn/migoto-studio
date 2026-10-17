@@ -248,19 +248,133 @@ context.ui.openRestoreModal('d:/mods/Character/merged.ini');
 
 ---
 
-### 3.7 UI 빌더 헬퍼 함수 (`context.ui.*`)
+### 3.7 기본 폼 컨트롤 및 위젯 팩토리 (`context.ui.*`)
 
 빠르고 일관된 테마 디자인을 위해 내장 컴포넌트 팩토리 메서드를 제공합니다.
 
-- `context.ui.createForm(config)`: 고수준 선언형 폼 컴포넌트 생성 (`getValues()`, `setValues()`, `reset()`)
-- `context.ui.createKeyInput(options)`: 3DMigoto 전용 키 캡처 입력기 위젯 ([키 감지] 및 [키 도우미] 버튼 내장)
-- `context.ui.createCard(options)`: 헤더/설명/액션 버튼이 포함된 스타일 카드
-- `context.ui.createButton(options)`: 일관된 스타일의 버튼 생성
-- `context.ui.createInput(options)`: 텍스트 입력 필드
-- `context.ui.createSelect(options)`: 드롭다운 선택 필드
-- `context.ui.createCheckbox(options)`: 체크박스
-- `context.ui.createSlider(options)`: 슬라이더
-- `context.ui.createBadge(text, color)`: 배지
+#### 1) 스타일 카드 (`context.ui.createCard`)
+제목, 부제목, 상태 배지 및 액션 버튼이 통합된 카드 컨테이너를 생성합니다.
+```typescript
+const card = context.ui.createCard({
+  title: '텍스처 오버라이드 설정',
+  subtitle: '캐릭터 텍스처 교체 슬롯 정의',
+  badge: '활성',
+  content: [row1, row2],
+  actions: [btnEdit, btnDelete],
+});
+```
+
+#### 2) 버튼 및 버튼 행 (`context.ui.createButton`, `context.ui.createButtonRow`)
+테마 일관 스타일의 액션 버튼을 생성합니다.
+```typescript
+const btnSave = context.ui.createButton({
+  text: '설정 저장',
+  variant: 'primary', // 'primary' | 'secondary' | 'danger' | 'small'
+  onClick: () => saveSettings(),
+});
+
+const btnRow = context.ui.createButtonRow([btnSave, btnCancel]);
+```
+
+#### 3) 기본 폼 입력 컨트롤 (`createInput`, `createSelect`, `createCheckbox`, `createSlider`)
+라벨이 자동으로 결합된 표준 입력 필드들입니다.
+```typescript
+// 텍스트 입력창
+const nameInput = context.ui.createInput({
+  label: '섹션 이름',
+  value: 'TextureOverrideBody',
+  placeholder: '섹션명 입력',
+  onChange: (val) => console.log(val),
+});
+
+// 드롭다운 선택 필드
+const selectBox = context.ui.createSelect({
+  label: '토글 방식',
+  options: [
+    { value: 'cycle', label: '순환 (Cycle)' },
+    { value: 'hold', label: '홀드 (Hold)' },
+  ],
+  value: 'cycle',
+  onChange: (val) => console.log('선택:', val),
+});
+
+// 체크박스
+const check = context.ui.createCheckbox({
+  label: '작업 전 자동 백업 생성',
+  checked: true,
+  onChange: (checked) => console.log('백업 활성:', checked),
+});
+
+// 슬라이더
+const slider = context.ui.createSlider({
+  label: '불투명도',
+  min: 0,
+  max: 100,
+  value: 80,
+  step: 5,
+  onChange: (val) => console.log('값:', val),
+});
+```
+
+#### 4) 상태 배지 및 진행률 표시 바 (`createBadge`, `createProgressBar`)
+```typescript
+// 상태 배지
+const badge = context.ui.createBadge({
+  text: '권장',
+  variant: 'success', // 'neutral' | 'info' | 'success' | 'warning' | 'danger'
+});
+
+// 진행률 표시 바
+const progress = context.ui.createProgressBar({
+  label: 'DDS 텍스처 디코딩 중…',
+  value: 45,
+  max: 100,
+});
+// progress.setProgress(80);
+// progress.setLabel('완료 중…');
+```
+
+#### 5) 데이터 테이블 (`context.ui.createTable`)
+테마 스크롤과 자동 열 정렬을 지원하는 데이터 테이블을 생성합니다.
+```typescript
+const table = context.ui.createTable({
+  headers: ['섹션명', '타입', '단축키', '상태'],
+  rows: [
+    ['KeyToggleHair', 'cycle', 'VK_F4', '정상'],
+    ['KeyToggleDress', 'hold', 'VK_F5', '경고'],
+  ],
+});
+
+// table.addRow(['KeyToggleShoe', 'cycle', 'VK_F6', '정상']);
+// table.setRows([ ... ]);
+// table.clear();
+```
+
+#### 6) 대화형 콘솔 뷰어 (`context.ui.createConsole`)
+실시간 로그 출력 및 명령어 입력을 지원하는 터미널 스타일 뷰어입니다.
+```typescript
+const consoleView = context.ui.createConsole({
+  title: 'Python 빌드 출력',
+  placeholder: '로그가 여기에 표시됩니다…',
+});
+
+consoleView.append('작업을 시작합니다.\n');
+// consoleView.clear();
+```
+
+#### 7) 키보드 실시간 감지 단축키 입력 필드 (`context.ui.createKeyInput`)
+3DMigoto 전용 단축키 입력 필드로, 실시간 `[⌨️ 감지]` 및 모달 `[키 도우미]` 버튼이 기본 탑재되어 있습니다.
+```typescript
+const keyInput = context.ui.createKeyInput({
+  label: '토글 키',
+  value: 'no_modifiers alt VK_F4',
+  onChange: (newKey) => {
+    console.log('단축키 변경:', newKey);
+  },
+});
+// keyInput.getValue();
+// keyInput.setValue('ctrl no_alt VK_F1');
+```
 
 ---
 

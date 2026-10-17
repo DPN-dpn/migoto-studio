@@ -30,8 +30,10 @@
 5. 에디터 텍스트 수정 및 작업영역:
    - Monaco 에디터의 실행 취소(`Ctrl+Z`) 기록을 온전히 보존하는 `context.editor.setText(text)` 또는 `context.editor.replaceSelection(text)`를 사용하세요.
    - 워크스페이스 전역 검색은 `context.workspace.search`, 탭 제어는 `context.workspace.getOpenTabs / focusTab / closeTab`, 안전 백업은 `context.workspace.createBackup`을 활용하세요.
+6. API 상세 레퍼런스:
+   - 플러그인 개발 시 사용할 수 있는 모든 `context.*` API의 상세 시그니처, 매개변수 및 예제는 [`docs/PLUGIN_API.md`](./PLUGIN_API.md)를 반드시 참조하세요.
 
-자세한 API 명세와 선언형 폼 스키마, 템플릿은 아래 기술 지침을 엄격히 준수하세요.
+자세한 아키텍처 규칙, 권장 개발 지침 및 템플릿은 아래 내용을 엄격히 준수하세요.
 ```
 
 ---
@@ -84,244 +86,32 @@ export default {
 
 ---
 
-## 4. 핵심 API 레퍼런스 (`context`)
+## 4. 플러그인 아키텍처 및 핵심 API 도메인 개요
 
-### 4.1 UI 확장 API (`context.ui`)
+Migoto Studio 플러그인은 `activate(context)` 함수로 전달되는 `PluginContext` 객체를 통해 에디터의 모든 기능과 상호작용합니다.
 
-#### 1) 선언형 폼 탭 열기 (`context.ui.openFormTab`) - **(가장 권장)**
-HTML 마크업을 일일이 작성할 필요 없이, 필드 스키마만 전달하면 카드 레이아웃, 실시간 키 감지, 테마 스타일이 완비된 메인 에디터 탭을 즉시 생성합니다.
+> [!IMPORTANT]
+> **공식 API 상세 레퍼런스 문서 안내 (`PLUGIN_API.md`)**
+> 각 네임스페이스별 모든 메서드의 상세 시그니처, 파라미터 타입, 반환값 및 실행 예제는 공식 레퍼런스 문서인 **[`docs/PLUGIN_API.md`](./PLUGIN_API.md)**에 완전하게 수록되어 있습니다.
+> 코드를 작성할 때는 `AGENTS.md`의 아키텍처 규칙과 템플릿을 따르되, 구체적인 API 명세는 반드시 `PLUGIN_API.md`를 참조하세요.
 
-```typescript
-const tab = context.ui.openFormTab({
-  id: 'unique-tab-id',
-  title: '탭 제목',
-  icon: '🎛️', // 선택 사항
-  closable: true,
-  form: {
-    title: '폼 제목',
-    description: '상단 설명 문구',
-    fields: [
-      // FormFieldDef 배열
-      { id: 'section', type: 'text', label: '섹션 이름', default: 'KeyToggleDress', required: true },
-      { id: 'key', type: 'key', label: '단축키', default: 'VK_F4', description: '키 감지 버튼으로 직접 입력 가능' },
-      { id: 'mode', type: 'select', label: '토글 방식', options: ['cycle', 'hold'], default: 'cycle' },
-      { id: 'states', type: 'number', label: '상태 개수', default: 2, min: 2, max: 10 },
-      { id: 'enabled', type: 'checkbox', label: '활성화', default: true },
-    ],
-    submitLabel: 'INI 문서에 적용',
-    onSubmit: (values) => {
-      // values: { section: '...', key: '...', mode: '...', states: 2, enabled: true }
-    }
-  }
-});
-```
+### 주요 API 네임스페이스 개요
 
-**지원하는 필드 타입 (`type`)**:
-- `'key'`: 3DMigoto 전용 단축키 입력기 (실시간 `[⌨️ 감지]` 버튼 내장, 키보드 입력 시 수식키와 `VK_*` 자동 완성)
-- `'text'`: 텍스트 입력창
-- `'number'`: 숫자 입력창 (`min`, `max`, `step` 지원)
-- `'select'`: 드롭다운 목록 (`options: string[]` 또는 `{ value: string, label: string }[]`)
-- `'checkbox'`: 체크박스 토글
-- `'textarea'`: 여러 줄 텍스트 입력창 (`rows` 지원)
-- `'color'`: 색상 선택기
+| 네임스페이스 | 주요 역할 및 핵심 기능 | 상세 레퍼런스 문서 |
+| :--- | :--- | :--- |
+| **`context.ui`** | • 선언형 폼 탭(`openFormTab`) 및 커스텀 에디터 탭(`openTab`) 열기<br>• 상단 툴바 메뉴 등록(`registerMenuItem`), 사이드바 패널 등록(`registerSidebarView`)<br>• 확인/입력 모달(`confirm`, `prompt`), Diff 비교 탭(`openDiffTab`), 백업 복원 모달(`openRestoreModal`)<br>• 3DMigoto 키 바인딩 대화상자(`openKeyBindingModal`), 키 입력 위젯(`createKeyInput`)<br>• UI 빌더: 분할뷰(`createSplitView`), 탭(`createTabs`), 아코디언(`createCollapsible`), 세그먼트(`createSegmentedControl`), 검색창(`createSearchInput`), 파일선택기(`createFilePicker`), 드롭존(`createDropZone`), 툴팁(`attachTooltip`), 카드, 테이블, 콘솔 등 | [`PLUGIN_API.md#3-ui-api-contextui`](./PLUGIN_API.md#3-ui-api-contextui) |
+| **`context.ini`** | • 3DMigoto/XXMI 문법 파싱 및 섹션 자동 분류(`parse`, `classifySection`)<br>• 기존 주석 및 배치 보존 스마트 섹션 갱신(`upsertSection`) 및 삭제(`deleteSection`)<br>• 토글 키 섹션 텍스트 생성(`formatKeyToggle`), 단축키 파싱 및 조합(`parseKeyBinding`, `formatKeyBinding`)<br>• 변수, 리소스, CommandList 고속 심볼 추출(`extractSymbols`), 스마트 병합(`merge`) | [`PLUGIN_API.md#4-ini-문서-파싱-및-조작-api-contextini`](./PLUGIN_API.md#4-ini-문서-파싱-및-조작-api-contextini) |
+| **`context.editor`** | • 현재 열린 활성 파일의 텍스트 읽기/쓰기(`getText`, `setText`) — Monaco 실행 취소(`Ctrl+Z`) 이력 완벽 보존<br>• 커서 위치 조회/이동(`getCursor`, `setCursor`), 선택 영역 교체(`replaceSelection`), 텍스트 삽입(`insertText`)<br>• 에디터 우클릭 컨텍스트 메뉴 등록(`registerContextMenuAction`), 텍스트 변경 이벤트 감지 | [`PLUGIN_API.md#6-에디터-제어-contexteditor`](./PLUGIN_API.md#6-에디터-제어-contexteditor) |
+| **`context.workspace`** | • 활성 파일/작업 폴더 정보(`getCurrentFile`, `getCurrentFolder`), 파일 열기 및 저장(`openFile`, `saveCurrentFile`)<br>• 텍스트/바이너리 파일 I/O(`readTextFile`, `writeTextFile`, `readBinaryFile`, `writeBinaryFile`)<br>• 디렉터리 트리 순회(`readDirectory`), 워크스페이스 전역 텍스트 검색(`search`)<br>• 수정 전 안전 백업 생성(`createBackup`), 열린 탭 목록 조회/전환/닫기 제어(`getOpenTabs`, `focusTab`, `closeTab`) | [`PLUGIN_API.md#5-워크스페이스--파일-io-contextworkspace`](./PLUGIN_API.md#5-워크스페이스--파일-io-contextworkspace) |
+| **`context.linter`** | • 커스텀 INI 린트 규칙 등록(`registerRule`)<br>• 외부 플러그인 전용 허용 리소스 및 변수 화이트리스트 등록(`registerAllowedResource`, `registerAllowedVariable`) | [`PLUGIN_API.md`](./PLUGIN_API.md) |
+| **`context.storage`** | • 플러그인 ID별로 격리된 영구 설정 저장/조회/삭제(`get`, `set`, `remove`) | [`PLUGIN_API.md#7-영구-저장소-contextstorage`](./PLUGIN_API.md#7-영구-저장소-contextstorage) |
+| **`context.system`** | • 데스크톱 환경에서 외부 유틸리티 CLI 프로세스 비동기 실행(`exec`) | [`PLUGIN_API.md#8-시스템-프로세스-실행-contextsystem---데스크톱-전용`](./PLUGIN_API.md#8-시스템-프로세스-실행-contextsystem---데스크톱-전용) |
 
-#### 2) 커스텀 메인 에디터 탭 열기 (`context.ui.openTab`)
-원시 DOM 요소를 조작하거나 캔버스/외부 라이브러리를 마운트할 때 사용합니다.
-```typescript
-const tab = context.ui.openTab({
-  id: 'my-custom-viewer',
-  title: '뷰어 탭',
-  icon: '🖼️',
-  render(container) {
-    container.innerHTML = `<div style="padding: 24px;">내용...</div>`;
-    return () => {
-      // 탭이 닫힐 때 정리 작업
-    };
-  }
-});
-```
+### UI 구성 시 권장 개발 가이드라인
 
-#### 3) 상단 툴바 메뉴 등록 (`context.ui.registerMenuItem`)
-에디터 상단 메뉴바의 **[플러그인]** 메뉴에 항목을 등록합니다.
-- **1개 등록 시**: 상단 메뉴에 직접 1단 메뉴 항목으로 바로 연결됩니다.
-- **2개 이상 등록 시**: 플러그인 이름의 서브메뉴(▶)로 깔끔하게 자동 묶여 하위 항목으로 노출됩니다.
-
-```typescript
-const unregister = context.ui.registerMenuItem({
-  label: '토글 키 설정 열기…',
-  shortcut: 'Ctrl+Shift+T', // 표시용 단축키
-  action: () => {
-    // 실행할 동작 (예: 설정 폼 탭 열기)
-  }
-});
-```
-
-#### 4) 사이드바 패널 등록 (`context.ui.registerSidebarView`)
-좌측 액티비티 바에 전용 탭 아이콘과 사이드바 패널을 등록합니다. 플러그인 순서 변경 시에도 액티비티바 탭 위치가 매니페스트 순서대로 올바르게 동기화됩니다.
-```typescript
-context.ui.registerSidebarView({
-  id: 'my-sidebar',
-  title: '내 도구',
-  icon: 'TOOL',
-  render(container) {
-    // container에 UI 요소 추가
-  }
-});
-```
-
-#### 5) UI 빌더 팩토리 및 레이아웃 API (`context.ui.*`)
-- `createSplitView({ direction?, first?, second?, initialSize?, minFirstSize?, minSecondSize?, resizable?, storageKey?, onResize? })`: 마우스 드래그 조절 스플릿 뷰 생성 (`{ container, firstPane, secondPane, splitter, setSize(), getSize(), reset(), dispose() }` 반환)
-  ```typescript
-  // 좌우 리사이저블 분할 화면 생성
-  const split = context.ui.createSplitView({
-    direction: 'horizontal', // 'horizontal' (좌우) | 'vertical' (상하)
-    initialSize: 280,        // 초기 크기 (숫자 px, '280px', '40%' 등)
-    storageKey: 'my_plugin_split_width', // 사용자 조절 크기 자동 저장
-  });
-  split.firstPane.append(sidebarEl);
-  split.secondPane.append(contentEl);
-  container.append(split.container);
-  ```
-- `createRow({ children?, gap?, align?, justify?, wrap? })`: 가로 방향 Flexbox 레이아웃 컨테이너
-  ```typescript
-  const row = context.ui.createRow({ gap: 8, align: 'center', children: [btn1, btn2, inputEl] });
-  ```
-- `createColumn({ children?, gap?, align?, justify? })`: 세로 방향 Flexbox 레이아웃 컨테이너
-  ```typescript
-  const col = context.ui.createColumn({ gap: 12, children: [titleEl, formEl] });
-  ```
-- `createGrid({ columns?, gap?, children? })`: Grid 다단 레이아웃 컨테이너
-- `createDivider({ vertical?, margin? })`: 수평/수직 구분선 요소
-- `createScrollContainer({ content?, direction?, maxHeight?, height?, autoScroll? })`: 테마 스크롤바 컨테이너 (`{ container, content, append(), clear(), scrollToTop(), scrollToBottom() }` 반환)
-  ```typescript
-  const scroll = context.ui.createScrollContainer({ maxHeight: 350, autoScroll: true });
-  scroll.append(logItem1, logItem2);
-  ```
-- `createTabs({ tabs, defaultTab?, className?, onChange? })`: 탭 네비게이션 컨테이너 (`{ container, tabNav, tabContent, switchTab(id), getActiveTab(), setTabBadge(id, badge), setTabDisabled(id, disabled) }` 반환)
-- `createCollapsible({ title, subtitle?, badge?, defaultOpen?, content, headerActions?, className?, onToggle? })`: 아코디언 접기/펼치기 섹션 (`{ container, header, body, toggle(), open(), close(), isOpen(), setTitle(title) }` 반환)
-- `createSegmentedControl({ label?, options, value?, className?, disabled?, onChange? })`: 알약(Pill) 스타일 라디오 버튼 그룹 (`{ row, container, getValue(), setValue(val), setDisabled(disabled) }` 반환)
-- `createSearchInput({ placeholder?, value?, debounceMs?, className?, onSearch?, onClear? })`: 디바운스 실시간 검색창 (`{ container, input, clearBtn, getValue(), setValue(val, trigger?), clear(), focus() }` 반환)
-- `createFilePicker({ label?, placeholder?, value?, buttonText?, filter?, onChange?, onBrowse? })`: 파일 경로 입력 + 탐색 대화상자 결합 필드 (`{ row, input, browseBtn, getValue(), setValue(val), focus() }` 반환)
-- `attachTooltip(element, textOrOptions)`: 요소에 마우스 호버 시 플로팅 툴팁 연결 (해제 함수 `() => void` 반환)
-- `createDropZone({ label?, sublabel?, icon?, accept?, className?, onDrop?, onClick? })`: 파일 드래그 & 드롭 영역 (`{ container, labelEl, sublabelEl, iconEl, setLabel(label, sublabel), dispose() }` 반환)
-- `openKeyBindingModal({ title?, initialKey?, onApply? })`: 3DMigoto 단축키 설정 대화상자를 비동기(`Promise<string | null>`)로 호출 (실시간 키 캡처, 수식키 조합, 가상키 목록 검색 제공)
-- `openKeyHelperModal(options)`: `openKeyBindingModal`의 별칭
-- `createKeyInput({ label?, value?, description?, onChange? })`: 실시간 키 캡처 및 [키 도우미] 모달 버튼이 포함된 단축키 입력 필드
-- `confirm(options)`: 확인/취소 대화상자 (`Promise<boolean>`)
-- `prompt(options)`: 텍스트 입력 프롬프트 (`Promise<string | null>`)
-- `openDiffTab({ title?, originalTitle, modifiedTitle, originalText, modifiedText, languageId? })`: Monaco 기반 Diff 비교 탭 열기 (`{ id, close(), focus() }` 반환)
-- `openRestoreModal(filePath?)`: 자동 보관 백업 목록 및 Diff 비교/복원 모달 호출
-- `createCard({ title?, subtitle?, badge?, content?, actions? })`: 스타일 카드
-- `createForm(formConfig)`: 선언형 폼 인스턴스 (`getValues()`, `setValues()`, `reset()`)
-- `createButton({ text, variant?: 'primary'|'secondary'|'danger'|'small', onClick })`
-- `createInput({ label?, type?, placeholder?, value?, onInput? })`
-- `createSelect({ label?, options, value?, onChange? })`
-- `createCheckbox({ label, checked?, onChange? })`
-- `createTable({ headers, rows? })`
-- `createConsole({ title?, placeholder? })`
-- `showToast(message, type?: 'info'|'warn'|'error')`
-- `showModal(title, render: (container, close) => void)`
-
----
-
-### 4.2 INI 파일 파싱 및 수정 API (`context.ini`)
-
-3DMigoto/XXMI 특화 고수준 유틸리티입니다.
-
-```typescript
-// 1. 토글 키 섹션 텍스트 생성
-const snippet = context.ini.formatKeyToggle({
-  sectionName: 'KeyToggleDress',
-  key: 'no_modifiers VK_F4',
-  type: 'cycle',
-  states: 2,
-  variableName: '$dress',
-  comments: ['의상 변경 토글'],
-});
-
-// 2. 키 바인딩 문자열 파싱 (수식키 상태와 가상키로 분해)
-const parsed = context.ini.parseKeyBinding('ctrl no_alt VK_F4');
-// { vk: 'VK_F4', ctrl: 'require', alt: 'exclude', shift: 'none', win: 'none' }
-
-// 3. 키 바인딩 문자열 조합
-const keyStr = context.ini.formatKeyBinding({ vk: 'VK_F4', ctrl: 'require', alt: 'exclude' });
-// "ctrl no_alt VK_F4"
-
-// 4. 지원하는 가상키 전체 목록 조회
-const allKeys = context.ini.getKeyList(); // [ { vk: 'VK_F1', label: 'F1', ... }, ... ]
-
-// 5. 현재 열린 INI 파일에 섹션 추가/갱신 (기존 섹션은 제자리 교체, 주석 유지)
-context.ini.upsertSection('KeyToggleDress', {
-  key: 'no_modifiers VK_F4',
-  type: 'cycle',
-  '$dress': '0, 1',
-});
-
-// 6. 특정 섹션 삭제
-context.ini.deleteSection('KeyToggleDress');
-
-// 7. 문서 내 모든 섹션명 목록 조회 (문자열 배열)
-const sections = context.ini.getSections(); // ['Constants', 'KeyToggleDress', ...]
-
-// 8. 문서 내 선언된 모든 $변수 목록 조회
-const vars = context.ini.getVariables(); // { "$dress": "0", "$active": "1" }
-
-// 9. INI 심볼(변수, 리소스, CommandList, 섹션) 구조 분석
-const syms = context.ini.extractSymbols();
-// { variables: { "dress": "0, 1" }, resources: [...], commandLists: [...], sections: [...] }
-
-// 10. 전체 구조 파싱
-const doc = context.ini.parse(); // { preamble, sections, properties, variables }
-
-// 11. 스마트 병합
-const result = context.ini.merge(targetText, sourceText, { replaceInPlace: true });
-```
-
----
-
-### 4.3 에디터 제어 API (`context.editor`)
-
-- `getText()`: 현재 활성 파일의 전체 텍스트 반환
-- `setText(text)`: 텍스트 전체 교체 (Monaco `Ctrl+Z` 히스토리 보존)
-- `getSelectedText()`: 사용자가 마우스로 드래그한 선택 영역 텍스트
-- `replaceSelection(text)`: 선택 영역 치환
-- `insertText(text)`: 현재 커서 위치에 텍스트 삽입
-- `getCursor()`: `{ lineNumber, column }`
-- `setCursor(line, col)`: 커서 이동 및 스크롤 포커스
-- `onDidChangeText(listener)`: 문서 변경 실시간 리스너
-
----
-
-### 4.4 작업영역 및 파일 I/O (`context.workspace`)
-
-- `getCurrentFile()`: `{ name, path, location } | null`
-- `getCurrentFolder()`: 현재 열려 있는 프로젝트/모드 루트 디렉터리 경로
-- `openFile(path, line?, col?)`: 대상 파일 열기
-- `saveCurrentFile()`: 현재 문서 디스크 저장
-- `readTextFile(path)`: 텍스트 파일 읽기 (`Promise<string>`)
-- `writeTextFile(path, text)`: 텍스트 파일 쓰기 (`Promise<void>`)
-- `readBinaryFile(path)`: 바이너리 읽기 (`Promise<Uint8Array>`)
-- `writeBinaryFile(path, bytes)`: 바이너리 쓰기 (`Promise<void>`)
-- `readDirectory(path?)`: 디렉터리 항목 목록 트리 (`Promise<DirEntry[]>`)
-- `search(query, options?)`: 워크스페이스 전역 텍스트 검색 (`Promise<WorkspaceSearchResult[]>`)
-- `createBackup(filePath?, label?)`: 안전 파일 백업 생성 (`Promise<string | null>`)
-- `getOpenTabs()`: 현재 열려 있는 탭 목록 조회 (`PluginTabInfo[]`)
-- `closeTab(tabId)`: 탭 닫기 (`Promise<boolean>`)
-- `focusTab(tabId)`: 탭 활성화 포커스
-
----
-
-### 4.5 영구 설정 저장소 (`context.storage`)
-
-- `get(key, defaultValue)`
-- `set(key, value)`
-- `remove(key)`
-
----
-
-### 4.6 외부 프로세스 실행 (`context.system` - 데스크톱 전용)
-
-- `exec(command, args?, cwd?, stdin?)`: 외부 CLI 명령어/스크립트 실행 (`Promise<{ stdout, stderr, exitCode }>`)
+1. **설정/입력 위주의 도구**: 복잡한 HTML을 작성하지 말고 `context.ui.openFormTab`을 사용하세요. 선언적 필드 배열(`FormFieldDef[]`)만 정의하면 카드 레이아웃, 실시간 키보드 감지, 테마 스타일, 값 수집 및 검증이 자동 처리됩니다.
+2. **복합 뷰어/커스텀 레이아웃**: `context.ui.openTab`을 사용하고, 내부 구조는 `context.ui.createSplitView`, `createTabs`, `createCollapsible`, `createRow`, `createColumn`, `createScrollContainer` 등 내장 UI 빌더 컴포넌트를 조합하여 구성하세요.
+3. **단축키 입력**: 단축키 필드는 항상 `type: 'key'`(폼 탭) 또는 `context.ui.createKeyInput` / `openKeyBindingModal`을 사용하여 사용자가 키보드를 누르는 것만으로 올바른 3DMigoto 가상 키(`VK_*`)와 수식키(`no_modifiers`, `ctrl`, `alt` 등)가 입력되도록 하세요.
 
 ---
 
