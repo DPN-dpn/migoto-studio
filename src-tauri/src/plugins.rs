@@ -34,7 +34,29 @@ pub fn plugins_dir() -> PathBuf {
   }
 
   let custom_lint_dir = p.join("custom-lint");
-  if had_legacy || !custom_lint_dir.exists() {
+  let need_reinstall = had_legacy || !custom_lint_dir.exists() || {
+    let bundled_manifest = include_str!("../default-plugins/custom-lint/plugin.json");
+    let installed_manifest_file = custom_lint_dir.join("plugin.json");
+    if let Ok(content) = fs::read_to_string(&installed_manifest_file) {
+      let b_val: Option<String> = serde_json::from_str::<serde_json::Value>(bundled_manifest)
+        .ok()
+        .and_then(|v| v.get("version").and_then(|s| s.as_str()).map(|s| s.to_string()));
+      let i_val: Option<String> = serde_json::from_str::<serde_json::Value>(&content)
+        .ok()
+        .and_then(|v| v.get("version").and_then(|s| s.as_str()).map(|s| s.to_string()));
+      match (b_val, i_val) {
+        (Some(b), Some(i)) => b != i,
+        _ => false,
+      }
+    } else {
+      true
+    }
+  };
+
+  if need_reinstall {
+    if custom_lint_dir.exists() {
+      let _ = fs::remove_dir_all(&custom_lint_dir);
+    }
     let _ = fs::create_dir_all(&custom_lint_dir);
     let _ = fs::write(
       custom_lint_dir.join("plugin.json"),
@@ -310,6 +332,9 @@ pub fn save_disk_plugin(
   files: Option<std::collections::HashMap<String, String>>,
 ) -> Result<(), String> {
   let dir = plugins_dir().join(&id);
+  if dir.exists() {
+    let _ = fs::remove_dir_all(&dir);
+  }
   fs::create_dir_all(&dir).map_err(|e| format!("플러그인 폴더 생성 실패: {e}"))?;
 
   if let Some(f_map) = files {

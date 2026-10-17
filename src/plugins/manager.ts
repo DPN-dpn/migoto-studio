@@ -861,6 +861,13 @@ export class PluginManager {
         const pluginsDir = await platform().getPluginsDir!();
         const baseFolder = `${pluginsDir.replace(/\\/g, '/')}/${manifest.id}`;
 
+        // 플러그인 업데이트 시 파일명 변경 등으로 인한 구버전 잔여 파일이 남지 않도록 기존 폴더를 먼저 제거 후 재설치
+        if (platform().deleteEntry) {
+          try {
+            await platform().deleteEntry!(baseFolder);
+          } catch {}
+        }
+
         for (const [relPath, fileData] of Object.entries(files)) {
           const fullPath = `${baseFolder}/${relPath}`;
           await platform().writeBinaryFile!(fullPath, fileData);
