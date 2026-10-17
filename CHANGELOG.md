@@ -4,12 +4,22 @@
 
 ### 신규 기능
 - ZZMI TTL(Transparency Texture Lib) 투명도 라이브러리 구문 및 템플릿 지원:
-  - ZZMI 지원 플러그인(`zzmi-support`)에 TTL 투명도 렌더링 구문(`$\TTL\alpha`, `$\TTL\_1`, `$\TTL\_2`, `$\TTL\mask_channel`, `$\TTL\mask_invert`, `run = CommandList\TTL\Draw`, `Resource\TTL\TransparencyTex`) 린트 허용 등록
+  - ZZMI 지원 플러그인(`zzmi-support` v1.3.0)에 TTL 투명도 렌더링 구문(`$\TTL\alpha`, `$\TTL\_1`, `$\TTL\_2`, `$\TTL\mask_channel`, `$\TTL\mask_invert`, `run = CommandList\TTL\Draw`, `Resource\TTL\TransparencyTex`) 린트 허용 등록
   - 단일 알파 투명도 렌더링 템플릿(`ZZMI TTL 투명도 드로우 (단일 투명도)`) 및 텍스처 마스크 기반 투명도 템플릿(`ZZMI TTL 텍스처 마스크 투명도 (Texture Mask)`) 2종 추가
 
 ### 기능 개선
+- 플러그인 UI 빌더 스크롤 컨테이너 및 탭 레이아웃 자동 구속:
+  - `context.ui.createScrollContainer`: `flex: 1 1 0%`, `min-height: 0`, `height: 100%`, `scrollbar-gutter: stable`, `scrollbar-width: thin` 및 테마 WebKit 스크롤바 기본 내장
+  - `context.ui.createTabs`: 탭 컨테이너, 탭 바디 래퍼 및 개별 탭 패널에 `flex: 1 1 0%`, `min-height: 0`, `height: 100%`, `overflow: hidden`을 기본 내장하여 부모 컨테이너가 무한히 늘어나지 않고 뷰포트에 맞추어 자연스럽게 스크롤바가 작동하도록 개선
+  - `context.ui.createSplitView`: 패널(`firstPane`, `secondPane`)에 `display: flex`, `flex-direction: column`, `overflow: hidden`, `min-height: 0`을 부여하여 내부 스크롤 컨테이너 크기 계산 자동 보장
+  - `context.ui.openTab`: 플러그인에 전달되는 루트 요소를 `migoto-tab-editor-content`로 감싸 `flex: 1 1 0%`, `min-height: 0`, `height: 100%`를 기본 보장함으로써 플러그인에서 보조 CSS나 `!important` 없이도 완벽한 반응형 스크롤 동작 지원
+- 플러그인 역할 분담 아키텍처 공식화:
+  - `custom-lint`: 게임 중립적인 순수 범용 XXMI 기본 문법(네임스페이스, 교차 참조, 모드 폴더 리소스 실재성 검사) 전담
+  - `zzmi-support`: ZZMI 전용 문법(슬롯픽스, WEngineFX) 및 전용 라이브러리(TTL) 전담
+  - 아키텍처 결정서(`docs/DECISIONS.md`) 및 각 플러그인 README 최신화
 
 ### 버그 수정
+- 플러그인 UI 빌더 사용 시 스크롤 컨테이너가 뷰포트 높이에 구속되지 않고 무한히 늘어나거나 WebKit 브라우저 엔진에서 스크롤바가 숨겨지던 문제 수정
 
 ---
 
