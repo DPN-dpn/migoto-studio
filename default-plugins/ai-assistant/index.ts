@@ -200,7 +200,7 @@ const plugin: MigotoPlugin = {
 
         const presetCard = context.ui.createCard({
           title: '빠른 프로바이더 설정',
-          content: presetRow,
+          content: [presetRow],
         });
 
         const configCard = context.ui.createCard({
@@ -217,7 +217,7 @@ const plugin: MigotoPlugin = {
         `;
         const guideCard = context.ui.createCard({
           title: '환경 및 모델 안내',
-          content: guideDiv,
+          content: [guideDiv],
         });
 
         settingsPane.append(presetCard, configCard, guideCard);

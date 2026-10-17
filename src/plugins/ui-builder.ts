@@ -643,8 +643,8 @@ export function createUIBuilder() {
       title: string;
       subtitle?: string;
       badge?: { text: string; variant?: 'info' | 'success' | 'warn' | 'error' | 'neutral' };
-      children?: HTMLElement[];
-      content?: HTMLElement[];
+      children?: HTMLElement[] | HTMLElement;
+      content?: HTMLElement[] | HTMLElement;
       actions?: HTMLElement[];
     }): HTMLElement {
       const card = document.createElement('div');
@@ -678,8 +678,13 @@ export function createUIBuilder() {
       }
       card.append(header);
 
-      const childNodes = options.children || options.content;
-      if (childNodes && childNodes.length > 0) {
+      const rawContent = options.children ?? options.content;
+      const childNodes: HTMLElement[] = rawContent
+        ? Array.isArray(rawContent)
+          ? rawContent
+          : [rawContent]
+        : [];
+      if (childNodes.length > 0) {
         const body = document.createElement('div');
         body.className = 'plugin-card-body';
         childNodes.forEach((c) => body.append(c));

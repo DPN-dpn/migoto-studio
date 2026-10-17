@@ -173,7 +173,7 @@ var plugin = {
 				presetRow.append(btnPresetGemini, btnPresetOpenAI, btnPresetOllama);
 				const presetCard = context.ui.createCard({
 					title: "빠른 프로바이더 설정",
-					content: presetRow
+					content: [presetRow]
 				});
 				const configCard = context.ui.createCard({
 					title: "연결 정보 입력",
@@ -193,7 +193,7 @@ var plugin = {
         `;
 				const guideCard = context.ui.createCard({
 					title: "환경 및 모델 안내",
-					content: guideDiv
+					content: [guideDiv]
 				});
 				settingsPane.append(presetCard, configCard, guideCard);
 				const chatHistory = document.createElement("div");
