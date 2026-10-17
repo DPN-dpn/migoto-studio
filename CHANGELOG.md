@@ -11,6 +11,9 @@
   - 플러그인 엔트리 스크립트로 `index.js` 표준 인식 (`plugin.json`의 `main` 필드 또는 `index.js` -> `plugin.js` -> `main.js` 우선순위 자동 탐색)
 
 ### 기능 개선
+- 기본 내장 플러그인 전면 모듈화: `ai-assistant`, `custom-lint`, `python-runner`, `zzmi-support` 등 거대 단일 파일로 작성되었던 기본 플러그인을 역할별 세부 모듈(`ui.ts`, `api.ts`, `rules.ts`, `indexer.ts`, `runner.ts`, `templates.ts` 등)로 분리·구조화하여 가독성 및 유지보수성 대폭 개선
+- 플러그인 업데이트 클린 재설치 보장: 플러그인 업데이트 시 기존 폴더를 완전히 제거(`RMDir` / `deleteEntry`)한 후 최신 파일을 설치하도록 개선하여, 파일명 변경이나 파일 삭제 시 구버전 잔여 파일이 남아 발생하는 충돌 방지
+- 기본 플러그인 버전 업데이트: 모듈화 및 개선 사항을 반영하여 기본 플러그인 5종 버전 일괄 상향 (`ai-assistant 1.2.0`, `asset-viewer 1.3.0`, `custom-lint 1.4.0`, `python-runner 1.2.0`, `zzmi-support 1.2.0`)
 - 플러그인 관리 패널 UI 패딩 정규화: 플러그인 항목들을 접었을 때와 펼쳤을 때 내부 패딩이 동일한 기준선에 맞춰지도록 개선하여 시각적 어색함 해소
 - 플러그인 개발 가이드 및 API 레퍼런스(`docs/PLUGIN_API.md`, `docs/AGENTS.md`, `migoto-studio.wiki`) 최신화: 다중 파일 구조 및 가상 모듈 링커 명세 반영
 
