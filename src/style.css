@@ -1611,9 +1611,9 @@ select.status-btn option { background: var(--bg-elev); color: var(--fg); }
 .plugin-card {
   background: var(--bg-elev);
   border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 10px 12px;
-  margin-bottom: 8px;
+  border-radius: 5px;
+  padding: 4px 8px;
+  margin-bottom: 0;
   transition: border-color 0.15s ease;
 }
 .plugin-card.is-enabled {
@@ -3346,14 +3346,15 @@ body.ai-dock-resizing * {
 }
 
 .plugin-card {
-  padding: 8px 10px;
+  padding: 4px 8px;
   background: var(--bg-elev);
   border: 1px solid var(--border);
   border-radius: 5px;
   display: flex;
   flex-direction: column;
-  gap: 5px;
-  transition: border-color 0.15s, padding 0.15s;
+  gap: 4px;
+  margin-bottom: 0;
+  transition: border-color 0.15s ease;
 }
 
 .plugin-card.is-enabled {
@@ -4976,7 +4977,7 @@ body.ai-dock-resizing * {
 }
 
 .plugin-form-section-card,
-.plugin-card {
+.plugin-ui-card {
   background: var(--bg-elev);
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -4989,12 +4990,12 @@ body.ai-dock-resizing * {
 }
 
 .plugin-form-section-card:hover,
-.plugin-card:hover {
+.plugin-ui-card:hover {
   border-color: rgba(139, 124, 246, 0.35);
 }
 
 .plugin-section-header,
-.plugin-card-header {
+.plugin-ui-card .plugin-card-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -5004,21 +5005,21 @@ body.ai-dock-resizing * {
 }
 
 .plugin-section-title,
-.plugin-card-title {
+.plugin-ui-card .plugin-card-title {
   font-size: 13px;
   font-weight: 600;
   color: var(--fg);
 }
 
 .plugin-section-desc,
-.plugin-card-subtitle {
+.plugin-ui-card .plugin-card-subtitle {
   font-size: 11px;
   color: var(--fg-dim);
   margin-top: 2px;
 }
 
 .plugin-section-body,
-.plugin-card-body {
+.plugin-ui-card .plugin-card-body {
   display: flex;
   flex-direction: column;
   gap: 12px;
