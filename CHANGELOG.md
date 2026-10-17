@@ -1,6 +1,6 @@
 # 릴리스 노트 (Release Notes)
 
-## [다음 버전]
+## [0.12.5] - 2026-10-17
 
 ### 신규 기능
 - 플러그인 UI 빌더 숫자 입력 스텝퍼 위젯 (`context.ui.createNumberInput`):
