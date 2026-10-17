@@ -1265,6 +1265,7 @@ export function createUIBuilder() {
       container.style.overflow = 'hidden';
       container.style.position = 'relative';
       container.style.boxSizing = 'border-box';
+      container.style.alignItems = 'stretch';
 
       const firstPane = document.createElement('div');
       firstPane.className = 'plugin-split-pane plugin-split-first';
@@ -1276,6 +1277,7 @@ export function createUIBuilder() {
       firstPane.style.minHeight = '0';
       firstPane.style.minWidth = '0';
       firstPane.style.flexShrink = '0';
+      firstPane.style.alignSelf = 'stretch';
       if (isHorizontal) {
         firstPane.style.height = '100%';
       } else {
@@ -1285,6 +1287,13 @@ export function createUIBuilder() {
 
       const splitter = document.createElement('div');
       splitter.className = 'plugin-split-resizer';
+      splitter.style.flexShrink = '0';
+      splitter.style.alignSelf = 'stretch';
+      if (isHorizontal) {
+        splitter.style.height = '100%';
+      } else {
+        splitter.style.width = '100%';
+      }
       splitter.title = opts.resizable !== false ? '드래그하여 크기 조절 (더블 클릭: 기본 크기 복원)' : '';
 
       const secondPane = document.createElement('div');
@@ -1297,6 +1306,7 @@ export function createUIBuilder() {
       secondPane.style.minHeight = '0';
       secondPane.style.minWidth = '0';
       secondPane.style.flex = '1 1 0%';
+      secondPane.style.alignSelf = 'stretch';
       if (isHorizontal) {
         secondPane.style.height = '100%';
       } else {
@@ -1748,11 +1758,13 @@ export function createUIBuilder() {
         panel.style.flexDirection = 'column';
         panel.style.flex = '1 1 0%';
         panel.style.minHeight = '0';
+        panel.style.minWidth = '0';
         panel.style.height = '100%';
         panel.style.overflow = 'hidden';
         panel.style.position = 'relative';
         panel.style.width = '100%';
         panel.style.boxSizing = 'border-box';
+        panel.style.alignItems = 'stretch';
         panel.hidden = tab.id !== activeTabId;
         panel.append(tab.content);
         panels.set(tab.id, panel);

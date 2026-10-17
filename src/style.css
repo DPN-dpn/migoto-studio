@@ -5234,15 +5234,16 @@ body.ai-dock-resizing * {
    ========================================================================== */
 .plugin-split-container,
 .migoto-split-view {
-  display: flex;
-  width: 100%;
-  height: 100%;
-  flex: 1 1 0%;
-  min-height: 0;
-  min-width: 0;
-  overflow: hidden;
-  position: relative;
-  box-sizing: border-box;
+  display: flex !important;
+  width: 100% !important;
+  height: 100% !important;
+  flex: 1 1 0% !important;
+  min-height: 0 !important;
+  min-width: 0 !important;
+  overflow: hidden !important;
+  position: relative !important;
+  box-sizing: border-box !important;
+  align-items: stretch !important;
 }
 
 .plugin-split-container.plugin-split-horizontal,
@@ -5263,6 +5264,7 @@ body.ai-dock-resizing * {
   flex-direction: column;
   min-height: 0;
   min-width: 0;
+  align-self: stretch;
 }
 
 .plugin-split-first {
@@ -5286,6 +5288,8 @@ body.ai-dock-resizing * {
 
 .plugin-split-horizontal > .plugin-split-resizer {
   width: 5px;
+  height: 100% !important;
+  align-self: stretch !important;
   cursor: col-resize;
 }
 
@@ -5300,6 +5304,8 @@ body.ai-dock-resizing * {
 
 .plugin-split-vertical > .plugin-split-resizer {
   height: 5px;
+  width: 100% !important;
+  align-self: stretch !important;
   cursor: row-resize;
 }
 
@@ -5526,15 +5532,26 @@ body.plugin-split-resizing-v * {
 }
 
 .plugin-tab-panel {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  flex: 1 1 0%;
-  min-height: 0;
-  overflow: hidden;
-  position: relative;
-  box-sizing: border-box;
+  width: 100% !important;
+  height: 100% !important;
+  display: flex !important;
+  flex-direction: column !important;
+  flex: 1 1 0% !important;
+  min-height: 0 !important;
+  min-width: 0 !important;
+  overflow: hidden !important;
+  position: relative !important;
+  box-sizing: border-box !important;
+  align-items: stretch !important;
+}
+
+.plugin-tab-panel > .plugin-split-container,
+.plugin-tab-panel > .migoto-split-view {
+  width: 100% !important;
+  height: 100% !important;
+  flex: 1 1 0% !important;
+  min-height: 0 !important;
+  align-self: stretch !important;
 }
 
 .plugin-tab-panel[hidden] {
