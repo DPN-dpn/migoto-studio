@@ -240,6 +240,14 @@ export function registerLintRules(
 
           // 슬래시(\)가 포함된 네임스페이스 변수 검증
           if (fullVar.includes('\\')) {
+            if (ctx.isAllowedVariable && ctx.isAllowedVariable(fullVar)) {
+              continue;
+            }
+            const cleanVar = fullVar.replace(/^[\\$]+/, '');
+            if (cleanVar.toLowerCase().startsWith('ttl\\')) {
+              continue;
+            }
+
             const parts = fullVar.split('\\').filter(Boolean);
             if (parts.length >= 2) {
               const nsName = parts.slice(0, -1).join('\\');

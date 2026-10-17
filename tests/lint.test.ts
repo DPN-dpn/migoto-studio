@@ -6,6 +6,8 @@ import {
   MarkerSeverity,
   registerAllowedResource,
   clearAllowedResources,
+  registerAllowedVariable,
+  clearAllowedVariables,
   registerAllowedUsedVariable,
   registerAllowedUsedResource,
   type TextModelLike,
@@ -186,6 +188,39 @@ filename = Textures/WEngineFX.dds
     unusedItems: false,
   });
   assert.ok(markersWithoutZZMI.some((m) => m.message.includes('CommandList\\ZZMI\\SetTextures')));
+});
+
+test('ZZMI TTL syntax ($\\TTL\\alpha, $\\TTL\\_1, run = CommandList\\TTL\\Draw) is recognized as valid when allowed', () => {
+  clearAllowedResources();
+  clearAllowedVariables();
+
+  const uRes1 = registerAllowedResource(/^commandlist\\ttl\\/i);
+  const uRes2 = registerAllowedResource(/^resource\\ttl\\/i);
+  const uVar1 = registerAllowedVariable(/^\\?ttl\\/i);
+
+  const ttlIni = `
+[TextureOverridePart]
+hash = 1234abcd
+$\\TTL\\alpha = 0.4
+$\\TTL\\_1 = 192
+$\\TTL\\_2 = 71646
+run = CommandList\\TTL\\Draw
+`;
+
+  const model = createMockModel(ttlIni);
+  const markers = lintModel(model, {
+    ...defaultOptions,
+    undeclaredVars: true,
+    missingResources: true,
+    unusedItems: false,
+  });
+
+  const warnings = markers.filter((m) => m.severity === MarkerSeverity.Warning);
+  assert.equal(warnings.length, 0, 'No warnings for valid ZZMI TTL syntax when allowed');
+
+  uRes1();
+  uRes2();
+  uVar1();
 });
 
 test('single ini mode guides user to check namespace for undeclared and namespaced variables', () => {

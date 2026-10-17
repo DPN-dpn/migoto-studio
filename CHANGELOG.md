@@ -3,6 +3,10 @@
 ## [다음 버전]
 
 ### 신규 기능
+- ZZMI TTL(Transparency Texture Lib) 투명도 라이브러리 구문 및 템플릿 지원:
+  - ZZMI 지원 플러그인(`zzmi-support`)에 TTL 투명도 렌더링 구문(`$\TTL\alpha`, `$\TTL\_1`, `$\TTL\_2`, `$\TTL\mask_channel`, `$\TTL\mask_invert`, `run = CommandList\TTL\Draw`, `Resource\TTL\TransparencyTex`) 린트 허용 등록
+  - 단일 알파 투명도 렌더링 템플릿(`ZZMI TTL 투명도 드로우 (단일 투명도)`) 및 텍스처 마스크 기반 투명도 템플릿(`ZZMI TTL 텍스처 마스크 투명도 (Texture Mask)`) 2종 추가
+  - 커스텀 린터(`custom-lint`)의 네임스페이스 변수/커맨드리스트 검사에서 TTL 특수 변수 및 빌트인 리소스 오탐 방지 연동
 
 ### 기능 개선
 

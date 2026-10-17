@@ -529,7 +529,8 @@ test('zzmi-support plugin activates and registers allowed resource and code temp
   const plugin = def.createPlugin();
 
   const allowedResources: any[] = [];
-  let registeredTemplate: any = null;
+  const allowedVars: any[] = [];
+  const registeredTemplates: any[] = [];
   let registeredView: any = null;
 
   const mockContext: any = {
@@ -538,10 +539,15 @@ test('zzmi-support plugin activates and registers allowed resource and code temp
       registerAllowedResource: (pattern: any) => {
         allowedResources.push(pattern);
       },
+      registerAllowedVariable: (pattern: any) => {
+        allowedVars.push(pattern);
+      },
+      registerAllowedUsedVariable: () => {},
+      registerAllowedUsedResource: () => {},
     },
     templates: {
       registerTemplate: (template: any) => {
-        registeredTemplate = template;
+        registeredTemplates.push(template);
       },
     },
     ui: {
@@ -555,11 +561,26 @@ test('zzmi-support plugin activates and registers allowed resource and code temp
   };
 
   plugin.activate(mockContext);
-  assert.ok(allowedResources.length >= 2);
-  assert.ok(registeredTemplate);
-  assert.equal(registeredTemplate.id, 'zzmi_slot_fix');
-  assert.ok(registeredTemplate.body.includes('CommandList\\ZZMI\\SetTextures'));
-  assert.ok(registeredTemplate.body.includes('Resource\\ZZMI\\WEngineFX'));
+  assert.ok(allowedResources.length >= 4);
+  assert.ok(allowedVars.length >= 1);
+  assert.ok(registeredTemplates.length >= 3);
+  const templateIds = registeredTemplates.map((t) => t.id);
+  assert.ok(templateIds.includes('zzmi_slot_fix'));
+  assert.ok(templateIds.includes('zzmi_ttl_draw'));
+  assert.ok(templateIds.includes('zzmi_ttl_texture'));
+
+  const slotFix = registeredTemplates.find((t) => t.id === 'zzmi_slot_fix')!;
+  assert.ok(slotFix.body.includes('CommandList\\ZZMI\\SetTextures'));
+  assert.ok(slotFix.body.includes('Resource\\ZZMI\\WEngineFX'));
+
+  const ttlDraw = registeredTemplates.find((t) => t.id === 'zzmi_ttl_draw')!;
+  assert.ok(ttlDraw.body.includes('CommandList\\TTL\\Draw'));
+  assert.ok(ttlDraw.body.includes('$\\TTL\\alpha'));
+
+  const ttlTexture = registeredTemplates.find((t) => t.id === 'zzmi_ttl_texture')!;
+  assert.ok(ttlTexture.body.includes('Resource\\TTL\\TransparencyTex'));
+  assert.ok(ttlTexture.body.includes('$\\TTL\\mask_channel'));
+
   assert.equal(registeredView, null);
 });
 
