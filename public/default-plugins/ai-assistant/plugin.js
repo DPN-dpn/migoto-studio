@@ -86,10 +86,6 @@ var t = e({
 					}
 				};
 				y();
-				let b = document.createElement("div");
-				b.className = "ai-settings-card";
-				let x = document.createElement("div");
-				x.className = "ai-settings-card-title", x.textContent = "빠른 프로바이더 설정";
 				let S = document.createElement("div");
 				S.className = "ai-quick-actions";
 				let C = e.ui.createButton({
@@ -114,13 +110,23 @@ var t = e({
 						s.setValue(t), g.setValue(n), e.storage.set("api_url", t), e.storage.set("model", n), y(), e.ui.showToast("Ollama 설정이 적용되었습니다. (Key는 비워둠)", "info");
 					}
 				});
-				S.append(C, w, T), b.append(x, S);
-				let E = document.createElement("div");
-				E.className = "ai-settings-card";
-				let D = document.createElement("div");
-				D.className = "ai-settings-card-title", D.textContent = "연결 정보 입력", E.append(D, s.row, c, g.row, _);
-				let O = document.createElement("div");
-				O.className = "ai-settings-card", O.style.fontSize = "11px", O.style.color = "var(--fg-dim)", O.style.lineHeight = "1.5", O.innerHTML = "\n          <div style=\"font-weight:600;color:var(--fg);margin-bottom:4px;\">안내사항</div>\n          <div>- Google Gemini: Google AI Studio 키(AQ...) 입력 시 gemini-flash-latest 모델이 기본 제공됩니다.</div>\n          <div>- OpenAI: platform.openai.com API 키 및 gpt-4o-mini 모델을 권장합니다.</div>\n          <div>- Ollama: 로컬 PC에서 실행 중인 경우 키 없이 바로 연결할 수 있습니다.</div>\n        ", o.append(b, E, O);
+				S.append(C, w, T);
+				let b = e.ui.createCard({
+					title: "빠른 프로바이더 설정",
+					content: S
+				});
+				let E = e.ui.createCard({
+					title: "연결 정보 입력",
+					content: [s.row, c, g.row, _]
+				});
+				let O_div = document.createElement("div");
+				O_div.style.cssText = "font-size: 11px; color: var(--fg-dim); line-height: 1.5;";
+				O_div.innerHTML = "\n          <div>- Google Gemini: Google AI Studio 키(AQ...) 입력 시 gemini-flash-latest 모델이 기본 제공됩니다.</div>\n          <div>- OpenAI: platform.openai.com API 키 및 gpt-4o-mini 모델을 권장합니다.</div>\n          <div>- Ollama: 로컬 PC에서 실행 중인 경우 키 없이 바로 연결할 수 있습니다.</div>\n        ";
+				let O = e.ui.createCard({
+					title: "환경 및 모델 안내",
+					content: O_div
+				});
+				o.append(b, E, O);
 				let k = document.createElement("div");
 				k.className = "ai-chat-history";
 				let A = document.createElement("div");
@@ -605,6 +611,13 @@ var t = e({
 				return () => {
 					Z && Z.abort("UNMOUNT"), window.removeEventListener("mousemove", ie), window.removeEventListener("mouseup", ae), document.removeEventListener("click", oe);
 				};
+			}
+		});
+		e.ui.registerMenuItem({
+			label: "AI 모딩 에이전트 열기",
+			shortcut: "Ctrl+Shift+A",
+			action: () => {
+				e.ui.showToast("좌측 액티비티 바에서 [AI 에이전트] 탭을 엽니다.", "info");
 			}
 		});
 	},

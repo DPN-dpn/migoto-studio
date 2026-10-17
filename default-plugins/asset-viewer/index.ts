@@ -7,6 +7,7 @@ import { ImageViewer } from './image-viewer.ts';
  */
 export default definePlugin({
   activate(context: PluginContext) {
+    // 1. 에디터 커스텀 뷰어 등록
     context.editor.registerCustomViewer({
       id: 'asset-viewer',
       name: 'DDS / 텍스처 뷰어',
@@ -19,6 +20,26 @@ export default definePlugin({
           bytes: file.bytes,
         });
         return () => viewer.dispose();
+      },
+    });
+
+    // 2. 상단 [플러그인] 메뉴: 파일 선택기를 통한 텍스처 열기
+    context.ui.registerMenuItem({
+      label: '텍스처/DDS 이미지 열기…',
+      action: async () => {
+        try {
+          const filePath = await context.workspace.pickFile({
+            title: '텍스처/이미지 파일 선택',
+            filters: [
+              { name: 'Textures & Images', extensions: ['dds', 'png', 'jpg', 'jpeg', 'bmp', 'webp', 'gif'] },
+            ],
+          });
+          if (filePath) {
+            await context.workspace.openFile(filePath);
+          }
+        } catch (err) {
+          context.ui.showToast(`이미지 열기 오류: ${err}`, 'error');
+        }
       },
     });
   },

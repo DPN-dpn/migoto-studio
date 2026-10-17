@@ -148,13 +148,6 @@ export default definePlugin({
         };
         renderChips();
 
-        const presetCard = document.createElement('div');
-        presetCard.className = 'ai-settings-card';
-
-        const presetTitle = document.createElement('div');
-        presetTitle.className = 'ai-settings-card-title';
-        presetTitle.textContent = '빠른 프로바이더 설정';
-
         const presetRow = document.createElement('div');
         presetRow.className = 'ai-quick-actions';
 
@@ -204,26 +197,28 @@ export default definePlugin({
         });
 
         presetRow.append(btnPresetGemini, btnPresetOpenAI, btnPresetOllama);
-        presetCard.append(presetTitle, presetRow);
 
-        const configCard = document.createElement('div');
-        configCard.className = 'ai-settings-card';
-        const configTitle = document.createElement('div');
-        configTitle.className = 'ai-settings-card-title';
-        configTitle.textContent = '연결 정보 입력';
-        configCard.append(configTitle, urlInput.row, keyRow, modelInput.row, modelChipsWrap);
+        const presetCard = context.ui.createCard({
+          title: '빠른 프로바이더 설정',
+          content: presetRow,
+        });
 
-        const guideCard = document.createElement('div');
-        guideCard.className = 'ai-settings-card';
-        guideCard.style.fontSize = '11px';
-        guideCard.style.color = 'var(--fg-dim)';
-        guideCard.style.lineHeight = '1.5';
-        guideCard.innerHTML = `
-          <div style="font-weight:600;color:var(--fg);margin-bottom:4px;">안내사항</div>
+        const configCard = context.ui.createCard({
+          title: '연결 정보 입력',
+          content: [urlInput.row, keyRow, modelInput.row, modelChipsWrap],
+        });
+
+        const guideDiv = document.createElement('div');
+        guideDiv.style.cssText = 'font-size: 11px; color: var(--fg-dim); line-height: 1.5;';
+        guideDiv.innerHTML = `
           <div>- Google Gemini: Google AI Studio 키(AQ...) 입력 시 gemini-flash-latest 모델이 기본 제공됩니다.</div>
           <div>- OpenAI: platform.openai.com API 키 및 gpt-4o-mini 모델을 권장합니다.</div>
           <div>- Ollama: 로컬 PC에서 실행 중인 경우 키 없이 바로 연결할 수 있습니다.</div>
         `;
+        const guideCard = context.ui.createCard({
+          title: '환경 및 모델 안내',
+          content: guideDiv,
+        });
 
         settingsPane.append(presetCard, configCard, guideCard);
 
@@ -1494,6 +1489,15 @@ export default definePlugin({
           window.removeEventListener('mouseup', onResizerMouseUp);
           document.removeEventListener('click', onDocClick);
         };
+      },
+    });
+
+    // 2. 상단 [플러그인] 메뉴: AI 에이전트 바로가기
+    context.ui.registerMenuItem({
+      label: 'AI 모딩 에이전트 열기',
+      shortcut: 'Ctrl+Shift+A',
+      action: () => {
+        context.ui.showToast('좌측 액티비티 바에서 [AI 에이전트] 탭을 엽니다.', 'info');
       },
     });
   },

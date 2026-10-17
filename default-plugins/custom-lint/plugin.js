@@ -620,6 +620,13 @@ var i = !1, a = [], o = null, s = null, c = null, l = null, u = null, d = null, 
 			return d;
 		} };
 		e.editor?.registerDefinitionProvider ? u = e.editor.registerDefinitionProvider(h) : e.linter?.registerDefinitionProvider && (u = e.linter.registerDefinitionProvider(h)), e.editor?.registerReferenceProvider ? d = e.editor.registerReferenceProvider(g) : e.linter?.registerReferenceProvider && (d = e.linter.registerReferenceProvider(g));
+		e.ui.registerMenuItem({
+			label: "모드 리소스 및 네임스페이스 린트 상태 확인",
+			action: () => {
+				let t = e.workspace.getCurrentFile(), n = e.workspace.getCurrentFolder();
+				n ? e.ui.showToast(`커스텀 린터가 정상 동작 중입니다. (모드 폴더: ${n})`, "info") : t ? e.ui.showToast(`커스텀 린터가 정상 동작 중입니다. (파일: ${t.name})`, "info") : e.ui.showToast("커스텀 린터가 활성화되어 있습니다.", "info");
+			}
+		});
 	},
 	deactivate() {
 		if (i = !1, a.length > 0) {

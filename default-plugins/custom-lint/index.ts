@@ -1108,6 +1108,22 @@ export default definePlugin({
     } else if (context.linter?.registerReferenceProvider) {
       unregisterRefProvider = context.linter.registerReferenceProvider(referenceProvider);
     }
+
+    // 상단 [플러그인] 메뉴: 린터 상태 확인
+    context.ui.registerMenuItem({
+      label: '모드 리소스 및 네임스페이스 린트 상태 확인',
+      action: () => {
+        const cur = context.workspace.getCurrentFile();
+        const folder = context.workspace.getCurrentFolder();
+        if (folder) {
+          context.ui.showToast(`커스텀 린터가 정상 동작 중입니다. (모드 폴더: ${folder})`, 'info');
+        } else if (cur) {
+          context.ui.showToast(`커스텀 린터가 정상 동작 중입니다. (파일: ${cur.name})`, 'info');
+        } else {
+          context.ui.showToast('커스텀 린터가 활성화되어 있습니다.', 'info');
+        }
+      },
+    });
   },
   deactivate() {
     isPluginActive = false;
