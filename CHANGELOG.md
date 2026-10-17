@@ -18,6 +18,9 @@
   - 커스텀 탭의 `customCleanup` 콜백이 탭 전환 시마다 잘못 실행되던 문제를 해결하여 탭이 실제로 닫힐 때(`closeTab`)만 정상 정리되도록 라이프사이클 분리
   - Monaco 에디터 탭 복귀 시 뷰포트 레이아웃 계산과 `restoreViewState` 동기화를 보완하여 커서 및 스크롤 위치 복원 안정화
   - `context.ui.createTabs` 서브 탭 전환 시에도 각 패널 내부의 스크롤 위치를 기록하고 복원하도록 개선
+- ZZMI 플러그인(`zzmi-support` v1.3.1) TTL 템플릿 기본값 개선:
+  - TTL 단일 투명도 드로우 템플릿의 `$\TTL\alpha` 기본값을 `0.4`에서 `0.5`로 변경
+  - TTL 템플릿의 `$\TTL\_2` 플레이스홀더를 `${3:StartIndexLocation}`에서 `${3:FirstIndex}`로 변경하여 가독성 및 호환성 향상
 
 ### 버그 수정
 - `node --test` 환경에서 `createNumberInput` 마우스 연속 누름 타이머가 활성 상태로 남아 프로세스가 종료되지 않던 현상 수정 (`unref` 적용 및 `destroy` 정리 메서드 추가)
