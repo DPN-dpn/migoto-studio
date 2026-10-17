@@ -1,5 +1,6 @@
 import type { SelectOption, FormConfig, FormFieldDef, FormInstance } from './types.ts';
 import { CODE_TO_VK } from '../core/ini/keys.ts';
+import { openKeyHelperModal, type KeyHelperModalOptions } from '../ui/modals/key-helper.ts';
 
 /**
  * 플러그인 전용 고수준 UI 빌더 API 구현체
@@ -620,12 +621,24 @@ export function createUIBuilder() {
         cleanupListener = () => window.removeEventListener('keydown', handler, { capture: true });
       };
 
-      captureBtn.addEventListener('click', (e) => {
+      const helperBtn = document.createElement('button');
+      helperBtn.type = 'button';
+      helperBtn.className = 'small-btn plugin-key-helper-btn';
+      helperBtn.textContent = '키 도우미';
+      helperBtn.title = '3DMigoto 키 조합 도우미 창을 엽니다';
+      helperBtn.addEventListener('click', async (e) => {
         e.preventDefault();
-        startListening();
+        const selected = await openKeyHelperModal({
+          title: options.label ? `${options.label} 설정` : '3DMigoto 키 입력 도우미',
+          initialKey: input.value,
+        });
+        if (selected) {
+          input.value = selected;
+          options.onChange?.(selected);
+        }
       });
 
-      wrap.append(input, captureBtn);
+      wrap.append(input, captureBtn, helperBtn);
       row.append(wrap);
 
       return {
@@ -930,6 +943,22 @@ export function createUIBuilder() {
           });
         },
       };
+    },
+
+    /**
+     * 3DMigoto 키 바인딩 설정 모달 창을 대화형으로 엽니다.
+     * 사용자가 키를 선택하고 확인하면 선택된 3DMigoto 단축키 문자열(예: 'ctrl no_alt VK_F1')을 반환하고,
+     * 취소하면 null을 반환합니다.
+     */
+    openKeyBindingModal(options?: KeyHelperModalOptions): Promise<string | null> {
+      return openKeyHelperModal(options);
+    },
+
+    /**
+     * openKeyBindingModal의 별칭 (동일 동작)
+     */
+    openKeyHelperModal(options?: KeyHelperModalOptions): Promise<string | null> {
+      return openKeyHelperModal(options);
     },
   };
 }

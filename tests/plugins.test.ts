@@ -1005,5 +1005,61 @@ test('Plugin UI API FormConfig schema and value aggregation works properly', () 
   assert.equal(values.states, 3);
 });
 
+test('Plugin UI API and INI API provide toggle key and key binding helpers', () => {
+  let invoked = false;
+  const plugin = definePlugin({
+    activate(context) {
+      assert.equal(typeof context.ui.openKeyBindingModal, 'function');
+      assert.equal(typeof context.ui.openKeyHelperModal, 'function');
+      assert.equal(typeof context.ini.formatKeyToggle, 'function');
+      assert.equal(typeof context.ini.parseKeyBinding, 'function');
+      assert.equal(typeof context.ini.formatKeyBinding, 'function');
+      assert.equal(typeof context.ini.getKeyList, 'function');
+
+      const parsed = context.ini.parseKeyBinding('ctrl no_alt VK_F4');
+      assert.equal(parsed.vk, 'VK_F4');
+      assert.equal(parsed.ctrl, 'require');
+      assert.equal(parsed.alt, 'exclude');
+
+      const formatted = context.ini.formatKeyBinding({
+        vk: 'VK_F4',
+        ctrl: 'require',
+        alt: 'exclude',
+      });
+      assert.equal(formatted, 'ctrl no_alt VK_F4');
+
+      const keyList = context.ini.getKeyList();
+      assert.ok(keyList.length > 50);
+
+      const toggleSection = context.ini.formatKeyToggle({
+        sectionName: 'KeyToggleOutfit',
+        key: 'VK_F1',
+        type: 'cycle',
+        states: 3,
+        variableName: '$outfit',
+      });
+      assert.ok(toggleSection.includes('[KeyToggleOutfit]'));
+      assert.ok(toggleSection.includes('key = VK_F1'));
+      assert.ok(toggleSection.includes('$outfit = 0, 1, 2'));
+      invoked = true;
+    },
+  });
+
+  plugin.activate({
+    ui: {
+      openKeyBindingModal: async () => 'VK_F1',
+      openKeyHelperModal: async () => 'VK_F1',
+    },
+    ini: {
+      formatKeyToggle: (opts: any) => `[${opts.sectionName}]\nkey = ${opts.key}\ntype = ${opts.type}\n$outfit = 0, 1, 2`,
+      parseKeyBinding: (text: string) => ({ vk: 'VK_F4', ctrl: 'require', alt: 'exclude', shift: 'none', win: 'none' }),
+      formatKeyBinding: (opts: any) => `${opts.ctrl === 'require' ? 'ctrl ' : ''}${opts.alt === 'exclude' ? 'no_alt ' : ''}${opts.vk}`,
+      getKeyList: () => new Array(60).fill({ vk: 'VK_F1', label: 'F1', category: '기능키' }),
+    },
+  } as any);
+
+  assert.ok(invoked);
+});
+
 
 

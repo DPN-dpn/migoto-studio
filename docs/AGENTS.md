@@ -162,7 +162,9 @@ context.ui.registerSidebarView({
 ```
 
 #### 5) UI 빌더 팩토리 컴포넌트 (`context.ui.*`)
-- `createKeyInput({ label?, value?, description?, onChange? })`: 실시간 키 캡처 인풋
+- `openKeyBindingModal({ title?, initialKey?, onApply? })`: 3DMigoto 단축키 설정 대화상자를 비동기(`Promise<string | null>`)로 호출 (실시간 키 캡처, 수식키 조합, 가상키 목록 검색 제공)
+- `openKeyHelperModal(options)`: `openKeyBindingModal`의 별칭
+- `createKeyInput({ label?, value?, description?, onChange? })`: 실시간 키 캡처 및 [키 도우미] 모달 버튼이 포함된 단축키 입력 필드
 - `createCard({ title?, subtitle?, badge?, content?, actions? })`: 스타일 카드
 - `createForm(formConfig)`: 선언형 폼 인스턴스 (`getValues()`, `setValues()`, `reset()`)
 - `createButton({ text, variant?: 'primary'|'secondary'|'danger'|'small', onClick })`
@@ -191,26 +193,37 @@ const snippet = context.ini.formatKeyToggle({
   comments: ['의상 변경 토글'],
 });
 
-// 2. 현재 열린 INI 파일에 섹션 추가/갱신 (기존 섹션은 제자리 교체, 주석 유지)
+// 2. 키 바인딩 문자열 파싱 (수식키 상태와 가상키로 분해)
+const parsed = context.ini.parseKeyBinding('ctrl no_alt VK_F4');
+// { vk: 'VK_F4', ctrl: 'require', alt: 'exclude', shift: 'none', win: 'none' }
+
+// 3. 키 바인딩 문자열 조합
+const keyStr = context.ini.formatKeyBinding({ vk: 'VK_F4', ctrl: 'require', alt: 'exclude' });
+// "ctrl no_alt VK_F4"
+
+// 4. 지원하는 가상키 전체 목록 조회
+const allKeys = context.ini.getKeyList(); // [ { vk: 'VK_F1', label: 'F1', ... }, ... ]
+
+// 5. 현재 열린 INI 파일에 섹션 추가/갱신 (기존 섹션은 제자리 교체, 주석 유지)
 context.ini.upsertSection('KeyToggleDress', {
   key: 'no_modifiers VK_F4',
   type: 'cycle',
   '$dress': '0, 1',
 });
 
-// 3. 특정 섹션 삭제
+// 6. 특정 섹션 삭제
 context.ini.deleteSection('KeyToggleDress');
 
-// 4. 문서 내 모든 섹션명 목록 조회 (문자열 배열)
+// 7. 문서 내 모든 섹션명 목록 조회 (문자열 배열)
 const sections = context.ini.getSections(); // ['Constants', 'KeyToggleDress', ...]
 
-// 5. 문서 내 선언된 모든 $변수 목록 조회
+// 8. 문서 내 선언된 모든 $변수 목록 조회
 const vars = context.ini.getVariables(); // { "$dress": "0", "$active": "1" }
 
-// 6. 전체 구조 파싱
+// 9. 전체 구조 파싱
 const doc = context.ini.parse(); // { preamble, sections, properties, variables }
 
-// 7. 스마트 병합
+// 10. 스마트 병합
 const result = context.ini.merge(targetText, sourceText, { replaceInPlace: true });
 ```
 

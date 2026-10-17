@@ -5,6 +5,7 @@ import {
   VK_KEY_LIST,
   formatKeyBinding,
   generateKeySnippet,
+  parseKeyBinding,
   parseKeyBindingLine,
 } from '../src/core/ini/keys.ts';
 
@@ -106,6 +107,22 @@ test('parseKeyBindingLine extracts prefix, modifiers and virtual key from editor
   // Non-key line
   const res3 = parseKeyBindingLine('type = cycle');
   assert.equal(res3, null);
+});
+
+test('parseKeyBinding parses standalone key strings and line values', () => {
+  const p1 = parseKeyBinding('VK_F1');
+  assert.equal(p1.vk, 'VK_F1');
+  assert.equal(p1.ctrl, 'none');
+
+  const p2 = parseKeyBinding('ctrl no_alt VK_F4');
+  assert.equal(p2.vk, 'VK_F4');
+  assert.equal(p2.ctrl, 'require');
+  assert.equal(p2.alt, 'exclude');
+
+  const p3 = parseKeyBinding('key = shift windows VK_SPACE');
+  assert.equal(p3.vk, 'VK_SPACE');
+  assert.equal(p3.shift, 'require');
+  assert.equal(p3.win, 'require');
 });
 
 test('generateKeySnippet creates expected formats', () => {

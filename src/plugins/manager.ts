@@ -31,6 +31,11 @@ import {
   formatKeyToggleSection,
   deleteIniSection,
 } from '../core/ini/ini';
+import {
+  parseKeyBinding,
+  formatKeyBinding,
+  VK_KEY_LIST,
+} from '../core/ini/keys';
 import type {
   CustomDefinitionProvider,
   CustomLintRule,
@@ -1278,6 +1283,9 @@ export default {
           condition?: string;
           comments?: string[];
         }) => formatKeyToggleSection(options),
+        parseKeyBinding: (text: string) => parseKeyBinding(text),
+        formatKeyBinding: (options: Parameters<typeof formatKeyBinding>[0]) => formatKeyBinding(options),
+        getKeyList: () => VK_KEY_LIST,
         getSections: (text?: string) => {
           const doc = parseIni(text !== undefined ? text : this.editor.getValue());
           return doc.sections;

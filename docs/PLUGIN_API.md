@@ -180,6 +180,38 @@ const unregister = context.ui.registerMenuItem({
 
 ---
 
+### 3.7 키 바인딩 설정 모달 대화상자 (`context.ui.openKeyBindingModal`)
+
+3DMigoto 전용 키 입력 도우미 모달 대화상자를 호출하여 실시간 키보드 입력 감지, 필수/부정 수식키(`ctrl`, `no_ctrl`, `alt`, `no_alt` 등) 조합 및 전체 가상 키 목록 검색/선택을 제공합니다.
+사용자가 [확인]을 누르면 선택된 3DMigoto 단축키 문자열을 반환하고, 취소 시 `null`을 반환합니다.
+
+```typescript
+// 1. 비동기 대화상자 호출 (Promise)
+const selectedKey = await context.ui.openKeyBindingModal({
+  title: '헤어 토글 키 설정',
+  initialKey: 'no_modifiers alt VK_F4', // 기존 설정값 (생략 시 기본값)
+});
+
+if (selectedKey) {
+  console.log('선택된 키:', selectedKey); // e.g. "ctrl no_alt VK_F4"
+  // INI 파일이나 설정에 적용
+}
+
+// 2. 콜백 방식으로 호출
+context.ui.openKeyBindingModal({
+  title: '단축키 변경',
+  initialKey: currentKey,
+  onApply: (newKey) => {
+    updateBinding(newKey);
+  },
+});
+```
+
+- **별칭**: `context.ui.openKeyHelperModal(options)`로도 동일하게 호출할 수 있습니다.
+- **위젯 연동**: `context.ui.createKeyInput(options)` 위젯에는 실시간 [키 감지] 버튼 외에 모달을 여는 [키 도우미] 버튼이 기본 내장되어 있습니다.
+
+---
+
 ## 4. INI 문서 파싱 및 조작 API (`context.ini`)
 
 3DMigoto 및 XXMI 문법에 특화된 고수준 조작 유틸리티를 제공합니다.
@@ -195,24 +227,40 @@ const keyToggleBlock = context.ini.formatKeyToggle({
   comments: ['머리 모양 순환 토글'],
 });
 
-// 2. 현재 열린 INI 파일에 섹션 추가/업데이트 (기존 섹션은 제자리 교체)
+// 2. 키 바인딩 문자열 파싱 (수식키 및 가상키 분해)
+const parsedKey = context.ini.parseKeyBinding('ctrl no_alt VK_F4');
+// { vk: 'VK_F4', ctrl: 'require', alt: 'exclude', shift: 'none', win: 'none' }
+
+// 3. 키 바인딩 문자열 조합
+const keyStr = context.ini.formatKeyBinding({
+  vk: 'VK_F4',
+  ctrl: 'require',
+  alt: 'exclude',
+});
+// "ctrl no_alt VK_F4"
+
+// 4. 지원하는 3DMigoto 가상키 전체 목록 조회
+const allKeys = context.ini.getKeyList();
+// [ { vk: 'VK_F1', label: 'F1', category: '기능키(F1~F12)' }, ... ]
+
+// 5. 현재 열린 INI 파일에 섹션 추가/업데이트 (기존 섹션은 제자리 교체)
 context.ini.upsertSection('KeyToggleHair', {
   key: 'no_modifiers alt VK_F4',
   type: 'cycle',
   '$hair': '0, 1, 2',
 });
 
-// 3. 특정 섹션 삭제
+// 6. 특정 섹션 삭제
 context.ini.deleteSection('KeyToggleHair');
 
-// 4. 섹션 검색 및 목록
+// 7. 섹션 검색 및 목록
 const sections = context.ini.getSections(); // 현재 문서의 모든 섹션 배열
 const keySec = context.ini.findSection(/^Key/i); // 정규식 또는 문자열로 섹션 검색
 
-// 5. 문서 내 선언된 모든 변수 목록 가져오기
+// 8. 문서 내 선언된 모든 변수 목록 가져오기
 const variables = context.ini.getVariables(); // { "$hair": "0", "$active": "1" }
 
-// 6. 원본 파싱 및 수동 병합
+// 9. 원본 파싱 및 수동 병합
 const doc = context.ini.parse();
 const kind = context.ini.classifySection('TextureOverrideBody');
 const merged = context.ini.merge(currentTargetText, newSectionText, { appendNew: true });

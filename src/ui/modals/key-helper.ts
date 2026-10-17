@@ -1,44 +1,74 @@
-import { openModal } from './modal';
-import { monaco } from '../../core/editor/monaco';
+import { openModal } from './modal.ts';
+import type { monaco } from '../../core/editor/monaco.ts';
 import {
   CODE_TO_VK,
   VK_KEY_LIST,
   formatKeyBinding,
+  parseKeyBinding,
   parseKeyBindingLine,
   type ModifierState,
   type VkKeyItem,
-} from '../../core/ini/keys';
-import { showToast } from '../common/toast';
+} from '../../core/ini/keys.ts';
+import { showToast } from '../common/toast.ts';
+
+export interface KeyHelperModalOptions {
+  /** 모달 다이얼로그 타이틀 (기본값: '3DMigoto 키 입력 도우미') */
+  title?: string;
+  /** 초기 단축키 문자열 (예: 'ctrl no_alt VK_F1', 'VK_F4', 'key = VK_SPACE') */
+  initialKey?: string;
+  /** 특정 에디터 라인 번호 대상 편집 시 지정 */
+  targetLineNumber?: number;
+  /** 대상 Monaco 에디터 인스턴스 (생략 시 에디터 삽입 없이 반환값으로만 사용 가능) */
+  editor?: monaco.editor.ICodeEditor | null;
+  /** 적용 버튼 레이블 (기본값: 에디터 존재 시 '에디터에 적용/삽입', 그 외 '확인') */
+  applyLabel?: string;
+  /** 키 선택 및 적용 완료 시 콜백 */
+  onApply?: (keyBinding: string) => void;
+}
 
 /**
  * Opens the interactive Key Helper Modal dialog.
- * When opened from a 'key = ...' line (e.g. via context menu), it initializes with the current line's
- * value and directly updates that line upon apply.
- * Supports positive and negative modifier conditions (ctrl, no_ctrl, alt, no_alt, etc.).
+ * Can be called with a Monaco editor instance, or with KeyHelperModalOptions.
+ * Returns a Promise that resolves with the selected 3DMigoto keyBinding string (e.g. 'ctrl no_alt VK_F1')
+ * or null if cancelled.
  */
-export function openKeyHelperModal(editor: monaco.editor.ICodeEditor): void {
-  const body = document.createElement('div');
-  body.className = 'key-helper-modal-body';
+export function openKeyHelperModal(
+  editorOrOptions?: monaco.editor.ICodeEditor | KeyHelperModalOptions,
+): Promise<string | null> {
+  return new Promise((resolve) => {
+    let resolved = false;
+    const safeResolve = (val: string | null) => {
+      if (!resolved) {
+        resolved = true;
+        resolve(val);
+      }
+    };
 
-  let currentVk = 'VK_F1';
-  let ctrlState: ModifierState = 'none';
-  let altState: ModifierState = 'none';
-  let shiftState: ModifierState = 'none';
-  let winState: ModifierState = 'none';
-  let currentFriendlyName = 'F1';
+    const isEditor =
+      editorOrOptions &&
+      typeof (editorOrOptions as any).getPosition === 'function' &&
+      typeof (editorOrOptions as any).getModel === 'function';
 
-  // Check if cursor/context is on an existing 'key = ...' line
-  const pos = editor.getPosition();
-  const model = editor.getModel();
-  let targetLineNumber: number | null = null;
-  let linePrefix = 'key = ';
+    const options: KeyHelperModalOptions = isEditor
+      ? { editor: editorOrOptions as monaco.editor.ICodeEditor }
+      : (editorOrOptions as KeyHelperModalOptions) || {};
 
-  if (pos && model) {
-    const curLine = model.getLineContent(pos.lineNumber);
-    const parsed = parseKeyBindingLine(curLine);
-    if (parsed) {
-      targetLineNumber = pos.lineNumber;
-      linePrefix = parsed.prefix;
+    const editor = options.editor ?? null;
+    const body = document.createElement('div');
+    body.className = 'key-helper-modal-body';
+
+    let currentVk = 'VK_F1';
+    let ctrlState: ModifierState = 'none';
+    let altState: ModifierState = 'none';
+    let shiftState: ModifierState = 'none';
+    let winState: ModifierState = 'none';
+    let currentFriendlyName = 'F1';
+
+    let targetLineNumber: number | null = options.targetLineNumber ?? null;
+    let linePrefix = 'key = ';
+
+    if (options.initialKey) {
+      const parsed = parseKeyBinding(options.initialKey);
       currentVk = parsed.vk;
       ctrlState = parsed.ctrl;
       altState = parsed.alt;
@@ -46,30 +76,53 @@ export function openKeyHelperModal(editor: monaco.editor.ICodeEditor): void {
       winState = parsed.win;
       const found = VK_KEY_LIST.find((k) => k.vk === currentVk);
       if (found) currentFriendlyName = found.label;
+    } else if (editor) {
+      // Check if cursor/context is on an existing 'key = ...' line
+      const pos = editor.getPosition();
+      const model = editor.getModel();
+      if (pos && model) {
+        const curLine = model.getLineContent(pos.lineNumber);
+        const parsed = parseKeyBindingLine(curLine);
+        if (parsed) {
+          targetLineNumber = pos.lineNumber;
+          linePrefix = parsed.prefix;
+          currentVk = parsed.vk;
+          ctrlState = parsed.ctrl;
+          altState = parsed.alt;
+          shiftState = parsed.shift;
+          winState = parsed.win;
+          const found = VK_KEY_LIST.find((k) => k.vk === currentVk);
+          if (found) currentFriendlyName = found.label;
+        }
+      }
     }
-  }
 
-  let closeFn: (() => void) | null = null;
+    let closeFn: (() => void) | null = null;
 
-  // 1. Live Key Capture Area
-  const captureSection = document.createElement('div');
-  captureSection.className = 'key-capture-section';
+    // 1. Live Key Capture Area
+    const captureSection = document.createElement('div');
+    captureSection.className = 'key-capture-section';
 
-  const captureTitleRow = document.createElement('div');
-  captureTitleRow.className = 'key-section-title-row';
+    const captureTitleRow = document.createElement('div');
+    captureTitleRow.className = 'key-section-title-row';
 
-  const captureTitle = document.createElement('div');
-  captureTitle.className = 'key-section-title';
-  captureTitle.textContent = '실시간 키보드 입력 감지';
+    const captureTitle = document.createElement('div');
+    captureTitle.className = 'key-section-title';
+    captureTitle.textContent = '실시간 키보드 입력 감지';
 
-  if (targetLineNumber) {
-    const lineBadge = document.createElement('span');
-    lineBadge.className = 'key-line-badge';
-    lineBadge.textContent = `${targetLineNumber}번 줄 구문 편집 중`;
-    captureTitleRow.append(captureTitle, lineBadge);
-  } else {
-    captureTitleRow.append(captureTitle);
-  }
+    if (targetLineNumber) {
+      const lineBadge = document.createElement('span');
+      lineBadge.className = 'key-line-badge';
+      lineBadge.textContent = `${targetLineNumber}번 줄 구문 편집 중`;
+      captureTitleRow.append(captureTitle, lineBadge);
+    } else if (options.initialKey) {
+      const valBadge = document.createElement('span');
+      valBadge.className = 'key-line-badge';
+      valBadge.textContent = `현재 설정: ${options.initialKey.replace(/^\s*key\s*=\s*/i, '')}`;
+      captureTitleRow.append(captureTitle, valBadge);
+    } else {
+      captureTitleRow.append(captureTitle);
+    }
 
   const captureBox = document.createElement('div');
   captureBox.className = 'key-capture-box';
@@ -386,7 +439,9 @@ export function openKeyHelperModal(editor: monaco.editor.ICodeEditor): void {
 
   const applyBtn = document.createElement('button');
   applyBtn.className = 'primary key-action-btn';
-  applyBtn.textContent = targetLineNumber ? '에디터에 적용' : '에디터에 삽입';
+  applyBtn.textContent =
+    options.applyLabel ||
+    (targetLineNumber ? '에디터에 적용' : (editor ? '에디터에 삽입' : '확인'));
 
   applyBtn.onclick = () => {
     const keyString = formatKeyBinding({
@@ -397,41 +452,51 @@ export function openKeyHelperModal(editor: monaco.editor.ICodeEditor): void {
       win: winState,
     });
 
-    if (targetLineNumber !== null && model) {
-      // Replace only the target line's value
-      const lineRange = new monaco.Range(
-        targetLineNumber,
-        1,
-        targetLineNumber,
-        model.getLineMaxColumn(targetLineNumber),
-      );
-      editor.pushUndoStop();
-      editor.executeEdits('key-helper', [{ range: lineRange, text: `${linePrefix}${keyString}` }]);
-      editor.pushUndoStop();
-      editor.focus();
-      closeFn?.();
-      showToast(`'${linePrefix}${keyString}' 적용 완료`, 'info');
-    } else {
-      // Insert at cursor / selection
-      const selection = editor.getSelection();
-      const position = editor.getPosition();
-      const range = selection && !selection.isEmpty()
-        ? selection
-        : new monaco.Range(
-            position?.lineNumber || 1,
-            position?.column || 1,
-            position?.lineNumber || 1,
-            position?.column || 1,
-          );
-
-      const snippet = `key = ${keyString}`;
-      editor.pushUndoStop();
-      editor.executeEdits('key-helper', [{ range, text: snippet }]);
-      editor.pushUndoStop();
-      editor.focus();
-      closeFn?.();
-      showToast(`'${snippet}' 삽입 완료`, 'info');
+    if (options.onApply) {
+      options.onApply(keyString);
     }
+
+    if (editor) {
+      const model = editor.getModel();
+      if (targetLineNumber !== null && model) {
+        // Replace only the target line's value
+        const lineRange = {
+          startLineNumber: targetLineNumber,
+          startColumn: 1,
+          endLineNumber: targetLineNumber,
+          endColumn: model.getLineMaxColumn(targetLineNumber),
+        };
+        editor.pushUndoStop();
+        editor.executeEdits('key-helper', [{ range: lineRange, text: `${linePrefix}${keyString}` }]);
+        editor.pushUndoStop();
+        editor.focus();
+        showToast(`'${linePrefix}${keyString}' 적용 완료`, 'info');
+      } else {
+        // Insert at cursor / selection
+        const selection = editor.getSelection();
+        const position = editor.getPosition();
+        const range = selection && !selection.isEmpty()
+          ? selection
+          : {
+              startLineNumber: position?.lineNumber || 1,
+              startColumn: position?.column || 1,
+              endLineNumber: position?.lineNumber || 1,
+              endColumn: position?.column || 1,
+            };
+
+        const snippet = `key = ${keyString}`;
+        editor.pushUndoStop();
+        editor.executeEdits('key-helper', [{ range, text: snippet }]);
+        editor.pushUndoStop();
+        editor.focus();
+        showToast(`'${snippet}' 삽입 완료`, 'info');
+      }
+    } else if (!options.onApply) {
+      showToast(`'${keyString}' 설정 완료`, 'info');
+    }
+
+    safeResolve(keyString);
+    closeFn?.();
   };
 
   const copyBtn = document.createElement('button');
@@ -456,17 +521,33 @@ export function openKeyHelperModal(editor: monaco.editor.ICodeEditor): void {
   const cancelBtn = document.createElement('button');
   cancelBtn.className = 'key-action-btn';
   cancelBtn.textContent = '닫기';
-  cancelBtn.onclick = () => closeFn?.();
+  cancelBtn.onclick = () => {
+    safeResolve(null);
+    closeFn?.();
+  };
 
   actionsBar.append(applyBtn, copyBtn, cancelBtn);
 
   body.append(captureSection, modSection, listSection, previewSection, actionsBar);
 
+  const modalTitle =
+    options.title ||
+    (targetLineNumber
+      ? `3DMigoto 키 바인딩 편집 (${targetLineNumber}번 줄)`
+      : '3DMigoto 키 입력 도우미');
+
   closeFn = openModal(
-    targetLineNumber ? `3DMigoto 키 바인딩 편집 (${targetLineNumber}번 줄)` : '3DMigoto 키 입력 도우미',
+    modalTitle,
     body,
-    { autoHeight: true, className: 'modal-key-helper' },
+    {
+      autoHeight: true,
+      className: 'modal-key-helper',
+      onClose: () => {
+        safeResolve(null);
+      },
+    },
   );
 
   setTimeout(() => captureBox.focus(), 60);
+  });
 }

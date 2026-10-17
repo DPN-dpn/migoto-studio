@@ -5065,6 +5065,25 @@ body.ai-dock-resizing * {
   color: var(--accent);
 }
 
+.plugin-key-helper-btn {
+  white-space: nowrap;
+  flex-shrink: 0;
+  padding: 5px 12px;
+  border-radius: 4px;
+  background: var(--bg-hover);
+  border: 1px solid var(--border);
+  color: var(--fg);
+  font-size: 11.5px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.plugin-key-helper-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(59, 130, 246, 0.1);
+}
+
 .plugin-key-capture-btn.listening {
   background: rgba(239, 68, 68, 0.2);
   border-color: #ef4444;

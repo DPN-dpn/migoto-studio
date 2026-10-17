@@ -2,6 +2,7 @@
 export interface ModalOptions {
   autoHeight?: boolean;
   className?: string;
+  onClose?: () => void;
 }
 
 let closeCurrent: (() => void) | null = null;
@@ -37,6 +38,7 @@ export function openModal(title: string, body: HTMLElement, options?: ModalOptio
     document.removeEventListener('keydown', onKey, true);
     backdrop.remove();
     if (closeCurrent === close) closeCurrent = null;
+    options?.onClose?.();
   };
   const onKey = (e: KeyboardEvent) => {
     if (e.key === 'Escape') { e.stopPropagation(); close(); }

@@ -240,9 +240,7 @@ export function formatKeyBinding(options: KeyBindingOptions): string {
   return parts.join(' ');
 }
 
-export interface ParsedKeyLine {
-  isKeyLine: boolean;
-  prefix: string; // e.g. "key = " or "    key = "
+export interface KeyBindingComponents {
   vk: string;
   ctrl: ModifierState;
   alt: ModifierState;
@@ -251,14 +249,11 @@ export interface ParsedKeyLine {
 }
 
 /**
- * Parses an existing editor line (e.g. "key = ctrl no_alt VK_F1") to extract its modifiers and virtual key.
+ * Parses a 3DMigoto key binding value string (e.g. "ctrl no_alt VK_F1" or "key = VK_SPACE")
+ * into individual modifier states and virtual key.
  */
-export function parseKeyBindingLine(lineText: string): ParsedKeyLine | null {
-  const match = /^(\s*key\s*=\s*)(.*)$/i.exec(lineText);
-  if (!match) return null;
-
-  const prefix = match[1];
-  const valuePart = match[2].trim();
+export function parseKeyBinding(text: string): KeyBindingComponents {
+  const valuePart = text.replace(/^\s*key\s*=\s*/i, '').trim();
   const tokens = valuePart.split(/\s+/).filter(Boolean);
 
   let vk = 'VK_F1';
@@ -301,14 +296,26 @@ export function parseKeyBindingLine(lineText: string): ParsedKeyLine | null {
     }
   }
 
+  return { vk, ctrl, alt, shift, win };
+}
+
+export interface ParsedKeyLine extends KeyBindingComponents {
+  isKeyLine: boolean;
+  prefix: string; // e.g. "key = " or "    key = "
+}
+
+/**
+ * Parses an existing editor line (e.g. "key = ctrl no_alt VK_F1") to extract its modifiers and virtual key.
+ */
+export function parseKeyBindingLine(lineText: string): ParsedKeyLine | null {
+  const match = /^(\s*key\s*=\s*)(.*)$/i.exec(lineText);
+  if (!match) return null;
+
+  const parsed = parseKeyBinding(match[2]);
   return {
     isKeyLine: true,
-    prefix,
-    vk,
-    ctrl,
-    alt,
-    shift,
-    win,
+    prefix: match[1],
+    ...parsed,
   };
 }
 

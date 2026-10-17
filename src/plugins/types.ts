@@ -28,6 +28,10 @@ export function renderPluginIcon(icon: string | undefined | null, fallback = 'PL
 }
 
 import type { PluginUIBuilder } from './ui-builder.ts';
+import type { KeyHelperModalOptions } from '../ui/modals/key-helper.ts';
+export type { KeyHelperModalOptions };
+import type { VkKeyItem, ModifierState, KeyBindingComponents } from '../core/ini/keys.ts';
+export type { VkKeyItem, ModifierState, KeyBindingComponents };
 
 export interface SelectOption {
   value: string;
@@ -260,6 +264,15 @@ export interface PluginContext {
       condition?: string;
       comments?: string[];
     }): string;
+    parseKeyBinding(text: string): KeyBindingComponents;
+    formatKeyBinding(options: {
+      vk: string;
+      ctrl?: ModifierState;
+      alt?: ModifierState;
+      shift?: ModifierState;
+      win?: ModifierState;
+    }): string;
+    getKeyList(): VkKeyItem[];
     getSections(text?: string): IniSection[];
     findSection(nameOrPattern: string | RegExp, text?: string): IniSection | undefined;
     getVariables(text?: string): Record<string, string>;
@@ -307,6 +320,8 @@ export interface PluginContext {
       shortcut?: string;
       action: () => void;
     }): () => void;
+    openKeyBindingModal(options?: KeyHelperModalOptions): Promise<string | null>;
+    openKeyHelperModal(options?: KeyHelperModalOptions): Promise<string | null>;
   } & PluginUIBuilder;
 
   // ---- System execution (desktop) ----
