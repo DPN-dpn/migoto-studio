@@ -1,12 +1,18 @@
 # 릴리스 노트 (Release Notes)
 
-## [다음 버전]
+## [0.12.2] - 2026-10-17
 
 ### 신규 기능
+- 플러그인 레이아웃 및 분할 뷰 API (`context.ui.createSplitView`, `createRow`, `createColumn`, `createGrid`, `createDivider`, `createScrollContainer`): 마우스 드래그 조절 리사이저블 스플릿 뷰(크기 자동 저장 지원), 가로/세로 Flexbox 컨테이너, Grid 다단 레이아웃, 테마 스크롤바 컨테이너 추가
+- 플러그인 확장 UI 빌더 컴포넌트 API (`createTabs`, `createCollapsible`, `createSegmentedControl`, `createSearchInput`, `createFilePicker`, `attachTooltip`, `createDropZone`): 인라인 탭 네비게이션, 아코디언 접기/펼치기, 알약(Pill) 세그먼트 컨트롤, 실시간 디바운스 검색창(클리어 버튼 내장), 파일 열기 대화상자 연동 경로 선택기, 테마 플로팅 툴팁, 파일 드래그 앤 드롭 영역 7종 추가
 
 ### 기능 개선
+- 상단 메뉴바 플러그인 메뉴 노출 개선: 플러그인이 메뉴를 1개 등록할 경우 상단 [플러그인] 메뉴에 1단으로 직접 노출하고, 2개 이상 등록 시에만 플러그인 이름의 서브메뉴(▶)로 자동 그룹화하도록 개선
+- AI 플러그인 개발 지침서(`docs/AGENTS.md`) 및 공식 레퍼런스 문서(`docs/PLUGIN_API.md`) 구조 개편: `AGENTS.md`의 중복 API 열거를 걷어내고 `PLUGIN_API.md`를 단일 진실 공급원(Single Source of Truth)으로 참조하도록 슬림화 및 전체 위젯 명세 보강
+- GitHub Wiki (`migoto-studio.wiki`) 최신화: `Plugin-System.md`에 레이아웃 및 신규 확장 UI 컴포넌트 13종의 매개변수와 사용법 수록
 
 ### 버그 수정
+- 커스텀 플러그인 사이드바 탭 순서 동기화 버그 수정: 기본 내장 플러그인 외에 사용자가 직접 설치한 외부 커스텀 플러그인도 플러그인 관리자에서 설정한 정렬 순서대로 액티비티 바 탭 순서가 올바르게 재배치되도록 수정
 
 ---
 
