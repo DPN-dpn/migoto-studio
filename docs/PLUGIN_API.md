@@ -67,38 +67,82 @@ export default {
 
 ## 3. UI 확장 API (`context.ui`)
 
-### 3.1 메인 에디터 탭 열기 (`context.ui.openTab`)
+### 3.1 메인 에디터 탭 열기 (`context.ui.openTab` 및 `context.ui.openFormTab`)
 
 사이드바 패널이 비좁거나 사용자에게 넓은 GUI 작업 공간을 제공해야 하는 경우, INI 에디터 탭과 나란히 메인 에디터 영역에 독립된 탭을 생성할 수 있습니다.
+
+#### A. 초간단 선언형 폼 탭 (`context.ui.openFormTab`) - **(권장)**
+HTML/CSS를 일일이 짤 필요 없이, 필드 목록 스키마만 정의하면 Migoto Studio가 테마에 맞추어 카드 레이아웃, 실시간 키 캡처, 유효성 검사, 적용 버튼이 포함된 고품질 GUI 탭을 자동으로 생성합니다.
+
+```typescript
+const formTab = context.ui.openFormTab({
+  id: 'key-toggle-wizard',
+  title: '토글 키 설정',
+  icon: '🎛️',
+  form: {
+    title: '토글 키 생성 마법사',
+    description: '단축키와 모드를 선택하면 현재 INI 파일에 [KeyToggle] 섹션을 자동으로 추가합니다.',
+    fields: [
+      { id: 'section', type: 'text', label: '섹션 이름', default: 'KeyToggleDress', placeholder: 'KeyToggle...' },
+      { id: 'key', type: 'key', label: '단축키', default: 'VK_F4', description: '토글을 발동할 키 (키 감지 버튼으로 직접 입력 가능)' },
+      { id: 'mode', type: 'select', label: '토글 모드', options: ['cycle', 'hold'], default: 'cycle' },
+      { id: 'varName', type: 'text', label: '변수명', default: '$dress', placeholder: '$var_name' },
+      { id: 'states', type: 'number', label: '의상 상태 개수', default: 2, min: 2, max: 10 },
+    ],
+    submitLabel: 'INI 파일에 적용하기',
+    onSubmit: (values) => {
+      // 1. 3DMigoto KeyToggle 섹션 텍스트 생성
+      const sectionText = context.ini.formatKeyToggle({
+        sectionName: values.section,
+        key: values.key,
+        type: values.mode,
+        states: values.states,
+        variableName: values.varName,
+      });
+
+      // 2. 현재 열린 INI 파일에 자동으로 섹션 병합/업서트
+      context.ini.upsertSection(values.section, {
+        key: values.key,
+        type: values.mode,
+        [values.varName]: Array.from({ length: values.states }, (_, i) => i).join(', '),
+      });
+
+      context.ui.showToast(`[${values.section}] 토글 키가 적용되었습니다!`, 'info');
+    },
+  },
+});
+```
+
+- 지원하는 필드 타입(`type`):
+  - `'key'`: 3DMigoto 전용 키 바인딩 선택기 (실시간 키보드 입력 감지 버튼 내장)
+  - `'text'`: 텍스트 입력창
+  - `'number'`: 숫자 입력창 (`min`, `max`, `step` 지원)
+  - `'select'`: 드롭다운 선택창 (`options` 배열 지원)
+  - `'checkbox'`: 체크박스 토글
+  - `'textarea'`: 여러 줄 텍스트/코드 입력창
+  - `'color'`: 색상 선택기
+
+---
+
+#### B. 자유 형식 커스텀 탭 (`context.ui.openTab`)
+원시 DOM 요소를 직접 구성하거나 외부 캔버스 라이브러리 등을 렌더링할 때 사용합니다.
 
 ```typescript
 const tab = context.ui.openTab({
   id: 'my-gui-tab',
-  title: '토글 키 설정기',
+  title: '커스텀 뷰어',
   icon: '⚙️',
   render(container) {
-    container.innerHTML = `
-      <div style="padding: 24px; max-width: 800px; margin: 0 auto; color: var(--fg);">
-        <h2>🎛️ 토글 키 설정 매니저</h2>
-        <p>열려 있는 모드의 INI 설정을 직관적으로 편집합니다.</p>
-        <div id="gui-content"></div>
-      </div>
-    `;
-
-    // 정리(Cleanup)가 필요한 경우 함수를 반환합니다.
+    container.innerHTML = `<div style="padding: 24px;">...자유로운 HTML/CSS...</div>`;
     return () => {
-      console.log('탭이 닫히거나 전환될 때 정리 로직 수행');
+      // 탭이 닫히거나 전환될 때 정리 로직 수행
     };
   },
 });
-
-// 프로그래밍 방식으로 탭 제어 가능:
-// tab.focus();  // 탭으로 포커스 전환
-// tab.close();  // 탭 닫기
 ```
 
 - **다중 탭 호환**: 다른 INI 탭들과 완벽히 호환되며, `Ctrl+W`로 닫거나 마우스 휠 클릭 닫기, 탭 간 전환이 자연스럽게 작동합니다.
-- **상태 보존**: 동일한 `id`로 `openTab`을 다시 호출하면 새 탭을 중복 생성하지 않고 기존에 열려 있는 탭으로 즉시 전환됩니다.
+- **상태 보존**: 동일한 `id`로 `openTab` 또는 `openFormTab`을 다시 호출하면 새 탭을 중복 생성하지 않고 기존에 열려 있는 탭으로 즉시 전환됩니다.
 
 ---
 
@@ -112,74 +156,8 @@ const unregister = context.ui.registerMenuItem({
   label: '토글 키 설정 열기…',
   shortcut: 'Ctrl+Shift+T', // 선택 사항 (표시용 텍스트)
   action: () => {
-    // 클릭 시 실행할 동작
-    openMyTab(context);
-  },
-});
-```
-
-- **메뉴 구조**:
-  ```
-  [상단 메뉴바]
-    └── [플러그인]
-          ├── 플러그인 관리… (Ctrl+Shift+X)
-          ├── 플러그인 폴더 열기…
-          ├── ────────────────────
-          └── [내 커스텀 플러그인] ▶
-                └── 토글 키 설정 열기… (Ctrl+Shift+T)
-  ```
-
----
-
-### 3.3 좌측 사이드바 패널 등록 (`context.ui.registerSidebarView`)
-
-좌측 액티비티 바에 전용 탭 아이콘과 사이드바 패널을 등록합니다.
-
-```typescript
-context.ui.registerSidebarView({
-  id: 'my-sidebar-panel',
-  title: '플러그인 도구',
-  icon: '🛠️',
-  render(container) {
-    container.innerHTML = `<div style="padding: 12px;">사이드바 내용</div>`;
-    return () => {
-      // 사이드바 언마운트 시 정리
-    };
-  },
-});
-```
-
----
-
-### 3.4 모달 창 및 토스트 알림
-
-```typescript
-// 모달 띄우기
-context.ui.showModal('설정 마법사', (bodyEl, closeModal) => {
-  bodyEl.innerHTML = `<p>설정을 진행하시겠습니까?</p>`;
-  const btn = document.createElement('button');
-  btn.textContent = '확인';
-  btn.onclick = () => {
-    closeModal();
-  };
-  bodyEl.appendChild(btn);
-});
-
-// 토스트 메시지
-context.ui.showToast('설정이 성공적으로 저장되었습니다.', 'info'); // 'info' | 'warn' | 'error'
-```
-
----
-
-### 3.5 상태 표시줄 아이템 (`context.ui.registerStatusBarItem`)
-
-```typescript
-context.ui.registerStatusBarItem({
-  id: 'my-status',
-  text: '모드: 활성',
-  tooltip: '클릭하여 상태 변경',
-  onClick: () => {
-    context.ui.showToast('상태 토글됨');
+    // 클릭 시 실행할 동작 (예: 폼 탭 열기)
+    openMyForm(context);
   },
 });
 ```
@@ -190,46 +168,56 @@ context.ui.registerStatusBarItem({
 
 빠르고 일관된 테마 디자인을 위해 내장 컴포넌트 팩토리 메서드를 제공합니다.
 
+- `context.ui.createForm(config)`: 고수준 선언형 폼 컴포넌트 생성 (`getValues()`, `setValues()`, `reset()`)
+- `context.ui.createKeyInput(options)`: 3DMigoto 전용 키 캡처 입력기 위젯
+- `context.ui.createCard(options)`: 헤더/설명/액션 버튼이 포함된 스타일 카드
 - `context.ui.createButton(options)`: 일관된 스타일의 버튼 생성
 - `context.ui.createInput(options)`: 텍스트 입력 필드
 - `context.ui.createSelect(options)`: 드롭다운 선택 필드
 - `context.ui.createCheckbox(options)`: 체크박스
 - `context.ui.createSlider(options)`: 슬라이더
-- `context.ui.createSection(title, description)`: 섹션 컨테이너 카드
 - `context.ui.createBadge(text, color)`: 배지
 
 ---
 
 ## 4. INI 문서 파싱 및 조작 API (`context.ini`)
 
-3DMigoto 및 XXMI 문법에 특화된 파서와 조작 유틸리티를 제공합니다.
+3DMigoto 및 XXMI 문법에 특화된 고수준 조작 유틸리티를 제공합니다.
 
 ```typescript
-// 1. 현재 에디터 또는 임의의 텍스트 파싱
+// 1. 토글 키 섹션 텍스트 생성
+const keyToggleBlock = context.ini.formatKeyToggle({
+  sectionName: 'KeyToggleHair',
+  key: 'no_modifiers alt VK_F4',
+  type: 'cycle',
+  states: 3,
+  variableName: '$hair',
+  comments: ['머리 모양 순환 토글'],
+});
+
+// 2. 현재 열린 INI 파일에 섹션 추가/업데이트 (기존 섹션은 제자리 교체)
+context.ini.upsertSection('KeyToggleHair', {
+  key: 'no_modifiers alt VK_F4',
+  type: 'cycle',
+  '$hair': '0, 1, 2',
+});
+
+// 3. 특정 섹션 삭제
+context.ini.deleteSection('KeyToggleHair');
+
+// 4. 섹션 검색 및 목록
+const sections = context.ini.getSections(); // 현재 문서의 모든 섹션 배열
+const keySec = context.ini.findSection(/^Key/i); // 정규식 또는 문자열로 섹션 검색
+
+// 5. 문서 내 선언된 모든 변수 목록 가져오기
+const variables = context.ini.getVariables(); // { "$hair": "0", "$active": "1" }
+
+// 6. 원본 파싱 및 수동 병합
 const doc = context.ini.parse();
-// doc.sections: Array of { name, rawName, lines: [{ type, key, value, line, raw }] }
-// doc.variables: Record<string, string>
-
-// 2. 섹션 분류
-const kind = context.ini.classifySection('KeyToggleDress');
-// 'key' | 'resource' | 'command_list' | 'custom_shader' | 'constants' | 'present' | 'texture_override' | 'general'
-
-// 3. 섹션 병합
+const kind = context.ini.classifySection('TextureOverrideBody');
 const merged = context.ini.merge(currentTargetText, newSectionText, { appendNew: true });
-// merged.text: 병합된 전체 문자열
-// merged.updatedCount, merged.appendedCount
-
-// 4. 섹션 서식화 문자열 생성
-const sectionStr = context.ini.formatSection(
-  'KeyToggleExample',
-  {
-    key: 'VK_F4',
-    type: 'cycle',
-    '$toggle': '0, 1',
-  },
-  { comments: ['토글 키 설정 섹션'] },
-);
 ```
+
 
 ---
 
@@ -375,3 +363,11 @@ function openStudioTab(context) {
   });
 }
 ```
+
+---
+
+## 10. AI 코딩 어시스턴트 활용 (ChatGPT / Claude / Cursor)
+
+다른 AI(ChatGPT, Claude, Cursor 등)에게 Migoto Studio 플러그인 개발을 요청할 때는 [`docs/AGENTS.md`](./AGENTS.md) 지침서를 시스템 프롬프트로 제공하세요.
+내부 코드를 일일이 설명할 필요 없이 선언형 폼 빌더(`openFormTab`)와 `context.ini` API를 사용한 안전하고 즉시 실행 가능한 플러그인 코드를 단번에 작성할 수 있습니다.
+

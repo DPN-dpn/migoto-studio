@@ -1,4 +1,5 @@
-import type { SelectOption } from './types.ts';
+import type { SelectOption, FormConfig, FormFieldDef, FormInstance } from './types.ts';
+import { CODE_TO_VK } from '../core/ini/keys.ts';
 
 /**
  * 플러그인 전용 고수준 UI 빌더 API 구현체
@@ -486,7 +487,397 @@ export function createUIBuilder() {
         },
       };
     },
+
+    createKeyInput(options: {
+      label?: string;
+      value?: string;
+      placeholder?: string;
+      description?: string;
+      onChange?: (keyStr: string) => void;
+    }) {
+      const row = document.createElement('div');
+      row.className = 'form-row plugin-key-input-row';
+
+      if (options.label) {
+        const lbl = document.createElement('label');
+        lbl.textContent = options.label;
+        row.append(lbl);
+      }
+
+      const wrap = document.createElement('div');
+      wrap.className = 'plugin-key-input-wrap';
+
+      const input = document.createElement('input');
+      input.className = 'plugin-input plugin-key-field';
+      input.type = 'text';
+      input.value = options.value ?? 'VK_F4';
+      if (options.placeholder) input.placeholder = options.placeholder;
+
+      input.oninput = () => {
+        options.onChange?.(input.value);
+      };
+
+      const captureBtn = document.createElement('button');
+      captureBtn.type = 'button';
+      captureBtn.className = 'small-btn plugin-key-capture-btn';
+      captureBtn.textContent = '키 감지';
+      captureBtn.title = '클릭 후 키보드를 누르면 단축키를 자동으로 감지합니다';
+
+      let isListening = false;
+      let cleanupListener: (() => void) | null = null;
+
+      const stopListening = () => {
+        isListening = false;
+        captureBtn.textContent = '키 감지';
+        captureBtn.classList.remove('listening');
+        if (cleanupListener) {
+          cleanupListener();
+          cleanupListener = null;
+        }
+      };
+
+      const startListening = () => {
+        if (isListening) {
+          stopListening();
+          return;
+        }
+        isListening = true;
+        captureBtn.textContent = '키 누르는 중...';
+        captureBtn.classList.add('listening');
+
+        const handler = (e: KeyboardEvent) => {
+          if (['Control', 'Shift', 'Alt', 'Meta'].includes(e.key)) return;
+
+          e.preventDefault();
+          e.stopPropagation();
+
+          if (e.key === 'Escape') {
+            stopListening();
+            return;
+          }
+
+          const vk = CODE_TO_VK[e.code] || `VK_${e.key.toUpperCase()}`;
+          const modifiers: string[] = [];
+          if (e.ctrlKey) modifiers.push('ctrl');
+          if (e.altKey) modifiers.push('alt');
+          if (e.shiftKey) modifiers.push('shift');
+
+          const keyBinding = modifiers.length > 0 ? `${modifiers.join(' ')} ${vk}` : vk;
+          input.value = keyBinding;
+          options.onChange?.(keyBinding);
+          stopListening();
+        };
+
+        window.addEventListener('keydown', handler, { capture: true });
+        cleanupListener = () => window.removeEventListener('keydown', handler, { capture: true });
+      };
+
+      captureBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        startListening();
+      });
+
+      wrap.append(input, captureBtn);
+      row.append(wrap);
+
+      return {
+        row,
+        input,
+        getValue: () => input.value,
+        setValue: (v: string) => {
+          input.value = v;
+          options.onChange?.(v);
+        },
+      };
+    },
+
+    createCard(options: {
+      title: string;
+      subtitle?: string;
+      badge?: { text: string; variant?: 'info' | 'success' | 'warn' | 'error' | 'neutral' };
+      children?: HTMLElement[];
+      actions?: HTMLElement[];
+    }): HTMLElement {
+      const card = document.createElement('div');
+      card.className = 'plugin-card';
+
+      const header = document.createElement('div');
+      header.className = 'plugin-card-header';
+
+      const titleWrap = document.createElement('div');
+      titleWrap.className = 'plugin-card-title-wrap';
+
+      const titleEl = document.createElement('div');
+      titleEl.className = 'plugin-card-title';
+      titleEl.textContent = options.title;
+      titleWrap.append(titleEl);
+
+      if (options.subtitle) {
+        const subEl = document.createElement('div');
+        subEl.className = 'plugin-card-subtitle';
+        subEl.textContent = options.subtitle;
+        titleWrap.append(subEl);
+      }
+      header.append(titleWrap);
+
+      if (options.badge) {
+        const badge = this.createBadge({
+          text: options.badge.text,
+          variant: options.badge.variant || 'neutral',
+        });
+        header.append(badge);
+      }
+      card.append(header);
+
+      if (options.children && options.children.length > 0) {
+        const body = document.createElement('div');
+        body.className = 'plugin-card-body';
+        options.children.forEach((c) => body.append(c));
+        card.append(body);
+      }
+
+      if (options.actions && options.actions.length > 0) {
+        const footer = document.createElement('div');
+        footer.className = 'plugin-card-footer';
+        options.actions.forEach((a) => footer.append(a));
+        card.append(footer);
+      }
+
+      return card;
+    },
+
+    createForm(config: FormConfig): FormInstance {
+      const form = document.createElement('form');
+      form.className = 'plugin-form';
+      form.onsubmit = (e) => e.preventDefault();
+
+      if (config.title || config.description) {
+        const intro = document.createElement('div');
+        intro.className = 'plugin-form-intro';
+        if (config.title) {
+          const h = document.createElement('h3');
+          h.className = 'plugin-form-title';
+          h.textContent = config.title;
+          if (config.badge) {
+            const badge = this.createBadge({ text: config.badge, variant: 'info' });
+            badge.style.marginLeft = '8px';
+            badge.style.verticalAlign = 'middle';
+            h.append(badge);
+          }
+          intro.append(h);
+        }
+        if (config.description) {
+          const p = document.createElement('p');
+          p.className = 'plugin-form-desc';
+          p.textContent = config.description;
+          intro.append(p);
+        }
+        form.append(intro);
+      }
+
+      const values: Record<string, any> = { ...(config.initialValues || {}) };
+      const fieldControls = new Map<string, { getValue: () => any; setValue: (v: any) => void }>();
+
+      const renderField = (field: FormFieldDef): HTMLElement => {
+        const initialVal = values[field.id] !== undefined ? values[field.id] : field.default;
+        if (initialVal !== undefined) {
+          values[field.id] = initialVal;
+        }
+
+        const fieldWrapper = document.createElement('div');
+        fieldWrapper.className = 'plugin-field-group';
+
+        const updateValue = (newVal: any) => {
+          values[field.id] = newVal;
+          config.onChange?.(values, field.id);
+        };
+
+        let controlRow: HTMLElement;
+
+        if (field.type === 'key') {
+          const keyInput = this.createKeyInput({
+            label: field.label,
+            value: initialVal !== undefined ? String(initialVal) : 'VK_F4',
+            placeholder: field.placeholder,
+            onChange: updateValue,
+          });
+          fieldControls.set(field.id, {
+            getValue: () => keyInput.getValue(),
+            setValue: (v) => keyInput.setValue(v),
+          });
+          controlRow = keyInput.row;
+        } else if (field.type === 'select') {
+          const sel = this.createSelect({
+            label: field.label,
+            options: field.options || [],
+            value: initialVal !== undefined ? String(initialVal) : undefined,
+            onChange: updateValue,
+          });
+          fieldControls.set(field.id, {
+            getValue: () => sel.getValue(),
+            setValue: (v) => sel.setValue(v),
+          });
+          controlRow = sel.row;
+        } else if (field.type === 'checkbox') {
+          const chk = this.createCheckbox({
+            label: field.label,
+            checked: Boolean(initialVal),
+            onChange: updateValue,
+          });
+          fieldControls.set(field.id, {
+            getValue: () => chk.isChecked(),
+            setValue: (v) => chk.setChecked(Boolean(v)),
+          });
+          controlRow = chk.row;
+        } else if (field.type === 'textarea') {
+          const txt = this.createCodeEditor({
+            label: field.label,
+            value: initialVal !== undefined ? String(initialVal) : '',
+            placeholder: field.placeholder,
+            rows: 4,
+            onInput: updateValue,
+          });
+          fieldControls.set(field.id, {
+            getValue: () => txt.getValue(),
+            setValue: (v) => txt.setValue(v),
+          });
+          controlRow = txt.container;
+        } else {
+          const inp = this.createInput({
+            label: field.label,
+            type: field.type || 'text',
+            value: initialVal !== undefined ? String(initialVal) : '',
+            placeholder: field.placeholder,
+            onInput: (val) => {
+              const parsed = field.type === 'number' ? Number(val) : val;
+              updateValue(parsed);
+            },
+          });
+          if (field.min !== undefined) (inp.input as HTMLInputElement).min = String(field.min);
+          if (field.max !== undefined) (inp.input as HTMLInputElement).max = String(field.max);
+          if (field.step !== undefined) (inp.input as HTMLInputElement).step = String(field.step);
+
+          fieldControls.set(field.id, {
+            getValue: () => (field.type === 'number' ? Number(inp.getValue()) : inp.getValue()),
+            setValue: (v) => inp.setValue(String(v)),
+          });
+          controlRow = inp.row;
+        }
+
+        fieldWrapper.append(controlRow);
+
+        if (field.description) {
+          const desc = document.createElement('div');
+          desc.className = 'plugin-field-help';
+          desc.textContent = field.description;
+          fieldWrapper.append(desc);
+        }
+
+        return fieldWrapper;
+      };
+
+      const sections = config.sections || (config.fields ? [{ fields: config.fields }] : []);
+      sections.forEach((sec) => {
+        const secCard = document.createElement('div');
+        secCard.className = 'plugin-form-section-card';
+
+        if (sec.title || sec.description) {
+          const secHeader = document.createElement('div');
+          secHeader.className = 'plugin-section-header';
+          if (sec.title) {
+            const h4 = document.createElement('div');
+            h4.className = 'plugin-section-title';
+            h4.textContent = sec.title;
+            secHeader.append(h4);
+          }
+          if (sec.description) {
+            const sp = document.createElement('div');
+            sp.className = 'plugin-section-desc';
+            sp.textContent = sec.description;
+            secHeader.append(sp);
+          }
+          secCard.append(secHeader);
+        }
+
+        const secBody = document.createElement('div');
+        secBody.className = 'plugin-section-body';
+        sec.fields.forEach((f) => {
+          secBody.append(renderField(f));
+        });
+        secCard.append(secBody);
+        form.append(secCard);
+      });
+
+      const actionsRow = document.createElement('div');
+      actionsRow.className = 'plugin-form-actions';
+
+      const submitBtn = document.createElement('button');
+      submitBtn.type = 'button';
+      submitBtn.className = 'primary plugin-form-submit';
+      submitBtn.textContent = config.submitLabel || '적용';
+
+      submitBtn.onclick = async () => {
+        submitBtn.disabled = true;
+        const originalText = submitBtn.textContent;
+        submitBtn.textContent = '처리 중...';
+        try {
+          fieldControls.forEach((ctl, id) => {
+            values[id] = ctl.getValue();
+          });
+          await config.onSubmit(values);
+        } finally {
+          submitBtn.disabled = false;
+          submitBtn.textContent = originalText;
+        }
+      };
+
+      actionsRow.append(submitBtn);
+
+      if (config.showReset) {
+        const resetBtn = document.createElement('button');
+        resetBtn.type = 'button';
+        resetBtn.className = 'secondary';
+        resetBtn.textContent = config.resetLabel || '초기화';
+        resetBtn.onclick = () => {
+          const defaults = config.initialValues || {};
+          fieldControls.forEach((ctl, id) => {
+            const defVal = defaults[id] ?? '';
+            ctl.setValue(defVal);
+            values[id] = defVal;
+          });
+          config.onReset?.();
+        };
+        actionsRow.append(resetBtn);
+      }
+
+      form.append(actionsRow);
+
+      return {
+        element: form,
+        getValues: () => {
+          fieldControls.forEach((ctl, id) => {
+            values[id] = ctl.getValue();
+          });
+          return { ...values };
+        },
+        setValues: (newVals: Record<string, any>) => {
+          Object.entries(newVals).forEach(([k, v]) => {
+            values[k] = v;
+            fieldControls.get(k)?.setValue(v);
+          });
+        },
+        reset: () => {
+          const defaults = config.initialValues || {};
+          fieldControls.forEach((ctl, id) => {
+            const defVal = defaults[id] ?? '';
+            ctl.setValue(defVal);
+            values[id] = defVal;
+          });
+        },
+      };
+    },
   };
 }
+
 
 export type PluginUIBuilder = ReturnType<typeof createUIBuilder>;

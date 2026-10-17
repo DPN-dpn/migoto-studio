@@ -314,3 +314,60 @@ export function formatIniSection(
 
   return lines.join('\n');
 }
+
+/**
+ * 3DMigoto KeyToggle 섹션 텍스트 블록을 포맷팅합니다.
+ */
+export function formatKeyToggleSection(options: {
+  sectionName?: string;
+  key: string;
+  type?: 'cycle' | 'hold';
+  states?: number | string[];
+  variableName?: string;
+  condition?: string;
+  comments?: string[];
+}): string {
+  const name = options.sectionName || 'KeyToggle';
+  const varName = options.variableName
+    ? (options.variableName.startsWith('$') ? options.variableName : `$${options.variableName}`)
+    : '$toggle';
+  const type = options.type || 'cycle';
+
+  let statesStr = '0, 1';
+  if (Array.isArray(options.states)) {
+    statesStr = options.states.join(', ');
+  } else if (typeof options.states === 'number' && options.states > 1) {
+    statesStr = Array.from({ length: options.states }, (_, i) => i).join(', ');
+  }
+
+  const props: Record<string, string> = {
+    key: options.key,
+    type,
+    [varName]: statesStr,
+  };
+
+  if (options.condition) {
+    props['condition'] = options.condition;
+  }
+
+  return formatIniSection(name, props, { comments: options.comments });
+}
+
+/**
+ * INI 텍스트에서 특정 섹션을 안전하게 삭제합니다.
+ */
+export function deleteIniSection(iniText: string, sectionName: string): { newText: string; deleted: boolean } {
+  const doc = parseIni(iniText);
+  const targetKey = sectionName.trim().toLowerCase();
+  const exists = doc.sections.some((s) => s.name.toLowerCase() === targetKey);
+  if (!exists) return { newText: iniText, deleted: false };
+
+  const remaining = doc.sections.filter((s) => s.name.toLowerCase() !== targetKey);
+  const parts: string[] = [];
+  if (doc.preamble.trim()) parts.push(doc.preamble.trimEnd());
+  for (const s of remaining) {
+    parts.push(s.fullText.trimEnd());
+  }
+  return { newText: parts.join('\n\n') + '\n', deleted: true };
+}
+

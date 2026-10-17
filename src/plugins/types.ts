@@ -128,6 +128,56 @@ export interface PluginTemplate {
   group: string;
 }
 
+export type FormFieldType =
+  | 'text'
+  | 'number'
+  | 'select'
+  | 'checkbox'
+  | 'key'
+  | 'textarea'
+  | 'color';
+
+export interface FormFieldDef {
+  id: string;
+  label: string;
+  type: FormFieldType;
+  default?: any;
+  placeholder?: string;
+  description?: string;
+  options?: Array<string | SelectOption>;
+  min?: number;
+  max?: number;
+  step?: number;
+}
+
+export interface FormSectionDef {
+  title?: string;
+  description?: string;
+  fields: FormFieldDef[];
+}
+
+export interface FormConfig {
+  title?: string;
+  description?: string;
+  badge?: string;
+  sections?: FormSectionDef[];
+  fields?: FormFieldDef[];
+  initialValues?: Record<string, any>;
+  submitLabel?: string;
+  resetLabel?: string;
+  showReset?: boolean;
+  onSubmit: (values: Record<string, any>) => void | Promise<void>;
+  onReset?: () => void;
+  onChange?: (values: Record<string, any>, fieldId: string) => void;
+}
+
+export interface FormInstance {
+  element: HTMLElement;
+  getValues: () => Record<string, any>;
+  setValues: (values: Record<string, any>) => void;
+  reset: () => void;
+}
+
 export interface PluginContext {
   manifest: PluginManifest;
 
@@ -201,12 +251,27 @@ export interface PluginContext {
     classifySection(name: string): string;
     merge(targetText: string, sourceText: string, options?: { appendNew?: boolean }): IniMergeResult;
     formatSection(name: string, properties: Record<string, string>, options?: { comments?: string[]; variables?: Record<string, string> }): string;
+    formatKeyToggle(options: {
+      sectionName?: string;
+      key: string;
+      type?: 'cycle' | 'hold';
+      states?: number | string[];
+      variableName?: string;
+      condition?: string;
+      comments?: string[];
+    }): string;
+    getSections(text?: string): IniSection[];
+    findSection(nameOrPattern: string | RegExp, text?: string): IniSection | undefined;
+    getVariables(text?: string): Record<string, string>;
+    upsertSection(name: string, properties: Record<string, string>, options?: { comments?: string[]; variables?: Record<string, string>; replaceExisting?: boolean }): void;
+    deleteSection(name: string): boolean;
   };
 
   // ---- UI integration ----
   ui: {
     registerSidebarView(options: {
       id: string;
+      pluginId?: string;
       title: string;
       icon: string;
       render: (container: HTMLElement) => void | (() => void);
@@ -225,6 +290,18 @@ export interface PluginContext {
       icon?: string;
       render: (container: HTMLElement) => void | (() => void);
     }): { close: () => void; focus: () => void };
+    openFormTab(options: {
+      id: string;
+      title: string;
+      icon?: string;
+      form: FormConfig;
+    }): {
+      close: () => void;
+      focus: () => void;
+      getValues: () => Record<string, any>;
+      setValues: (values: Record<string, any>) => void;
+      reset: () => void;
+    };
     registerMenuItem(options: {
       label: string;
       shortcut?: string;

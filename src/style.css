@@ -4912,4 +4912,166 @@ body.ai-dock-resizing * {
   font-weight: 600;
 }
 
+/* ==========================================================================
+   High-Level Plugin Form, Card & Key Helper Styling
+   ========================================================================== */
+.plugin-form-tab-container {
+  width: 100%;
+  height: 100%;
+  overflow-y: auto;
+  background: var(--bg);
+  padding: 24px 20px 48px;
+  box-sizing: border-box;
+}
+
+.plugin-form {
+  max-width: 780px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.plugin-form-intro {
+  margin-bottom: 8px;
+}
+
+.plugin-form-title {
+  margin: 0 0 6px 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--fg);
+  display: flex;
+  align-items: center;
+}
+
+.plugin-form-desc {
+  margin: 0;
+  font-size: 13px;
+  color: var(--fg-dim);
+  line-height: 1.5;
+}
+
+.plugin-form-section-card,
+.plugin-card {
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: border-color 0.15s ease;
+}
+
+.plugin-form-section-card:hover,
+.plugin-card:hover {
+  border-color: rgba(139, 124, 246, 0.35);
+}
+
+.plugin-section-header,
+.plugin-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 8px;
+  margin-bottom: 4px;
+}
+
+.plugin-section-title,
+.plugin-card-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fg);
+}
+
+.plugin-section-desc,
+.plugin-card-subtitle {
+  font-size: 11px;
+  color: var(--fg-dim);
+  margin-top: 2px;
+}
+
+.plugin-section-body,
+.plugin-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.plugin-field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.plugin-field-help {
+  font-size: 11px;
+  color: var(--fg-dim);
+  line-height: 1.4;
+  margin-left: 2px;
+}
+
+.plugin-key-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.plugin-key-field {
+  font-family: 'Cascadia Code', 'D2Coding', Consolas, monospace !important;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: var(--accent) !important;
+}
+
+.plugin-key-capture-btn {
+  white-space: nowrap;
+  flex-shrink: 0;
+  padding: 5px 12px;
+  border-radius: 4px;
+  background: var(--bg-hover);
+  border: 1px solid var(--border);
+  color: var(--fg);
+  font-size: 11.5px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.plugin-key-capture-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.plugin-key-capture-btn.listening {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: #ef4444;
+  color: #f87171;
+  animation: pulse-capture 1.2s infinite;
+}
+
+@keyframes pulse-capture {
+  0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
+  50% { transform: scale(1.02); box-shadow: 0 0 0 6px rgba(239, 68, 68, 0); }
+  100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+}
+
+.plugin-form-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.plugin-form-submit {
+  min-width: 100px;
+  padding: 8px 18px !important;
+  font-weight: 600 !important;
+  font-size: 13px !important;
+}
+
+
 

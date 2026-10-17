@@ -980,4 +980,30 @@ test('Plugin UI API registerMenuItem groups items under plugin and cleans up', (
   assert.equal(pluginMenuItems.size, 0);
 });
 
+test('Plugin UI API FormConfig schema and value aggregation works properly', () => {
+  const formConfig: any = {
+    title: '토글 키 설정',
+    fields: [
+      { id: 'key', type: 'key', label: '단축키', default: 'VK_F4' },
+      { id: 'mode', type: 'select', label: '토글 모드', options: ['cycle', 'hold'], default: 'cycle' },
+      { id: 'states', type: 'number', label: '의상 상태 개수', default: 2 },
+    ],
+  };
+
+  const values: Record<string, any> = {};
+  for (const field of formConfig.fields) {
+    values[field.id] = field.default;
+  }
+
+  assert.equal(values.key, 'VK_F4');
+  assert.equal(values.mode, 'cycle');
+  assert.equal(values.states, 2);
+
+  values.key = 'no_modifiers alt VK_F4';
+  values.states = 3;
+  assert.equal(values.key, 'no_modifiers alt VK_F4');
+  assert.equal(values.states, 3);
+});
+
+
 

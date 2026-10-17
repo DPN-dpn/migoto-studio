@@ -23,7 +23,14 @@ import {
   isAllowedVariable,
 } from '../core/ini/lint';
 import { registerPluginTemplate } from '../core/ini/templates';
-import { parseIni, classifyIniSection, mergeIniSections, formatIniSection } from '../core/ini/ini';
+import {
+  parseIni,
+  classifyIniSection,
+  mergeIniSections,
+  formatIniSection,
+  formatKeyToggleSection,
+  deleteIniSection,
+} from '../core/ini/ini';
 import type {
   CustomDefinitionProvider,
   CustomLintRule,
@@ -38,6 +45,8 @@ import type {
   PluginTemplate,
   RegisteredSidebarView,
   SymbolLocation,
+  FormConfig,
+  FormInstance,
 } from './types';
 import { createUIBuilder } from './ui-builder';
 
@@ -1260,6 +1269,77 @@ export default {
           properties: Record<string, string>,
           options?: { comments?: string[]; variables?: Record<string, string> },
         ) => formatIniSection(name, properties, options),
+        formatKeyToggle: (options: {
+          sectionName?: string;
+          key: string;
+          type?: 'cycle' | 'hold';
+          states?: number | string[];
+          variableName?: string;
+          condition?: string;
+          comments?: string[];
+        }) => formatKeyToggleSection(options),
+        getSections: (text?: string) => {
+          const doc = parseIni(text !== undefined ? text : this.editor.getValue());
+          return doc.sections;
+        },
+        findSection: (nameOrPattern: string | RegExp, text?: string) => {
+          const doc = parseIni(text !== undefined ? text : this.editor.getValue());
+          if (typeof nameOrPattern === 'string') {
+            return doc.getSection(nameOrPattern);
+          }
+          return doc.sections.find((s) => nameOrPattern.test(s.name));
+        },
+        getVariables: (text?: string) => {
+          const doc = parseIni(text !== undefined ? text : this.editor.getValue());
+          const vars: Record<string, string> = {};
+          const lines = doc.preamble.split('\n');
+          for (const l of lines) {
+            const m = l.match(/^\s*(\$[a-zA-Z0-9_]+)\s*=\s*([^;\r\n]*)/);
+            if (m) vars[m[1]] = m[2].trim();
+          }
+          for (const sec of doc.sections) {
+            Object.assign(vars, sec.variables);
+          }
+          return vars;
+        },
+        upsertSection: (
+          name: string,
+          properties: Record<string, string>,
+          options?: { comments?: string[]; variables?: Record<string, string>; replaceExisting?: boolean },
+        ) => {
+          const currentText = this.editor.getValue();
+          const newSectionText = formatIniSection(name, properties, options);
+          const merged = mergeIniSections(currentText, newSectionText, {
+            appendNew: options?.replaceExisting === false ? false : true,
+          });
+          const model = this.editor.getModel();
+          if (model) {
+            this.editor.pushUndoStop();
+            this.editor.executeEdits('plugin-ini-upsert', [
+              { range: model.getFullModelRange(), text: merged.newText },
+            ]);
+            this.editor.pushUndoStop();
+          } else {
+            this.editor.setValue(merged.newText);
+          }
+        },
+        deleteSection: (name: string) => {
+          const currentText = this.editor.getValue();
+          const res = deleteIniSection(currentText, name);
+          if (res.deleted) {
+            const model = this.editor.getModel();
+            if (model) {
+              this.editor.pushUndoStop();
+              this.editor.executeEdits('plugin-ini-delete', [
+                { range: model.getFullModelRange(), text: res.newText },
+              ]);
+              this.editor.pushUndoStop();
+            } else {
+              this.editor.setValue(res.newText);
+            }
+          }
+          return res.deleted;
+        },
       },
 
       ui: {
@@ -1320,6 +1400,49 @@ export default {
           callbacks.onRegisterCleanup(cleanup);
 
           return { close, focus };
+        },
+        openFormTab: (options: {
+          id: string;
+          title: string;
+          icon?: string;
+          form: FormConfig;
+        }) => {
+          let formInstance: FormInstance | null = null;
+          const tabId = `plugin_${manifest.id}_${options.id}`;
+          this.doc.openCustomTab({
+            id: tabId,
+            title: options.title,
+            icon: options.icon ?? manifest.icon,
+            render: (container: HTMLElement) => {
+              container.className = 'plugin-form-tab-container';
+              const builder = createUIBuilder();
+              formInstance = builder.createForm(options.form);
+              container.replaceChildren(formInstance.element);
+              return () => {
+                formInstance = null;
+              };
+            },
+          });
+
+          const close = () => {
+            this.doc.closeTab(tabId);
+          };
+          const focus = () => {
+            this.doc.switchTab(tabId);
+          };
+
+          const cleanup = () => {
+            close();
+          };
+          callbacks.onRegisterCleanup(cleanup);
+
+          return {
+            close,
+            focus,
+            getValues: () => formInstance?.getValues() ?? {},
+            setValues: (vals: Record<string, any>) => formInstance?.setValues(vals),
+            reset: () => formInstance?.reset(),
+          };
         },
         registerMenuItem: (options: {
           label: string;
