@@ -1,5 +1,5 @@
-import type { IniSection, IniDocument, IniMergeResult } from '../core/ini/ini.ts';
-export type { IniSection, IniDocument, IniMergeResult } from '../core/ini/ini.ts';
+import type { IniSection, IniDocument, IniMergeResult, IniSectionLine } from '../core/ini/ini.ts';
+export type { IniSection, IniDocument, IniMergeResult, IniSectionLine } from '../core/ini/ini.ts';
 
 export interface PluginManifest {
   id: string;
@@ -270,6 +270,7 @@ export interface NumberInputOptions {
 }
 
 export interface NumberInputInstance {
+  element: HTMLElement;
   row: HTMLElement;
   container: HTMLElement;
   input: HTMLInputElement;
@@ -281,6 +282,10 @@ export interface NumberInputInstance {
   setMin: (min: number | undefined) => void;
   setMax: (max: number | undefined) => void;
   setStep: (step: number | undefined) => void;
+  getElement: () => HTMLElement;
+  setError: (message: string) => void;
+  clearError: () => void;
+  hasError: () => boolean;
   destroy?: () => void;
 }
 
@@ -414,6 +419,10 @@ export interface PluginContext {
     upsertSection(name: string, properties: Record<string, string>, options?: { comments?: string[]; variables?: Record<string, string>; replaceExisting?: boolean }): void;
     deleteSection(name: string): boolean;
     extractSymbols(text?: string): IniSymbolsResult;
+    formatDisplayKey(rawKey?: string | null): string;
+    getSectionRaw(sectionName: string, text?: string): string | null;
+    setSectionRaw(sectionName: string, rawContent: string): void;
+    parseSectionLines(sectionName: string, text?: string): IniSectionLine[] | null;
   };
 
   // ---- UI integration ----

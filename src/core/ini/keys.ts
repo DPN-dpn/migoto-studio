@@ -336,3 +336,42 @@ export function generateKeySnippet(format: KeyInsertFormat, keyString: string): 
       return `[KeyHold]\nkey = ${keyString}\ntype = hold\n$variable = 1\n`;
   }
 }
+
+/**
+ * 3DMigoto 단축키 문자열(예: 'no_modifiers alt VK_F4')을 부정키를 제거하고
+ * 가독성 높은 UI 표시용 포맷(예: 'Alt + F4')으로 변환합니다.
+ */
+export function formatDisplayKey(rawKey?: string | null, fallback = ''): string {
+  if (!rawKey || typeof rawKey !== 'string') return fallback;
+  const tokens = rawKey.trim().split(/\s+/).filter(Boolean);
+  const positive = tokens.filter((t) => !t.toLowerCase().startsWith('no_'));
+  if (positive.length === 0) return fallback;
+
+  const order = (k: string) => {
+    const l = k.toLowerCase();
+    if (l === 'ctrl') return 1;
+    if (l === 'alt') return 2;
+    if (l === 'shift') return 3;
+    if (l === 'windows' || l === 'win') return 4;
+    return 10;
+  };
+
+  const sorted = [...positive].sort((a, b) => order(a) - order(b));
+
+  return sorted
+    .map((t) => {
+      const l = t.toLowerCase();
+      if (l === 'ctrl') return 'Ctrl';
+      if (l === 'alt') return 'Alt';
+      if (l === 'shift') return 'Shift';
+      if (l === 'windows' || l === 'win') return 'Win';
+      if (t.toUpperCase().startsWith('VK_')) {
+        const sub = t.slice(3).toUpperCase();
+        const known = VK_KEY_LIST.find((k) => k.vk.toUpperCase() === t.toUpperCase());
+        if (known) return known.label.replace(/\s*\([^)]*\)$/, '');
+        return sub;
+      }
+      return t;
+    })
+    .join(' + ');
+}

@@ -139,6 +139,25 @@
   - 해당 게임이나 전용 라이브러리의 **특화 문법 및 템플릿**(예: ZZMI 슬롯픽스 `Resource\ZZMI\...`, WEngineFX, TTL 라이브러리의 `CommandList\TTL\Draw`, `Resource\TTL\TransparencyTex`, `$\TTL\alpha` 등)을 전담합니다.
   - `context.linter.registerAllowedResource` / `context.linter.registerAllowedVariable` 등의 동적 확장 API를 통해 코어나 범용 린터를 오염시키지 않고 독립적으로 동작합니다.
 
+### 플러그인 코어 API 및 UI 빌더 구조 개선 (완료)
+- **배경**: 복잡한 모딩 관리 플러그인(토글 키 및 메쉬 매니저 등) 개발 과정에서 체감된 위젯 최상위 엘리먼트 속성명 불일치, 단축키 텍스트 정제 기능 부재, 다중 동일 키/조건문 블록 보존 한계, 스플릿 뷰 Flex 레이아웃 붕괴, 입력 필드 인라인 에러 피드백 부재 등의 구조적 한계를 해소.
+- **아키텍처 결정 및 개선 사항**:
+  1. **UI 위젯 최상위 엘리먼트 표준화 (`.element` & `.getElement()`)**:
+     - 기존의 `.container`, `.row`, `.element` 파편화를 방지하기 위해 모든 UI 컴포넌트 객체에 표준 `.element` 속성과 `.getElement()` 메서드를 일관되게 제공(기존 속성 하위 호환 유지).
+     - `context.ui.toElement()` 헬퍼를 도입하고, 컨테이너 컴포넌트(`createRow`, `createColumn`, `createGrid`, `createCard`, `createSplitView`, `createScrollContainer`, `createTabs`, `createCollapsible`)의 자식 전달 시 위젯 인스턴스를 자동으로 최상위 엘리먼트로 언래핑.
+  2. **단축키 포맷팅 유틸리티 (`formatDisplayKey`)**:
+     - INI 키 바인딩 문자열(`no_modifiers alt VK_F4`)에서 부정 플래그(`no_*`)를 제거하고 모디파이어 대문자화 및 가상 키 명칭 정제를 거쳐 화면 표시용 배지 텍스트(`Alt + F4`)로 즉시 변환하는 `context.ini.formatDisplayKey()` 제공.
+     - `createKeyInput` 위젯에 `.getDisplayValue()` 메서드 추가 및 `onChange(raw, { raw, display, tokens })` 상세 객체 전달 지원.
+  3. **다중 동일 키 및 순서/주석 보존 Raw Section API**:
+     - 딕셔너리(`{ key: value }`) 파서의 중복 키 덮어쓰기 및 주석 유실 문제를 해결하기 위해, 원본 텍스트를 손상 없이 읽고 쓰는 `context.ini.getSectionRaw(iniText, sectionName)` 및 `context.ini.setSectionRaw(iniText, sectionName, newBlock)` 추가.
+     - `drawindexed = auto` 다중 호출 및 `if-endif` 조건 블록을 순서대로 분석할 수 있는 `context.ini.parseSectionLines(iniOrBlockText, sectionName?)` 라인 단위 AST/블록 파서 도입.
+  4. **스플릿 뷰 Flexbox 레이아웃 방어 강화**:
+     - `createSplitView` 내부 패널(`.plugin-split-pane`, `.plugin-split-first`, `.plugin-split-second`)에 `min-width: 0 !important; min-height: 0 !important; overflow: hidden !important;`를 코어 CSS 차원에서 강제하여 내부 스크롤 컨테이너나 긴 텍스트로 인해 스플릿 비율이 붕괴되는 현상을 원천 방지.
+  5. **입력 필드 폼 검증 상태(Validation State) API**:
+     - 모든 입력 위젯(`createInput`, `createNumberInput`, `createSelect`, `createKeyInput`, `createSearchInput`)에 `.setError(message)`, `.clearError()`, `.hasError()` 표준 탑재.
+     - 에러 발생 시 입력 필드 테두리 경고 색상(`--accent-danger`)과 함께 하단 에러 메시지 툴팁(`.plugin-input-error`)이 매끄러운 페이드인 애니메이션으로 즉각 표시.
+
+
 
 ## 배포 방식 (설치형 + 웹, 둘 다 지원)
 

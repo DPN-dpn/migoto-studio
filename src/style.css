@@ -5258,23 +5258,31 @@ body.ai-dock-resizing * {
 
 .plugin-split-pane {
   position: relative;
-  overflow: hidden;
-  box-sizing: border-box;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
+  overflow: hidden !important;
+  box-sizing: border-box !important;
+  display: flex !important;
+  flex-direction: column !important;
+  min-height: 0 !important;
+  min-width: 0 !important;
+  align-self: stretch !important;
+}
+
+.plugin-split-pane > * {
   min-width: 0;
-  align-self: stretch;
 }
 
 .plugin-split-first {
-  flex-shrink: 0;
+  flex-shrink: 0 !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
 }
 
 .plugin-split-second {
-  flex: 1 1 0%;
-  min-width: 0;
-  min-height: 0;
+  flex: 1 1 0% !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
 }
 
 .plugin-split-resizer {
@@ -5798,3 +5806,63 @@ body.plugin-split-resizing-v * {
   font-size: 11px;
   color: var(--fg-dim);
 }
+
+/* ==========================================================================
+   Plugin Validation & Error Feedback Styles
+   ========================================================================== */
+.form-row.has-error > label {
+  color: #ef4444 !important;
+}
+
+.plugin-input.has-error,
+.plugin-select.has-error,
+.plugin-number-input.has-error,
+.plugin-key-field.has-error,
+.plugin-search-field.has-error,
+.plugin-file-picker-field.has-error {
+  border-color: #ef4444 !important;
+  background-color: rgba(239, 68, 68, 0.06) !important;
+  box-shadow: 0 0 0 1.5px rgba(239, 68, 68, 0.3) !important;
+}
+
+.plugin-input.has-error:focus,
+.plugin-select.has-error:focus,
+.plugin-number-input.has-error:focus,
+.plugin-key-field.has-error:focus,
+.plugin-search-field.has-error:focus,
+.plugin-file-picker-field.has-error:focus {
+  border-color: #f87171 !important;
+  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.45) !important;
+  outline: none !important;
+}
+
+.plugin-input-error {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 5px;
+  font-size: 11.5px;
+  color: #ef4444;
+  font-weight: 500;
+  line-height: 1.35;
+  animation: pluginErrorFadeIn 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.plugin-input-error::before {
+  content: '⚠️';
+  font-size: 11px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+@keyframes pluginErrorFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+

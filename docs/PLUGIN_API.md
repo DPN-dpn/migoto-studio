@@ -269,14 +269,26 @@ context.ui.openRestoreModal('d:/mods/Character/merged.ini');
 
 빠르고 일관된 테마 디자인을 위해 내장 컴포넌트 팩토리 메서드를 제공합니다.
 
+> [!TIP]
+> **컴포넌트 최상위 엘리먼트 통일 표준 (`.element` 및 `.getElement()`, `context.ui.toElement`)**
+> * 모든 UI 빌더 컴포넌트(`createInput`, `createNumberInput`, `createSelect`, `createKeyInput`, `createSplitView`, `createScrollContainer`, `createCard` 등)는 **라벨을 포함한 최상위 DOM 요소를 항상 `.element` 속성 및 `.getElement()` 메서드로 통일 제공**합니다. (기존 `.row`, `.container`도 100% 하위 호환됩니다.)
+> * `createRow`, `createColumn`, `createGrid`, `createCard`, `createScrollContainer`의 `children`/`content` 배열에는 DOM 요소뿐만 아니라 **위젯 인스턴스 자체를 그대로 전달**할 수 있습니다. 코어가 `toElement()`를 통해 자동으로 최상위 엘리먼트를 언래핑하여 DOM에 부착합니다.
+
+> [!NOTE]
+> **표준 폼 유효성 검사 및 에러 피드백 API (`setError`, `clearError`, `hasError`)**
+> * 입력 컴포넌트(`createInput`, `createNumberInput`, `createSelect`, `createKeyInput`, `createSearchInput`, `createFilePicker`)는 모두 표준 에러 검증 메서드를 제공합니다:
+>   * `widget.setError('이미 존재하는 섹션명입니다.')`: 필드에 빨간색 테두리와 포커스 링, 하단 경고 메시지(`⚠️`)를 즉시 띄웁니다.
+>   * `widget.clearError()`: 에러 상태 및 메시지를 제거하고 원래 스타일로 복원합니다.
+>   * `widget.hasError()`: 현재 에러 상태인지 여부(`boolean`)를 확인합니다.
+
 #### 1) 스타일 카드 (`context.ui.createCard`)
 제목, 부제목, 상태 배지 및 액션 버튼이 통합된 카드 컨테이너를 생성합니다.
 ```typescript
 const card = context.ui.createCard({
   title: '텍스처 오버라이드 설정',
   subtitle: '캐릭터 텍스처 교체 슬롯 정의',
-  badge: '활성',
-  content: [row1, row2],
+  badge: { text: '활성', variant: 'success' },
+  content: [row1, row2, numInput], // 위젯 인스턴스를 직접 넘겨도 자동 부착!
   actions: [btnEdit, btnDelete],
 });
 ```
@@ -293,15 +305,21 @@ const btnSave = context.ui.createButton({
 const btnRow = context.ui.createButtonRow([btnSave, btnCancel]);
 ```
 
-#### 3) 기본 폼 입력 컨트롤 (`createInput`, `createSelect`, `createCheckbox`, `createSlider`)
-라벨이 자동으로 결합된 표준 입력 필드들입니다.
+#### 3) 기본 폼 입력 컨트롤 (`createInput`, `createSelect`, `createCheckbox`, `createSlider`, `createNumberInput`)
+라벨이 자동으로 결합된 표준 입력 필드들이며, 에러 피드백(`.setError`)을 기본 지원합니다.
 ```typescript
 // 텍스트 입력창
 const nameInput = context.ui.createInput({
   label: '섹션 이름',
   value: 'TextureOverrideBody',
   placeholder: '섹션명 입력',
-  onChange: (val) => console.log(val),
+  onInput: (val) => {
+    if (val.includes(' ')) {
+      nameInput.setError('섹션명에는 공백이 들어갈 수 없습니다.');
+    } else {
+      nameInput.clearError();
+    }
+  },
 });
 
 // 드롭다운 선택 필드
@@ -338,13 +356,14 @@ const numInput = context.ui.createNumberInput({
   value: 0.5,
   min: 0,
   max: 1,
+  precision: 2, // 소수점 2자리 제한
   step: 0.05,
-  precision: 2,
-  onChange: (val) => console.log('새 값:', val),
+  onChange: (val) => console.log('Alpha 변경:', val),
 });
+// numInput.element; // 최상위 래퍼 (라벨 + 증감 버튼 일체)
 // numInput.getValue(); // 0.5
 // numInput.setValue(0.8);
-// numInput.setDisabled(true);
+// numInput.setError('값은 0 이상이어야 합니다.');
 ```
 
 #### 4) 상태 배지 및 진행률 표시 바 (`createBadge`, `createProgressBar`)
@@ -394,17 +413,23 @@ consoleView.append('작업을 시작합니다.\n');
 ```
 
 #### 7) 키보드 실시간 감지 단축키 입력 필드 (`context.ui.createKeyInput`)
-3DMigoto 전용 단축키 입력 필드로, 실시간 `[⌨️ 감지]` 및 모달 `[키 도우미]` 버튼이 기본 탑재되어 있습니다.
+3DMigoto 전용 단축키 입력 필드로, 실시간 `[⌨️ 감지]` 및 모달 `[키 도우미]` 버튼이 기본 탑재되어 있으며, 화면 표시용 정제(`display`) 및 유효성 검사를 기본 지원합니다.
 ```typescript
 const keyInput = context.ui.createKeyInput({
   label: '토글 키',
   value: 'no_modifiers alt VK_F4',
-  onChange: (newKey) => {
-    console.log('단축키 변경:', newKey);
+  onChange: (rawKey, details) => {
+    console.log('원문 INI 포맷:', rawKey); // 'no_modifiers alt VK_F4'
+    console.log('UI 표시용 포맷:', details?.display); // 'Alt + F4'
   },
 });
-// keyInput.getValue();
-// keyInput.setValue('ctrl no_alt VK_F1');
+
+// keyInput.element; // 최상위 DOM 래퍼 (라벨 + 입력필드 + 감지 버튼 일체)
+// keyInput.getValue(); // 'no_modifiers alt VK_F4'
+// keyInput.getDisplayValue(); // 'Alt + F4' (부정키가 제거된 깔끔한 표시용 문자열)
+// keyInput.setValue('ctrl no_alt no_shift VK_F1');
+// keyInput.setError('이미 사용 중인 단축키입니다.');
+// keyInput.clearError();
 ```
 
 ---
@@ -781,6 +806,34 @@ const symbols = context.ini.extractSymbols();
 const doc = context.ini.parse();
 const kind = context.ini.classifySection('TextureOverrideBody');
 const merged = context.ini.merge(currentTargetText, newSectionText, { appendNew: true });
+
+// 11. 화면 표시용 단축키 변환 (부정키 제거 및 깔끔한 조합 표기)
+const displayKey = context.ini.formatDisplayKey('no_modifiers alt VK_F4');
+// 'Alt + F4'
+const customDisplay = context.ini.formatDisplayKey('ctrl no_alt no_shift VK_F1');
+// 'Ctrl + F1'
+
+// 12. 중복 키 / if-endif 조건문 / 주석 보존 원본 섹션 조작 (Raw Section API)
+// 딕셔너리({ key: val }) 구조로 다 담기 어려운 다중 drawindexed나 주석, if문 구조를 그대로 읽고 수정합니다.
+const rawBlock = context.ini.getSectionRaw('TextureOverrideBody');
+// [TextureOverrideBody]
+// hash = abcdef12
+// match_first_index = 0
+// drawindexed = auto
+// match_first_index = 100
+// drawindexed = auto
+
+// 섹션 라인 단위 구조 파싱
+const lines = context.ini.parseSectionLines('TextureOverrideBody');
+// [
+//   { type: 'property', key: 'hash', value: 'abcdef12', isProperty: true, raw: 'hash = abcdef12' },
+//   { type: 'property', key: 'match_first_index', value: '0', isProperty: true, ... },
+//   { type: 'property', key: 'drawindexed', value: 'auto', isProperty: true, ... },
+//   ...
+// ]
+
+// 기존 주석/라인 배치를 온전히 유지한 채 에디터의 해당 섹션만 통째로 제자리 교체 (실행 취소 Ctrl+Z 보존)
+context.ini.setSectionRaw('TextureOverrideBody', `[TextureOverrideBody]\nhash = abcdef12\nmatch_first_index = 0\ndrawindexed = auto`);
 ```
 
 

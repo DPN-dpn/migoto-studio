@@ -18,8 +18,10 @@ const BUILTIN_PLUGINS = [
 ];
 import { validatePluginZip } from '../src/plugins/zip.ts';
 import { definePlugin } from '../src/plugins/api.ts';
-import { createUIBuilder } from '../src/plugins/ui-builder.ts';
+import { createUIBuilder, toElement } from '../src/plugins/ui-builder.ts';
 import { renderPluginIcon } from '../src/plugins/types.ts';
+import { formatDisplayKey } from '../src/core/ini/keys.ts';
+import { getSectionRaw, setSectionRaw, parseSectionLines } from '../src/core/ini/ini.ts';
 import {
   normalizePluginPath,
   resolveRelativeSpecifier,
@@ -1807,5 +1809,140 @@ test('validatePluginZip extracts multi-file plugin with index.js as entry point'
   assert.ok(extracted.files['ui.js']);
   assert.ok(extracted.files['index.js']);
 });
+
+test('formatDisplayKey formats 3DMigoto key bindings for clean UI presentation', () => {
+  assert.equal(formatDisplayKey('no_modifiers VK_F4'), 'F4');
+  assert.equal(formatDisplayKey('ctrl no_alt no_shift VK_F1'), 'Ctrl + F1');
+  assert.equal(formatDisplayKey('alt shift VK_SPACE'), 'Alt + Shift + Space');
+  assert.equal(formatDisplayKey('ctrl alt no_shift VK_OEM_3'), 'Ctrl + Alt + ` ~');
+  assert.equal(formatDisplayKey('VK_OEM_PERIOD'), '. >');
+  assert.equal(formatDisplayKey(''), '');
+});
+
+test('INI raw block manipulation preserves repeated keys and comment ordering', () => {
+  const ini = `
+[TextureOverrideBody]
+hash = abcdef12
+match_first_index = 0
+; First draw indexed
+drawindexed = auto
+match_first_index = 100
+; Second draw indexed
+drawindexed = auto
+
+[Constants]
+global $active = 1
+`.trim();
+
+  // 1. getSectionRaw
+  const raw = getSectionRaw(ini, 'TextureOverrideBody');
+  assert.ok(raw);
+  assert.ok(raw.includes('match_first_index = 0'));
+  assert.ok(raw.includes('match_first_index = 100'));
+
+  // 2. parseSectionLines
+  const lines = parseSectionLines(raw);
+  assert.ok(lines.length >= 7);
+  const drawindexedLines = lines.filter((l) => l.type === 'property' && l.key === 'drawindexed');
+  assert.equal(drawindexedLines.length, 2);
+  const commentLines = lines.filter((l) => l.type === 'comment');
+  assert.equal(commentLines.length, 2);
+
+  // 3. setSectionRaw replaces block cleanly
+  const updatedBlock = `[TextureOverrideBody]\nhash = 99999999\ndrawindexed = auto`;
+  const modifiedIni = setSectionRaw(ini, 'TextureOverrideBody', updatedBlock);
+  assert.ok(modifiedIni.includes('hash = 99999999'));
+  assert.ok(!modifiedIni.includes('abcdef12'));
+  assert.ok(modifiedIni.includes('[Constants]'));
+});
+
+test('Plugin UI Builder widgets uniformly expose .element and validation methods', () => {
+  const createElement = (tag: string) => {
+    const el: any = {
+      tagName: tag.toUpperCase(),
+      className: '',
+      children: [] as any[],
+      style: {} as Record<string, string>,
+      classList: {
+        add: (...cls: string[]) => { el.className = `${el.className} ${cls.join(' ')}`.trim(); },
+        remove: (...cls: string[]) => {
+          cls.forEach((c) => { el.className = el.className.replace(new RegExp(`\\b${c}\\b`, 'g'), '').trim(); });
+        },
+        contains: (c: string) => el.className.split(/\s+/).includes(c),
+      },
+      attributes: {} as Record<string, string>,
+      setAttribute: (k: string, v: string) => { el.attributes[k] = v; },
+      removeAttribute: (k: string) => { delete el.attributes[k]; },
+      append: (...nodes: any[]) => el.children.push(...nodes),
+      remove: () => {},
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    };
+    return el;
+  };
+
+  const origDocument = (globalThis as any).document;
+  (globalThis as any).document = {
+    createElement,
+  };
+
+  try {
+    const ui = createUIBuilder();
+
+    // 1. createInput
+    const inputWidget = ui.createInput({ label: 'Name', value: 'Test' });
+    assert.ok(inputWidget.element, 'createInput must have .element');
+    assert.equal(toElement(inputWidget), inputWidget.element);
+    assert.equal(inputWidget.hasError(), false);
+    inputWidget.setError('Invalid section name');
+    assert.equal(inputWidget.hasError(), true);
+    inputWidget.clearError();
+    assert.equal(inputWidget.hasError(), false);
+
+    // 2. createNumberInput
+    const numWidget = ui.createNumberInput({ label: 'Opacity', value: 0.5 });
+    assert.ok(numWidget.element, 'createNumberInput must have .element');
+    assert.equal(toElement(numWidget), numWidget.element);
+    assert.equal(numWidget.element, numWidget.row);
+    assert.equal(numWidget.hasError(), false);
+    numWidget.setError('Value must be >= 0');
+    assert.equal(numWidget.hasError(), true);
+    numWidget.clearError();
+    assert.equal(numWidget.hasError(), false);
+
+    // 3. createKeyInput
+    let emittedDetails: any = null;
+    const keyWidget = ui.createKeyInput({
+      label: 'Toggle Key',
+      value: 'no_modifiers VK_F4',
+      onChange: (raw, details) => {
+        emittedDetails = details;
+      },
+    });
+    assert.ok(keyWidget.element, 'createKeyInput must have .element');
+    assert.equal(toElement(keyWidget), keyWidget.element);
+    assert.equal(keyWidget.getDisplayValue(), 'F4');
+    keyWidget.setValue('ctrl no_alt no_shift VK_F1');
+    assert.equal(keyWidget.getDisplayValue(), 'Ctrl + F1');
+    assert.ok(emittedDetails);
+    assert.equal(emittedDetails.display, 'Ctrl + F1');
+    keyWidget.setError('Duplicate key shortcut');
+    assert.equal(keyWidget.hasError(), true);
+    keyWidget.clearError();
+    assert.equal(keyWidget.hasError(), false);
+
+    // 4. Container children unwrapping via toElement
+    const row = ui.createRow({
+      children: [inputWidget, numWidget, keyWidget],
+    });
+    assert.equal(row.children.length, 3);
+    assert.equal(row.children[0], inputWidget.element);
+    assert.equal(row.children[1], numWidget.element);
+    assert.equal(row.children[2], keyWidget.element);
+  } finally {
+    (globalThis as any).document = origDocument;
+  }
+});
+
 
 

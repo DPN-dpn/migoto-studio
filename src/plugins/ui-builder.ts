@@ -1,9 +1,62 @@
 import type { SelectOption, FormConfig, FormFieldDef, FormInstance, NumberInputOptions, NumberInputInstance } from './types.ts';
-import { CODE_TO_VK } from '../core/ini/keys.ts';
+import { CODE_TO_VK, formatDisplayKey } from '../core/ini/keys.ts';
 import { openKeyHelperModal, type KeyHelperModalOptions } from '../ui/modals/key-helper.ts';
 import { openConfirmModal, openPromptModal, type ConfirmOptions, type PromptOptions } from '../ui/modals/confirm-ui.ts';
 import { platform } from '../platform/index.ts';
 export type { ConfirmOptions, PromptOptions, NumberInputOptions, NumberInputInstance };
+
+/**
+ * 플러그인 위젯 인스턴스 또는 원시 DOM 엘리먼트로부터
+ * 표준 최상위 HTMLElement를 안전하게 추출합니다.
+ */
+export function toElement(target: any): any {
+  if (!target) return null;
+  if (typeof HTMLElement !== 'undefined' && target instanceof HTMLElement) return target;
+  if (typeof target.getElement === 'function') {
+    const res = target.getElement();
+    if (res) return res;
+  }
+  if (target.element) return target.element;
+  if (target.row) return target.row;
+  if (target.container) return target.container;
+  if (target.nodeType !== undefined || target.tagName !== undefined || typeof target.append === 'function') {
+    return target;
+  }
+  return null;
+}
+
+/**
+ * 입력 컨트롤에 표준 에러/유효성 검사 상태(빨간 테두리 및 에러 메시지)를 연결하는 헬퍼
+ */
+function attachValidation(targetWrapper: HTMLElement, targetInput: HTMLElement) {
+  let errorEl: HTMLElement | null = null;
+  return {
+    setError(message: string) {
+      if (!errorEl) {
+        errorEl = document.createElement('div');
+        errorEl.className = 'plugin-input-error';
+        targetWrapper.append(errorEl);
+      }
+      errorEl.textContent = message;
+      errorEl.style.display = 'flex';
+      targetWrapper.classList.add('has-error');
+      targetInput.classList.add('has-error');
+      targetInput.setAttribute('aria-invalid', 'true');
+    },
+    clearError() {
+      if (errorEl) {
+        errorEl.remove();
+        errorEl = null;
+      }
+      targetWrapper.classList.remove('has-error');
+      targetInput.classList.remove('has-error');
+      targetInput.removeAttribute('aria-invalid');
+    },
+    hasError() {
+      return targetWrapper.classList.contains('has-error') || targetInput.classList.contains('has-error');
+    },
+  };
+}
 
 /**
  * 플러그인 전용 고수준 UI 빌더 API 구현체
@@ -12,6 +65,13 @@ export type { ConfirmOptions, PromptOptions, NumberInputOptions, NumberInputInst
  */
 export function createUIBuilder() {
   return {
+    /**
+     * 위젯 인스턴스 또는 엘리먼트로부터 표준 최상위 HTMLElement를 반환합니다.
+     */
+    toElement(target: any): HTMLElement | null {
+      return toElement(target);
+    },
+
     createPanelHeader(title: string): HTMLElement {
       const header = document.createElement('div');
       header.className = 'panel-section-title';
@@ -21,12 +81,13 @@ export function createUIBuilder() {
       return header;
     },
 
-    createFormRow(label: string, control: HTMLElement): HTMLElement {
+    createFormRow(label: string, control: HTMLElement | any): HTMLElement {
       const row = document.createElement('div');
       row.className = 'form-row';
       const lbl = document.createElement('label');
       lbl.textContent = label;
-      row.append(lbl, control);
+      const controlEl = toElement(control) || control;
+      row.append(lbl, controlEl);
       return row;
     },
 
@@ -63,13 +124,18 @@ export function createUIBuilder() {
         ? this.createFormRow(options.label, select)
         : select;
 
+      const validation = attachValidation(row, select);
+
       return {
+        element: row,
         row,
         select,
         getValue: () => select.value,
         setValue: (v: string) => {
           select.value = v;
         },
+        getElement: () => row,
+        ...validation,
       };
     },
 
@@ -94,13 +160,18 @@ export function createUIBuilder() {
         ? this.createFormRow(options.label, input)
         : input;
 
+      const validation = attachValidation(row, input);
+
       return {
+        element: row,
         row,
         input,
         getValue: () => input.value,
         setValue: (v: string) => {
           input.value = v;
         },
+        getElement: () => row,
+        ...validation,
       };
     },
 
@@ -312,8 +383,11 @@ export function createUIBuilder() {
       const row = opts.label
         ? this.createFormRow(opts.label, container)
         : container;
+      const element = row;
+      const validation = attachValidation(row, input);
 
       return {
+        element,
         row,
         container,
         input,
@@ -345,10 +419,12 @@ export function createUIBuilder() {
           currentStep = step !== undefined ? step : (currentIntegerOnly ? 1 : 1);
           input.step = String(currentStep);
         },
+        getElement: () => element,
         destroy: () => {
           stopDec();
           stopInc();
         },
+        ...validation,
       };
     },
 
@@ -377,12 +453,14 @@ export function createUIBuilder() {
       row.append(checkbox, label);
 
       return {
+        element: row,
         row,
         checkbox,
         isChecked: () => checkbox.checked,
         setChecked: (c: boolean) => {
           checkbox.checked = c;
         },
+        getElement: () => row,
       };
     },
 
@@ -449,12 +527,14 @@ export function createUIBuilder() {
       container.append(textarea);
 
       return {
+        element: container,
         container,
         textarea,
         getValue: () => textarea.value,
         setValue: (v: string) => {
           textarea.value = v;
         },
+        getElement: () => container,
       };
     },
 
@@ -529,9 +609,11 @@ export function createUIBuilder() {
       }
 
       return {
+        element: container,
         container,
         output,
         input: inputEl ?? undefined,
+        getElement: () => container,
         append(text: string) {
           if (output.textContent === defaultPlaceholder) {
             output.textContent = '';
@@ -701,6 +783,7 @@ export function createUIBuilder() {
       container.append(header, track);
 
       return {
+        element: container,
         container,
         setProgress(val: number, max?: number) {
           currentVal = val;
@@ -710,6 +793,7 @@ export function createUIBuilder() {
         setLabel(text: string) {
           labelSpan.textContent = text;
         },
+        getElement: () => container,
       };
     },
 
@@ -768,6 +852,7 @@ export function createUIBuilder() {
       container.append(table);
 
       return {
+        element: container,
         container,
         table,
         tbody,
@@ -790,6 +875,7 @@ export function createUIBuilder() {
         clear() {
           tbody.replaceChildren();
         },
+        getElement: () => container,
       };
     },
 
@@ -798,7 +884,7 @@ export function createUIBuilder() {
       value?: string;
       placeholder?: string;
       description?: string;
-      onChange?: (keyStr: string) => void;
+      onChange?: (keyStr: string, details?: { raw: string; display: string; tokens: string[] }) => void;
     }) {
       const row = document.createElement('div');
       row.className = 'form-row plugin-key-input-row';
@@ -818,8 +904,18 @@ export function createUIBuilder() {
       input.value = options.value ?? 'VK_F4';
       if (options.placeholder) input.placeholder = options.placeholder;
 
+      const triggerChange = (val: string) => {
+        if (options.onChange) {
+          options.onChange(val, {
+            raw: val,
+            display: formatDisplayKey(val),
+            tokens: val.split(/\s+/).filter(Boolean),
+          });
+        }
+      };
+
       input.oninput = () => {
-        options.onChange?.(input.value);
+        triggerChange(input.value);
       };
 
       const captureBtn = document.createElement('button');
@@ -869,12 +965,17 @@ export function createUIBuilder() {
 
           const keyBinding = modifiers.length > 0 ? `${modifiers.join(' ')} ${vk}` : vk;
           input.value = keyBinding;
-          options.onChange?.(keyBinding);
+          triggerChange(keyBinding);
           stopListening();
         };
 
         window.addEventListener('keydown', handler, { capture: true });
         cleanupListener = () => window.removeEventListener('keydown', handler, { capture: true });
+      };
+
+      captureBtn.onclick = () => {
+        if (isListening) stopListening();
+        else startListening();
       };
 
       const helperBtn = document.createElement('button');
@@ -890,21 +991,27 @@ export function createUIBuilder() {
         });
         if (selected) {
           input.value = selected;
-          options.onChange?.(selected);
+          triggerChange(selected);
         }
       });
 
       wrap.append(input, captureBtn, helperBtn);
       row.append(wrap);
 
+      const validation = attachValidation(row, input);
+
       return {
+        element: row,
         row,
         input,
         getValue: () => input.value,
         setValue: (v: string) => {
           input.value = v;
-          options.onChange?.(v);
+          triggerChange(v);
         },
+        getDisplayValue: () => formatDisplayKey(input.value),
+        getElement: () => row,
+        ...validation,
       };
     },
 
@@ -912,9 +1019,9 @@ export function createUIBuilder() {
       title: string;
       subtitle?: string;
       badge?: { text: string; variant?: 'info' | 'success' | 'warn' | 'error' | 'neutral' };
-      children?: HTMLElement[] | HTMLElement;
-      content?: HTMLElement[] | HTMLElement;
-      actions?: HTMLElement[];
+      children?: any[] | any;
+      content?: any[] | any;
+      actions?: any[];
     }): HTMLElement {
       const card = document.createElement('div');
       card.className = 'plugin-card plugin-ui-card';
@@ -948,7 +1055,7 @@ export function createUIBuilder() {
       card.append(header);
 
       const rawContent = options.children ?? options.content;
-      const childNodes: HTMLElement[] = rawContent
+      const childNodes: any[] = rawContent
         ? Array.isArray(rawContent)
           ? rawContent
           : [rawContent]
@@ -956,14 +1063,20 @@ export function createUIBuilder() {
       if (childNodes.length > 0) {
         const body = document.createElement('div');
         body.className = 'plugin-card-body';
-        childNodes.forEach((c) => body.append(c));
+        childNodes.forEach((c) => {
+          const el = toElement(c);
+          if (el) body.append(el);
+        });
         card.append(body);
       }
 
       if (options.actions && options.actions.length > 0) {
         const footer = document.createElement('div');
         footer.className = 'plugin-card-footer';
-        options.actions.forEach((a) => footer.append(a));
+        options.actions.forEach((a) => {
+          const el = toElement(a);
+          if (el) footer.append(el);
+        });
         card.append(footer);
       }
 
@@ -1283,7 +1396,10 @@ export function createUIBuilder() {
       } else {
         firstPane.style.width = '100%';
       }
-      if (opts.first) firstPane.append(opts.first);
+      if (opts.first) {
+        const firstEl = toElement(opts.first);
+        if (firstEl) firstPane.append(firstEl);
+      }
 
       const splitter = document.createElement('div');
       splitter.className = 'plugin-split-resizer';
@@ -1312,7 +1428,10 @@ export function createUIBuilder() {
       } else {
         secondPane.style.width = '100%';
       }
-      if (opts.second) secondPane.append(opts.second);
+      if (opts.second) {
+        const secondEl = toElement(opts.second);
+        if (secondEl) secondPane.append(secondEl);
+      }
 
       const minFirst = opts.minFirstSize ?? 50;
       const minSecond = opts.minSecondSize ?? 50;
@@ -1405,6 +1524,7 @@ export function createUIBuilder() {
       container.append(firstPane, splitter, secondPane);
 
       return {
+        element: container,
         container,
         firstPane,
         secondPane,
@@ -1422,6 +1542,7 @@ export function createUIBuilder() {
             } catch {}
           }
         },
+        getElement: () => container,
         dispose: () => {
           onMouseUp();
         },
@@ -1452,7 +1573,10 @@ export function createUIBuilder() {
         Object.assign(row.style, options.style);
       }
       if (options?.children) {
-        options.children.forEach((c) => row.append(c));
+        options.children.forEach((c) => {
+          const el = toElement(c);
+          if (el) row.append(el);
+        });
       }
       return row;
     },
@@ -1495,7 +1619,10 @@ export function createUIBuilder() {
         Object.assign(col.style, options.style);
       }
       if (options?.children) {
-        options.children.forEach((c) => col.append(c));
+        options.children.forEach((c) => {
+          const el = toElement(c);
+          if (el) col.append(el);
+        });
       }
       return col;
     },
@@ -1517,11 +1644,13 @@ export function createUIBuilder() {
         Object.assign(grid.style, options.style);
       }
       if (options?.children) {
-        options.children.forEach((c) => grid.append(c));
+        options.children.forEach((c) => {
+          const el = toElement(c);
+          if (el) grid.append(el);
+        });
       }
       return grid;
     },
-
 
     /**
      * 일관된 테마 스크롤바와 상/하단 스크롤 제어 메서드를 갖춘 스크롤 컨테이너를 생성합니다.
@@ -1573,7 +1702,10 @@ export function createUIBuilder() {
 
       if (options?.content) {
         const items = Array.isArray(options.content) ? options.content : [options.content];
-        items.forEach((it) => content.append(it));
+        items.forEach((it) => {
+          const el = toElement(it);
+          if (el) content.append(el);
+        });
       }
 
       container.append(content);
@@ -1598,8 +1730,11 @@ export function createUIBuilder() {
         }
       };
 
-      const append = (...items: HTMLElement[]) => {
-        items.forEach((it) => content.append(it));
+      const append = (...items: any[]) => {
+        items.forEach((it) => {
+          const el = toElement(it);
+          if (el) content.append(el);
+        });
         if (options?.autoScroll) {
           scrollToBottom();
         }
@@ -1610,6 +1745,7 @@ export function createUIBuilder() {
       };
 
       return {
+        element: container,
         container,
         content,
         append,
@@ -1620,6 +1756,7 @@ export function createUIBuilder() {
         setScrollTop: (val: number) => {
           container.scrollTop = val;
         },
+        getElement: () => container,
       };
     },
 
@@ -1766,7 +1903,8 @@ export function createUIBuilder() {
         panel.style.boxSizing = 'border-box';
         panel.style.alignItems = 'stretch';
         panel.hidden = tab.id !== activeTabId;
-        panel.append(tab.content);
+        const contentEl = toElement(tab.content) || tab.content;
+        panel.append(contentEl);
         panels.set(tab.id, panel);
         tabContent.append(panel);
       });
@@ -1774,6 +1912,7 @@ export function createUIBuilder() {
       container.append(tabNav, tabContent);
 
       return {
+        element: container,
         container,
         tabNav,
         tabContent,
@@ -1800,6 +1939,7 @@ export function createUIBuilder() {
           const tab = options.tabs.find((t) => t.id === tabId);
           if (tab) tab.disabled = disabled;
         },
+        getElement: () => container,
       };
     },
 
@@ -1853,7 +1993,7 @@ export function createUIBuilder() {
         const actionsWrap = document.createElement('div');
         actionsWrap.className = 'plugin-collapsible-actions';
         options.headerActions.forEach((act) => {
-          act.addEventListener('click', (e) => e.stopPropagation());
+          act.addEventListener('click', (e: Event) => e.stopPropagation());
           actionsWrap.append(act);
         });
         header.append(actionsWrap);
@@ -1864,7 +2004,10 @@ export function createUIBuilder() {
       body.hidden = !isOpen;
 
       const items = Array.isArray(options.content) ? options.content : [options.content];
-      items.forEach((c) => body.append(c));
+      items.forEach((c) => {
+        const el = toElement(c);
+        if (el) body.append(el);
+      });
 
       const setOpen = (open: boolean) => {
         isOpen = open;
@@ -1880,6 +2023,7 @@ export function createUIBuilder() {
       container.append(header, body);
 
       return {
+        element: container,
         container,
         header,
         body,
@@ -1890,6 +2034,7 @@ export function createUIBuilder() {
         setTitle: (title: string) => {
           titleEl.textContent = title;
         },
+        getElement: () => container,
       };
     },
 
@@ -1953,6 +2098,7 @@ export function createUIBuilder() {
       const row = options.label ? this.createFormRow(options.label, ctrl) : ctrl;
 
       return {
+        element: row,
         row,
         container: ctrl,
         getValue: () => currentValue,
@@ -1962,6 +2108,7 @@ export function createUIBuilder() {
             btn.disabled = disabled;
           });
         },
+        getElement: () => row,
       };
     },
 
@@ -2026,7 +2173,10 @@ export function createUIBuilder() {
 
       const row = opts.label ? this.createFormRow(opts.label, wrap) : wrap;
 
+      const validation = attachValidation(row, input);
+
       return {
+        element: row,
         row,
         input,
         clearBtn,
@@ -2038,6 +2188,8 @@ export function createUIBuilder() {
         },
         clear,
         focus: () => input.focus(),
+        getElement: () => row,
+        ...validation,
       };
     },
 
@@ -2089,7 +2241,10 @@ export function createUIBuilder() {
 
       const row = opts.label ? this.createFormRow(opts.label, wrap) : wrap;
 
+      const validation = attachValidation(row, input);
+
       return {
+        element: row,
         row,
         input,
         browseBtn,
@@ -2098,6 +2253,8 @@ export function createUIBuilder() {
           input.value = val;
           opts.onChange?.(val);
         },
+        getElement: () => row,
+        ...validation,
       };
     },
 
@@ -2240,6 +2397,7 @@ export function createUIBuilder() {
       }
 
       return {
+        element: container,
         container,
         setLabel: (newLabel: string, newSublabel?: string) => {
           label.textContent = newLabel;
@@ -2252,6 +2410,7 @@ export function createUIBuilder() {
             sublabel.textContent = newSublabel;
           }
         },
+        getElement: () => container,
         dispose: () => {
           container.removeEventListener('dragover', onDragOver);
           container.removeEventListener('dragenter', onDragOver);
@@ -2265,8 +2424,8 @@ export function createUIBuilder() {
 
 export interface SplitViewOptions {
   direction?: 'horizontal' | 'vertical';
-  first?: HTMLElement;
-  second?: HTMLElement;
+  first?: HTMLElement | any;
+  second?: HTMLElement | any;
   initialSize?: number | string;
   minFirstSize?: number;
   minSecondSize?: number;
@@ -2277,6 +2436,7 @@ export interface SplitViewOptions {
 }
 
 export interface SplitViewInstance {
+  element: HTMLElement;
   container: HTMLElement;
   firstPane: HTMLElement;
   secondPane: HTMLElement;
@@ -2284,11 +2444,12 @@ export interface SplitViewInstance {
   setSize: (size: number | string) => void;
   getSize: () => number;
   reset: () => void;
+  getElement: () => HTMLElement;
   dispose: () => void;
 }
 
 export interface RowOptions {
-  children?: HTMLElement[];
+  children?: any[];
   gap?: number | string;
   align?: 'start' | 'center' | 'end' | 'stretch' | 'baseline';
   justify?: 'start' | 'center' | 'end' | 'space-between' | 'space-around';
@@ -2298,7 +2459,7 @@ export interface RowOptions {
 }
 
 export interface ColumnOptions {
-  children?: HTMLElement[];
+  children?: any[];
   gap?: number | string;
   align?: 'start' | 'center' | 'end' | 'stretch';
   justify?: 'start' | 'center' | 'end' | 'space-between';
@@ -2312,7 +2473,7 @@ export interface ColumnOptions {
 export interface GridOptions {
   columns?: number | string;
   gap?: number | string;
-  children?: HTMLElement[];
+  children?: any[];
   className?: string;
   style?: Partial<CSSStyleDeclaration>;
 }
@@ -2324,7 +2485,7 @@ export interface DividerOptions {
 }
 
 export interface ScrollContainerOptions {
-  content?: HTMLElement | HTMLElement[];
+  content?: any | any[];
   direction?: 'vertical' | 'horizontal' | 'both';
   maxHeight?: number | string;
   maxWidth?: number | string;
@@ -2338,14 +2499,16 @@ export interface ScrollContainerOptions {
 }
 
 export interface ScrollContainerInstance {
+  element: HTMLElement;
   container: HTMLElement;
   content: HTMLElement;
-  append: (...items: HTMLElement[]) => void;
+  append: (...items: any[]) => void;
   clear: () => void;
   scrollToTop: (smooth?: boolean) => void;
   scrollToBottom: (smooth?: boolean) => void;
   getScrollTop: () => number;
   setScrollTop: (top: number) => void;
+  getElement: () => HTMLElement;
 }
 
 export interface TabDef {
@@ -2353,7 +2516,7 @@ export interface TabDef {
   label: string;
   icon?: string;
   badge?: string;
-  content: HTMLElement;
+  content: any;
   disabled?: boolean;
 }
 
@@ -2365,6 +2528,7 @@ export interface TabsOptions {
 }
 
 export interface TabsInstance {
+  element: HTMLElement;
   container: HTMLElement;
   tabNav: HTMLElement;
   tabContent: HTMLElement;
@@ -2372,20 +2536,22 @@ export interface TabsInstance {
   getActiveTab: () => string;
   setTabBadge: (tabId: string, badge?: string) => void;
   setTabDisabled: (tabId: string, disabled: boolean) => void;
+  getElement: () => HTMLElement;
 }
 
 export interface CollapsibleOptions {
   title: string;
   subtitle?: string;
   badge?: { text: string; variant?: 'info' | 'success' | 'warn' | 'error' | 'neutral' };
-  content: HTMLElement | HTMLElement[];
+  content: any | any[];
   defaultOpen?: boolean;
-  headerActions?: HTMLElement[];
+  headerActions?: any[];
   onToggle?: (isOpen: boolean) => void;
   className?: string;
 }
 
 export interface CollapsibleInstance {
+  element: HTMLElement;
   container: HTMLElement;
   header: HTMLElement;
   body: HTMLElement;
@@ -2394,6 +2560,7 @@ export interface CollapsibleInstance {
   close: () => void;
   isOpen: () => boolean;
   setTitle: (title: string) => void;
+  getElement: () => HTMLElement;
 }
 
 export interface SegmentOption {
@@ -2412,11 +2579,13 @@ export interface SegmentedControlOptions {
 }
 
 export interface SegmentedControlInstance {
+  element: HTMLElement;
   row: HTMLElement;
   container: HTMLElement;
   getValue: () => string;
   setValue: (value: string) => void;
   setDisabled: (disabled: boolean) => void;
+  getElement: () => HTMLElement;
 }
 
 export interface SearchInputOptions {
@@ -2430,6 +2599,7 @@ export interface SearchInputOptions {
 }
 
 export interface SearchInputInstance {
+  element: HTMLElement;
   row: HTMLElement;
   input: HTMLInputElement;
   clearBtn: HTMLButtonElement;
@@ -2437,6 +2607,10 @@ export interface SearchInputInstance {
   setValue: (value: string, triggerSearch?: boolean) => void;
   clear: () => void;
   focus: () => void;
+  getElement: () => HTMLElement;
+  setError: (message: string) => void;
+  clearError: () => void;
+  hasError: () => boolean;
 }
 
 export interface FilePickerOptions {
@@ -2453,11 +2627,16 @@ export interface FilePickerOptions {
 }
 
 export interface FilePickerInstance {
+  element: HTMLElement;
   row: HTMLElement;
   input: HTMLInputElement;
   browseBtn: HTMLButtonElement;
   getValue: () => string;
   setValue: (path: string) => void;
+  getElement: () => HTMLElement;
+  setError: (message: string) => void;
+  clearError: () => void;
+  hasError: () => boolean;
 }
 
 export interface TooltipOptions {
@@ -2479,10 +2658,13 @@ export interface DropZoneOptions {
 }
 
 export interface DropZoneInstance {
+  element: HTMLElement;
   container: HTMLElement;
   setLabel: (label: string, sublabel?: string) => void;
+  getElement: () => HTMLElement;
   dispose: () => void;
 }
 
 export type PluginUIBuilder = ReturnType<typeof createUIBuilder>;
+
 

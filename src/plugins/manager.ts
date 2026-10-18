@@ -31,10 +31,15 @@ import {
   formatIniSection,
   formatKeyToggleSection,
   deleteIniSection,
+  getSectionRaw,
+  setSectionRaw,
+  parseSectionLines,
+  type IniSectionLine,
 } from '../core/ini/ini';
 import {
   parseKeyBinding,
   formatKeyBinding,
+  formatDisplayKey,
   VK_KEY_LIST,
 } from '../core/ini/keys';
 import { openRestore } from '../ui/modals/restore-ui';
@@ -1513,6 +1518,32 @@ export default {
             commandLists: syms.commandLists,
             sections: syms.sections,
           };
+        },
+        formatDisplayKey: (rawKey?: string | null) => formatDisplayKey(rawKey),
+        getSectionRaw: (sectionName: string, text?: string) =>
+          getSectionRaw(text !== undefined ? text : this.editor.getValue(), sectionName),
+        setSectionRaw: (sectionName: string, rawContent: string) => {
+          const currentText = this.editor.getValue();
+          const newText = setSectionRaw(currentText, sectionName, rawContent);
+          const model = this.editor.getModel();
+          if (model) {
+            this.editor.pushUndoStop();
+            this.editor.executeEdits('plugin-ini-set-raw', [
+              { range: model.getFullModelRange(), text: newText },
+            ]);
+            this.editor.pushUndoStop();
+          } else {
+            this.editor.setValue(newText);
+          }
+        },
+        parseSectionLines: (sectionNameOrBlock: string, text?: string) => {
+          if (text !== undefined) {
+            return parseSectionLines(text, sectionNameOrBlock);
+          }
+          if (sectionNameOrBlock.includes('\n') || /^\s*\[/.test(sectionNameOrBlock)) {
+            return parseSectionLines(sectionNameOrBlock);
+          }
+          return parseSectionLines(this.editor.getValue(), sectionNameOrBlock);
         },
       },
 

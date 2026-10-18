@@ -371,3 +371,105 @@ export function deleteIniSection(iniText: string, sectionName: string): { newTex
   return { newText: parts.join('\n\n') + '\n', deleted: true };
 }
 
+export interface IniSectionLine {
+  type: 'comment' | 'condition' | 'property' | 'other';
+  raw: string;
+  trimmed: string;
+  isComment: boolean;
+  isCondition: boolean;
+  isProperty: boolean;
+  key?: string;
+  value?: string;
+}
+
+/**
+ * 특정 섹션의 전체 원본 텍스트(헤더, 주석, if문, 중복 키 포함)를 반환합니다.
+ */
+export function getSectionRaw(iniText: string, sectionName: string): string | null {
+  const doc = parseIni(iniText);
+  const sec = doc.getSection(sectionName);
+  return sec ? sec.fullText : null;
+}
+
+/**
+ * 특정 섹션 전체(헤더 및 본문 블록 전체)를 주어진 원본 텍스트로 정확히 제자리 교체하거나,
+ * 존재하지 않으면 파일 끝에 추가합니다.
+ */
+export function setSectionRaw(iniText: string, sectionName: string, rawContent: string): string {
+  const doc = parseIni(iniText);
+  const targetKey = sectionName.trim().toLowerCase();
+  const existing = doc.sections.find((s) => s.name.toLowerCase() === targetKey);
+  const cleanRaw = rawContent.trim();
+
+  if (!existing) {
+    const trimmed = iniText.trimEnd();
+    return trimmed ? `${trimmed}\n\n${cleanRaw}\n` : `${cleanRaw}\n`;
+  }
+
+  const lines = iniText.split(/\r?\n/);
+  // startLine과 endLine은 1-indexed
+  const before = lines.slice(0, existing.startLine - 1);
+  const after = lines.slice(existing.endLine);
+
+  const middle = cleanRaw.split(/\r?\n/);
+  const resultLines = [...before, ...middle, ...after];
+  return resultLines.join('\n');
+}
+
+/**
+ * 특정 섹션 또는 raw 블록의 본문 라인들을 구조화된 라인 정보 배열로 분해하여 반환합니다.
+ */
+export function parseSectionLines(iniOrBlockText: string, sectionName?: string): IniSectionLine[] | null {
+  if (!iniOrBlockText) return null;
+  let targetLines: string[];
+
+  if (sectionName) {
+    const doc = parseIni(iniOrBlockText);
+    const sec = doc.getSection(sectionName);
+    if (!sec) return null;
+    targetLines = sec.bodyLines;
+  } else {
+    const allLines = iniOrBlockText.split(/\r?\n/);
+    if (allLines.length > 0 && /^\s*\[[^\]]+\]\s*$/.test(allLines[0].trim())) {
+      targetLines = allLines.slice(1);
+    } else {
+      targetLines = allLines;
+    }
+  }
+
+  return targetLines.map((line) => {
+    const trimmed = line.trim();
+    const isComment = trimmed.startsWith(';');
+    const isCondition = /^(\s*(if|else\s+if|else|endif))\b/i.test(trimmed);
+    const eqIdx = line.indexOf('=');
+    let isProperty = false;
+    let key: string | undefined;
+    let value: string | undefined;
+
+    if (!isComment && !isCondition && eqIdx !== -1) {
+      isProperty = true;
+      key = line.slice(0, eqIdx).trim();
+      value = line.slice(eqIdx + 1).trim();
+    }
+
+    const type: 'comment' | 'condition' | 'property' | 'other' = isComment
+      ? 'comment'
+      : isCondition
+      ? 'condition'
+      : isProperty
+      ? 'property'
+      : 'other';
+
+    return {
+      type,
+      raw: line,
+      trimmed,
+      isComment,
+      isCondition,
+      isProperty,
+      key,
+      value,
+    };
+  });
+}
+
