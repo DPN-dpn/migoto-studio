@@ -27,7 +27,9 @@
    - 모든 UI 빌더 컴포넌트는 최상위 DOM 요소인 `.element`와 `.getElement()`를 표준 제공합니다. 레이아웃 컴포넌트(`createRow`, `createColumn`, `createCard` 등)의 `children` 배열에는 위젯 객체 자체를 넘기면 자동으로 최상위 엘리먼트로 언래핑됩니다.
    - 입력 필드 유효성 검사 실패 시 `widget.setError(msg)`와 `widget.clearError()`를 사용하여 인라인 경고 테두리와 메시지 툴팁을 띄우세요.
    - 토글키/단축키 입력 필드가 필요할 때는 `type: 'key'`(폼 탭) 또는 `context.ui.createKeyInput`을 사용하며, 화면 표시용 정제 문자열은 `context.ini.formatDisplayKey(rawKey)` 또는 `keyInput.getDisplayValue()`로 간결하게 취득하세요 (`'no_modifiers alt VK_F4'` ➔ `'Alt + F4'`).
-   - 고품질 인터페이스 구현 시 분할 화면(`createSplitView`), 탭 네비게이션(`createTabs`), 아코디언(`createCollapsible`), 세그먼트 컨트롤(`createSegmentedControl`), 디바운스 검색창(`createSearchInput`), 숫자 입력 스텝퍼(`createNumberInput`), 파일 선택기(`createFilePicker`), 드롭존(`createDropZone`), 툴팁(`attachTooltip`)을 적극 활용하세요.
+   - 고품질 인터페이스 구현 시 분할 화면(`createSplitView` - Flex/Split 100% 높이 자동 방어 내장), 탭 네비게이션(`createTabs`), 아코디언(`createCollapsible`), 세그먼트 컨트롤(`createSegmentedControl`), 디바운스 검색창(`createSearchInput`), 숫자 입력 스텝퍼(`createNumberInput`), 파일 경로 선택기(`createFilePicker`), 드롭존(`createDropZone`), 툴팁(`attachTooltip`)을 적극 활용하세요.
+   - 모딩 목록 및 코드 프리뷰 시 수동 HTML을 작성하지 말고, 상태/타입 배지(`createBadge`), 원클릭 복사 내장 코드 블록(`createCodeBlock`), 호버/선택 테두리 지원 리스트 아이템(`createListItem`)을 활용하세요.
+   - 모든 폼 컨트롤(`createInput`, `createSelect`, `createNumberInput`)은 `min-width: 0; width: 100%; margin: 0;`가 기본 내장되어 부모 너비를 넘치지 않으므로 수동 CSS 보정 없이 API를 그대로 사용하세요.
 4. INI 파일 조작 시:
    - 텍스트 전체를 무작위로 교체하지 말고 `context.ini.upsertSection`, `context.ini.formatKeyToggle`, `context.ini.merge`를 사용하여 기존 주석과 배치를 보존하세요.
    - `drawindexed = auto` 다중 호출, `match_first_index`, 주석 순서, `if-endif` 블록 등이 중요한 메쉬 오버라이드 섹션은 딕셔너리 대신 `context.ini.getSectionRaw`, `context.ini.setSectionRaw`, `context.ini.parseSectionLines`를 활용하세요.
@@ -115,11 +117,11 @@ Migoto Studio 플러그인은 `activate(context)` 함수로 전달되는 `Plugin
 
 | 네임스페이스 | 주요 역할 및 핵심 기능 | 상세 레퍼런스 문서 |
 | :--- | :--- | :--- |
-| **`context.ui`** | • 선언형 폼 탭(`openFormTab`) 및 커스텀 에디터 탭(`openTab`) 열기<br>• 상단 툴바 메뉴 등록(`registerMenuItem`), 사이드바 패널 등록(`registerSidebarView`)<br>• 확인/입력 모달(`confirm`, `prompt`), Diff 비교 탭(`openDiffTab`), 백업 복원 모달(`openRestoreModal`)<br>• 3DMigoto 키 바인딩 대화상자(`openKeyBindingModal`), 키 입력 위젯(`createKeyInput` - 실시간 감지/표시용 정제/인라인 검증)<br>• UI 빌더: 모든 위젯 표준 `.element` 및 `.getElement()`, 자동 언래핑(`toElement`)<br>• 인라인 검증 상태(`setError`, `clearError`, `hasError`)<br>• 레이아웃: 분할뷰(`createSplitView` - Flex 방어 내장), 탭(`createTabs`), 아코디언(`createCollapsible`), 세그먼트(`createSegmentedControl`), 검색창(`createSearchInput`), 숫자 스텝퍼(`createNumberInput`), 파일선택기(`createFilePicker`), 드롭존(`createDropZone`), 툴팁(`attachTooltip`), 카드, 테이블, 콘솔 등 | [`PLUGIN_API.md#3-ui-api-contextui`](./PLUGIN_API.md#3-ui-api-contextui) |
+| **`context.ui`** | • 선언형 폼 탭(`openFormTab`) 및 커스텀 에디터 탭(`openTab`) 열기<br>• 상단 툴바 메뉴 등록(`registerMenuItem`), 사이드바 패널 등록(`registerSidebarView`)<br>• 확인/입력 모달(`confirm`, `prompt`), Diff 비교 탭(`openDiffTab`), 백업 복원 모달(`openRestoreModal`)<br>• 3DMigoto 키 바인딩 대화상자(`openKeyBindingModal`), 키 입력 위젯(`createKeyInput` - 실시간 감지/표시용 정제/인라인 검증)<br>• UI 빌더: 모든 위젯 표준 `.element` 및 `.getElement()`, 자동 언래핑(`toElement`)<br>• 인라인 검증 상태(`setError`, `clearError`, `hasError`)<br>• 고수준 컴포넌트: 상태 배지(`createBadge`), 원클릭 복사 코드 블록(`createCodeBlock`), 리스트 아이템(`createListItem`)<br>• 레이아웃: 분할뷰(`createSplitView` - Flex/Split 100% 방어 내장), 탭(`createTabs`), 아코디언(`createCollapsible`), 세그먼트(`createSegmentedControl`), 검색창(`createSearchInput`), 숫자 스텝퍼(`createNumberInput`), 파일선택기(`createFilePicker`), 드롭존(`createDropZone`), 툴팁(`attachTooltip`), 카드, 테이블, 콘솔 등 | [`PLUGIN_API.md#3-ui-api-contextui`](./PLUGIN_API.md#3-ui-api-contextui) |
 | **`context.ini`** | • 3DMigoto/XXMI 문법 파싱 및 섹션 자동 분류(`parse`, `classifySection`)<br>• 기존 주석 및 배치 보존 스마트 섹션 갱신(`upsertSection`) 및 삭제(`deleteSection`)<br>• 토글 키 섹션 텍스트 생성(`formatKeyToggle`), 단축키 파싱 및 조합(`parseKeyBinding`, `formatKeyBinding`)<br>• 화면 표시용 단축키 텍스트 정제(`formatDisplayKey` - 부정키 제거 및 배지 표기)<br>• 다중 동일 키(`drawindexed = auto`), `if-endif` 블록, 주석 보존 Raw 조작(`getSectionRaw`, `setSectionRaw`, `parseSectionLines`)<br>• 변수, 리소스, CommandList 고속 심볼 추출(`extractSymbols`), 스마트 병합(`merge`) | [`PLUGIN_API.md#4-ini-문서-파싱-및-조작-api-contextini`](./PLUGIN_API.md#4-ini-문서-파싱-및-조작-api-contextini) |
 | **`context.editor`** | • 현재 열린 활성 파일의 텍스트 읽기/쓰기(`getText`, `setText`) — Monaco 실행 취소(`Ctrl+Z`) 이력 완벽 보존<br>• 커서 위치 조회/이동(`getCursor`, `setCursor`), 선택 영역 교체(`replaceSelection`), 텍스트 삽입(`insertText`)<br>• 에디터 우클릭 컨텍스트 메뉴 등록(`registerContextMenuAction`), 텍스트 변경 이벤트 감지 | [`PLUGIN_API.md#6-에디터-제어-contexteditor`](./PLUGIN_API.md#6-에디터-제어-contexteditor) |
 | **`context.workspace`** | • 활성 파일/작업 폴더 정보(`getCurrentFile`, `getCurrentFolder`), 파일 열기 및 저장(`openFile`, `saveCurrentFile`)<br>• 텍스트/바이너리 파일 I/O(`readTextFile`, `writeTextFile`, `readBinaryFile`, `writeBinaryFile`)<br>• 디렉터리 트리 순회(`readDirectory`), 워크스페이스 전역 텍스트 검색(`search`)<br>• 수정 전 안전 백업 생성(`createBackup`), 열린 탭 목록 조회/전환/닫기 제어(`getOpenTabs`, `focusTab`, `closeTab`) | [`PLUGIN_API.md#5-워크스페이스--파일-io-contextworkspace`](./PLUGIN_API.md#5-워크스페이스--파일-io-contextworkspace) |
-| **`context.linter`** | • 커스텀 INI 린트 규칙 등록(`registerRule`)<br>• 외부 플러그인 전용 허용 리소스 및 변수 화이트리스트 등록(`registerAllowedResource`, `registerAllowedVariable`) | [`PLUGIN_API.md`](./PLUGIN_API.md) |
+| **`context.linter`** | • 커스텀 INI 린트 규칙 등록(`registerRule`)<br>• 사후 진단 필터 등록(`registerDiagnosticFilter`)으로 프레임워크 전용 문법 보정<br>• 외부 플러그인 전용 허용 리소스 및 변수 화이트리스트 등록(`registerAllowedResource`, `registerAllowedVariable`) | [`PLUGIN_API.md`](./PLUGIN_API.md) |
 | **`context.storage`** | • 플러그인 ID별로 격리된 영구 설정 저장/조회/삭제(`get`, `set`, `remove`) | [`PLUGIN_API.md#7-영구-저장소-contextstorage`](./PLUGIN_API.md#7-영구-저장소-contextstorage) |
 | **`context.system`** | • 데스크톱 환경에서 외부 유틸리티 CLI 프로세스 비동기 실행(`exec`) | [`PLUGIN_API.md#8-시스템-프로세스-실행-contextsystem---데스크톱-전용`](./PLUGIN_API.md#8-시스템-프로세스-실행-contextsystem---데스크톱-전용) |
 
@@ -128,8 +130,10 @@ Migoto Studio 플러그인은 `activate(context)` 함수로 전달되는 `Plugin
 1. **설정/입력 위주의 도구**: 복잡한 HTML을 작성하지 말고 `context.ui.openFormTab`을 사용하세요. 선언적 필드 배열(`FormFieldDef[]`)만 정의하면 카드 레이아웃, 실시간 키보드 감지, 테마 스타일, 값 수집 및 검증이 자동 처리됩니다.
 2. **복합 뷰어/커스텀 레이아웃**: `context.ui.openTab`을 사용하고, 내부 구조는 `context.ui.createSplitView`, `createTabs`, `createCollapsible`, `createRow`, `createColumn`, `createScrollContainer` 등 내장 UI 빌더 컴포넌트를 조합하여 구성하세요.
 3. **위젯 엘리먼트 전달**: 모든 UI 컴포넌트는 `.element` 속성을 표준 제공하며, `createRow`, `createColumn`, `createCard`의 `children` 배열에 위젯 객체를 그대로 넘기면 코어가 자동 언래핑합니다.
-4. **단축키 및 숫자 입력**: 단축키 필드는 항상 `type: 'key'`(폼 탭) 또는 `context.ui.createKeyInput` / `openKeyBindingModal`을 사용하고, 정수/실수 입력 필드는 `type: 'number'` 또는 `context.ui.createNumberInput` 스텝퍼 위젯(`min`, `max`, `step`, `precision`, `integerOnly` 지원)을 활용하세요.
-5. **폼 에러 피드백**: 유효하지 않은 입력 발생 시 `input.setError(message)`를 호출하여 인라인 툴팁을 표시하고, 정상 입력 시 `input.clearError()`를 호출하세요.
+4. **단축키 및 숫자/파일 입력**: 단축키 필드는 `context.ui.createKeyInput`, 숫자는 `context.ui.createNumberInput`, 파일 경로는 `context.ui.createFilePicker` 위젯을 활용하세요.
+5. **목록 및 코드 미리보기**: 모딩 부품/토글/템플릿 목록은 `context.ui.createListItem`을 사용하고, INI 코드 미리보기 및 복사는 `context.ui.createCodeBlock`을 사용하세요.
+6. **폼 에러 피드백**: 유효하지 않은 입력 발생 시 `input.setError(message)`를 호출하여 인라인 툴팁을 표시하고, 정상 입력 시 `input.clearError()`를 호출하세요.
+7. **레이아웃 높이 및 반응형 방어**: 코어 차원에서 `createSplitView`, `createTabs` 컨테이너 및 폼 컨트롤(`min-width: 0`)의 높이와 너비가 100% 자동 방어되므로, 임의의 수동 CSS(`height: 100% !important` 등)를 덧댈 필요가 없습니다.
 
 ---
 
@@ -361,8 +365,12 @@ export default {
 | 전역 `window` 객체에 이벤트 리스너 임의 등록 | `context.ui.openTab`의 `return () => cleanup` 또는 `openFormTab` 활용 |
 | 정규식으로 INI 파싱하다 주석 깨뜨림 | `context.ini.upsertSection` 또는 `context.ini.merge` 사용 |
 | 사이드바 좁은 공간에 거대한 양식 밀어넣음 | `context.ui.openFormTab`으로 넓은 에디터 탭 생성 |
-| 단축키를 일반 텍스트 입력창으로 처리 | `{ id: 'key', type: 'key' }` 필드로 실시간 키 감지 지원 |
-| 스크롤바를 위해 `style.css`에서 `!important`나 부모 flex를 수동 주입 | 에디터 코어 API(`createScrollContainer`, `createTabs`, `createSplitView`, `openTab`)에 `flex: 1 1 0; min-height: 0;` 및 테마 스크롤바가 자동 내장되어 있으므로 수동 스타일 조작 없이 API만 호출 |
+| 단축키를 일반 텍스트 입력창으로 처리 | `{ id: 'key', type: 'key' }` 필드 또는 `context.ui.createKeyInput`으로 실시간 키 감지 지원 |
+| 파일 경로 입력과 찾아보기 버튼을 수동 조립 | `context.ui.createFilePicker` 위젯으로 파일 선택기 일체형 사용 |
+| 상태/타입 태그를 위해 `span`에 수동 인라인 CSS 작성 | `context.ui.createBadge({ text, variant })` 표준 배지 위젯 사용 |
+| 코드 미리보기를 위해 `pre` 태그와 수동 복사 로직 작성 | `context.ui.createCodeBlock({ code, maxHeight })` 표준 코드 블록 사용 |
+| 토글 키/부품 목록 표시 시 `div`에 호버/테두리 CSS 수동 작성 | `context.ui.createListItem({ title, subtitle, badge, selected, onClick })` 사용 |
+| 스크롤바나 패널 높이를 위해 수동 CSS(`!important` 등) 덧댐 | 코어 API(`createScrollContainer`, `createTabs`, `createSplitView`)에 `flex: 1 1 0; min-height: 0; height: 100%`가 자동 내장되어 있으므로 불필요 |
 | `document.getElementById` 전역 검색 | 컨테이너 스코프 내부 검색(`container.querySelector`) |
 | 위젯마다 최상위 프로퍼티(`.row`, `.container`)를 외워서 분기 | 모든 컴포넌트 표준인 `.element` 사용 또는 `children: [myWidget]`으로 직접 전달 (자동 언래핑) |
 | 원시 키 문자열(`no_modifiers alt VK_F4`)을 UI에 그대로 노출 | `context.ini.formatDisplayKey(rawKey)` 또는 `keyInput.getDisplayValue()`로 깔끔하게 변환 (`Alt + F4`) |
