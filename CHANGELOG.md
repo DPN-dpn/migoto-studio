@@ -2,11 +2,17 @@
 
 ## [다음 버전]
 
-### 신규 기능
-
 ### 기능 개선
+- 플러그인 UI 빌더 스플릿 뷰 (`context.ui.createSplitView`) 전체 높이 및 정렬 강제 보장:
+  - 스플릿 컨테이너(`.plugin-split-container`)에 `height: 100% !important; flex: 1 1 0% !important; align-items: stretch !important;`를 코어 스타일로 적용하여 내부 자식 요소의 내용물 길이에 따라 스플릿 바가 중간에서 끊기거나 늘어나던 Flexbox 상속 문제 해결
+  - 스플릿 구분선(`.plugin-split-resizer`)에 `align-self: stretch !important; height: 100% !important;`를 적용하여 패널 내용물 분량과 상관없이 창 상하 끝까지 일관되게 늘어나도록 보장
+  - 탭 패널(`.plugin-tab-panel`) 및 직속 자식 스플릿 뷰(`plugin-tab-panel > .plugin-split-container`)에 `align-items: stretch !important; height: 100% !important;`를 부여하여 탭 내부에서도 스플릿이 뷰포트 전체를 채우도록 개선
+- 에디터 탭 내부 및 대화창 여백(패딩) 최적화:
+  - 플러그인 커스텀 에디터 탭(`context.ui.openTab`의 `.plugin-tab-editor-content`)에 슬림 패딩(`padding: 8px 10px;`)을 기본 적용하여 툴바와 폼 요소가 창 테두리에 바짝 붙지 않도록 개선
+  - 확인/프롬프트 대화상자(`context.ui.confirm`, `context.ui.prompt`) 바디 및 내부 메시지에 여백을 적용하여 텍스트가 모달 테두리에 밀착되던 현상 해결
 
 ### 버그 수정
+- 스플릿 뷰가 탭 패널이나 부모 컨테이너 내부에 배치될 때 기본 높이가 `height: auto`로 동작하여 내용물 길이에 따라 스플릿 구분선이 축소되던 버그 수정
 
 ---
 
