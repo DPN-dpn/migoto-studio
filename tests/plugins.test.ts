@@ -523,6 +523,26 @@ handling = skip
   };
   const nsDiagsBuiltin = await nsRule.check({ ...nsCtxBase, model: builtinModel });
   assert.equal(nsDiagsBuiltin.length, 0, 'BuiltinCommandList calls should produce 0 diagnostics');
+
+  // 2-g. Externally allowed variables (e.g. ZZMI TTL variables: $\TTL\alpha, $\TTL\_1, $\TTL\_2)
+  const ttlModel = {
+    getLineCount: () => 3,
+    getLineContent: (n: number) => {
+      if (n === 1) return '$\\TTL\\alpha = 0.4';
+      if (n === 2) return '$\\TTL\\_1 = 192';
+      return '$\\TTL\\_2 = 71646';
+    },
+    getValue: () => '$\\TTL\\alpha = 0.4\n$\\TTL\\_1 = 192\n$\\TTL\\_2 = 71646',
+  };
+  const nsDiagsTtl = await nsRule.check({
+    ...nsCtxBase,
+    model: ttlModel,
+    isAllowedVariable: (name: string) => {
+      const norm = name.toLowerCase().replace(/^[\\$]+/, '');
+      return norm.startsWith('ttl\\');
+    },
+  });
+  assert.equal(nsDiagsTtl.length, 0, 'TTL variables allowed via isAllowedVariable should have 0 diagnostics in custom-lint');
 });
 
 test('zzmi-support plugin activates and registers allowed resource and code template without sidebar view', () => {

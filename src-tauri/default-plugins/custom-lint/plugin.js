@@ -732,6 +732,8 @@ function registerLintRules(context, isActive, state) {
 						if (parts.length >= 2) {
 							const nsName = parts.slice(0, -1).join("\\");
 							const varName = parts[parts.length - 1];
+							const normalizedVar = parts.join("\\");
+							if (ctx.isAllowedVariable ? ctx.isAllowedVariable(fullVar) || ctx.isAllowedVariable(`\\${normalizedVar}`) || ctx.isAllowedVariable(normalizedVar) || ctx.isAllowedVariable(vm[0]) || ctx.isAllowedVariable(`${nsName}\\`) || ctx.isAllowedVariable(nsName) : false) continue;
 							const nsData = namespaceMap.get(nsName.toLowerCase());
 							if (!nsData) diagnostics.push({
 								severity: "warning",
