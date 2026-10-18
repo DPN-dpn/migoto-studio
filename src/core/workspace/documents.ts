@@ -164,6 +164,14 @@ export class DocumentManager {
     return () => this.beforeSwitchHandlers.delete(handler);
   }
 
+  markTabClean(tabId: string) {
+    const tab = this.tabs.find((t) => t.id === tabId);
+    if (tab && tab.kind === 'text') {
+      tab.savedVersion = tab.model.getAlternativeVersionId();
+      this.emit();
+    }
+  }
+
   private emit() {
     this.listeners.forEach((l) => l());
   }
@@ -407,6 +415,20 @@ export class DocumentManager {
     const idx = this.tabs.findIndex((t) => t.id === tabId);
     if (idx === -1) return true;
     const target = this.tabs[idx];
+
+    if (this.isTabDirty(target)) {
+      if (target.file && target.kind === 'text') {
+        try {
+          const loaded = await platform().readFile(target.file);
+          if (loaded.text === target.model.getValue()) {
+            target.savedVersion = target.model.getAlternativeVersionId();
+            this.emit();
+          }
+        } catch {
+          // ignore read error and proceed to ask
+        }
+      }
+    }
 
     if (this.isTabDirty(target)) {
       this.switchTab(target.id);

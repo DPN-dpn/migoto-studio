@@ -18,6 +18,7 @@ interface TabReviewSession {
   editor: monaco.editor.IStandaloneCodeEditor;
   model: monaco.editor.ITextModel;
   originalText: string;
+  wasCleanBefore: boolean;
   hunks: DiffHunk[];
   decorationIds: string[];
   zoneIds: string[];
@@ -327,6 +328,10 @@ function finishSession(session: TabReviewSession, accepted: boolean) {
       { range: session.model.getFullModelRange(), text: session.originalText },
     ]);
     session.editor.pushUndoStop();
+
+    if (session.wasCleanBefore && globalDoc) {
+      globalDoc.markTabClean(session.tabId);
+    }
   }
 
   session.editor.focus();
@@ -361,13 +366,21 @@ function resolveSingleHunk(session: TabReviewSession, hunkIdx: number, acceptHun
   session.hunks.splice(hunkIdx, 1);
 
   if (session.hunks.length === 0) {
+    const isOriginal = model.getValue() === session.originalText;
     finishSession(session, acceptHunk);
+    if (isOriginal && session.wasCleanBefore && globalDoc) {
+      globalDoc.markTabClean(session.tabId);
+    }
   } else {
     // Recompute diff on current content
     const updatedText = model.getValue();
     session.hunks = computeLineDiff(session.originalText, updatedText);
     if (session.hunks.length === 0) {
+      const isOriginal = updatedText === session.originalText;
       finishSession(session, true);
+      if (isOriginal && session.wasCleanBefore && globalDoc) {
+        globalDoc.markTabClean(session.tabId);
+      }
       return;
     }
 
@@ -463,7 +476,9 @@ export async function proposeEditorChanges(
   ensureKeyHandler();
 
   const tabId = targetTabId || getCurrentActiveTabId();
-  const tabTitle = globalDoc?.allTabs.find((t) => t.id === tabId)?.title || '';
+  const targetTab = globalDoc?.allTabs.find((t) => t.id === tabId);
+  const tabTitle = targetTab?.title || '';
+  const wasCleanBefore = targetTab ? !globalDoc?.isTabDirty(targetTab) : false;
 
   // Cancel any existing session for this specific tab
   const existingSession = tabSessions.get(tabId);
@@ -525,6 +540,7 @@ export async function proposeEditorChanges(
       editor,
       model,
       originalText,
+      wasCleanBefore,
       hunks,
       decorationIds,
       zoneIds: [],
