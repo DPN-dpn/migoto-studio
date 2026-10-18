@@ -235,6 +235,16 @@ export interface CustomReferenceProvider {
   ) => Promise<SymbolLocation[]> | SymbolLocation[];
 }
 
+export interface ProposeChangesOptions {
+  title?: string;
+  description?: string;
+  highlightOnly?: boolean;
+}
+
+export interface ProposeChangesResult {
+  accepted: boolean;
+}
+
 export interface PluginTemplate {
   id?: string;
   label: string;
@@ -359,6 +369,7 @@ export interface PluginContext {
     registerLintRule(rule: CustomLintRule): () => void;
     registerDefinitionProvider?(provider: CustomDefinitionProvider): () => void;
     registerReferenceProvider?(provider: CustomReferenceProvider): () => void;
+    proposeChanges(newText: string, options?: ProposeChangesOptions): Promise<ProposeChangesResult>;
   };
 
   // ---- Workspace & files ----

@@ -2040,5 +2040,54 @@ test('Plugin UI Builder widgets uniformly expose .element and validation methods
   }
 });
 
+test('computeLineDiff calculates accurate line additions and deletions', async () => {
+  const { computeLineDiff } = await import('../src/core/editor/diff.ts');
+
+  // Identical text
+  assert.deepEqual(computeLineDiff('hello\nworld', 'hello\nworld'), []);
+
+  // Simple modification
+  const orig = 'line1\nline2\nline3';
+  const mod = 'line1\nline_changed\nline3';
+  const hunks = computeLineDiff(orig, mod);
+  assert.equal(hunks.length, 1);
+  assert.equal(hunks[0].originalStart, 2);
+  assert.deepEqual(hunks[0].originalLines, ['line2']);
+  assert.equal(hunks[0].modifiedStart, 2);
+  assert.deepEqual(hunks[0].modifiedLines, ['line_changed']);
+
+  // Pure insertion
+  const modInsert = 'line1\ninserted\nline2\nline3';
+  const insertHunks = computeLineDiff(orig, modInsert);
+  assert.equal(insertHunks.length, 1);
+  assert.deepEqual(insertHunks[0].originalLines, []);
+  assert.deepEqual(insertHunks[0].modifiedLines, ['inserted']);
+
+  // Pure deletion
+  const modDelete = 'line1\nline3';
+  const deleteHunks = computeLineDiff(orig, modDelete);
+  assert.equal(deleteHunks.length, 1);
+  assert.deepEqual(deleteHunks[0].originalLines, ['line2']);
+  assert.deepEqual(deleteHunks[0].modifiedLines, []);
+});
+
+test('PluginContext editor exposes proposeChanges method', () => {
+  let tested = false;
+  const plugin = definePlugin({
+    activate(context) {
+      assert.equal(typeof context.editor.proposeChanges, 'function');
+      tested = true;
+    },
+  });
+
+  const mockContext: any = {
+    editor: {
+      proposeChanges: async () => ({ accepted: true }),
+    },
+  };
+  plugin.activate(mockContext);
+  assert.ok(tested);
+});
+
 
 

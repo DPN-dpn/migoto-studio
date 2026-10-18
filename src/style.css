@@ -6085,4 +6085,132 @@ body.plugin-split-resizing-v * {
   overflow: hidden !important;
 }
 
+/* ==========================================================================
+   Inline Diff Review (proposeChanges)
+   ========================================================================== */
+
+/* Green insertion highlight for modified lines */
+.inline-diff-line-insert {
+  background-color: rgba(46, 160, 67, 0.18) !important;
+}
+.inline-diff-gutter-insert {
+  border-left: 3px solid #3fb950 !important;
+}
+
+/* Red deletion viewzone for removed lines */
+.inline-diff-viewzone-delete {
+  background-color: rgba(248, 81, 73, 0.15);
+  border-top: 1px dashed rgba(248, 81, 73, 0.4);
+  border-bottom: 1px dashed rgba(248, 81, 73, 0.4);
+  width: 100%;
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
+  pointer-events: none;
+  box-sizing: border-box;
+}
+
+.inline-diff-line-delete {
+  display: flex;
+  align-items: center;
+  padding-left: 10px;
+  color: #f85149;
+  white-space: pre;
+  opacity: 0.85;
+}
+
+.inline-diff-line-delete .inline-diff-prefix {
+  user-select: none;
+  font-weight: bold;
+  margin-right: 6px;
+  color: #f85149;
+}
+
+.inline-diff-line-delete .inline-diff-text {
+  text-decoration: line-through;
+}
+
+/* Floating Review Action Toolbar */
+.inline-diff-toolbar {
+  position: absolute;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  background: var(--bg-elev, #1c2128);
+  border: 1px solid var(--border, #30363d);
+  border-radius: 6px;
+  padding: 4px 10px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+  font-size: 12px;
+  user-select: none;
+  transform: translateY(-8px);
+}
+
+.inline-diff-toolbar-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.inline-diff-toolbar-title {
+  font-weight: 600;
+  color: var(--fg, #e6edf3);
+}
+
+.inline-diff-toolbar-desc {
+  font-size: 11px;
+  color: var(--fg-dim, #8b949e);
+}
+
+.inline-diff-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.inline-diff-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.15s ease;
+}
+
+.inline-diff-btn kbd {
+  font-size: 9px;
+  opacity: 0.75;
+  background: rgba(0, 0, 0, 0.25);
+  padding: 1px 3px;
+  border-radius: 3px;
+}
+
+.inline-diff-btn.accept {
+  background: #238636;
+  color: #ffffff;
+  border-color: #2ea043;
+}
+
+.inline-diff-btn.accept:hover {
+  background: #2ea043;
+}
+
+.inline-diff-btn.discard {
+  background: #21262d;
+  color: #c9d1d9;
+  border-color: #30363d;
+}
+
+.inline-diff-btn.discard:hover {
+  background: #30363d;
+  color: #f85149;
+}
+
+
 

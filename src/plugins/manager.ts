@@ -12,6 +12,7 @@ import {
   setCustomReferencesResolver,
   type SymbolOccurrence,
 } from '../core/ini/symbol-nav';
+import { proposeEditorChanges } from '../core/editor/inline-review';
 import type { ActivityBar } from '../ui/layout/activitybar';
 import {
   registerAllowedResource,
@@ -75,6 +76,8 @@ import type {
   DiagnosticFilter,
   DiagnosticFilterContext,
   LintDiagnostic,
+  ProposeChangesOptions,
+  ProposeChangesResult,
 } from './types';
 import { createUIBuilder } from './ui-builder';
 
@@ -1187,6 +1190,9 @@ export default {
           const cleanup = this.registerReferenceProvider(provider);
           callbacks.onRegisterCleanup(cleanup);
           return cleanup;
+        },
+        proposeChanges: async (newText: string, options?: ProposeChangesOptions): Promise<ProposeChangesResult> => {
+          return await proposeEditorChanges(this.editor, newText, options);
         },
       },
 

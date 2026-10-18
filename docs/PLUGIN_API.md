@@ -995,6 +995,20 @@ context.editor.registerContextMenuAction({
     context.editor.replaceSelection(text.toUpperCase());
   },
 });
+
+// 인라인 변경 제안 및 대화형 검토 (VS Code 스타일 Inline Diff Review)
+// 별도 탭 이동 없이 현재 에디터에 삭제된 줄(빨간색 취소선)과 추가된 줄(초록색)을 인라인으로 띄우고,
+// 상단 플로팅 툴바에서 [✓ 수락 (Ctrl+Enter)] / [✕ 되돌리기 (Esc)]로 사용자가 직접 확정/취소할 수 있습니다.
+const result = await context.editor.proposeChanges(newIniText, {
+  title: '토글 키 변경 제안',     // 플로팅 툴바 제목 (선택)
+  description: 'NumPad1 → F5 키로 교체', // 플로팅 툴바 보조 설명 (선택)
+});
+
+if (result.accepted) {
+  context.ui.showToast('변경사항이 적용되었습니다.', 'info');
+} else {
+  context.ui.showToast('변경이 취소되고 원래 코드로 복구되었습니다.', 'warn');
+}
 ```
 
 ---
