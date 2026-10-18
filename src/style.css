@@ -6135,8 +6135,27 @@ body.plugin-split-resizing-v * {
   text-decoration: line-through;
 }
 
+/* Monaco Editor ViewZone Interactivity & Stacking Fix */
+.monaco-editor .lines-content .view-zones {
+  z-index: 10 !important;
+  pointer-events: none;
+}
+
+.monaco-editor .lines-content .view-zones > * {
+  pointer-events: auto !important;
+}
+
+.inline-diff-hunk-zone {
+  position: relative;
+  z-index: 15 !important;
+  pointer-events: auto !important;
+  cursor: default !important;
+}
+
 /* Inline Hunk Action Bar (VS Code style above change) */
 .inline-diff-hunk-actions {
+  position: relative;
+  z-index: 20 !important;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -6146,7 +6165,8 @@ body.plugin-split-resizing-v * {
   font-size: 11px;
   user-select: none;
   box-sizing: border-box;
-  pointer-events: auto;
+  pointer-events: auto !important;
+  cursor: default !important;
 }
 
 .inline-diff-hunk-label {
@@ -6159,6 +6179,8 @@ body.plugin-split-resizing-v * {
 }
 
 .inline-diff-hunk-btn {
+  position: relative;
+  z-index: 25 !important;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -6172,12 +6194,16 @@ body.plugin-split-resizing-v * {
   font-size: 10px;
   font-weight: 500;
   font-family: inherit;
-  cursor: pointer;
+  cursor: pointer !important;
   border: 1px solid transparent;
   transition: all 0.15s ease;
   box-sizing: border-box;
-  pointer-events: auto;
+  pointer-events: auto !important;
   vertical-align: middle;
+}
+
+.inline-diff-hunk-btn * {
+  pointer-events: none !important;
 }
 
 .inline-diff-hunk-btn.accept {

@@ -177,12 +177,16 @@ function attachSession(session: TabReviewSession) {
       const afterLine = Math.max(0, hunk.modifiedStart - 1);
       const zoneDom = document.createElement('div');
       zoneDom.className = 'inline-diff-hunk-zone';
+      zoneDom.style.pointerEvents = 'auto';
+      zoneDom.style.cursor = 'default';
 
       // 1. Action Row
       const actionRow = document.createElement('div');
       actionRow.className = 'inline-diff-hunk-actions';
       actionRow.style.paddingLeft = `${contentLeft}px`;
       actionRow.style.height = `${ACTION_BAR_HEIGHT}px`;
+      actionRow.style.pointerEvents = 'auto';
+      actionRow.style.cursor = 'default';
 
       const label = document.createElement('span');
       label.className = 'inline-diff-hunk-label';
@@ -194,6 +198,8 @@ function attachSession(session: TabReviewSession) {
       btnAccept.className = 'inline-diff-hunk-btn accept';
       btnAccept.title = '이 변경만 수락';
       btnAccept.innerHTML = '✓ 수락';
+      btnAccept.style.cursor = 'pointer';
+      btnAccept.style.pointerEvents = 'auto';
       const onAcceptClick = (e: Event) => {
         e.stopPropagation();
         e.preventDefault();
@@ -201,6 +207,7 @@ function attachSession(session: TabReviewSession) {
       };
       btnAccept.addEventListener('pointerdown', (e) => e.stopPropagation());
       btnAccept.addEventListener('mousedown', (e) => e.stopPropagation());
+      btnAccept.addEventListener('mouseup', (e) => e.stopPropagation());
       btnAccept.addEventListener('click', onAcceptClick);
 
       const btnDiscard = document.createElement('button');
@@ -208,6 +215,8 @@ function attachSession(session: TabReviewSession) {
       btnDiscard.className = 'inline-diff-hunk-btn discard';
       btnDiscard.title = '이 변경 되돌리기';
       btnDiscard.innerHTML = '✕ 되돌리기';
+      btnDiscard.style.cursor = 'pointer';
+      btnDiscard.style.pointerEvents = 'auto';
       const onDiscardClick = (e: Event) => {
         e.stopPropagation();
         e.preventDefault();
@@ -215,6 +224,7 @@ function attachSession(session: TabReviewSession) {
       };
       btnDiscard.addEventListener('pointerdown', (e) => e.stopPropagation());
       btnDiscard.addEventListener('mousedown', (e) => e.stopPropagation());
+      btnDiscard.addEventListener('mouseup', (e) => e.stopPropagation());
       btnDiscard.addEventListener('click', onDiscardClick);
 
       actionRow.appendChild(btnAccept);
