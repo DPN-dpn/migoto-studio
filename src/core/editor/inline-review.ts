@@ -11,94 +11,18 @@ export interface ProposeChangesResult {
   accepted: boolean;
 }
 
-class ReviewToolbarWidget implements monaco.editor.IContentWidget {
-  private domNode: HTMLElement;
-  private id: string;
-  private lineNumber: number;
-
-  constructor(
-    id: string,
-    lineNumber: number,
-    title: string,
-    description: string,
-    onAccept: () => void,
-    onDiscard: () => void,
-  ) {
-    this.id = id;
-    this.lineNumber = lineNumber;
-
-    this.domNode = document.createElement('div');
-    this.domNode.className = 'inline-diff-toolbar';
-
-    const header = document.createElement('div');
-    header.className = 'inline-diff-toolbar-header';
-
-    const titleEl = document.createElement('span');
-    titleEl.className = 'inline-diff-toolbar-title';
-    titleEl.textContent = title;
-    header.appendChild(titleEl);
-
-    if (description) {
-      const descEl = document.createElement('span');
-      descEl.className = 'inline-diff-toolbar-desc';
-      descEl.textContent = description;
-      header.appendChild(descEl);
-    }
-
-    const actions = document.createElement('div');
-    actions.className = 'inline-diff-toolbar-actions';
-
-    const acceptBtn = document.createElement('button');
-    acceptBtn.className = 'inline-diff-btn accept';
-    acceptBtn.innerHTML = '<span>✓ 수락</span> <kbd>Ctrl+Enter</kbd>';
-    acceptBtn.title = '변경사항 적용 (Ctrl+Enter)';
-    acceptBtn.onclick = (e) => {
-      e.stopPropagation();
-      e.preventDefault();
-      onAccept();
-    };
-
-    const discardBtn = document.createElement('button');
-    discardBtn.className = 'inline-diff-btn discard';
-    discardBtn.innerHTML = '<span>✕ 되돌리기</span> <kbd>Esc</kbd>';
-    discardBtn.title = '변경사항 취소 (Esc)';
-    discardBtn.onclick = (e) => {
-      e.stopPropagation();
-      e.preventDefault();
-      onDiscard();
-    };
-
-    actions.appendChild(acceptBtn);
-    actions.appendChild(discardBtn);
-
-    this.domNode.appendChild(header);
-    this.domNode.appendChild(actions);
-  }
-
-  getId(): string {
-    return this.id;
-  }
-
-  getDomNode(): HTMLElement {
-    return this.domNode;
-  }
-
-  getPosition(): monaco.editor.IContentWidgetPosition | null {
-    return {
-      position: { lineNumber: Math.max(1, this.lineNumber), column: 1 },
-      preference: [monaco.editor.ContentWidgetPositionPreference.ABOVE, monaco.editor.ContentWidgetPositionPreference.EXACT],
-    };
-  }
+interface ActiveSession {
+  cancel: () => void;
+  accept: () => void;
+  hunkCount: number;
 }
 
-let activeReviewSession: {
-  cancel: () => void;
-} | null = null;
+let activeReviewSession: ActiveSession | null = null;
 
 export async function proposeEditorChanges(
   editor: monaco.editor.IStandaloneCodeEditor,
   proposedText: string,
-  options?: ProposeChangesOptions,
+  _options?: ProposeChangesOptions,
 ): Promise<ProposeChangesResult> {
   const model = editor.getModel();
   if (!model) return { accepted: false };
@@ -156,61 +80,176 @@ export async function proposeEditorChanges(
 
   const decorationIds = editor.deltaDecorations([], decorations);
 
-  // 4. Create ViewZones for deleted lines (red strikethrough zone)
-  const zoneIds: string[] = [];
-  editor.changeViewZones((accessor) => {
-    for (const hunk of hunks) {
-      if (hunk.originalLines.length > 0) {
-        // Position view zone after line (hunk.modifiedStart - 1)
+  return new Promise<ProposeChangesResult>((resolve) => {
+    let resolved = false;
+
+    // 4. Create ViewZones for deleted lines and hunk actions
+    const zoneIds: string[] = [];
+
+    // Helper to accept/discard a single hunk
+    const resolveHunk = (hunkIdx: number, acceptHunk: boolean) => {
+      const hunk = hunks[hunkIdx];
+      if (!hunk) return;
+
+      const currentModel = editor.getModel();
+      if (!currentModel) return;
+
+      if (!acceptHunk) {
+        // Revert this hunk back to original lines
+        const modStart = hunk.modifiedStart;
+        const modCount = hunk.modifiedLines.length;
+        const origText = hunk.originalLines.join(currentModel.getEOL());
+
+        editor.pushUndoStop();
+        if (modCount > 0) {
+          const modEnd = modStart + modCount - 1;
+          const range = new monaco.Range(modStart, 1, modEnd, currentModel.getLineMaxColumn(modEnd));
+          editor.executeEdits('revert-hunk', [{ range, text: origText }]);
+        } else {
+          // Pure insertion revert (delete inserted lines)
+          const range = new monaco.Range(modStart, 1, modStart, 1);
+          editor.executeEdits('revert-hunk', [{ range, text: origText.length ? origText + currentModel.getEOL() : '' }]);
+        }
+        editor.pushUndoStop();
+      }
+
+      // Check if all hunks are resolved
+      hunks.splice(hunkIdx, 1);
+      if (hunks.length === 0) {
+        finish(acceptHunk);
+      } else {
+        // Re-propose remaining changes with updated text
+        const updatedText = currentModel.getValue();
+        finish(acceptHunk);
+        proposeEditorChanges(editor, updatedText);
+      }
+    };
+
+    editor.changeViewZones((accessor) => {
+      hunks.forEach((hunk, idx) => {
         const afterLine = Math.max(0, hunk.modifiedStart - 1);
 
         const zoneDom = document.createElement('div');
-        zoneDom.className = 'inline-diff-viewzone-delete';
-        for (const lineText of hunk.originalLines) {
-          const lineEl = document.createElement('div');
-          lineEl.className = 'inline-diff-line-delete';
-          const prefix = document.createElement('span');
-          prefix.className = 'inline-diff-prefix';
-          prefix.textContent = '- ';
-          const code = document.createElement('span');
-          code.className = 'inline-diff-text';
-          code.textContent = lineText || ' ';
-          lineEl.appendChild(prefix);
-          lineEl.appendChild(code);
-          zoneDom.appendChild(lineEl);
+        zoneDom.className = 'inline-diff-hunk-zone';
+
+        // Deleted original lines block
+        if (hunk.originalLines.length > 0) {
+          const deleteContainer = document.createElement('div');
+          deleteContainer.className = 'inline-diff-viewzone-delete';
+          for (const lineText of hunk.originalLines) {
+            const lineEl = document.createElement('div');
+            lineEl.className = 'inline-diff-line-delete';
+            const prefix = document.createElement('span');
+            prefix.className = 'inline-diff-prefix';
+            prefix.textContent = '- ';
+            const code = document.createElement('span');
+            code.className = 'inline-diff-text';
+            code.textContent = lineText || ' ';
+            lineEl.appendChild(prefix);
+            lineEl.appendChild(code);
+            deleteContainer.appendChild(lineEl);
+          }
+          zoneDom.appendChild(deleteContainer);
         }
 
+        // Inline hunk action bar (displayed right above/at the change)
+        const actionRow = document.createElement('div');
+        actionRow.className = 'inline-diff-hunk-actions';
+
+        const label = document.createElement('span');
+        label.className = 'inline-diff-hunk-label';
+        label.textContent = `변경 #${idx + 1}`;
+        actionRow.appendChild(label);
+
+        const btnAccept = document.createElement('button');
+        btnAccept.className = 'inline-diff-hunk-btn accept';
+        btnAccept.title = '이 변경만 수락';
+        btnAccept.innerHTML = '✓ 수락';
+        btnAccept.onclick = (e) => {
+          e.stopPropagation();
+          e.preventDefault();
+          resolveHunk(idx, true);
+        };
+
+        const btnDiscard = document.createElement('button');
+        btnDiscard.className = 'inline-diff-hunk-btn discard';
+        btnDiscard.title = '이 변경 되돌리기';
+        btnDiscard.innerHTML = '✕ 되돌리기';
+        btnDiscard.onclick = (e) => {
+          e.stopPropagation();
+          e.preventDefault();
+          resolveHunk(idx, false);
+        };
+
+        actionRow.appendChild(btnAccept);
+        actionRow.appendChild(btnDiscard);
+        zoneDom.appendChild(actionRow);
+
+        const totalHeight = hunk.originalLines.length + 1; // lines + 1 action row
         const zoneId = accessor.addZone({
           afterLineNumber: afterLine,
-          heightInLines: hunk.originalLines.length,
+          heightInLines: totalHeight,
           domNode: zoneDom,
           suppressMouseDown: true,
         });
         zoneIds.push(zoneId);
+      });
+    });
+
+    // 5. Sticky Header Bar at the top of the editor
+    let stickyBar = document.getElementById('inline-diff-sticky-bar');
+    if (!stickyBar) {
+      stickyBar = document.createElement('div');
+      stickyBar.id = 'inline-diff-sticky-bar';
+      stickyBar.className = 'inline-diff-sticky-bar';
+
+      const editorContainer = document.getElementById('editor-container');
+      if (editorContainer) {
+        editorContainer.appendChild(stickyBar);
       }
     }
-  });
 
-  return new Promise<ProposeChangesResult>((resolve) => {
-    let resolved = false;
+    stickyBar.replaceChildren();
 
-    // 5. Floating action widget
-    const widgetId = `inline-diff-toolbar-${Date.now()}`;
-    const toolbar = new ReviewToolbarWidget(
-      widgetId,
-      firstModLine,
-      options?.title || '변경 제안 검토',
-      options?.description || `${hunks.length}개 블록 변경됨`,
-      () => finish(true),
-      () => finish(false),
-    );
+    const infoEl = document.createElement('div');
+    infoEl.className = 'inline-diff-sticky-info';
+    infoEl.innerHTML = `<span class="inline-diff-sticky-badge">${hunks.length}</span>개의 인라인 변경 사항 검토 중`;
+    stickyBar.appendChild(infoEl);
 
-    editor.addContentWidget(toolbar);
-    editor.layoutContentWidget(toolbar);
+    const btnGroup = document.createElement('div');
+    btnGroup.className = 'inline-diff-sticky-actions';
+
+    const btnAcceptAll = document.createElement('button');
+    btnAcceptAll.className = 'inline-diff-btn accept';
+    btnAcceptAll.innerHTML = '<span>✓ 모두 수락</span> <kbd>Ctrl+Enter</kbd>';
+    btnAcceptAll.title = '모든 변경 사항 일괄 수락 (Ctrl+Enter)';
+    btnAcceptAll.onclick = (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+      finish(true);
+    };
+
+    const btnDiscardAll = document.createElement('button');
+    btnDiscardAll.className = 'inline-diff-btn discard';
+    btnDiscardAll.innerHTML = '<span>✕ 모두 되돌리기</span> <kbd>Esc</kbd>';
+    btnDiscardAll.title = '모든 변경 사항 취소 및 원본 복원 (Esc)';
+    btnDiscardAll.onclick = (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+      finish(false);
+    };
+
+    btnGroup.appendChild(btnAcceptAll);
+    btnGroup.appendChild(btnDiscardAll);
+    stickyBar.appendChild(btnGroup);
+    stickyBar.style.display = 'flex';
 
     const cleanup = () => {
-      // Remove widget
-      editor.removeContentWidget(toolbar);
+      // Hide sticky bar
+      if (stickyBar) {
+        stickyBar.style.display = 'none';
+        stickyBar.replaceChildren();
+      }
 
       // Remove decorations
       editor.deltaDecorations(decorationIds, []);
@@ -261,6 +300,8 @@ export async function proposeEditorChanges(
 
     activeReviewSession = {
       cancel: () => finish(false),
+      accept: () => finish(true),
+      hunkCount: hunks.length,
     };
   });
 }

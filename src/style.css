@@ -6110,6 +6110,13 @@ body.plugin-split-resizing-v * {
   box-sizing: border-box;
 }
 
+.inline-diff-hunk-zone {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  box-sizing: border-box;
+}
+
 .inline-diff-line-delete {
   display: flex;
   align-items: center;
@@ -6130,51 +6137,127 @@ body.plugin-split-resizing-v * {
   text-decoration: line-through;
 }
 
-/* Floating Review Action Toolbar */
-.inline-diff-toolbar {
-  position: absolute;
-  z-index: 100;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  background: var(--bg-elev, #1c2128);
-  border: 1px solid var(--border, #30363d);
-  border-radius: 6px;
-  padding: 4px 10px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
-  font-size: 12px;
-  user-select: none;
-  transform: translateY(-8px);
-}
-
-.inline-diff-toolbar-header {
+/* Inline Hunk Action Bar (VS Code style above change) */
+.inline-diff-hunk-actions {
   display: flex;
   align-items: center;
   gap: 8px;
+  padding: 2px 10px;
+  background: rgba(30, 34, 45, 0.85);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 11px;
+  user-select: none;
+  box-sizing: border-box;
+  height: 24px;
 }
 
-.inline-diff-toolbar-title {
+.inline-diff-hunk-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--fg-dim, #8b949e);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.inline-diff-hunk-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.15s ease;
+}
+
+.inline-diff-hunk-btn.accept {
+  background: rgba(46, 160, 67, 0.2);
+  color: #3fb950;
+  border-color: rgba(46, 160, 67, 0.4);
+}
+
+.inline-diff-hunk-btn.accept:hover {
+  background: #2ea043;
+  color: #ffffff;
+}
+
+.inline-diff-hunk-btn.discard {
+  background: rgba(248, 81, 73, 0.15);
+  color: #f85149;
+  border-color: rgba(248, 81, 73, 0.35);
+}
+
+.inline-diff-hunk-btn.discard:hover {
+  background: #da3633;
+  color: #ffffff;
+}
+
+/* Sticky Top Bar for Tab (Accept All / Discard All) */
+.inline-diff-sticky-bar {
+  position: absolute;
+  top: 35px; /* below tabbar */
+  left: 0;
+  right: 0;
+  z-index: 40;
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 14px;
+  background: var(--bg-elev, #1c2128);
+  border-bottom: 1px solid var(--border, #30363d);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+  animation: slideDownDiffBar 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
+  box-sizing: border-box;
+}
+
+@keyframes slideDownDiffBar {
+  from {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.inline-diff-sticky-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--fg, #e6edf3);
 }
 
-.inline-diff-toolbar-desc {
+.inline-diff-sticky-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: 9px;
+  background: var(--accent, #8b7cf6);
+  color: #ffffff;
   font-size: 11px;
-  color: var(--fg-dim, #8b949e);
+  font-weight: 700;
 }
 
-.inline-diff-toolbar-actions {
+.inline-diff-sticky-actions {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
 }
 
 .inline-diff-btn {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  padding: 3px 8px;
+  padding: 4px 10px;
   border-radius: 4px;
   font-size: 11px;
   font-weight: 500;
@@ -6187,7 +6270,7 @@ body.plugin-split-resizing-v * {
   font-size: 9px;
   opacity: 0.75;
   background: rgba(0, 0, 0, 0.25);
-  padding: 1px 3px;
+  padding: 1px 4px;
   border-radius: 3px;
 }
 
@@ -6211,6 +6294,7 @@ body.plugin-split-resizing-v * {
   background: #30363d;
   color: #f85149;
 }
+
 
 
 
