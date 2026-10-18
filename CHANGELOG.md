@@ -1,6 +1,6 @@
 # 릴리스 노트 (Release Notes)
 
-## [다음 버전]
+## [0.12.8] - 2026-10-18
 
 ### 신규 기능
 - 에디터 인라인 Diff 검토 및 수락/되돌리기 API (`context.editor.proposeChanges`):
