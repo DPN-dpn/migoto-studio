@@ -415,7 +415,7 @@ const keyInput = context.ui.createKeyInput({
 
 #### A. 리사이저블 스플릿 뷰 (`context.ui.createSplitView`)
 마우스 드래그로 실시간 크기를 조절할 수 있는 분할 뷰입니다. 가로(좌우) 및 세로(상하) 분할을 지원하며, 사용자가 조절한 크기를 `localStorage`에 자동 영구 보존할 수 있습니다.
-`firstPane`과 `secondPane` 모두 코어 차원에서 `display: flex; flex-direction: column; overflow: hidden; min-height: 0;`가 기본 보장되어, 내부에 `createScrollContainer`나 `createTabs`를 넣었을 때 뷰포트 크기에 정확히 맞춰집니다.
+`firstPane`과 `secondPane` 및 루트 컨테이너, 리사이저 바 모두 코어 차원에서 `display: flex; height: 100%; flex: 1 1 0%; align-items: stretch; overflow: hidden; min-height: 0;`가 기본 보장되어, 내부 내용물 분량에 관계없이 뷰포트나 탭 패널 전체 높이에 맞추어 완벽하게 늘어납니다.
 
 ```typescript
 const split = context.ui.createSplitView({
