@@ -24,10 +24,13 @@
    - 상단 툴바 메뉴 등록은 `context.ui.registerMenuItem`을 사용하세요.
    - 사용자 확인이 필요할 때는 `context.ui.confirm` 및 `context.ui.prompt` 비동기 모달을 사용하세요.
    - 텍스트 변경점 비교 시 `context.ui.openDiffTab`을 열고, 백업 복원 시 `context.ui.openRestoreModal`을 활용하세요.
-   - 토글키/단축키 입력 필드가 필요할 때는 `type: 'key'` 필드를 사용하면 에디터 자체 실시간 키 감지 위젯이 자동 바인딩되며, 모달 창이 필요할 때는 `context.ui.openKeyBindingModal`을 호출하세요.
+   - 모든 UI 빌더 컴포넌트는 최상위 DOM 요소인 `.element`와 `.getElement()`를 표준 제공합니다. 레이아웃 컴포넌트(`createRow`, `createColumn`, `createCard` 등)의 `children` 배열에는 위젯 객체 자체를 넘기면 자동으로 최상위 엘리먼트로 언래핑됩니다.
+   - 입력 필드 유효성 검사 실패 시 `widget.setError(msg)`와 `widget.clearError()`를 사용하여 인라인 경고 테두리와 메시지 툴팁을 띄우세요.
+   - 토글키/단축키 입력 필드가 필요할 때는 `type: 'key'`(폼 탭) 또는 `context.ui.createKeyInput`을 사용하며, 화면 표시용 정제 문자열은 `context.ini.formatDisplayKey(rawKey)` 또는 `keyInput.getDisplayValue()`로 간결하게 취득하세요 (`'no_modifiers alt VK_F4'` ➔ `'Alt + F4'`).
    - 고품질 인터페이스 구현 시 분할 화면(`createSplitView`), 탭 네비게이션(`createTabs`), 아코디언(`createCollapsible`), 세그먼트 컨트롤(`createSegmentedControl`), 디바운스 검색창(`createSearchInput`), 숫자 입력 스텝퍼(`createNumberInput`), 파일 선택기(`createFilePicker`), 드롭존(`createDropZone`), 툴팁(`attachTooltip`)을 적극 활용하세요.
 4. INI 파일 조작 시:
    - 텍스트 전체를 무작위로 교체하지 말고 `context.ini.upsertSection`, `context.ini.formatKeyToggle`, `context.ini.merge`를 사용하여 기존 주석과 배치를 보존하세요.
+   - `drawindexed = auto` 다중 호출, `match_first_index`, 주석 순서, `if-endif` 블록 등이 중요한 메쉬 오버라이드 섹션은 딕셔너리 대신 `context.ini.getSectionRaw`, `context.ini.setSectionRaw`, `context.ini.parseSectionLines`를 활용하세요.
    - 변수/리소스/섹션 구조 파악 시 `context.ini.extractSymbols`를 사용하세요.
 5. 에디터 텍스트 수정 및 작업영역:
    - Monaco 에디터의 실행 취소(`Ctrl+Z`) 기록을 온전히 보존하는 `context.editor.setText(text)` 또는 `context.editor.replaceSelection(text)`를 사용하세요.
@@ -112,8 +115,8 @@ Migoto Studio 플러그인은 `activate(context)` 함수로 전달되는 `Plugin
 
 | 네임스페이스 | 주요 역할 및 핵심 기능 | 상세 레퍼런스 문서 |
 | :--- | :--- | :--- |
-| **`context.ui`** | • 선언형 폼 탭(`openFormTab`) 및 커스텀 에디터 탭(`openTab`) 열기<br>• 상단 툴바 메뉴 등록(`registerMenuItem`), 사이드바 패널 등록(`registerSidebarView`)<br>• 확인/입력 모달(`confirm`, `prompt`), Diff 비교 탭(`openDiffTab`), 백업 복원 모달(`openRestoreModal`)<br>• 3DMigoto 키 바인딩 대화상자(`openKeyBindingModal`), 키 입력 위젯(`createKeyInput`)<br>• UI 빌더: 분할뷰(`createSplitView`), 탭(`createTabs`), 아코디언(`createCollapsible`), 세그먼트(`createSegmentedControl`), 검색창(`createSearchInput`), 숫자 스텝퍼(`createNumberInput`), 파일선택기(`createFilePicker`), 드롭존(`createDropZone`), 툴팁(`attachTooltip`), 카드, 테이블, 콘솔 등 | [`PLUGIN_API.md#3-ui-api-contextui`](./PLUGIN_API.md#3-ui-api-contextui) |
-| **`context.ini`** | • 3DMigoto/XXMI 문법 파싱 및 섹션 자동 분류(`parse`, `classifySection`)<br>• 기존 주석 및 배치 보존 스마트 섹션 갱신(`upsertSection`) 및 삭제(`deleteSection`)<br>• 토글 키 섹션 텍스트 생성(`formatKeyToggle`), 단축키 파싱 및 조합(`parseKeyBinding`, `formatKeyBinding`)<br>• 변수, 리소스, CommandList 고속 심볼 추출(`extractSymbols`), 스마트 병합(`merge`) | [`PLUGIN_API.md#4-ini-문서-파싱-및-조작-api-contextini`](./PLUGIN_API.md#4-ini-문서-파싱-및-조작-api-contextini) |
+| **`context.ui`** | • 선언형 폼 탭(`openFormTab`) 및 커스텀 에디터 탭(`openTab`) 열기<br>• 상단 툴바 메뉴 등록(`registerMenuItem`), 사이드바 패널 등록(`registerSidebarView`)<br>• 확인/입력 모달(`confirm`, `prompt`), Diff 비교 탭(`openDiffTab`), 백업 복원 모달(`openRestoreModal`)<br>• 3DMigoto 키 바인딩 대화상자(`openKeyBindingModal`), 키 입력 위젯(`createKeyInput` - 실시간 감지/표시용 정제/인라인 검증)<br>• UI 빌더: 모든 위젯 표준 `.element` 및 `.getElement()`, 자동 언래핑(`toElement`)<br>• 인라인 검증 상태(`setError`, `clearError`, `hasError`)<br>• 레이아웃: 분할뷰(`createSplitView` - Flex 방어 내장), 탭(`createTabs`), 아코디언(`createCollapsible`), 세그먼트(`createSegmentedControl`), 검색창(`createSearchInput`), 숫자 스텝퍼(`createNumberInput`), 파일선택기(`createFilePicker`), 드롭존(`createDropZone`), 툴팁(`attachTooltip`), 카드, 테이블, 콘솔 등 | [`PLUGIN_API.md#3-ui-api-contextui`](./PLUGIN_API.md#3-ui-api-contextui) |
+| **`context.ini`** | • 3DMigoto/XXMI 문법 파싱 및 섹션 자동 분류(`parse`, `classifySection`)<br>• 기존 주석 및 배치 보존 스마트 섹션 갱신(`upsertSection`) 및 삭제(`deleteSection`)<br>• 토글 키 섹션 텍스트 생성(`formatKeyToggle`), 단축키 파싱 및 조합(`parseKeyBinding`, `formatKeyBinding`)<br>• 화면 표시용 단축키 텍스트 정제(`formatDisplayKey` - 부정키 제거 및 배지 표기)<br>• 다중 동일 키(`drawindexed = auto`), `if-endif` 블록, 주석 보존 Raw 조작(`getSectionRaw`, `setSectionRaw`, `parseSectionLines`)<br>• 변수, 리소스, CommandList 고속 심볼 추출(`extractSymbols`), 스마트 병합(`merge`) | [`PLUGIN_API.md#4-ini-문서-파싱-및-조작-api-contextini`](./PLUGIN_API.md#4-ini-문서-파싱-및-조작-api-contextini) |
 | **`context.editor`** | • 현재 열린 활성 파일의 텍스트 읽기/쓰기(`getText`, `setText`) — Monaco 실행 취소(`Ctrl+Z`) 이력 완벽 보존<br>• 커서 위치 조회/이동(`getCursor`, `setCursor`), 선택 영역 교체(`replaceSelection`), 텍스트 삽입(`insertText`)<br>• 에디터 우클릭 컨텍스트 메뉴 등록(`registerContextMenuAction`), 텍스트 변경 이벤트 감지 | [`PLUGIN_API.md#6-에디터-제어-contexteditor`](./PLUGIN_API.md#6-에디터-제어-contexteditor) |
 | **`context.workspace`** | • 활성 파일/작업 폴더 정보(`getCurrentFile`, `getCurrentFolder`), 파일 열기 및 저장(`openFile`, `saveCurrentFile`)<br>• 텍스트/바이너리 파일 I/O(`readTextFile`, `writeTextFile`, `readBinaryFile`, `writeBinaryFile`)<br>• 디렉터리 트리 순회(`readDirectory`), 워크스페이스 전역 텍스트 검색(`search`)<br>• 수정 전 안전 백업 생성(`createBackup`), 열린 탭 목록 조회/전환/닫기 제어(`getOpenTabs`, `focusTab`, `closeTab`) | [`PLUGIN_API.md#5-워크스페이스--파일-io-contextworkspace`](./PLUGIN_API.md#5-워크스페이스--파일-io-contextworkspace) |
 | **`context.linter`** | • 커스텀 INI 린트 규칙 등록(`registerRule`)<br>• 외부 플러그인 전용 허용 리소스 및 변수 화이트리스트 등록(`registerAllowedResource`, `registerAllowedVariable`) | [`PLUGIN_API.md`](./PLUGIN_API.md) |
@@ -124,7 +127,9 @@ Migoto Studio 플러그인은 `activate(context)` 함수로 전달되는 `Plugin
 
 1. **설정/입력 위주의 도구**: 복잡한 HTML을 작성하지 말고 `context.ui.openFormTab`을 사용하세요. 선언적 필드 배열(`FormFieldDef[]`)만 정의하면 카드 레이아웃, 실시간 키보드 감지, 테마 스타일, 값 수집 및 검증이 자동 처리됩니다.
 2. **복합 뷰어/커스텀 레이아웃**: `context.ui.openTab`을 사용하고, 내부 구조는 `context.ui.createSplitView`, `createTabs`, `createCollapsible`, `createRow`, `createColumn`, `createScrollContainer` 등 내장 UI 빌더 컴포넌트를 조합하여 구성하세요.
-3. **단축키 및 숫자 입력**: 단축키 필드는 항상 `type: 'key'`(폼 탭) 또는 `context.ui.createKeyInput` / `openKeyBindingModal`을 사용하고, 정수/실수 입력 필드는 `type: 'number'` 또는 `context.ui.createNumberInput` 스텝퍼 위젯(`min`, `max`, `step`, `precision`, `integerOnly` 지원)을 활용하세요.
+3. **위젯 엘리먼트 전달**: 모든 UI 컴포넌트는 `.element` 속성을 표준 제공하며, `createRow`, `createColumn`, `createCard`의 `children` 배열에 위젯 객체를 그대로 넘기면 코어가 자동 언래핑합니다.
+4. **단축키 및 숫자 입력**: 단축키 필드는 항상 `type: 'key'`(폼 탭) 또는 `context.ui.createKeyInput` / `openKeyBindingModal`을 사용하고, 정수/실수 입력 필드는 `type: 'number'` 또는 `context.ui.createNumberInput` 스텝퍼 위젯(`min`, `max`, `step`, `precision`, `integerOnly` 지원)을 활용하세요.
+5. **폼 에러 피드백**: 유효하지 않은 입력 발생 시 `input.setError(message)`를 호출하여 인라인 툴팁을 표시하고, 정상 입력 시 `input.clearError()`를 호출하세요.
 
 ---
 
@@ -359,5 +364,10 @@ export default {
 | 단축키를 일반 텍스트 입력창으로 처리 | `{ id: 'key', type: 'key' }` 필드로 실시간 키 감지 지원 |
 | 스크롤바를 위해 `style.css`에서 `!important`나 부모 flex를 수동 주입 | 에디터 코어 API(`createScrollContainer`, `createTabs`, `createSplitView`, `openTab`)에 `flex: 1 1 0; min-height: 0;` 및 테마 스크롤바가 자동 내장되어 있으므로 수동 스타일 조작 없이 API만 호출 |
 | `document.getElementById` 전역 검색 | 컨테이너 스코프 내부 검색(`container.querySelector`) |
+| 위젯마다 최상위 프로퍼티(`.row`, `.container`)를 외워서 분기 | 모든 컴포넌트 표준인 `.element` 사용 또는 `children: [myWidget]`으로 직접 전달 (자동 언래핑) |
+| 원시 키 문자열(`no_modifiers alt VK_F4`)을 UI에 그대로 노출 | `context.ini.formatDisplayKey(rawKey)` 또는 `keyInput.getDisplayValue()`로 깔끔하게 변환 (`Alt + F4`) |
+| `drawindexed = auto` 다중 호출이나 if-endif 블록을 단일 딕셔너리로 덮어쓰다 유실 | `context.ini.getSectionRaw`, `setSectionRaw`, `parseSectionLines`로 원본 라인 및 순서 보존 |
+| 입력값 오류 시 화면 전체 경고창이나 토스트만 남발 | `input.setError('경고 메시지')`와 `input.clearError()`를 활용하여 인라인 필드 피드백 제공 |
 | 코드가 길어졌을 때 단일 파일에 억지로 우겨넣음 | `index.js`, `ui.js`, `constants.js`, `style.css` 등으로 분할하여 상대 경로 `import` 사용 |
 | Vite/webpack/esbuild 번들러 설정 생성 시도 | 에디터 코어 가상 모듈 링커가 런타임에 자동 해석하므로 번들러 불필요 (순수 ESM 작성) |
+
