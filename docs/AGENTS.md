@@ -25,7 +25,7 @@
    - 사용자 확인이 필요할 때는 `context.ui.confirm` 및 `context.ui.prompt` 비동기 모달을 사용하세요.
    - 텍스트 변경점 비교 시 `context.ui.openDiffTab`을 열고, 백업 복원 시 `context.ui.openRestoreModal`을 활용하세요.
    - 토글키/단축키 입력 필드가 필요할 때는 `type: 'key'` 필드를 사용하면 에디터 자체 실시간 키 감지 위젯이 자동 바인딩되며, 모달 창이 필요할 때는 `context.ui.openKeyBindingModal`을 호출하세요.
-   - 고품질 인터페이스 구현 시 분할 화면(`createSplitView`), 탭 네비게이션(`createTabs`), 아코디언(`createCollapsible`), 세그먼트 컨트롤(`createSegmentedControl`), 디바운스 검색창(`createSearchInput`), 파일 선택기(`createFilePicker`), 드롭존(`createDropZone`), 툴팁(`attachTooltip`)을 적극 활용하세요.
+   - 고품질 인터페이스 구현 시 분할 화면(`createSplitView`), 탭 네비게이션(`createTabs`), 아코디언(`createCollapsible`), 세그먼트 컨트롤(`createSegmentedControl`), 디바운스 검색창(`createSearchInput`), 숫자 입력 스텝퍼(`createNumberInput`), 파일 선택기(`createFilePicker`), 드롭존(`createDropZone`), 툴팁(`attachTooltip`)을 적극 활용하세요.
 4. INI 파일 조작 시:
    - 텍스트 전체를 무작위로 교체하지 말고 `context.ini.upsertSection`, `context.ini.formatKeyToggle`, `context.ini.merge`를 사용하여 기존 주석과 배치를 보존하세요.
    - 변수/리소스/섹션 구조 파악 시 `context.ini.extractSymbols`를 사용하세요.
@@ -112,7 +112,7 @@ Migoto Studio 플러그인은 `activate(context)` 함수로 전달되는 `Plugin
 
 | 네임스페이스 | 주요 역할 및 핵심 기능 | 상세 레퍼런스 문서 |
 | :--- | :--- | :--- |
-| **`context.ui`** | • 선언형 폼 탭(`openFormTab`) 및 커스텀 에디터 탭(`openTab`) 열기<br>• 상단 툴바 메뉴 등록(`registerMenuItem`), 사이드바 패널 등록(`registerSidebarView`)<br>• 확인/입력 모달(`confirm`, `prompt`), Diff 비교 탭(`openDiffTab`), 백업 복원 모달(`openRestoreModal`)<br>• 3DMigoto 키 바인딩 대화상자(`openKeyBindingModal`), 키 입력 위젯(`createKeyInput`)<br>• UI 빌더: 분할뷰(`createSplitView`), 탭(`createTabs`), 아코디언(`createCollapsible`), 세그먼트(`createSegmentedControl`), 검색창(`createSearchInput`), 파일선택기(`createFilePicker`), 드롭존(`createDropZone`), 툴팁(`attachTooltip`), 카드, 테이블, 콘솔 등 | [`PLUGIN_API.md#3-ui-api-contextui`](./PLUGIN_API.md#3-ui-api-contextui) |
+| **`context.ui`** | • 선언형 폼 탭(`openFormTab`) 및 커스텀 에디터 탭(`openTab`) 열기<br>• 상단 툴바 메뉴 등록(`registerMenuItem`), 사이드바 패널 등록(`registerSidebarView`)<br>• 확인/입력 모달(`confirm`, `prompt`), Diff 비교 탭(`openDiffTab`), 백업 복원 모달(`openRestoreModal`)<br>• 3DMigoto 키 바인딩 대화상자(`openKeyBindingModal`), 키 입력 위젯(`createKeyInput`)<br>• UI 빌더: 분할뷰(`createSplitView`), 탭(`createTabs`), 아코디언(`createCollapsible`), 세그먼트(`createSegmentedControl`), 검색창(`createSearchInput`), 숫자 스텝퍼(`createNumberInput`), 파일선택기(`createFilePicker`), 드롭존(`createDropZone`), 툴팁(`attachTooltip`), 카드, 테이블, 콘솔 등 | [`PLUGIN_API.md#3-ui-api-contextui`](./PLUGIN_API.md#3-ui-api-contextui) |
 | **`context.ini`** | • 3DMigoto/XXMI 문법 파싱 및 섹션 자동 분류(`parse`, `classifySection`)<br>• 기존 주석 및 배치 보존 스마트 섹션 갱신(`upsertSection`) 및 삭제(`deleteSection`)<br>• 토글 키 섹션 텍스트 생성(`formatKeyToggle`), 단축키 파싱 및 조합(`parseKeyBinding`, `formatKeyBinding`)<br>• 변수, 리소스, CommandList 고속 심볼 추출(`extractSymbols`), 스마트 병합(`merge`) | [`PLUGIN_API.md#4-ini-문서-파싱-및-조작-api-contextini`](./PLUGIN_API.md#4-ini-문서-파싱-및-조작-api-contextini) |
 | **`context.editor`** | • 현재 열린 활성 파일의 텍스트 읽기/쓰기(`getText`, `setText`) — Monaco 실행 취소(`Ctrl+Z`) 이력 완벽 보존<br>• 커서 위치 조회/이동(`getCursor`, `setCursor`), 선택 영역 교체(`replaceSelection`), 텍스트 삽입(`insertText`)<br>• 에디터 우클릭 컨텍스트 메뉴 등록(`registerContextMenuAction`), 텍스트 변경 이벤트 감지 | [`PLUGIN_API.md#6-에디터-제어-contexteditor`](./PLUGIN_API.md#6-에디터-제어-contexteditor) |
 | **`context.workspace`** | • 활성 파일/작업 폴더 정보(`getCurrentFile`, `getCurrentFolder`), 파일 열기 및 저장(`openFile`, `saveCurrentFile`)<br>• 텍스트/바이너리 파일 I/O(`readTextFile`, `writeTextFile`, `readBinaryFile`, `writeBinaryFile`)<br>• 디렉터리 트리 순회(`readDirectory`), 워크스페이스 전역 텍스트 검색(`search`)<br>• 수정 전 안전 백업 생성(`createBackup`), 열린 탭 목록 조회/전환/닫기 제어(`getOpenTabs`, `focusTab`, `closeTab`) | [`PLUGIN_API.md#5-워크스페이스--파일-io-contextworkspace`](./PLUGIN_API.md#5-워크스페이스--파일-io-contextworkspace) |
@@ -124,7 +124,7 @@ Migoto Studio 플러그인은 `activate(context)` 함수로 전달되는 `Plugin
 
 1. **설정/입력 위주의 도구**: 복잡한 HTML을 작성하지 말고 `context.ui.openFormTab`을 사용하세요. 선언적 필드 배열(`FormFieldDef[]`)만 정의하면 카드 레이아웃, 실시간 키보드 감지, 테마 스타일, 값 수집 및 검증이 자동 처리됩니다.
 2. **복합 뷰어/커스텀 레이아웃**: `context.ui.openTab`을 사용하고, 내부 구조는 `context.ui.createSplitView`, `createTabs`, `createCollapsible`, `createRow`, `createColumn`, `createScrollContainer` 등 내장 UI 빌더 컴포넌트를 조합하여 구성하세요.
-3. **단축키 입력**: 단축키 필드는 항상 `type: 'key'`(폼 탭) 또는 `context.ui.createKeyInput` / `openKeyBindingModal`을 사용하여 사용자가 키보드를 누르는 것만으로 올바른 3DMigoto 가상 키(`VK_*`)와 수식키(`no_modifiers`, `ctrl`, `alt` 등)가 입력되도록 하세요.
+3. **단축키 및 숫자 입력**: 단축키 필드는 항상 `type: 'key'`(폼 탭) 또는 `context.ui.createKeyInput` / `openKeyBindingModal`을 사용하고, 정수/실수 입력 필드는 `type: 'number'` 또는 `context.ui.createNumberInput` 스텝퍼 위젯(`min`, `max`, `step`, `precision`, `integerOnly` 지원)을 활용하세요.
 
 ---
 
