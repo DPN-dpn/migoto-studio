@@ -23,6 +23,7 @@ import { lintModel, optionsFromSettings } from './core/ini/lint';
 import { registerSmartCompletions } from './core/editor/completions';
 import { registerFoldingProvider } from './core/editor/folding';
 import { DiffViewer } from './ui/views/diff-viewer';
+import { initInlineReview } from './core/editor/inline-review';
 import { openCompareDialog } from './ui/modals/diff-dialog';
 import { openKeyHelperModal } from './ui/modals/key-helper';
 import {
@@ -118,6 +119,7 @@ async function boot() {
   });
 
   const doc = new DocumentManager(editor, $('custom-viewer-container'));
+  initInlineReview(doc, editor);
   registerSymbolProviders(monaco, doc);
   pruneRedundantContextActions();
   const diffViewer = new DiffViewer($('diff-container'), doc);

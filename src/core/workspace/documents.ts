@@ -89,6 +89,7 @@ export class DocumentManager {
   private tabSeq = 0;
   private untitledSeq = 0;
   private listeners = new Set<() => void>();
+  private beforeSwitchHandlers = new Set<(fromTabId: string, toTabId: string) => void>();
   private viewerProvider?: CustomViewerProvider;
   private diffViewer?: DiffViewerHandler;
 
@@ -158,6 +159,11 @@ export class DocumentManager {
     return () => this.listeners.delete(listener);
   }
 
+  onBeforeSwitchTab(handler: (fromTabId: string, toTabId: string) => void): () => void {
+    this.beforeSwitchHandlers.add(handler);
+    return () => this.beforeSwitchHandlers.delete(handler);
+  }
+
   private emit() {
     this.listeners.forEach((l) => l());
   }
@@ -216,6 +222,15 @@ export class DocumentManager {
     if (!force && this.activeTabId === tabId) return;
     const target = this.tabs.find((t) => t.id === tabId);
     if (!target) return;
+
+    const prevTabId = this.activeTabId;
+    this.beforeSwitchHandlers.forEach((handler) => {
+      try {
+        handler(prevTabId, target.id);
+      } catch (err) {
+        console.warn('[DocumentManager] beforeSwitchHandler error:', err);
+      }
+    });
 
     if (this.activeTab && this.activeTab.kind === 'text') {
       this.activeTab.viewState = this.editor.saveViewState();

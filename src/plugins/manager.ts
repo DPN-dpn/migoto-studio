@@ -1192,7 +1192,7 @@ export default {
           return cleanup;
         },
         proposeChanges: async (newText: string, options?: ProposeChangesOptions): Promise<ProposeChangesResult> => {
-          return await proposeEditorChanges(this.editor, newText, options);
+          return await proposeEditorChanges(this.editor, newText, options, this.doc.currentTabId);
         },
       },
 
