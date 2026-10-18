@@ -4,8 +4,6 @@ import { executePythonScript } from './runner.ts';
 export function buildPythonRunnerView(context: PluginContext, container: HTMLElement) {
   // 1. 헤더 생성
   const header = context.ui.createPanelHeader('Python 실행기');
-  const pyBadge = context.ui.createBadge({ text: 'Python 3', variant: 'accent' });
-  header.append(pyBadge);
 
   // 2. 실행 인터프리터 선택 드롭다운 API
   const cmdSelect = context.ui.createSelect({

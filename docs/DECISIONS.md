@@ -166,10 +166,8 @@
      - 폼 컨트롤 너비 100% 자동 반응 (`width: 100%; max-width: 100%; min-width: 0; box-sizing: border-box; text-overflow: ellipsis;`).
      - 외곽 마진 제로화 및 `gap` 기반 정렬 표준화 (`margin: 0;`).
      - 모딩 플러그인 빈출 UI 패턴 내장 위젯화 (`createBadge`, `createCodeBlock`, `createListItem`)를 통해 플러그인 측 수십 줄의 인라인 CSS 작성 부담 해소.
-   8. **기본 내장 플러그인 3종 신규 UI 빌더 API 전면 전환 및 템플릿 탐색기 탑재**:
-      - `python-runner` (v1.3.0): `createFilePicker` 파일 선택 위젯 및 헤더 `createBadge` 적용으로 스크립트 지정 UX 개선.
-      - `ai-assistant` (v1.3.0): 기존 수동 DOM 조작 서브탭을 `createTabs`로 전면 교체하여 탭 스크롤 위치 보존 및 에이전트/설정 전환 부드러움 극대화, 프로바이더 프리셋 `createButtonRow` 적용.
-      - `zzmi-support` (v1.4.0): 단순 린트/스니펫 전용에서 좌측 사이드바 템플릿 탐색 뷰(`ZZMI 모딩 도구`)로 확장, `createListItem` 리스트 탐색, `createCodeBlock` 실시간 코드 미리보기 및 에디터 원클릭 삽입 탑재.
+   8. **`python-runner` (v1.3.0) 외부 파일 경로 선택기(`createFilePicker`) 적용**:
+      - 기존 수동 `input` + `button` + 이벤트 리스너 보일러플레이트를 단일 `createFilePicker` 위젯으로 간소화하여 네이티브 파일 탐색기와 자연스럽게 연동.
 
 
 

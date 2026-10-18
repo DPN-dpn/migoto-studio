@@ -25,11 +25,6 @@ async function executePythonScript(context, options) {
 //#region default-plugins/python-runner/ui.ts
 function buildPythonRunnerView(context, container) {
 	const header = context.ui.createPanelHeader("Python 실행기");
-	const pyBadge = context.ui.createBadge({
-		text: "Python 3",
-		variant: "accent"
-	});
-	header.append(pyBadge);
 	const cmdSelect = context.ui.createSelect({
 		label: "실행 명령:",
 		options: [
