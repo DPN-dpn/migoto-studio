@@ -1,6 +1,6 @@
 # 릴리스 노트 (Release Notes)
 
-## [다음 버전]
+## [0.12.6] - 2026-10-18
 
 ### 기능 개선
 - 플러그인 UI 빌더 스플릿 뷰 (`context.ui.createSplitView`) 전체 높이 및 정렬 강제 보장:
