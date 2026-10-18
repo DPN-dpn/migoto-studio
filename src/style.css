@@ -6146,6 +6146,7 @@ body.plugin-split-resizing-v * {
   font-size: 11px;
   user-select: none;
   box-sizing: border-box;
+  pointer-events: auto;
 }
 
 .inline-diff-hunk-label {
@@ -6154,19 +6155,29 @@ body.plugin-split-resizing-v * {
   color: var(--fg-dim, #8b949e);
   letter-spacing: 0.5px;
   text-transform: uppercase;
+  line-height: 1;
 }
 
 .inline-diff-hunk-btn {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 4px;
-  padding: 1px 6px;
+  height: 18px;
+  min-height: 18px;
+  max-height: 18px;
+  line-height: 16px;
+  padding: 0 6px;
   border-radius: 3px;
   font-size: 10px;
   font-weight: 500;
+  font-family: inherit;
   cursor: pointer;
   border: 1px solid transparent;
   transition: all 0.15s ease;
+  box-sizing: border-box;
+  pointer-events: auto;
+  vertical-align: middle;
 }
 
 .inline-diff-hunk-btn.accept {

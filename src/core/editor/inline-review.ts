@@ -150,24 +150,32 @@ export async function proposeEditorChanges(
         actionRow.appendChild(label);
 
         const btnAccept = document.createElement('button');
+        btnAccept.type = 'button';
         btnAccept.className = 'inline-diff-hunk-btn accept';
         btnAccept.title = '이 변경만 수락';
         btnAccept.innerHTML = '✓ 수락';
-        btnAccept.onclick = (e) => {
+        const onAcceptClick = (e: Event) => {
           e.stopPropagation();
           e.preventDefault();
           resolveHunk(idx, true);
         };
+        btnAccept.addEventListener('pointerdown', (e) => e.stopPropagation());
+        btnAccept.addEventListener('mousedown', (e) => e.stopPropagation());
+        btnAccept.addEventListener('click', onAcceptClick);
 
         const btnDiscard = document.createElement('button');
+        btnDiscard.type = 'button';
         btnDiscard.className = 'inline-diff-hunk-btn discard';
         btnDiscard.title = '이 변경 되돌리기';
         btnDiscard.innerHTML = '✕ 되돌리기';
-        btnDiscard.onclick = (e) => {
+        const onDiscardClick = (e: Event) => {
           e.stopPropagation();
           e.preventDefault();
           resolveHunk(idx, false);
         };
+        btnDiscard.addEventListener('pointerdown', (e) => e.stopPropagation());
+        btnDiscard.addEventListener('mousedown', (e) => e.stopPropagation());
+        btnDiscard.addEventListener('click', onDiscardClick);
 
         actionRow.appendChild(btnAccept);
         actionRow.appendChild(btnDiscard);
@@ -210,7 +218,7 @@ export async function proposeEditorChanges(
           afterLineNumber: afterLine,
           heightInPx: totalPx,
           domNode: zoneDom,
-          suppressMouseDown: true,
+          suppressMouseDown: false,
         });
         zoneIds.push(zoneId);
       });
