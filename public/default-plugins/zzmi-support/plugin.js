@@ -24,6 +24,16 @@ function registerZzmiRules(context) {
 		cleanups.push(context.linter.registerAllowedUsedResource(/^resource\\ttl\\/i));
 		cleanups.push(context.linter.registerAllowedUsedResource(/^commandlist\\ttl\\/i));
 	}
+	if (context.linter?.registerDiagnosticFilter) cleanups.push(context.linter.registerDiagnosticFilter((diag, ctx) => {
+		const msg = diag.message || "";
+		if (msg.includes("'TTL'") || msg.includes("'ttl'")) return false;
+		if (/\bttl[\\_]/i.test(msg) || /\$?\\?ttl\\/i.test(msg)) return false;
+		if (ctx?.model && diag.startLineNumber) {
+			const lineContent = ctx.model.getLineContent(diag.startLineNumber) || "";
+			if (/\\?TTL\\/i.test(lineContent) && /ttl/i.test(msg)) return false;
+		}
+		return true;
+	}));
 	return cleanups;
 }
 //#endregion

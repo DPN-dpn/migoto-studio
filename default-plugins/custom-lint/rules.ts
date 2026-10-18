@@ -244,19 +244,6 @@ export function registerLintRules(
             if (parts.length >= 2) {
               const nsName = parts.slice(0, -1).join('\\');
               const varName = parts[parts.length - 1];
-              const normalizedVar = parts.join('\\');
-
-              // 외부 플러그인(zzmi-support 등)에서 등록한 허용 변수/네임스페이스인지 확인
-              const isAllowed = ctx.isAllowedVariable
-                ? ctx.isAllowedVariable(fullVar) ||
-                  ctx.isAllowedVariable(`\\${normalizedVar}`) ||
-                  ctx.isAllowedVariable(normalizedVar) ||
-                  ctx.isAllowedVariable(vm[0]) ||
-                  ctx.isAllowedVariable(`${nsName}\\`) ||
-                  ctx.isAllowedVariable(nsName)
-                : false;
-              if (isAllowed) continue;
-
               const nsData = namespaceMap.get(nsName.toLowerCase());
 
               if (!nsData) {

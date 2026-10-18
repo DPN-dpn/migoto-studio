@@ -273,14 +273,16 @@ async function boot() {
       return;
     }
     const baseMarkers = lintModel(model, optionsFromSettings(s, hasFolder));
-    currentMarkers = [...baseMarkers, ...customMarkers];
+    const rawMarkers = [...baseMarkers, ...customMarkers];
+    currentMarkers = pluginManager.filterDiagnostics(rawMarkers, model);
     monaco.editor.setModelMarkers(model, 'migoto-lint', currentMarkers);
 
     // Also refresh markers for any other open text tabs
     for (const tab of doc.allTabs) {
       if (tab.kind === 'text' && tab.model !== model) {
         const markers = lintModel(tab.model, optionsFromSettings(s, hasFolder));
-        monaco.editor.setModelMarkers(tab.model, 'migoto-lint', markers);
+        const filtered = pluginManager.filterDiagnostics(markers, tab.model);
+        monaco.editor.setModelMarkers(tab.model, 'migoto-lint', filtered);
       }
     }
 

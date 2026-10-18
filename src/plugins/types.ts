@@ -146,6 +146,21 @@ export interface LintDiagnostic {
   endColumn: number;
 }
 
+export interface DiagnosticFilterContext {
+  model: {
+    getLineCount(): number;
+    getLineContent(lineNumber: number): string;
+    getValue(): string;
+  };
+  file: { name: string; path: string; location: string } | null;
+  folder: string | null;
+}
+
+export type DiagnosticFilter = (
+  diagnostic: LintDiagnostic,
+  context: DiagnosticFilterContext,
+) => boolean;
+
 export interface CustomLintRule {
   id: string;
   name: string;
@@ -370,6 +385,7 @@ export interface PluginContext {
   // ---- Linter & Diagnostics ----
   linter: {
     registerRule(rule: CustomLintRule): () => void;
+    registerDiagnosticFilter(filter: DiagnosticFilter): () => void;
     registerAllowedResource(resourceOrPattern: string | RegExp | ((name: string) => boolean)): () => void;
     registerAllowedVariable(variableOrPattern: string | RegExp | ((name: string) => boolean)): () => void;
     registerAllowedUsedResource(resourceOrPattern: string | RegExp | ((name: string) => boolean)): () => void;

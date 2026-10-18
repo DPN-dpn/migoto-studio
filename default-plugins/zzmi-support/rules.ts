@@ -43,5 +43,36 @@ export function registerZzmiRules(context: PluginContext): (() => void)[] {
     cleanups.push(context.linter.registerAllowedUsedResource(/^commandlist\\ttl\\/i));
   }
 
+  // 4. ZZMI 진단 필터 등록: 커스텀 린트(custom-lint) 및 코어 린터가 먼저 발생시킨 경고 중
+  // ZZMI 표준(TTL 등)에 해당하는 경고를 바로잡아 억제(문제없는 정상 코드로 보정)
+  if (context.linter?.registerDiagnosticFilter) {
+    cleanups.push(
+      context.linter.registerDiagnosticFilter((diag, ctx) => {
+        const msg = diag.message || '';
+
+        // A. TTL 네임스페이스 부재 경고 필터링 (ZZMI 환경에서는 TTL이 엔진 내장 라이브러리이므로 정상)
+        if (msg.includes("'TTL'") || msg.includes("'ttl'")) {
+          return false;
+        }
+
+        // B. TTL 변수 또는 드로우콜 관련 경고 메시지 필터링
+        if (/\bttl[\\_]/i.test(msg) || /\$?\\?ttl\\/i.test(msg)) {
+          return false;
+        }
+
+        // C. 해당 라인에 TTL 구문이 있고, 메시지에서 TTL 관련 심볼을 지칭하는 경우
+        if (ctx?.model && diag.startLineNumber) {
+          const lineContent = ctx.model.getLineContent(diag.startLineNumber) || '';
+          if (/\\?TTL\\/i.test(lineContent) && /ttl/i.test(msg)) {
+            return false;
+          }
+        }
+
+        return true;
+      }),
+    );
+  }
+
   return cleanups;
 }
+

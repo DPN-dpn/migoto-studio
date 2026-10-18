@@ -524,7 +524,7 @@ handling = skip
   const nsDiagsBuiltin = await nsRule.check({ ...nsCtxBase, model: builtinModel });
   assert.equal(nsDiagsBuiltin.length, 0, 'BuiltinCommandList calls should produce 0 diagnostics');
 
-  // 2-g. Externally allowed variables (e.g. ZZMI TTL variables: $\TTL\alpha, $\TTL\_1, $\TTL\_2)
+  // 2-g. custom-lint independently emits namespace warning for TTL when namespace = TTL is absent in folder
   const ttlModel = {
     getLineCount: () => 3,
     getLineContent: (n: number) => {
@@ -537,15 +537,11 @@ handling = skip
   const nsDiagsTtl = await nsRule.check({
     ...nsCtxBase,
     model: ttlModel,
-    isAllowedVariable: (name: string) => {
-      const norm = name.toLowerCase().replace(/^[\\$]+/, '');
-      return norm.startsWith('ttl\\');
-    },
   });
-  assert.equal(nsDiagsTtl.length, 0, 'TTL variables allowed via isAllowedVariable should have 0 diagnostics in custom-lint');
+  assert.equal(nsDiagsTtl.length, 3, 'custom-lint independently flags unknown namespace TTL when unassisted');
 });
 
-test('zzmi-support plugin activates and registers allowed resource and code template without sidebar view', () => {
+test('zzmi-support plugin activates and registers allowed resource, code template, and diagnostic filter', () => {
   const def = BUILTIN_PLUGINS.find((p) => p.manifest.id === 'zzmi-support')!;
   assert.ok(def);
   const plugin = def.createPlugin();
@@ -553,6 +549,7 @@ test('zzmi-support plugin activates and registers allowed resource and code temp
   const allowedResources: any[] = [];
   const allowedVars: any[] = [];
   const registeredTemplates: any[] = [];
+  const registeredFilters: any[] = [];
   let registeredView: any = null;
 
   const mockContext: any = {
@@ -566,6 +563,10 @@ test('zzmi-support plugin activates and registers allowed resource and code temp
       },
       registerAllowedUsedVariable: () => {},
       registerAllowedUsedResource: () => {},
+      registerDiagnosticFilter: (filter: any) => {
+        registeredFilters.push(filter);
+        return () => {};
+      },
     },
     templates: {
       registerTemplate: (template: any) => {
@@ -586,6 +587,25 @@ test('zzmi-support plugin activates and registers allowed resource and code temp
   assert.ok(allowedResources.length >= 4);
   assert.ok(allowedVars.length >= 1);
   assert.ok(registeredTemplates.length >= 3);
+  assert.ok(registeredFilters.length >= 1, 'zzmi-support should register a diagnostic filter');
+
+  // Verify that the zzmi diagnostic filter suppresses TTL warnings from custom-lint
+  const filter = registeredFilters[0];
+  const ttlDiag1 = { message: "모드 폴더 내에서 네임스페이스 'TTL'을(를) 찾을 수 없습니다. (해당 ini 파일에 'namespace = TTL' 선언이 있는지 확인하세요)", startLineNumber: 1 };
+  const ttlDiag2 = { message: "선언되지 않은 변수 '$\\TTL\\alpha'입니다.", startLineNumber: 1 };
+  const nonTtlDiag = { message: "모드 폴더 내에서 네임스페이스 'UnknownMod'을(를) 찾을 수 없습니다.", startLineNumber: 1 };
+
+  const mockCtx = {
+    model: {
+      getLineCount: () => 1,
+      getLineContent: () => '$\\TTL\\alpha = 0.4',
+      getValue: () => '$\\TTL\\alpha = 0.4',
+    },
+  };
+
+  assert.equal(filter(ttlDiag1, mockCtx), false, 'TTL namespace warning should be corrected/suppressed by zzmi-support');
+  assert.equal(filter(ttlDiag2, mockCtx), false, 'TTL variable warning should be corrected/suppressed by zzmi-support');
+  assert.equal(filter(nonTtlDiag, mockCtx), true, 'Non-TTL diagnostic must be preserved');
   const templateIds = registeredTemplates.map((t) => t.id);
   assert.ok(templateIds.includes('zzmi_slot_fix'));
   assert.ok(templateIds.includes('zzmi_ttl_draw'));

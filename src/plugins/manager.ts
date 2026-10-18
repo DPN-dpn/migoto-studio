@@ -72,6 +72,9 @@ import type {
   WorkspaceSearchOptions,
   WorkspaceSearchResult,
   IniSymbolsResult,
+  DiagnosticFilter,
+  DiagnosticFilterContext,
+  LintDiagnostic,
 } from './types';
 import { createUIBuilder } from './ui-builder';
 
@@ -97,6 +100,7 @@ export class PluginManager {
   private statusBarEl: HTMLElement | null = null;
   private pluginStatusBarItems: Map<string, HTMLElement> = new Map();
   private customLintRules: Map<string, CustomLintRule> = new Map();
+  private diagnosticFilters: Set<DiagnosticFilter> = new Set();
   private customDefinitionProviders: CustomDefinitionProvider[] = [];
   private customReferenceProviders: CustomReferenceProvider[] = [];
   private pluginMenuItems: Map<string, { manifest: PluginManifest; items: PluginMenuItemDef[] }> = new Map();
@@ -499,6 +503,62 @@ export class PluginManager {
     } finally {
       this.isLinting = false;
     }
+  }
+
+  filterDiagnostics(
+    markers: monaco.editor.IMarkerData[],
+    model: monaco.editor.ITextModel,
+  ): monaco.editor.IMarkerData[] {
+    if (this.diagnosticFilters.size === 0) return markers;
+
+    const curFile = this.doc.file
+      ? {
+          name: this.doc.fileName,
+          path: this.doc.file.id,
+          location: this.doc.file.location,
+        }
+      : null;
+    const curFolder =
+      this.explorer && this.explorer.hasFolder
+        ? ((this.explorer as any).currentFolder?.id ?? null)
+        : null;
+
+    const ctx: DiagnosticFilterContext = {
+      model: {
+        getLineCount: () => model.getLineCount(),
+        getLineContent: (n: number) => model.getLineContent(n),
+        getValue: () => model.getValue(),
+      },
+      file: curFile,
+      folder: curFolder,
+    };
+
+    return markers.filter((marker) => {
+      const diag: LintDiagnostic = {
+        message: marker.message,
+        severity:
+          marker.severity === monaco.MarkerSeverity.Error
+            ? 'error'
+            : marker.severity === monaco.MarkerSeverity.Info
+            ? 'info'
+            : 'warning',
+        startLineNumber: marker.startLineNumber,
+        startColumn: marker.startColumn,
+        endLineNumber: marker.endLineNumber,
+        endColumn: marker.endColumn,
+      };
+
+      for (const filter of this.diagnosticFilters) {
+        try {
+          if (!filter(diag, ctx)) {
+            return false;
+          }
+        } catch (err) {
+          console.warn('[PluginManager] Diagnostic filter error:', err);
+        }
+      }
+      return true;
+    });
   }
 
   getSidebarViews(): RegisteredSidebarView[] {
@@ -1339,6 +1399,16 @@ export default {
           this.triggerLint();
           const cleanup = () => {
             this.customLintRules.delete(ruleKey);
+            this.triggerLint();
+          };
+          callbacks.onRegisterCleanup(cleanup);
+          return cleanup;
+        },
+        registerDiagnosticFilter: (filter: DiagnosticFilter) => {
+          this.diagnosticFilters.add(filter);
+          this.triggerLint();
+          const cleanup = () => {
+            this.diagnosticFilters.delete(filter);
             this.triggerLint();
           };
           callbacks.onRegisterCleanup(cleanup);

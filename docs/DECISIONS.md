@@ -156,6 +156,11 @@
   5. **입력 필드 폼 검증 상태(Validation State) API**:
      - 모든 입력 위젯(`createInput`, `createNumberInput`, `createSelect`, `createKeyInput`, `createSearchInput`)에 `.setError(message)`, `.clearError()`, `.hasError()` 표준 탑재.
      - 에러 발생 시 입력 필드 테두리 경고 색상(`--accent-danger`)과 함께 하단 에러 메시지 툴팁(`.plugin-input-error`)이 매끄러운 페이드인 애니메이션으로 즉각 표시.
+  6. **플러그인 상호 독립성 및 사후 진단 필터링 파이프라인 (Post-Diagnostic Filtering)**:
+     - 커스텀 린터(`custom-lint`)와 특정 프레임워크 플러그인(`zzmi-support` 등) 간의 직접적인 코드 결합도를 0으로 유지.
+     - 범용 린터는 외부 플러그인의 존재 여부와 무관하게 순수 XXMI 규칙(모드 폴더 내 네임스페이스 선언 유무 등)을 독립적으로 검사하여 진단을 생성.
+     - 코어 에디터의 `context.linter.registerDiagnosticFilter` 파이프라인을 통해, 프레임워크 플러그인이 사후 단계에서 진단 마커를 가로채어 해당 프레임워크 표준(예: ZZMI의 TTL 내장 투명도 라이브러리 `$\TTL\alpha`, `CommandList\TTL\Draw` 등)에 부합하는 경고를 억제하고 정상 코드로 보정.
+     - 이를 통해 플러그인 간 로딩 순서나 상호 참조 종속성 없이도 완벽한 모듈식 에코시스템을 유지.
 
 
 
