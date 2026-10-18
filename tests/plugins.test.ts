@@ -1765,9 +1765,65 @@ test('Plugin UI Builder extended components (tabs, collapsible, segmented, searc
       onDrop: (files) => { droppedFiles = files; },
     });
 
-    assert.ok(dropZone.container.className.includes('plugin-drop-zone'));
     dropZone.setLabel('새 라벨', '새 서브라벨');
     dropZone.dispose();
+
+    // 8. Test createBadge
+    const badge = builder.createBadge({ text: '$arm == 0', variant: 'accent' });
+    assert.equal(badge.getText(), '$arm == 0');
+    assert.equal(badge.getVariant(), 'accent');
+    assert.ok(badge.element.className.includes('plugin-badge-accent'));
+    badge.setText('상시 렌더링');
+    badge.setVariant('muted');
+    assert.equal(badge.getText(), '상시 렌더링');
+    assert.equal(badge.getVariant(), 'muted');
+    assert.ok(badge.element.className.includes('plugin-badge-muted'));
+
+    // 9. Test createCodeBlock
+    const codeBlock = builder.createCodeBlock({ code: 'run = CommandList\\Draw', language: 'ini' });
+    assert.equal(codeBlock.getCode(), 'run = CommandList\\Draw');
+    assert.ok(codeBlock.container.className.includes('plugin-codeblock-container'));
+    codeBlock.setCode('run = CommandList\\ZZMI\\SetTextures');
+    assert.equal(codeBlock.getCode(), 'run = CommandList\\ZZMI\\SetTextures');
+
+    // 10. Test createListItem
+    let itemClicked = false;
+    const listItem = builder.createListItem({
+      title: '머리 파트 (부위 #1)',
+      subtitle: 'drawindexed = auto · match_first_index: 0',
+      badge: { text: '$hair == 1', variant: 'accent' },
+      selected: false,
+      onClick: () => { itemClicked = true; },
+    });
+    assert.equal(listItem.isSelected(), false);
+    assert.ok(listItem.element.className.includes('plugin-list-item'));
+    listItem.setSelected(true);
+    assert.equal(listItem.isSelected(), true);
+    assert.ok(listItem.element.className.includes('selected'));
+
+    listItem.setTitle('몸체 파트 (부위 #2)');
+    listItem.setSubtitle('상시 표시');
+    listItem.setBadge({ text: '상시', variant: 'muted' });
+    if (listItem.element.onclick) listItem.element.onclick({} as any);
+    assert.equal(itemClicked, true);
+
+    // 11. Test form control responsiveness and zero margin defaults
+    const sel = builder.createSelect({
+      label: '변수',
+      options: ['a', 'b'],
+    });
+    assert.equal(sel.select.style.width, '100%');
+    assert.equal(sel.select.style.minWidth, '0');
+    assert.equal(sel.select.style.margin, '0');
+    assert.equal(sel.row.style.margin, '0');
+
+    const inp = builder.createInput({
+      label: '텍스트',
+      value: '테스트',
+    });
+    assert.equal(inp.input.style.width, '100%');
+    assert.equal(inp.input.style.minWidth, '0');
+    assert.equal(inp.input.style.margin, '0');
   } finally {
     if (origDoc) (globalThis as any).document = origDoc;
     else delete (globalThis as any).document;

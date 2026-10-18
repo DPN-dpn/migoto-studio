@@ -1746,7 +1746,11 @@ input:checked + .slider:before {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 8px;
+  margin: 0;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 .form-row label {
   font-size: 11px;
@@ -1755,7 +1759,12 @@ input:checked + .slider:before {
   flex-shrink: 0;
 }
 .plugin-input, .plugin-select {
-  flex: 1;
+  flex: 1 1 0%;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  text-overflow: ellipsis;
   padding: 5px 8px;
   font-size: 12px;
   background: var(--bg);
@@ -1773,13 +1782,15 @@ input:checked + .slider:before {
   display: inline-flex;
   align-items: stretch;
   position: relative;
-  flex: 1;
-  min-width: 110px;
+  flex: 1 1 0%;
+  width: 100%;
   max-width: 100%;
+  min-width: 0;
   border: 1px solid var(--border);
   border-radius: 4px;
   background: var(--bg);
   box-sizing: border-box;
+  margin: 0;
   overflow: hidden;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
@@ -5262,9 +5273,18 @@ body.ai-dock-resizing * {
   box-sizing: border-box !important;
   display: flex !important;
   flex-direction: column !important;
+  height: 100% !important;
   min-height: 0 !important;
   min-width: 0 !important;
   align-self: stretch !important;
+}
+
+.plugin-split-horizontal > .plugin-split-pane {
+  height: 100% !important;
+}
+
+.plugin-split-vertical > .plugin-split-pane {
+  width: 100% !important;
 }
 
 .plugin-split-pane > * {
@@ -5865,4 +5885,204 @@ body.plugin-split-resizing-v * {
     transform: translateY(0);
   }
 }
+
+/* ==========================================================================
+   Plugin UI Built-in Standard Widgets: Badge, CodeBlock, ListItem
+   ========================================================================== */
+
+/* 1. Badge */
+.plugin-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-size: 11px;
+  line-height: 1.25;
+  font-family: monospace;
+  white-space: nowrap;
+  user-select: none;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.plugin-badge-muted {
+  background: var(--bg-hover, rgba(255, 255, 255, 0.08));
+  color: var(--fg-dim, #8b949e);
+  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.05));
+}
+
+.plugin-badge-accent {
+  background: rgba(139, 124, 246, 0.15);
+  color: var(--accent, #a78bfa);
+  border: 1px solid rgba(139, 124, 246, 0.3);
+}
+
+.plugin-badge-success {
+  background: rgba(46, 160, 67, 0.15);
+  color: #3fb950;
+  border: 1px solid rgba(46, 160, 67, 0.3);
+}
+
+.plugin-badge-warning {
+  background: rgba(210, 153, 34, 0.15);
+  color: #d29922;
+  border: 1px solid rgba(210, 153, 34, 0.3);
+}
+
+.plugin-badge-danger {
+  background: rgba(248, 81, 73, 0.15);
+  color: #f85149;
+  border: 1px solid rgba(248, 81, 73, 0.3);
+}
+
+.plugin-badge-info {
+  background: rgba(88, 166, 255, 0.15);
+  color: #58a6ff;
+  border: 1px solid rgba(88, 166, 255, 0.3);
+}
+
+/* 2. CodeBlock */
+.plugin-codeblock-container {
+  position: relative;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: var(--code-bg, #111111);
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.plugin-codeblock-pre {
+  margin: 0;
+  padding: 10px 12px;
+  font-family: monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--code-fg, #7ee787);
+  overflow-x: auto;
+  tab-size: 2;
+  box-sizing: border-box;
+  width: 100%;
+  flex: 1;
+}
+
+.plugin-codeblock-copy-btn {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  border: 1px solid var(--border);
+  background: var(--bg-elev, #1e1e1e);
+  color: var(--fg-dim, #8b949e);
+  cursor: pointer;
+  user-select: none;
+  opacity: 0.85;
+  transition: opacity 0.15s ease, background 0.15s ease, color 0.15s ease;
+  z-index: 2;
+}
+
+.plugin-codeblock-copy-btn:hover {
+  opacity: 1;
+  background: var(--bg-hover, rgba(255, 255, 255, 0.1));
+  color: var(--fg, #ffffff);
+}
+
+.plugin-codeblock-copy-btn.copied {
+  color: #3fb950 !important;
+  border-color: rgba(46, 160, 67, 0.4) !important;
+}
+
+/* 3. ListItem */
+.plugin-list-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.05));
+  background: var(--bg-elev, rgba(255, 255, 255, 0.02));
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  margin: 0;
+}
+
+.plugin-list-item:hover {
+  background: var(--bg-hover, rgba(255, 255, 255, 0.05));
+  border-color: rgba(139, 124, 246, 0.25);
+}
+
+.plugin-list-item.selected {
+  background: rgba(139, 124, 246, 0.12) !important;
+  border-color: var(--accent, #a78bfa) !important;
+  box-shadow: 0 0 0 1px var(--accent, #a78bfa) !important;
+}
+
+.plugin-list-item.disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.plugin-list-item-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  gap: 8px;
+  min-width: 0;
+}
+
+.plugin-list-item-title {
+  font-weight: 600;
+  font-size: 13px;
+  line-height: 1.35;
+  color: var(--fg, #e6edf3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+
+.plugin-list-item-subtitle {
+  font-size: 11px;
+  line-height: 1.3;
+  color: var(--fg-dim, #8b949e);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  width: 100%;
+  min-width: 0;
+}
+
+/* 4. Column & Row in Split/Tabs */
+.plugin-split-pane > .plugin-column.fill,
+.plugin-tab-panel > .plugin-column.fill {
+  flex: 1 1 0% !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  min-width: 0 !important;
+  overflow: hidden !important;
+}
+
 

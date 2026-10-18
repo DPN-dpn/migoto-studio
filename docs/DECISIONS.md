@@ -161,6 +161,11 @@
      - 범용 린터는 외부 플러그인의 존재 여부와 무관하게 순수 XXMI 규칙(모드 폴더 내 네임스페이스 선언 유무 등)을 독립적으로 검사하여 진단을 생성.
      - 코어 에디터의 `context.linter.registerDiagnosticFilter` 파이프라인을 통해, 프레임워크 플러그인이 사후 단계에서 진단 마커를 가로채어 해당 프레임워크 표준(예: ZZMI의 TTL 내장 투명도 라이브러리 `$\TTL\alpha`, `CommandList\TTL\Draw` 등)에 부합하는 경고를 억제하고 정상 코드로 보정.
      - 이를 통해 플러그인 간 로딩 순서나 상호 참조 종속성 없이도 완벽한 모듈식 에코시스템을 유지.
+  7. **플러그인 UI 빌더 레이아웃 자동 방어 및 표준 위젯 기본 탑재**:
+     - 스플릿/탭 계층의 Flex 높이 100% 및 넘침 자동 방어 (`height: 100% !important; min-height: 0 !important; min-width: 0 !important; overflow: hidden !important;`).
+     - 폼 컨트롤 너비 100% 자동 반응 (`width: 100%; max-width: 100%; min-width: 0; box-sizing: border-box; text-overflow: ellipsis;`).
+     - 외곽 마진 제로화 및 `gap` 기반 정렬 표준화 (`margin: 0;`).
+     - 모딩 플러그인 빈출 UI 패턴 내장 위젯화 (`createBadge`, `createCodeBlock`, `createListItem`)를 통해 플러그인 측 수십 줄의 인라인 CSS 작성 부담 해소.
 
 
 

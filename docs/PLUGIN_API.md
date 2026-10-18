@@ -740,8 +740,86 @@ numStepper.setDisabled(false);
 // numStepper.destroy();   // 컴포넌트 해제 시 타이머 정리 (선택 사항)
 ```
 
-> [!TIP]
-> `context.ui.createForm`에서 `field.type: 'number'`를 정의할 때도 이 좌우 화살표 스텝퍼 위젯과 `integerOnly`, `precision`, `min`, `max`, `step` 제한이 자동으로 완벽히 연동됩니다.
+#### I. 인라인 배지 위젯 (`context.ui.createBadge`)
+단축키(`VK_F4`), 조건문(`$arm == 0`), 상태값 등을 깔끔한 고정폭(monospace) 폰트와 테마 배지로 표시합니다.
+
+```typescript
+// 1. 단순 텍스트로 생성
+const simpleBadge = context.ui.createBadge('$hair == 1');
+
+// 2. 옵션 및 색상 테마(variant) 지정
+const statusBadge = context.ui.createBadge({
+  text: '상시 렌더링',
+  variant: 'muted', // 'accent' | 'muted' | 'success' | 'warning' | 'danger' | 'info'
+  icon: '⚡',
+  monospace: true,
+});
+
+// 프로그래밍 방식 동적 변경
+statusBadge.setText('$outfit == 2');
+statusBadge.setVariant('accent');
+
+container.append(statusBadge.element);
+```
+
+#### J. 복사 기능 내장 코드 블록 (`context.ui.createCodeBlock`)
+INI 파일에 삽입될 코드나 결과 미리보기를 위한 코드 블록입니다. 테마 다크 배경, 가로 스크롤, 그리고 원클릭 클립보드 복사 버튼이 기본 내장되어 있습니다.
+
+```typescript
+const codePreview = context.ui.createCodeBlock({
+  code: '[TextureOverrideDress]\nhash = abcdef12\nrun = CommandList\\Dress\\Draw',
+  language: 'ini',
+  copyable: true,   // 우측 상단 '복사' 버튼 자동 탑재 (기본값: true)
+  maxHeight: 250,   // 최대 높이 제한 (스크롤 지원)
+});
+
+// 내용 실시간 갱신
+codePreview.setCode('$\dress = 1');
+console.log(codePreview.getCode());
+
+container.append(codePreview.container);
+```
+
+#### K. 표준 리스트 아이템 (`context.ui.createListItem`)
+모딩 도구의 좌측 토글 목록, 메쉬 부위 목록, 드로우콜 목록 등을 단 한 줄로 구현할 수 있는 고수준 리스트 아이템 컴포넌트입니다. 마우스 호버, 선택 시 하이라이트 테두리, 제목/부제목 2행 구조, 우측 배지 및 커스텀 액션 버튼을 기본 탑재합니다.
+
+```typescript
+const item = context.ui.createListItem({
+  title: '머리 파트 (부위 #1)',
+  subtitle: 'drawindexed = auto · match_first_index: 0',
+  badge: {
+    text: '$hair == 1',
+    variant: 'accent',
+  },
+  selected: true, // 선택 상태 하이라이트 테두리 적용
+  onClick: () => {
+    selectPart('hair');
+  },
+});
+
+// 동적 제어
+item.setSelected(false);
+item.setTitle('몸체 파트');
+item.setSubtitle('상시 표시');
+item.setBadge({ text: '상시', variant: 'muted' });
+
+container.append(item.element);
+```
+
+---
+
+### 3.11 플러그인 레이아웃 및 폼 반응형 표준 규칙 (코어 기본 탑재)
+
+Migoto Studio 코어 UI 빌더는 플러그인 개발자가 불필요한 인라인 CSS 보정 코드를 작성하지 않아도 데스크톱 네이티브 수준의 견고한 반응형 레이아웃을 유지할 수 있도록 아래 규칙을 기본 탑재합니다:
+
+1. **Flex & Split 계층의 높이 100% 자동 방어**:
+   - `createSplitView`의 컨테이너 및 좌/우(`firstPane`, `secondPane`) 패널, `createTabs`의 탭 패널 컨테이너는 기본적으로 `height: 100%; min-height: 0; min-width: 0; overflow: hidden; display: flex; flex-direction: column;`가 강제 적용됩니다.
+   - 스플릿 내부나 탭 내부에 `createScrollContainer`나 `createColumn`을 배치해도 높이가 0으로 찌그러지지 않고 뷰포트에 맞추어 자연스럽게 스크롤바가 작동합니다.
+2. **모든 폼 컨트롤의 너비 100% 자동 반응 (`min-width: 0`)**:
+   - `createSelect`, `createInput`, `createNumberInput`, `createSearchInput` 등 모든 폼 위젯의 외곽 래퍼 및 내부 입력 엘리먼트에 `width: 100%; max-width: 100%; min-width: 0; box-sizing: border-box; text-overflow: ellipsis;`가 기본 내장됩니다.
+   - 좁은 스플릿 패널이나 `createRow` 내부에 배치해도 내용물의 긴 텍스트로 인해 부모 너비를 뚫고 나가 옆 요소를 찌그러뜨리지 않습니다.
+3. **컴포넌트 외곽 마진 제로화 (Gap 기반 정렬 표준화)**:
+   - 모든 위젯은 기본적으로 `margin: 0`을 유지합니다. 요소 간의 상하/좌우 여백은 부모 컨테이너(`createColumn({ gap: 8 })`, `createRow({ gap: 6 })`)의 `gap` 속성에 의해서만 일관되게 제어되므로, 패널 최상단에 위젯을 단독 배치했을 때 상단이 불필요하게 붕 뜨는 현상이 원천 차단됩니다.
 
 ---
 

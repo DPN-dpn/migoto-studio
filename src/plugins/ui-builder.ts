@@ -5,6 +5,77 @@ import { openConfirmModal, openPromptModal, type ConfirmOptions, type PromptOpti
 import { platform } from '../platform/index.ts';
 export type { ConfirmOptions, PromptOptions, NumberInputOptions, NumberInputInstance };
 
+export type BadgeVariant =
+  | 'accent'
+  | 'muted'
+  | 'success'
+  | 'warning'
+  | 'warn'
+  | 'danger'
+  | 'error'
+  | 'info'
+  | 'neutral';
+
+export interface BadgeOptions {
+  text: string;
+  variant?: BadgeVariant;
+  icon?: string;
+  monospace?: boolean;
+  title?: string;
+  className?: string;
+  style?: Record<string, string>;
+}
+
+export interface BadgeInstance {
+  element: HTMLElement;
+  getElement(): HTMLElement;
+  setText(text: string): void;
+  getText(): string;
+  setVariant(variant: BadgeVariant): void;
+  getVariant(): BadgeVariant;
+}
+
+export interface CodeBlockOptions {
+  code: string;
+  language?: string;
+  copyable?: boolean;
+  maxHeight?: number | string;
+  wrap?: boolean;
+  className?: string;
+  style?: Record<string, string>;
+}
+
+export interface CodeBlockInstance {
+  element: HTMLElement;
+  container: HTMLElement;
+  pre: HTMLElement;
+  getElement(): HTMLElement;
+  getCode(): string;
+  setCode(code: string): void;
+}
+
+export interface ListItemOptions {
+  title: string;
+  subtitle?: string;
+  badge?: string | HTMLElement | BadgeOptions;
+  selected?: boolean;
+  disabled?: boolean;
+  onClick?: () => void;
+  actions?: (HTMLElement | any)[];
+  className?: string;
+  style?: Record<string, string>;
+}
+
+export interface ListItemInstance {
+  element: HTMLElement;
+  getElement(): HTMLElement;
+  setSelected(selected: boolean): void;
+  isSelected(): boolean;
+  setTitle(title: string): void;
+  setSubtitle(subtitle?: string): void;
+  setBadge(badge?: string | HTMLElement | BadgeOptions): void;
+}
+
 /**
  * 플러그인 위젯 인스턴스 또는 원시 DOM 엘리먼트로부터
  * 표준 최상위 HTMLElement를 안전하게 추출합니다.
@@ -75,6 +146,7 @@ export function createUIBuilder() {
     createPanelHeader(title: string): HTMLElement {
       const header = document.createElement('div');
       header.className = 'panel-section-title';
+      header.style.margin = '0 0 8px 0';
       const span = document.createElement('span');
       span.textContent = title;
       header.append(span);
@@ -84,9 +156,19 @@ export function createUIBuilder() {
     createFormRow(label: string, control: HTMLElement | any): HTMLElement {
       const row = document.createElement('div');
       row.className = 'form-row';
+      row.style.margin = '0';
+      row.style.width = '100%';
+      row.style.maxWidth = '100%';
+      row.style.minWidth = '0';
+      row.style.boxSizing = 'border-box';
       const lbl = document.createElement('label');
       lbl.textContent = label;
+      lbl.style.margin = '0';
       const controlEl = toElement(control) || control;
+      if (controlEl && controlEl.style) {
+        controlEl.style.minWidth = '0';
+        controlEl.style.boxSizing = 'border-box';
+      }
       row.append(lbl, controlEl);
       return row;
     },
@@ -96,9 +178,17 @@ export function createUIBuilder() {
       options: Array<string | SelectOption>;
       value?: string;
       onChange?: (value: string) => void;
+      className?: string;
+      style?: Record<string, string>;
     }) {
       const select = document.createElement('select');
-      select.className = 'plugin-select';
+      select.className = `plugin-select${options.className ? ` ${options.className}` : ''}`;
+      select.style.width = '100%';
+      select.style.maxWidth = '100%';
+      select.style.minWidth = '0';
+      select.style.boxSizing = 'border-box';
+      select.style.textOverflow = 'ellipsis';
+      select.style.margin = '0';
 
       options.options.forEach((opt) => {
         const optEl = document.createElement('option');
@@ -118,6 +208,10 @@ export function createUIBuilder() {
 
       if (options.onChange) {
         select.onchange = () => options.onChange!(select.value);
+      }
+
+      if (options.style) {
+        Object.assign(select.style, options.style);
       }
 
       const row = options.label
@@ -145,15 +239,26 @@ export function createUIBuilder() {
       placeholder?: string;
       value?: string;
       onInput?: (value: string) => void;
+      className?: string;
+      style?: Record<string, string>;
     }) {
       const input = document.createElement('input');
-      input.className = 'plugin-input';
+      input.className = `plugin-input${options.className ? ` ${options.className}` : ''}`;
+      input.style.width = '100%';
+      input.style.maxWidth = '100%';
+      input.style.minWidth = '0';
+      input.style.boxSizing = 'border-box';
+      input.style.margin = '0';
       if (options.type) input.type = options.type;
       if (options.placeholder) input.placeholder = options.placeholder;
       if (options.value !== undefined) input.value = options.value;
 
       if (options.onInput) {
         input.oninput = () => options.onInput!(input.value);
+      }
+
+      if (options.style) {
+        Object.assign(input.style, options.style);
       }
 
       const row = options.label
@@ -737,14 +842,57 @@ export function createUIBuilder() {
       return msgEl;
     },
 
-    createBadge(options: {
-      text: string;
-      variant?: 'info' | 'success' | 'warn' | 'error' | 'neutral';
-    }): HTMLElement {
-      const span = document.createElement('span');
-      span.className = `plugin-badge badge-${options.variant || 'neutral'}`;
-      span.textContent = options.text;
-      return span;
+    /**
+     * 상태, 태그, 단축키 또는 조건문을 강조 표시하는 표준 인라인 배지 위젯을 생성합니다.
+     */
+    createBadge(options: BadgeOptions | string): BadgeInstance & HTMLElement {
+      const opts: BadgeOptions = typeof options === 'string' ? { text: options } : options;
+      let currentText = opts.text || '';
+      const normalizeVariant = (v?: BadgeVariant): BadgeVariant => {
+        if (v === 'warn') return 'warning';
+        if (v === 'error') return 'danger';
+        if (v === 'neutral') return 'muted';
+        return v || 'muted';
+      };
+      let currentVariant = normalizeVariant(opts.variant);
+
+      const el = document.createElement('span') as any;
+      el.className = `plugin-badge plugin-badge-${currentVariant} badge-${opts.variant || currentVariant}${opts.className ? ` ${opts.className}` : ''}`;
+      if (opts.title) el.title = opts.title;
+      if (opts.monospace === false) {
+        el.style.fontFamily = 'inherit';
+      }
+      if (opts.style) {
+        Object.assign(el.style, opts.style);
+      }
+
+      if (opts.icon) {
+        const iconSpan = document.createElement('span');
+        iconSpan.className = 'plugin-badge-icon';
+        iconSpan.textContent = opts.icon;
+        el.append(iconSpan);
+      }
+
+      const textSpan = document.createElement('span');
+      textSpan.className = 'plugin-badge-text';
+      textSpan.textContent = currentText;
+      el.append(textSpan);
+
+      el.element = el;
+      el.getElement = () => el;
+      el.setText = (text: string) => {
+        currentText = text;
+        textSpan.textContent = text;
+      };
+      el.getText = () => currentText;
+      el.setVariant = (variant: BadgeVariant) => {
+        el.classList.remove(`plugin-badge-${currentVariant}`);
+        currentVariant = normalizeVariant(variant);
+        el.classList.add(`plugin-badge-${currentVariant}`);
+      };
+      el.getVariant = () => currentVariant;
+
+      return el;
     },
 
     createProgressBar(options?: {
@@ -2416,6 +2564,188 @@ export function createUIBuilder() {
           container.removeEventListener('dragenter', onDragOver);
           container.removeEventListener('dragleave', onDragLeave);
           container.removeEventListener('drop', onDrop);
+        },
+      };
+    },
+
+    /**
+     * INI 구문이나 파이썬 코드 등의 미리보기를 위한 표준 코드 블록 위젯을 생성합니다.
+     * 원클릭 클립보드 복사 버튼을 내장하고 테마 다크 배경과 가로 스크롤을 기본 지원합니다.
+     */
+    createCodeBlock(options: CodeBlockOptions | string): CodeBlockInstance {
+      const opts: CodeBlockOptions = typeof options === 'string' ? { code: options } : options;
+      let currentCode = opts.code || '';
+
+      const container = document.createElement('div');
+      container.className = `plugin-codeblock-container${opts.className ? ` ${opts.className}` : ''}`;
+      if (opts.maxHeight !== undefined) {
+        container.style.maxHeight = typeof opts.maxHeight === 'number' ? `${opts.maxHeight}px` : opts.maxHeight;
+      }
+      if (opts.style) {
+        Object.assign(container.style, opts.style);
+      }
+
+      const pre = document.createElement('pre');
+      pre.className = 'plugin-codeblock-pre';
+      if (opts.wrap) {
+        pre.style.whiteSpace = 'pre-wrap';
+        pre.style.wordBreak = 'break-all';
+      }
+      pre.textContent = currentCode;
+      container.append(pre);
+
+      if (opts.copyable !== false) {
+        const copyBtn = document.createElement('button');
+        copyBtn.type = 'button';
+        copyBtn.className = 'plugin-codeblock-copy-btn';
+        copyBtn.title = '코드 복사';
+        copyBtn.setAttribute('aria-label', '코드 복사');
+        copyBtn.textContent = '복사';
+
+        let resetTimer: any = null;
+        copyBtn.onclick = async (e) => {
+          e.stopPropagation();
+          try {
+            if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) {
+              await navigator.clipboard.writeText(currentCode);
+            }
+            copyBtn.textContent = '복사됨 ✓';
+            copyBtn.classList.add('copied');
+            if (resetTimer) clearTimeout(resetTimer);
+            resetTimer = setTimeout(() => {
+              copyBtn.textContent = '복사';
+              copyBtn.classList.remove('copied');
+            }, 1500);
+          } catch {
+            // fallback
+          }
+        };
+        container.append(copyBtn);
+      }
+
+      return {
+        element: container,
+        container,
+        pre,
+        getElement: () => container,
+        getCode: () => currentCode,
+        setCode: (newCode: string) => {
+          currentCode = newCode;
+          pre.textContent = newCode;
+        },
+      };
+    },
+
+    /**
+     * 모딩 도구의 목록(토글 키 목록, 메쉬 파트 목록, 드로우콜 목록 등)을 위한 표준 리스트 아이템 컴포넌트입니다.
+     * 마우스 호버, 선택 상태 하이라이트 테두리, 제목/부제목 레이아웃 및 우측 배지 표시를 기본 탑재합니다.
+     */
+    createListItem(options: ListItemOptions): ListItemInstance {
+      let isSelected = Boolean(options.selected);
+      let currentTitle = options.title || '';
+      let currentSubtitle = options.subtitle || '';
+
+      const itemEl = document.createElement('div');
+      itemEl.className = `plugin-list-item${isSelected ? ' selected' : ''}${options.disabled ? ' disabled' : ''}${options.className ? ` ${options.className}` : ''}`;
+      itemEl.setAttribute('role', 'listitem');
+      itemEl.setAttribute('aria-selected', String(isSelected));
+      if (options.style) {
+        Object.assign(itemEl.style, options.style);
+      }
+
+      // 1행: 헤더 (제목 + 우측 배지/액션)
+      const headerRow = document.createElement('div');
+      headerRow.className = 'plugin-list-item-header';
+
+      const titleEl = document.createElement('div');
+      titleEl.className = 'plugin-list-item-title';
+      titleEl.textContent = currentTitle;
+      headerRow.append(titleEl);
+
+      const rightArea = document.createElement('div');
+      rightArea.style.display = 'flex';
+      rightArea.style.alignItems = 'center';
+      rightArea.style.gap = '6px';
+      rightArea.style.flexShrink = '0';
+
+      const renderBadge = (badgeSpec?: string | HTMLElement | BadgeOptions) => {
+        rightArea.innerHTML = '';
+        if (!badgeSpec) return;
+        if (typeof badgeSpec === 'string') {
+          const b = this.createBadge(badgeSpec);
+          rightArea.append(b.element);
+        } else if (typeof badgeSpec === 'object' && typeof (badgeSpec as any).text === 'string') {
+          const b = this.createBadge(badgeSpec as BadgeOptions);
+          rightArea.append(b.element);
+        } else {
+          const el = toElement(badgeSpec);
+          if (el) rightArea.append(el);
+        }
+      };
+
+      if (options.badge) {
+        renderBadge(options.badge);
+      }
+
+      if (options.actions && options.actions.length > 0) {
+        options.actions.forEach((act) => {
+          const actEl = toElement(act);
+          if (actEl) rightArea.append(actEl);
+        });
+      }
+
+      const hasRightContent = () => (rightArea.children?.length ?? 0) > 0 || (rightArea.childNodes?.length ?? 0) > 0;
+
+      if (hasRightContent() || options.badge) {
+        headerRow.append(rightArea);
+      }
+      itemEl.append(headerRow);
+
+      // 2행: 부제목 (subtitle)
+      const subEl = document.createElement('div');
+      subEl.className = 'plugin-list-item-subtitle';
+      if (currentSubtitle) {
+        subEl.textContent = currentSubtitle;
+        itemEl.append(subEl);
+      }
+
+      if (options.onClick) {
+        itemEl.onclick = () => {
+          if (options.disabled) return;
+          options.onClick!();
+        };
+      }
+
+      return {
+        element: itemEl,
+        getElement: () => itemEl,
+        setSelected: (selected: boolean) => {
+          isSelected = Boolean(selected);
+          itemEl.classList.toggle('selected', isSelected);
+          itemEl.setAttribute('aria-selected', String(isSelected));
+        },
+        isSelected: () => isSelected,
+        setTitle: (title: string) => {
+          currentTitle = title;
+          titleEl.textContent = title;
+        },
+        setSubtitle: (subtitle?: string) => {
+          currentSubtitle = subtitle || '';
+          if (currentSubtitle) {
+            subEl.textContent = currentSubtitle;
+            if (!subEl.parentElement) {
+              itemEl.append(subEl);
+            }
+            subEl.style.display = '';
+          } else {
+            subEl.style.display = 'none';
+          }
+        },
+        setBadge: (badge?: string | HTMLElement | BadgeOptions) => {
+          renderBadge(badge);
+          if (!rightArea.parentElement && hasRightContent()) {
+            headerRow.append(rightArea);
+          }
         },
       };
     },
