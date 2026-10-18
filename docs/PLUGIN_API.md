@@ -997,12 +997,10 @@ context.editor.registerContextMenuAction({
 });
 
 // 인라인 변경 제안 및 대화형 검토 (VS Code 스타일 Inline Diff Review)
-// 별도 탭 이동 없이 현재 에디터에 삭제된 줄(빨간색 취소선)과 추가된 줄(초록색)을 인라인으로 띄우고,
-// 상단 플로팅 툴바에서 [✓ 수락 (Ctrl+Enter)] / [✕ 되돌리기 (Esc)]로 사용자가 직접 확정/취소할 수 있습니다.
-const result = await context.editor.proposeChanges(newIniText, {
-  title: '토글 키 변경 제안',     // 플로팅 툴바 제목 (선택)
-  description: 'NumPad1 → F5 키로 교체', // 플로팅 툴바 보조 설명 (선택)
-});
+// 별도 탭 이동 없이 현재 에디터에 삭제된 줄(빨간색 취소선)과 추가된 줄(초록색)을 인라인으로 띄웁니다.
+// - 상단 스티키 바: 파일 전체에 걸친 변경 개수 배지와 [✓ 모두 수락 (Ctrl+Enter)] / [✕ 모두 되돌리기 (Esc)] 버튼 제공
+// - 인라인 변경 블록 액션: 변경된 줄 상단에 `변경 #N [✓ 수락] [✕ 되돌리기]` 버튼이 표시되어 블록별 개별 확정/취소 가능
+const result = await context.editor.proposeChanges(newIniText);
 
 if (result.accepted) {
   context.ui.showToast('변경사항이 적용되었습니다.', 'info');
