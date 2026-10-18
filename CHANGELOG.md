@@ -3,10 +3,25 @@
 ## [다음 버전]
 
 ### 신규 기능
+- 에디터 인라인 Diff 검토 및 수락/되돌리기 API (`context.editor.proposeChanges`):
+  - 별도의 Diff 탭으로 이동하지 않고 현재 열린 에디터 문서 내에서 직접 코드 변경 사항을 검토할 수 있는 VS Code 스타일의 인라인 리뷰 시스템 도입
+  - 변경점 시각화: 삭제된 줄은 Monaco ViewZone을 통한 빨간색 취소선 블록으로, 추가된 줄은 초록색 하이라이트 및 거터 인디케이터로 인라인 표시
+  - 플로팅 액션 툴바: 변경 블록 상단에 `[✓ 수락 (Ctrl+Enter)]` 및 `[✕ 되돌리기 (Esc)]` 플로팅 바가 표시되어 원클릭 또는 단축키로 즉각 확정/취소 가능
+  - 안전한 이력 관리: 수락 시 Monaco Undo/Redo(`Ctrl+Z`) 스택에 정식으로 등록되며, 취소 시 원래 코드로 완벽 복원
+- 플러그인 UI 빌더 신규 고수준 컴포넌트 추가:
+  - 상태 배지 (`context.ui.createBadge`): `primary`, `success`, `warning`, `danger`, `neutral` 등 다양한 스타일의 컴팩트 상태 태그 생성
+  - 원클릭 복사 코드 블록 (`context.ui.createCodeBlock`): 모나코 서식 테마와 코드 복사 버튼이 내장된 프리셋 뷰어
+  - 모딩 리스트 아이템 (`context.ui.createListItem`): 제목, 부제목, 상태 배지, 클릭 액션이 결합된 표준 아이템 컴포넌트
+  - 파일 선택기 (`context.ui.createFilePicker`): 디렉터리 및 특정 확장자 파일 브라우징 지원 위젯
 
 ### 기능 개선
+- Flex & Split 계층 높이 및 오버플로우 방어 내장:
+  - `createSplitView`, `createTabs`, `createColumn` 중첩 시 내부 스크롤 컨테이너 높이 붕괴를 원천 방지하도록 Flex 100% 레이아웃 및 `min-height: 0` 자동 적용
+- 폼 입력 행 레이아웃 반응형 자동 줄바꿈:
+  - 좁은 사이드바나 스플릿 뷰 환경에서 라벨과 컨트롤이 잘리지 않도록 Flex-wrap 및 간격 자동 최적화 적용
 
 ### 버그 수정
+- 독립 LCS 기반 줄 단위 Diff 알고리즘 (`computeLineDiff`) 도입으로 접두/접미사 최적화 및 안정적인 변경 블록 분할 지원
 
 ---
 
