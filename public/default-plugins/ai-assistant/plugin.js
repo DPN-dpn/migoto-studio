@@ -407,32 +407,16 @@ async function callAiChatApi(options) {
 function buildAiAssistantView(context, container) {
 	container.className = "sidebar-panel dynamic-plugin-panel plugin-subview ai-assistant-panel";
 	container.replaceChildren();
-	const subtabBar = document.createElement("div");
-	subtabBar.className = "ai-subtab-bar";
-	const btnTabAgent = document.createElement("button");
-	btnTabAgent.className = "ai-subtab-btn active";
-	btnTabAgent.textContent = "에이전트";
-	const btnTabSettings = document.createElement("button");
-	btnTabSettings.className = "ai-subtab-btn";
-	btnTabSettings.textContent = "설정";
-	subtabBar.append(btnTabAgent, btnTabSettings);
 	const agentPane = document.createElement("div");
 	agentPane.className = "ai-pane ai-agent-view";
 	const settingsPane = document.createElement("div");
 	settingsPane.className = "ai-pane ai-settings-view";
-	settingsPane.hidden = true;
-	btnTabAgent.onclick = () => {
-		btnTabAgent.classList.add("active");
-		btnTabSettings.classList.remove("active");
-		agentPane.hidden = false;
-		settingsPane.hidden = true;
-	};
-	btnTabSettings.onclick = () => {
-		btnTabSettings.classList.add("active");
-		btnTabAgent.classList.remove("active");
-		settingsPane.hidden = false;
-		agentPane.hidden = true;
-	};
+	const settingsHeader = context.ui.createPanelHeader("AI 연결 및 모델 설정");
+	const providerBadge = context.ui.createBadge({
+		text: "OpenAI API 호환",
+		variant: "muted"
+	});
+	settingsHeader.append(providerBadge);
 	const urlInput = context.ui.createInput({
 		label: "API URL:",
 		placeholder: "https://generativelanguage.googleapis.com/v1beta/openai 또는 https://api.openai.com/v1",
@@ -544,10 +528,14 @@ function buildAiAssistantView(context, container) {
 			context.ui.showToast("Ollama 설정이 적용되었습니다. (Key는 비워둠)", "info");
 		}
 	});
-	presetRow.append(btnPresetGemini, btnPresetOpenAI, btnPresetOllama);
+	const presetButtons = context.ui.createButtonRow([
+		btnPresetGemini,
+		btnPresetOpenAI,
+		btnPresetOllama
+	]);
 	const presetCard = context.ui.createCard({
 		title: "빠른 프로바이더 설정",
-		content: [presetRow]
+		content: [presetButtons]
 	});
 	const configCard = context.ui.createCard({
 		title: "연결 정보 입력",
@@ -569,7 +557,7 @@ function buildAiAssistantView(context, container) {
 		title: "환경 및 모델 안내",
 		content: [guideDiv]
 	});
-	settingsPane.append(presetCard, configCard, guideCard);
+	settingsPane.append(settingsHeader, presetCard, configCard, guideCard);
 	const chatHistory = document.createElement("div");
 	chatHistory.className = "ai-chat-history";
 	const emptyState = document.createElement("div");
@@ -742,7 +730,19 @@ function buildAiAssistantView(context, container) {
 	dockMain.append(dockTextarea, sendBtn);
 	inputDock.append(dockTop, dockMain);
 	agentPane.append(chatHistory, dockResizer, inputDock);
-	container.append(subtabBar, agentPane, settingsPane);
+	const tabs = context.ui.createTabs({
+		tabs: [{
+			id: "agent",
+			label: "에이전트",
+			content: agentPane
+		}, {
+			id: "settings",
+			label: "설정",
+			content: settingsPane
+		}],
+		defaultTab: "agent"
+	});
+	container.append(tabs.container);
 	const onDocClick = (e) => {
 		if (!templateMenu.hidden && !templateWrap.contains(e.target)) templateMenu.hidden = true;
 	};

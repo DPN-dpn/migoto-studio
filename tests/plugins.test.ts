@@ -623,7 +623,9 @@ test('zzmi-support plugin activates and registers allowed resource, code templat
   assert.ok(ttlTexture.body.includes('Resource\\TTL\\TransparencyTex'));
   assert.ok(ttlTexture.body.includes('$\\TTL\\mask_channel'));
 
-  assert.equal(registeredView, null);
+  assert.ok(registeredView, 'zzmi-support should register a sidebar view for templates');
+  assert.equal(registeredView.id, 'zzmi-support');
+  assert.equal(registeredView.title, 'ZZMI 지원');
 });
 
 test('default-plugins directory contains all 5 standalone plugins ready for installation', async () => {

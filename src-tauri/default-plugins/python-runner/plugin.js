@@ -25,6 +25,11 @@ async function executePythonScript(context, options) {
 //#region default-plugins/python-runner/ui.ts
 function buildPythonRunnerView(context, container) {
 	const header = context.ui.createPanelHeader("Python 실행기");
+	const pyBadge = context.ui.createBadge({
+		text: "Python 3",
+		variant: "accent"
+	});
+	header.append(pyBadge);
 	const cmdSelect = context.ui.createSelect({
 		label: "실행 명령:",
 		options: [
@@ -52,32 +57,19 @@ function buildPythonRunnerView(context, container) {
 			updateModeVisibility();
 		}
 	});
-	const filePathInput = context.ui.createInput({
+	const filePicker = context.ui.createFilePicker({
 		label: "Python 파일 (.py) 경로:",
 		placeholder: "예: C:/Scripts/my_tool.py 또는 ./script.py",
 		value: context.storage.get("script_file", ""),
-		onInput: (p) => context.storage.set("script_file", p)
-	});
-	const pickFileBtn = context.ui.createButton({
-		text: "파일 선택…",
-		variant: "secondary",
-		async onClick() {
-			const picked = await context.workspace.pickFile({
+		filter: ".py",
+		onChange: (p) => context.storage.set("script_file", p),
+		onBrowse: async () => {
+			return await context.workspace.pickFile({
 				extensions: ["py"],
 				title: "실행할 Python 스크립트 (.py) 선택"
 			});
-			if (picked) {
-				filePathInput.setValue(picked);
-				context.storage.set("script_file", picked);
-			}
 		}
 	});
-	const fileBox = document.createElement("div");
-	fileBox.className = "plugin-field-group";
-	const fileBtnRow = document.createElement("div");
-	fileBtnRow.style.cssText = "display: flex; gap: 6px; margin-top: 4px;";
-	fileBtnRow.append(pickFileBtn);
-	fileBox.append(filePathInput.row, fileBtnRow);
 	const codeEditor = context.ui.createCodeEditor({
 		label: "실행할 Python 코드:",
 		rows: 6,
@@ -86,10 +78,10 @@ function buildPythonRunnerView(context, container) {
 	});
 	const updateModeVisibility = () => {
 		if (currentMode === "file") {
-			fileBox.hidden = false;
+			filePicker.row.hidden = false;
 			codeEditor.container.hidden = true;
 		} else {
-			fileBox.hidden = true;
+			filePicker.row.hidden = true;
 			codeEditor.container.hidden = false;
 		}
 	};
@@ -121,7 +113,7 @@ function buildPythonRunnerView(context, container) {
 	async function executePython(stdinText) {
 		runBtn.disabled = true;
 		runBtn.textContent = "실행 중...";
-		if (currentMode === "file" && !filePathInput.getValue().trim()) {
+		if (currentMode === "file" && !filePicker.getValue().trim()) {
 			context.ui.showToast("실행할 Python (.py) 파일 경로를 지정해주세요.", "warn");
 			runBtn.disabled = false;
 			runBtn.textContent = "스크립트 실행";
@@ -133,7 +125,7 @@ function buildPythonRunnerView(context, container) {
 				cmd: cmdSelect.getValue(),
 				mode: currentMode,
 				code: codeEditor.getValue(),
-				filePath: filePathInput.getValue(),
+				filePath: filePicker.getValue(),
 				extraArgsString: argsInput.getValue(),
 				passCurrentFile: passFileCheck.isChecked(),
 				stdinText
@@ -176,7 +168,7 @@ function buildPythonRunnerView(context, container) {
 		}
 	});
 	const actionRow = context.ui.createButtonRow([runBtn, insertBtn]);
-	container.append(header, cmdSelect.row, modeSelect.row, fileBox, codeEditor.container, argsInput.row, passFileCheck.row, actionRow, consoleView.container);
+	container.append(header, cmdSelect.row, modeSelect.row, filePicker.row, codeEditor.container, argsInput.row, passFileCheck.row, actionRow, consoleView.container);
 }
 //#endregion
 //#region default-plugins/python-runner/index.ts
