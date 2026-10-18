@@ -6099,13 +6099,10 @@ body.plugin-split-resizing-v * {
 
 /* Red deletion viewzone for removed lines */
 .inline-diff-viewzone-delete {
-  background-color: rgba(248, 81, 73, 0.15);
-  border-top: 1px dashed rgba(248, 81, 73, 0.4);
-  border-bottom: 1px dashed rgba(248, 81, 73, 0.4);
+  background-color: rgba(248, 81, 73, 0.12);
+  border-top: 1px dashed rgba(248, 81, 73, 0.35);
+  border-bottom: 1px dashed rgba(248, 81, 73, 0.35);
   width: 100%;
-  font-family: inherit;
-  font-size: inherit;
-  line-height: inherit;
   pointer-events: none;
   box-sizing: border-box;
 }
@@ -6115,15 +6112,16 @@ body.plugin-split-resizing-v * {
   flex-direction: column;
   width: 100%;
   box-sizing: border-box;
+  overflow: hidden;
 }
 
 .inline-diff-line-delete {
   display: flex;
   align-items: center;
-  padding-left: 10px;
   color: #f85149;
   white-space: pre;
-  opacity: 0.85;
+  opacity: 0.9;
+  box-sizing: border-box;
 }
 
 .inline-diff-line-delete .inline-diff-prefix {
@@ -6142,13 +6140,12 @@ body.plugin-split-resizing-v * {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 2px 10px;
-  background: rgba(30, 34, 45, 0.85);
+  background: var(--bg-elev, #1c2128);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   font-size: 11px;
   user-select: none;
   box-sizing: border-box;
-  height: 24px;
 }
 
 .inline-diff-hunk-label {

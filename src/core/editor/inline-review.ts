@@ -125,6 +125,12 @@ export async function proposeEditorChanges(
       }
     };
 
+    const layoutInfo = editor.getLayoutInfo();
+    const lineHeight = editor.getOption(monaco.editor.EditorOption.lineHeight) || 19;
+    const fontInfo = editor.getOption(monaco.editor.EditorOption.fontInfo);
+    const contentLeft = layoutInfo.contentLeft || 60;
+    const ACTION_BAR_HEIGHT = 26;
+
     editor.changeViewZones((accessor) => {
       hunks.forEach((hunk, idx) => {
         const afterLine = Math.max(0, hunk.modifiedStart - 1);
@@ -132,29 +138,11 @@ export async function proposeEditorChanges(
         const zoneDom = document.createElement('div');
         zoneDom.className = 'inline-diff-hunk-zone';
 
-        // Deleted original lines block
-        if (hunk.originalLines.length > 0) {
-          const deleteContainer = document.createElement('div');
-          deleteContainer.className = 'inline-diff-viewzone-delete';
-          for (const lineText of hunk.originalLines) {
-            const lineEl = document.createElement('div');
-            lineEl.className = 'inline-diff-line-delete';
-            const prefix = document.createElement('span');
-            prefix.className = 'inline-diff-prefix';
-            prefix.textContent = '- ';
-            const code = document.createElement('span');
-            code.className = 'inline-diff-text';
-            code.textContent = lineText || ' ';
-            lineEl.appendChild(prefix);
-            lineEl.appendChild(code);
-            deleteContainer.appendChild(lineEl);
-          }
-          zoneDom.appendChild(deleteContainer);
-        }
-
-        // Inline hunk action bar (displayed right above/at the change)
+        // 1. Inline hunk action bar (displayed right at the top of the change)
         const actionRow = document.createElement('div');
         actionRow.className = 'inline-diff-hunk-actions';
+        actionRow.style.paddingLeft = `${contentLeft}px`;
+        actionRow.style.height = `${ACTION_BAR_HEIGHT}px`;
 
         const label = document.createElement('span');
         label.className = 'inline-diff-hunk-label';
@@ -185,10 +173,42 @@ export async function proposeEditorChanges(
         actionRow.appendChild(btnDiscard);
         zoneDom.appendChild(actionRow);
 
-        const totalHeight = hunk.originalLines.length + 1; // lines + 1 action row
+        // 2. Deleted original lines block
+        let deletedLinesHeight = 0;
+        if (hunk.originalLines.length > 0) {
+          deletedLinesHeight = hunk.originalLines.length * lineHeight;
+          const deleteContainer = document.createElement('div');
+          deleteContainer.className = 'inline-diff-viewzone-delete';
+          deleteContainer.style.height = `${deletedLinesHeight}px`;
+
+          for (const lineText of hunk.originalLines) {
+            const lineEl = document.createElement('div');
+            lineEl.className = 'inline-diff-line-delete';
+            lineEl.style.height = `${lineHeight}px`;
+            lineEl.style.lineHeight = `${lineHeight}px`;
+            lineEl.style.paddingLeft = `${contentLeft}px`;
+            if (fontInfo?.fontFamily) lineEl.style.fontFamily = fontInfo.fontFamily;
+            if (fontInfo?.fontSize) lineEl.style.fontSize = `${fontInfo.fontSize}px`;
+
+            const prefix = document.createElement('span');
+            prefix.className = 'inline-diff-prefix';
+            prefix.textContent = '- ';
+            const code = document.createElement('span');
+            code.className = 'inline-diff-text';
+            code.textContent = lineText || ' ';
+            lineEl.appendChild(prefix);
+            lineEl.appendChild(code);
+            deleteContainer.appendChild(lineEl);
+          }
+          zoneDom.appendChild(deleteContainer);
+        }
+
+        const totalPx = ACTION_BAR_HEIGHT + deletedLinesHeight;
+        zoneDom.style.height = `${totalPx}px`;
+
         const zoneId = accessor.addZone({
           afterLineNumber: afterLine,
-          heightInLines: totalHeight,
+          heightInPx: totalPx,
           domNode: zoneDom,
           suppressMouseDown: true,
         });
