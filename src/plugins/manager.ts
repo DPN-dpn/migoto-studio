@@ -2,6 +2,7 @@ import { monaco } from '../core/editor/monaco';
 import { platform } from '../platform';
 import { validatePluginZip, type ExtractedPlugin } from './zip';
 import { linkPluginModules } from './module-linker';
+import { appLogger } from '../core/logger';
 import type { DocumentManager } from '../core/workspace/documents';
 import type { FileExplorer } from '../ui/panels/explorer';
 import { openModal } from '../ui/modals/modal';
@@ -814,9 +815,10 @@ export class PluginManager {
           } catch {}
         }
       };
+      appLogger.info('Plugin', `플러그인 활성화: "${instance.manifest.name}" (v${instance.manifest.version})`);
     } catch (err: any) {
       instance.error = err.message || String(err);
-      console.error(`[plugins] Exception in plugin activate (${instance.manifest.id}):`, err);
+      appLogger.error('Plugin', `플러그인 활성화 실패: "${instance.manifest.name}"`, err);
     }
   }
 
@@ -844,6 +846,7 @@ export class PluginManager {
         clearAllowedVariables();
         clearAllowedResources();
       }
+      appLogger.info('Plugin', `플러그인 비활성화: "${p.manifest.name}"`);
     } else if (p.scriptContent) {
       await this.loadAndActivateScriptPlugin(p, p.scriptContent);
     }
@@ -1835,6 +1838,8 @@ export default {
       },
 
       fetch: (input, init) => window.fetch(input, init),
+
+      logger: appLogger.createPluginLogger(manifest.id, manifest.name),
     };
   }
 }

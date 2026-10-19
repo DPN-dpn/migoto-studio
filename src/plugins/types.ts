@@ -1,5 +1,7 @@
 import type { IniSection, IniDocument, IniMergeResult, IniSectionLine } from '../core/ini/ini.ts';
 export type { IniSection, IniDocument, IniMergeResult, IniSectionLine } from '../core/ini/ini.ts';
+import type { PluginLogger } from '../core/logger.ts';
+export type { PluginLogger };
 
 export interface PluginManifest {
   id: string;
@@ -562,6 +564,9 @@ export interface PluginContext {
 
   // ---- Network fetch ----
   fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response>;
+
+  // ---- Logging ----
+  logger: PluginLogger;
 }
 
 export interface MigotoPlugin {

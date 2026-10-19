@@ -10,6 +10,8 @@ import { TabBar } from './ui/layout/tabbar';
 import { FileExplorer } from './ui/panels/explorer';
 import { SearchPanel } from './ui/panels/search-panel';
 import { TemplatePanel } from './ui/panels/template-panel';
+import { ConsolePanel } from './ui/panels/console-panel';
+import { appLogger } from './core/logger';
 import { PluginManager } from './plugins';
 import { PluginPanel } from './ui/panels/plugin-panel';
 import { ActivityBar } from './ui/layout/activitybar';
@@ -45,6 +47,7 @@ const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as 
 async function boot() {
   await initPlatform();
   initPwa();
+  appLogger.info('App', `Migoto Studio v${CURRENT_APP_VERSION} 시작됨 (${platform().kind} 환경)`);
   const settings = await loadSettings();
   await initCustomTemplates();
 
@@ -226,6 +229,46 @@ async function boot() {
     editor.focus();
   };
 
+  // ---- Console Output Panel ----
+  const consolePanel = new ConsolePanel(
+    $('console-panel'),
+    $('console-resizer'),
+    editor,
+  );
+
+  editor.addAction({
+    id: 'migoto-toggle-console',
+    label: '출력 콘솔창 표시/숨기기 (Toggle Console)',
+    keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.Backquote],
+    run: () => consolePanel.toggle(),
+  });
+
+  // Statusbar console button
+  const statusConsoleBtn = $('status-console');
+  const statusConsoleText = $('status-console-text');
+  statusConsoleBtn?.addEventListener('click', () => consolePanel.toggle());
+
+  const updateStatusConsole = () => {
+    const entries = appLogger.getEntries();
+    const errs = entries.filter((e) => e.level === 'error').length;
+    const warns = entries.filter((e) => e.level === 'warn').length;
+    if (!statusConsoleBtn || !statusConsoleText) return;
+
+    if (errs > 0) {
+      statusConsoleBtn.className = 'status-btn has-error';
+      statusConsoleText.textContent = `콘솔 (오류 ${errs})`;
+    } else if (warns > 0) {
+      statusConsoleBtn.className = 'status-btn has-warn';
+      statusConsoleText.textContent = `콘솔 (경고 ${warns})`;
+    } else {
+      statusConsoleBtn.className = 'status-btn';
+      statusConsoleText.textContent = '콘솔';
+    }
+  };
+  appLogger.subscribe(updateStatusConsole);
+  appLogger.onClear(updateStatusConsole);
+  updateStatusConsole();
+
   // ---- Top Menu Bar ----
   new MenuBar($('menubar'), {
     doc,
@@ -233,6 +276,7 @@ async function boot() {
     explorer,
     activityBar,
     pluginManager,
+    consolePanel,
     onJumpLint: jumpNextLint,
     onGoToDefinition: () => jumpToDefinition(editor, doc),
     onFindReferences: () => showReferencesDialog(editor, doc),
@@ -387,6 +431,7 @@ async function boot() {
     else if (key === 'tab') run(() => (e.shiftKey ? doc.prevTab() : doc.nextTab()));
     else if (key === 'pageup') run(() => doc.prevTab());
     else if (key === 'pagedown') run(() => doc.nextTab());
+    else if (key === '`' || key === '~') run(() => consolePanel.toggle());
     else if (key === ',') run(() => openSettings());
   }, true);
 

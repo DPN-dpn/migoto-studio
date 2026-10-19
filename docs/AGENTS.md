@@ -38,7 +38,9 @@
 5. 에디터 텍스트 수정 및 작업영역:
    - Monaco 에디터의 실행 취소(`Ctrl+Z`) 기록을 온전히 보존하는 `context.editor.setText(text)` 또는 `context.editor.replaceSelection(text)`를 사용하세요.
    - 워크스페이스 전역 검색은 `context.workspace.search`, 탭 제어는 `context.workspace.getOpenTabs / focusTab / closeTab`, 안전 백업은 `context.workspace.createBackup`을 활용하세요.
-6. API 상세 레퍼런스:
+6. 로깅 및 디버깅:
+   - 플러그인 동작 상태나 오류, 디버그 정보는 브라우저 console 대신 `context.logger`(`info`, `warn`, `error`, `debug`)를 사용하면 에디터 하단 [출력 콘솔](Ctrl+`)에 플러그인 태그와 함께 실시간 출력됩니다.
+7. API 상세 레퍼런스:
    - 플러그인 개발 시 사용할 수 있는 모든 `context.*` API의 상세 시그니처, 매개변수 및 예제는 [`docs/PLUGIN_API.md`](./PLUGIN_API.md)를 반드시 참조하세요.
 
 자세한 아키텍처 규칙, 권장 개발 지침 및 템플릿은 아래 내용을 엄격히 준수하세요.

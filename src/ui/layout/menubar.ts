@@ -12,6 +12,7 @@ import { openRestore } from '../modals/restore-ui';
 import { openCompareDialog } from '../modals/diff-dialog';
 import { openKeyHelperModal } from '../modals/key-helper';
 import { runUpdateCheck, openExternalUrl } from '../../updater/updater';
+import type { ConsolePanel } from '../panels/console-panel';
 
 export interface MenuBarCallbacks {
   doc: DocumentManager;
@@ -19,6 +20,7 @@ export interface MenuBarCallbacks {
   explorer: FileExplorer;
   activityBar: ActivityBar;
   pluginManager?: PluginManager;
+  consolePanel?: ConsolePanel;
   onJumpLint: () => void;
   onGoToDefinition: () => void;
   onFindReferences: () => void;
@@ -215,6 +217,12 @@ export class MenuBar {
               shortcut: 'Ctrl+B',
               checked: () => s.showOutline,
               action: () => this.cb.activityBar.toggleSidebar(),
+            },
+            {
+              label: '콘솔창 보기',
+              shortcut: 'Ctrl+`',
+              checked: () => Boolean(this.cb.consolePanel?.isOpen()),
+              action: () => this.cb.consolePanel?.toggle(),
             },
             {
               label: '탐색기 열기',

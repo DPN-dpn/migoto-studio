@@ -4,6 +4,7 @@ import { platform, type FileRef } from '../../platform/index';
 import type { FileExplorer } from './explorer';
 import { flashLineHighlight } from '../../core/ini/symbol-nav';
 import { showToast } from '../common/toast';
+import { appLogger } from '../../core/logger';
 
 import {
   type SearchMatch,
@@ -451,6 +452,7 @@ export class SearchPanel {
       this.summaryEl.textContent = '일치하는 결과가 없습니다.';
     } else {
       this.summaryEl.textContent = `${totalFiles}개 파일에서 ${totalMatches}개 결과 발견`;
+      appLogger.info('Search', `'${this.query}' 검색 완료: ${totalFiles}개 파일에서 ${totalMatches}건 발견`);
     }
 
     this.renderResults();

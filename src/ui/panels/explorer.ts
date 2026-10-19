@@ -3,6 +3,7 @@ import type { DocumentManager } from '../../core/workspace/documents';
 import { showToast } from '../common/toast';
 import { promptFolderTrust } from '../modals/trust-modal';
 import { isFolderTrusted } from '../../core/workspace/trust';
+import { appLogger } from '../../core/logger';
 
 const STORAGE_LAST_FOLDER = 'migoto_last_folder';
 
@@ -242,6 +243,7 @@ export class FileExplorer {
     } catch {}
     this.onFolderChange?.(folder);
     await this.reload();
+    appLogger.info('Workspace', `작업 폴더 열림: "${folder.name}" (${this.entries.length}개 최상위 항목)`);
 
     // Auto-expand if the root has only 1 or 2 subdirectories
     const dirCount = this.entries.filter((e) => Boolean(e.isDir || (e as any).is_dir)).length;
@@ -274,6 +276,7 @@ export class FileExplorer {
   }
 
   closeFolder(): void {
+    const prevName = this.currentFolder?.name;
     this.currentFolder = null;
     this.entries = [];
     this.expandedDirs.clear();
@@ -283,6 +286,9 @@ export class FileExplorer {
     } catch {}
     this.onFolderChange?.(null);
     this.render();
+    if (prevName) {
+      appLogger.info('Workspace', `작업 폴더 닫힘: "${prevName}"`);
+    }
   }
 
   async reload(): Promise<void> {

@@ -99,12 +99,21 @@
           <main id="editor"></main>
           <div id="custom-viewer-container" class="custom-viewer-panel" hidden></div>
           <div id="diff-container" class="diff-container-panel" hidden></div>
+          <div id="console-resizer" class="console-resizer" hidden></div>
+          <div id="console-panel" class="console-panel" hidden></div>
         </div>
       </div>
       <footer id="statusbar">
         <span class="status-left">
           <span id="status-pos">줄 1, 열 1</span>
           <button id="status-lint" class="status-btn" title="오류/경고 위치로 이동">✓ 문제 없음</button>
+          <button id="status-console" class="status-btn" title="출력 콘솔창 열기/닫기 (Ctrl+`)">
+            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px;margin-right:4px;">
+              <polyline points="4 17 10 11 4 5"></polyline>
+              <line x1="12" y1="19" x2="20" y2="19"></line>
+            </svg>
+            <span id="status-console-text">콘솔</span>
+          </button>
         </span>
         <span class="status-right">
           <button id="status-eol" class="status-btn" title="줄바꿈 방식 전환 (CRLF/LF)">CRLF</button>

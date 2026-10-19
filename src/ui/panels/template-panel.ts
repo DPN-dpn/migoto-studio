@@ -1,6 +1,7 @@
 import { monaco } from '../../core/editor/monaco';
 import type { DocumentManager } from '../../core/workspace/documents';
 import { LANGUAGE_ID } from '../../core/editor/grammar';
+import { appLogger } from '../../core/logger';
 import {
   type Template,
   getAllTemplates,
@@ -410,6 +411,7 @@ export class TemplatePanel {
         return;
       }
       insertTemplate(this.editor, t);
+      appLogger.info('Template', `코드 스니펫 삽입: '${t.label}' (${t.group})`);
     });
 
     return card;

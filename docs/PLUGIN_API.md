@@ -1081,6 +1081,33 @@ console.log('stdout:', result.stdout);
 
 ---
 
+## 8.1 콘솔 로깅 API (`context.logger`)
+
+플러그인 실행 중 발생하는 동작 상태, 진행 정보, 경고 및 오류 데이터를 에디터 하단의 **[출력 콘솔]**(`Ctrl+\``) 창에 실시간으로 전송합니다.  
+각 로그에는 자동으로 해당 플러그인의 식별 태그(`[Plugin: 플러그인명]`)가 부착되며, 타임스탬프, 로그 레벨별 배지, 객체 펼쳐보기, 소스/레벨별 필터링, 클립보드 복사를 지원합니다.
+
+```typescript
+// 1. 일반 정보 로그
+context.logger.info('INI 모드 분석 완료', { sectionCount: 12 });
+
+// 2. 경고 로그
+context.logger.warn('일부 텍스처 해시 파일이 누락되었습니다.', missingList);
+
+// 3. 에러 로그 (Error 객체 및 스택 트레이스 자동 지원)
+try {
+  runTask();
+} catch (err) {
+  context.logger.error('외부 스크립트 실행 실패:', err);
+}
+
+// 4. 디버그 로그
+context.logger.debug('파싱 내부 파라미터:', intermediateData);
+```
+
+> **콘솔창 접근성**: 사용자는 상단 메뉴 **[보기] -> [콘솔창 보기]**, 단축키 **`Ctrl+\``**, 또는 하단 상태바의 **[콘솔]** 버튼을 통해 언제든지 콘솔 창을 열고 닫을 수 있습니다.
+
+---
+
 ## 9. 린터 및 템플릿 확장 API (`context.linter`, `context.templates`)
 
 Migoto Studio의 코어 린터 및 코드 템플릿 제안을 플러그인에서 동적으로 확장할 수 있습니다.

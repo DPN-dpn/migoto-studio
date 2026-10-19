@@ -3,6 +3,7 @@ import { platform, type Encoding, type FileRef } from '../../platform';
 import { getSettings, updateSettings } from './settings';
 import { LANGUAGE_ID } from '../editor/grammar';
 import { showToast } from '../../ui/common/toast';
+import { appLogger } from '../logger';
 export type { Encoding };
 export type TabKind = 'text' | 'custom' | 'diff';
 
@@ -404,6 +405,7 @@ export class DocumentManager {
     const tab = this.createTab({ text: initialText });
     this.tabs.push(tab);
     this.switchTab(tab.id);
+    appLogger.info('File', `새 문서 생성됨 (${tab.title})`);
     return tab;
   }
 
@@ -461,6 +463,7 @@ export class DocumentManager {
     const wasActive = target.id === this.activeTabId;
     this.tabs.splice(idx, 1);
     target.model.dispose();
+    appLogger.debug('File', `탭 닫힘: ${target.title}`);
 
     if (this.tabs.length === 0) {
       this.newFile();
@@ -582,6 +585,7 @@ export class DocumentManager {
         this.editor.setPosition({ lineNumber: 1, column: 1 });
         await this.rememberRecent(ref);
         this.emit();
+        appLogger.info('File', `파일 열림: ${ref.name} (${this.activeTab.model.getLineCount()}줄, ${loaded.encoding})`);
         return;
       }
 
@@ -597,6 +601,7 @@ export class DocumentManager {
       this.editor.setScrollPosition({ scrollTop: 0 });
       this.editor.setPosition({ lineNumber: 1, column: 1 });
       await this.rememberRecent(ref);
+      appLogger.info('File', `파일 열림: ${ref.name} (${newTab.model.getLineCount()}줄, ${loaded.encoding})`);
     } catch (e) {
       await platform().showError('파일을 열 수 없습니다', String(e));
     }
@@ -759,6 +764,7 @@ export class DocumentManager {
       tab.savedVersion = tab.model.getAlternativeVersionId();
       await this.rememberRecent(ref);
       this.emit();
+      appLogger.info('File', `파일 저장 완료: ${ref.name} (${tab.encoding})`);
       return true;
     } catch (e) {
       await platform().showError('저장하지 못했습니다', String(e));
