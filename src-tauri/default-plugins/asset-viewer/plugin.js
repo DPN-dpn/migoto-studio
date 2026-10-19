@@ -1,180 +1,90 @@
-//#region default-plugins/asset-viewer/dds-decoder.ts
-var DDS_MAGIC = 542327876;
-var FOURCC_DXT1 = 827611204;
-var FOURCC_DXT2 = 844388420;
-var FOURCC_DXT3 = 861165636;
-var FOURCC_DXT4 = 877942852;
-var FOURCC_DXT5 = 894720068;
-var FOURCC_ATI1 = 826889281;
-var FOURCC_BC4U = 1429488450;
-var FOURCC_BC4S = 1395934018;
-var FOURCC_ATI2 = 843666497;
-var FOURCC_BC5U = 1429553986;
-var FOURCC_BC5S = 1395999554;
-var FOURCC_DX10 = 808540228;
-var FOURCC_BC7 = 540492610;
-var FOURCC_BC7_ALT = 3621698;
-function decodeDDS(buffer) {
-	const bytes = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
-	if (bytes.byteLength < 4) throw new Error("유효한 DDS 파일이 아닙니다 (데이터 크기 부족).");
-	const header = new DataView(bytes.buffer, bytes.byteOffset, Math.min(bytes.byteLength, 148));
-	if (header.getUint32(0, true) !== DDS_MAGIC) throw new Error("유효한 DDS 파일이 아닙니다 (Magic 불일치).");
-	if (bytes.byteLength < 128) throw new Error("유효한 DDS 파일이 아닙니다 (헤더 크기 128바이트 미만).");
-	const height = header.getUint32(12, true);
-	const width = header.getUint32(16, true);
-	const pfFlags = header.getUint32(80, true);
-	const fourCC = header.getUint32(84, true);
-	const rgbBitCount = header.getUint32(88, true);
-	const rMask = header.getUint32(92, true);
-	header.getUint32(96, true);
-	const bMask = header.getUint32(100, true);
-	header.getUint32(104, true);
-	let dataOffset = 128;
-	let dxgiFormat;
-	let isSRGB = false;
-	let formatName = "RGBA";
-	if (fourCC === FOURCC_DX10 && bytes.byteLength >= 148) {
-		dataOffset = 148;
-		dxgiFormat = header.getUint32(128, true);
-	}
-	const rgba = new Uint8ClampedArray(width * height * 4);
-	if (dxgiFormat !== void 0) switch (dxgiFormat) {
-		case 98:
-			formatName = "BC7 (Linear)";
-			isSRGB = false;
-			decodeBC7(bytes, dataOffset, width, height, rgba);
-			break;
-		case 99:
-		case 97:
-			formatName = "BC7 (sRGB)";
-			isSRGB = true;
-			decodeBC7(bytes, dataOffset, width, height, rgba);
-			break;
-		case 71:
-		case 70:
-			formatName = "BC1 (Linear)";
-			isSRGB = false;
-			decodeDXT1(bytes, dataOffset, width, height, rgba);
-			break;
-		case 72:
-			formatName = "BC1 (sRGB)";
-			isSRGB = true;
-			decodeDXT1(bytes, dataOffset, width, height, rgba);
-			break;
-		case 74:
-		case 73:
-			formatName = "BC2 (Linear)";
-			isSRGB = false;
-			decodeDXT3(bytes, dataOffset, width, height, rgba);
-			break;
-		case 75:
-			formatName = "BC2 (sRGB)";
-			isSRGB = true;
-			decodeDXT3(bytes, dataOffset, width, height, rgba);
-			break;
-		case 77:
-		case 76:
-			formatName = "BC3 (Linear)";
-			isSRGB = false;
-			decodeDXT5(bytes, dataOffset, width, height, rgba);
-			break;
-		case 78:
-			formatName = "BC3 (sRGB)";
-			isSRGB = true;
-			decodeDXT5(bytes, dataOffset, width, height, rgba);
-			break;
-		case 80:
-		case 81:
-		case 79:
-			formatName = "BC4 (Linear)";
-			isSRGB = false;
-			decodeBC4(bytes, dataOffset, width, height, rgba);
-			break;
-		case 83:
-		case 84:
-		case 82:
-			formatName = "BC5 (Linear)";
-			isSRGB = false;
-			decodeBC5(bytes, dataOffset, width, height, rgba);
-			break;
-		case 28:
-			formatName = "RGBA32 (Linear)";
-			isSRGB = false;
-			decodeRGBA32(bytes, dataOffset, width, height, rgba);
-			break;
-		case 29:
-			formatName = "RGBA32 (sRGB)";
-			isSRGB = true;
-			decodeRGBA32(bytes, dataOffset, width, height, rgba);
-			break;
-		case 87:
-		case 88:
-			formatName = "BGRA32 (Linear)";
-			isSRGB = false;
-			decodeBGRA32(bytes, dataOffset, width, height, rgba);
-			break;
-		case 91:
-		case 93:
-			formatName = "BGRA32 (sRGB)";
-			isSRGB = true;
-			decodeBGRA32(bytes, dataOffset, width, height, rgba);
-			break;
-		default:
-			formatName = `DXGI Format ${dxgiFormat}`;
-			decodeBC7(bytes, dataOffset, width, height, rgba);
-	}
-	else if (fourCC === FOURCC_DXT1) {
-		formatName = "DXT1 (BC1)";
-		isSRGB = false;
-		decodeDXT1(bytes, dataOffset, width, height, rgba);
-	} else if (fourCC === FOURCC_DXT2 || fourCC === FOURCC_DXT3) {
-		formatName = "DXT3 (BC2)";
-		isSRGB = false;
-		decodeDXT3(bytes, dataOffset, width, height, rgba);
-	} else if (fourCC === FOURCC_DXT4 || fourCC === FOURCC_DXT5) {
-		formatName = "DXT5 (BC3)";
-		isSRGB = false;
-		decodeDXT5(bytes, dataOffset, width, height, rgba);
-	} else if (fourCC === FOURCC_BC7 || fourCC === FOURCC_BC7_ALT) {
-		formatName = "BC7";
-		isSRGB = false;
-		decodeBC7(bytes, dataOffset, width, height, rgba);
-	} else if (fourCC === FOURCC_ATI1 || fourCC === FOURCC_BC4U || fourCC === FOURCC_BC4S) {
-		formatName = "BC4";
-		isSRGB = false;
-		decodeBC4(bytes, dataOffset, width, height, rgba);
-	} else if (fourCC === FOURCC_ATI2 || fourCC === FOURCC_BC5U || fourCC === FOURCC_BC5S) {
-		formatName = "BC5";
-		isSRGB = false;
-		decodeBC5(bytes, dataOffset, width, height, rgba);
-	} else if ((pfFlags & 64) !== 0 || rgbBitCount === 32 || rgbBitCount === 24) {
-		if (rgbBitCount === 32) {
-			if (rMask === 255 && bMask === 16711680) {
-				formatName = "RGBA32";
-				decodeRGBA32(bytes, dataOffset, width, height, rgba);
-			} else {
-				formatName = "BGRA32";
-				decodeBGRA32(bytes, dataOffset, width, height, rgba);
-			}
-		} else if (rgbBitCount === 24) {
-			formatName = "BGR24";
-			decodeBGR24(bytes, dataOffset, width, height, rgba);
-		} else {
-			formatName = `RGB ${rgbBitCount}bpp`;
-			decodeBGRA32(bytes, dataOffset, width, height, rgba);
-		}
+//#region default-plugins/asset-viewer/dxt-decoder.ts
+/**
+* dxt-decoder.ts
+* BC1(DXT1), BC2(DXT3), BC3(DXT5), BC4, BC5 및 비압축(RGBA/BGRA/BGR) 텍스처 디코더
+*/
+function unpackRGB565Table(c0, c1, isDxt1) {
+	const r0 = Math.round((c0 >> 11 & 31) * 255 / 31);
+	const g0 = Math.round((c0 >> 5 & 63) * 255 / 63);
+	const b0 = Math.round((c0 & 31) * 255 / 31);
+	const r1 = Math.round((c1 >> 11 & 31) * 255 / 31);
+	const g1 = Math.round((c1 >> 5 & 63) * 255 / 63);
+	const b1 = Math.round((c1 & 31) * 255 / 31);
+	const table = [
+		[
+			r0,
+			g0,
+			b0,
+			255
+		],
+		[
+			r1,
+			g1,
+			b1,
+			255
+		],
+		[
+			0,
+			0,
+			0,
+			255
+		],
+		[
+			0,
+			0,
+			0,
+			255
+		]
+	];
+	if (!isDxt1 || c0 > c1) {
+		table[2] = [
+			Math.round((2 * r0 + r1) / 3),
+			Math.round((2 * g0 + g1) / 3),
+			Math.round((2 * b0 + b1) / 3),
+			255
+		];
+		table[3] = [
+			Math.round((r0 + 2 * r1) / 3),
+			Math.round((g0 + 2 * g1) / 3),
+			Math.round((b0 + 2 * b1) / 3),
+			255
+		];
 	} else {
-		formatName = `FourCC 0x${fourCC.toString(16)}`;
-		decodeDXT1(bytes, dataOffset, width, height, rgba);
+		table[2] = [
+			Math.round((r0 + r1) / 2),
+			Math.round((g0 + g1) / 2),
+			Math.round((b0 + b1) / 2),
+			255
+		];
+		table[3] = [
+			0,
+			0,
+			0,
+			0
+		];
 	}
-	return {
-		width,
-		height,
-		format: formatName,
-		rgba,
-		isSRGB,
-		dxgiFormat
-	};
+	return table;
+}
+function unpackAlphaTable(a0, a1) {
+	const table = new Array(8);
+	table[0] = a0;
+	table[1] = a1;
+	if (a0 > a1) {
+		table[2] = Math.round((6 * a0 + 1 * a1) / 7);
+		table[3] = Math.round((5 * a0 + 2 * a1) / 7);
+		table[4] = Math.round((4 * a0 + 3 * a1) / 7);
+		table[5] = Math.round((3 * a0 + 4 * a1) / 7);
+		table[6] = Math.round((2 * a0 + 5 * a1) / 7);
+		table[7] = Math.round((1 * a0 + 6 * a1) / 7);
+	} else {
+		table[2] = Math.round((4 * a0 + 1 * a1) / 5);
+		table[3] = Math.round((3 * a0 + 2 * a1) / 5);
+		table[4] = Math.round((2 * a0 + 3 * a1) / 5);
+		table[5] = Math.round((1 * a0 + 4 * a1) / 5);
+		table[6] = 0;
+		table[7] = 255;
+	}
+	return table;
 }
 function decodeDXT1(src, offset, width, height, dest) {
 	const numBlocksWide = Math.ceil(width / 4);
@@ -328,6 +238,52 @@ function decodeBC5(src, offset, width, height, dest) {
 		}
 	}
 }
+function decodeRGBA32(src, offset, width, height, dest) {
+	let s = offset;
+	let d = 0;
+	const total = width * height;
+	for (let i = 0; i < total && s + 4 <= src.length; i++) {
+		dest[d++] = src[s++];
+		dest[d++] = src[s++];
+		dest[d++] = src[s++];
+		dest[d++] = src[s++];
+	}
+}
+function decodeBGRA32(src, offset, width, height, dest) {
+	let s = offset;
+	let d = 0;
+	const total = width * height;
+	for (let i = 0; i < total && s + 4 <= src.length; i++) {
+		const b = src[s++];
+		const g = src[s++];
+		const r = src[s++];
+		const a = src[s++];
+		dest[d++] = r;
+		dest[d++] = g;
+		dest[d++] = b;
+		dest[d++] = a;
+	}
+}
+function decodeBGR24(src, offset, width, height, dest) {
+	let s = offset;
+	let d = 0;
+	const total = width * height;
+	for (let i = 0; i < total && s + 3 <= src.length; i++) {
+		const b = src[s++];
+		const g = src[s++];
+		const r = src[s++];
+		dest[d++] = r;
+		dest[d++] = g;
+		dest[d++] = b;
+		dest[d++] = 255;
+	}
+}
+//#endregion
+//#region default-plugins/asset-viewer/bc7-decoder.ts
+/**
+* bc7-decoder.ts
+* BC7 (DirectX 11 Block Compression 7) 텍스처 디코더 - Modes 0 to 7
+*/
 var BC7_WEIGHTS2 = [
 	0,
 	21,
@@ -3007,128 +2963,190 @@ function unpackBC7Mode6(lowChunk, highChunk, outPixels) {
 		outPixels[dIdx + 3] = ci[3];
 	}
 }
-function decodeRGBA32(src, offset, width, height, dest) {
-	let s = offset;
-	let d = 0;
-	const total = width * height;
-	for (let i = 0; i < total && s + 4 <= src.length; i++) {
-		dest[d++] = src[s++];
-		dest[d++] = src[s++];
-		dest[d++] = src[s++];
-		dest[d++] = src[s++];
+//#endregion
+//#region default-plugins/asset-viewer/dds-decoder.ts
+/**
+* dds-decoder.ts
+* Zero-dependency pure TypeScript DDS (DirectDraw Surface) texture decoder.
+* Supports BC1 (DXT1), BC2 (DXT3), BC3 (DXT5), BC4, BC5, BC7 (Modes 0-7),
+* DX10 extended headers, sRGB / Linear metadata detection, and uncompressed RGBA/BGRA textures.
+*/
+var DDS_MAGIC = 542327876;
+var FOURCC_DXT1 = 827611204;
+var FOURCC_DXT2 = 844388420;
+var FOURCC_DXT3 = 861165636;
+var FOURCC_DXT4 = 877942852;
+var FOURCC_DXT5 = 894720068;
+var FOURCC_ATI1 = 826889281;
+var FOURCC_BC4U = 1429488450;
+var FOURCC_BC4S = 1395934018;
+var FOURCC_ATI2 = 843666497;
+var FOURCC_BC5U = 1429553986;
+var FOURCC_BC5S = 1395999554;
+var FOURCC_DX10 = 808540228;
+var FOURCC_BC7 = 540492610;
+var FOURCC_BC7_ALT = 3621698;
+function decodeDDS(buffer) {
+	const bytes = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
+	if (bytes.byteLength < 4) throw new Error("유효한 DDS 파일이 아닙니다 (데이터 크기 부족).");
+	const header = new DataView(bytes.buffer, bytes.byteOffset, Math.min(bytes.byteLength, 148));
+	if (header.getUint32(0, true) !== DDS_MAGIC) throw new Error("유효한 DDS 파일이 아닙니다 (Magic 불일치).");
+	if (bytes.byteLength < 128) throw new Error("유효한 DDS 파일이 아닙니다 (헤더 크기 128바이트 미만).");
+	const height = header.getUint32(12, true);
+	const width = header.getUint32(16, true);
+	const pfFlags = header.getUint32(80, true);
+	const fourCC = header.getUint32(84, true);
+	const rgbBitCount = header.getUint32(88, true);
+	const rMask = header.getUint32(92, true);
+	header.getUint32(96, true);
+	const bMask = header.getUint32(100, true);
+	header.getUint32(104, true);
+	let dataOffset = 128;
+	let dxgiFormat;
+	let isSRGB = false;
+	let formatName = "RGBA";
+	if (fourCC === FOURCC_DX10 && bytes.byteLength >= 148) {
+		dataOffset = 148;
+		dxgiFormat = header.getUint32(128, true);
 	}
-}
-function decodeBGRA32(src, offset, width, height, dest) {
-	let s = offset;
-	let d = 0;
-	const total = width * height;
-	for (let i = 0; i < total && s + 4 <= src.length; i++) {
-		const b = src[s++];
-		const g = src[s++];
-		const r = src[s++];
-		const a = src[s++];
-		dest[d++] = r;
-		dest[d++] = g;
-		dest[d++] = b;
-		dest[d++] = a;
+	const rgba = new Uint8ClampedArray(width * height * 4);
+	if (dxgiFormat !== void 0) switch (dxgiFormat) {
+		case 98:
+			formatName = "BC7 (Linear)";
+			isSRGB = false;
+			decodeBC7(bytes, dataOffset, width, height, rgba);
+			break;
+		case 99:
+		case 97:
+			formatName = "BC7 (sRGB)";
+			isSRGB = true;
+			decodeBC7(bytes, dataOffset, width, height, rgba);
+			break;
+		case 71:
+		case 70:
+			formatName = "BC1 (Linear)";
+			isSRGB = false;
+			decodeDXT1(bytes, dataOffset, width, height, rgba);
+			break;
+		case 72:
+			formatName = "BC1 (sRGB)";
+			isSRGB = true;
+			decodeDXT1(bytes, dataOffset, width, height, rgba);
+			break;
+		case 74:
+		case 73:
+			formatName = "BC2 (Linear)";
+			isSRGB = false;
+			decodeDXT3(bytes, dataOffset, width, height, rgba);
+			break;
+		case 75:
+			formatName = "BC2 (sRGB)";
+			isSRGB = true;
+			decodeDXT3(bytes, dataOffset, width, height, rgba);
+			break;
+		case 77:
+		case 76:
+			formatName = "BC3 (Linear)";
+			isSRGB = false;
+			decodeDXT5(bytes, dataOffset, width, height, rgba);
+			break;
+		case 78:
+			formatName = "BC3 (sRGB)";
+			isSRGB = true;
+			decodeDXT5(bytes, dataOffset, width, height, rgba);
+			break;
+		case 80:
+		case 81:
+		case 79:
+			formatName = "BC4 (Linear)";
+			isSRGB = false;
+			decodeBC4(bytes, dataOffset, width, height, rgba);
+			break;
+		case 83:
+		case 84:
+		case 82:
+			formatName = "BC5 (Linear)";
+			isSRGB = false;
+			decodeBC5(bytes, dataOffset, width, height, rgba);
+			break;
+		case 28:
+			formatName = "RGBA32 (Linear)";
+			isSRGB = false;
+			decodeRGBA32(bytes, dataOffset, width, height, rgba);
+			break;
+		case 29:
+			formatName = "RGBA32 (sRGB)";
+			isSRGB = true;
+			decodeRGBA32(bytes, dataOffset, width, height, rgba);
+			break;
+		case 87:
+		case 88:
+			formatName = "BGRA32 (Linear)";
+			isSRGB = false;
+			decodeBGRA32(bytes, dataOffset, width, height, rgba);
+			break;
+		case 91:
+		case 93:
+			formatName = "BGRA32 (sRGB)";
+			isSRGB = true;
+			decodeBGRA32(bytes, dataOffset, width, height, rgba);
+			break;
+		default:
+			formatName = `DXGI Format ${dxgiFormat}`;
+			decodeBC7(bytes, dataOffset, width, height, rgba);
 	}
-}
-function decodeBGR24(src, offset, width, height, dest) {
-	let s = offset;
-	let d = 0;
-	const total = width * height;
-	for (let i = 0; i < total && s + 3 <= src.length; i++) {
-		const b = src[s++];
-		const g = src[s++];
-		const r = src[s++];
-		dest[d++] = r;
-		dest[d++] = g;
-		dest[d++] = b;
-		dest[d++] = 255;
-	}
-}
-function unpackRGB565Table(c0, c1, isDxt1) {
-	const r0 = Math.round((c0 >> 11 & 31) * 255 / 31);
-	const g0 = Math.round((c0 >> 5 & 63) * 255 / 63);
-	const b0 = Math.round((c0 & 31) * 255 / 31);
-	const r1 = Math.round((c1 >> 11 & 31) * 255 / 31);
-	const g1 = Math.round((c1 >> 5 & 63) * 255 / 63);
-	const b1 = Math.round((c1 & 31) * 255 / 31);
-	const table = [
-		[
-			r0,
-			g0,
-			b0,
-			255
-		],
-		[
-			r1,
-			g1,
-			b1,
-			255
-		],
-		[
-			0,
-			0,
-			0,
-			255
-		],
-		[
-			0,
-			0,
-			0,
-			255
-		]
-	];
-	if (!isDxt1 || c0 > c1) {
-		table[2] = [
-			Math.round((2 * r0 + r1) / 3),
-			Math.round((2 * g0 + g1) / 3),
-			Math.round((2 * b0 + b1) / 3),
-			255
-		];
-		table[3] = [
-			Math.round((r0 + 2 * r1) / 3),
-			Math.round((g0 + 2 * g1) / 3),
-			Math.round((b0 + 2 * b1) / 3),
-			255
-		];
+	else if (fourCC === FOURCC_DXT1) {
+		formatName = "DXT1 (BC1)";
+		isSRGB = false;
+		decodeDXT1(bytes, dataOffset, width, height, rgba);
+	} else if (fourCC === FOURCC_DXT2 || fourCC === FOURCC_DXT3) {
+		formatName = "DXT3 (BC2)";
+		isSRGB = false;
+		decodeDXT3(bytes, dataOffset, width, height, rgba);
+	} else if (fourCC === FOURCC_DXT4 || fourCC === FOURCC_DXT5) {
+		formatName = "DXT5 (BC3)";
+		isSRGB = false;
+		decodeDXT5(bytes, dataOffset, width, height, rgba);
+	} else if (fourCC === FOURCC_BC7 || fourCC === FOURCC_BC7_ALT) {
+		formatName = "BC7";
+		isSRGB = false;
+		decodeBC7(bytes, dataOffset, width, height, rgba);
+	} else if (fourCC === FOURCC_ATI1 || fourCC === FOURCC_BC4U || fourCC === FOURCC_BC4S) {
+		formatName = "BC4";
+		isSRGB = false;
+		decodeBC4(bytes, dataOffset, width, height, rgba);
+	} else if (fourCC === FOURCC_ATI2 || fourCC === FOURCC_BC5U || fourCC === FOURCC_BC5S) {
+		formatName = "BC5";
+		isSRGB = false;
+		decodeBC5(bytes, dataOffset, width, height, rgba);
+	} else if ((pfFlags & 64) !== 0 || rgbBitCount === 32 || rgbBitCount === 24) {
+		if (rgbBitCount === 32) {
+			if (rMask === 255 && bMask === 16711680) {
+				formatName = "RGBA32";
+				decodeRGBA32(bytes, dataOffset, width, height, rgba);
+			} else {
+				formatName = "BGRA32";
+				decodeBGRA32(bytes, dataOffset, width, height, rgba);
+			}
+		} else if (rgbBitCount === 24) {
+			formatName = "BGR24";
+			decodeBGR24(bytes, dataOffset, width, height, rgba);
+		} else {
+			formatName = `RGB ${rgbBitCount}bpp`;
+			decodeBGRA32(bytes, dataOffset, width, height, rgba);
+		}
 	} else {
-		table[2] = [
-			Math.round((r0 + r1) / 2),
-			Math.round((g0 + g1) / 2),
-			Math.round((b0 + b1) / 2),
-			255
-		];
-		table[3] = [
-			0,
-			0,
-			0,
-			0
-		];
+		formatName = `FourCC 0x${fourCC.toString(16)}`;
+		decodeDXT1(bytes, dataOffset, width, height, rgba);
 	}
-	return table;
-}
-function unpackAlphaTable(a0, a1) {
-	const table = new Array(8);
-	table[0] = a0;
-	table[1] = a1;
-	if (a0 > a1) {
-		table[2] = Math.round((6 * a0 + 1 * a1) / 7);
-		table[3] = Math.round((5 * a0 + 2 * a1) / 7);
-		table[4] = Math.round((4 * a0 + 3 * a1) / 7);
-		table[5] = Math.round((3 * a0 + 4 * a1) / 7);
-		table[6] = Math.round((2 * a0 + 5 * a1) / 7);
-		table[7] = Math.round((1 * a0 + 6 * a1) / 7);
-	} else {
-		table[2] = Math.round((4 * a0 + 1 * a1) / 5);
-		table[3] = Math.round((3 * a0 + 2 * a1) / 5);
-		table[4] = Math.round((2 * a0 + 3 * a1) / 5);
-		table[5] = Math.round((1 * a0 + 4 * a1) / 5);
-		table[6] = 0;
-		table[7] = 255;
-	}
-	return table;
+	return {
+		width,
+		height,
+		format: formatName,
+		rgba,
+		isSRGB,
+		dxgiFormat
+	};
 }
 //#endregion
 //#region default-plugins/asset-viewer/image-viewer.ts

@@ -1,187 +1,6 @@
 //#region default-plugins/ai-assistant/icon.ts
 var iconSvg = `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3z"></path></svg>`;
 //#endregion
-//#region default-plugins/ai-assistant/markdown.ts
-/**
-* HTML 및 마크다운 렌더링 유틸리티
-*/
-function escapeHtml(str) {
-	return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
-}
-function formatInlineMarkdown(text) {
-	const safe = escapeHtml(text);
-	const codeTokens = [];
-	let formatted = safe.replace(/`([^`]+)`/g, (_match, codeContent) => {
-		const idx = codeTokens.length;
-		codeTokens.push(`<code class="ai-inline-code">${codeContent}</code>`);
-		return `\uFFF0CODE_${idx}\uFFF1`;
-	}).replace(/(\*\*\*|___)(.*?)\1/g, "<strong><em>$2</em></strong>");
-	formatted = formatted.replace(/(\*\*|__)(.*?)\1/g, "<strong>$2</strong>");
-	formatted = formatted.replace(/(?<!\w)(\*|_)(.*?)\1(?!\w)/g, "<em>$2</em>");
-	formatted = formatted.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, "<a href=\"$2\" target=\"_blank\" rel=\"noopener noreferrer\" class=\"ai-link\">$1</a>");
-	formatted = formatted.replace(/\uFFF0CODE_(\d+)\uFFF1/g, (_m, idxStr) => {
-		return codeTokens[parseInt(idxStr, 10)] || "";
-	});
-	return formatted;
-}
-function parseMarkdownToHtml(mdText) {
-	const lines = mdText.split(/\r?\n/);
-	const out = [];
-	let inUl = false;
-	let inOl = false;
-	let inBlockquote = false;
-	let inTable = false;
-	let tableHeaders = [];
-	let tableRows = [];
-	let paraLines = [];
-	const flushPara = () => {
-		if (paraLines.length > 0) {
-			const content = paraLines.map((l) => formatInlineMarkdown(l)).join("<br>");
-			out.push(`<p class="ai-md-p">${content}</p>`);
-			paraLines = [];
-		}
-	};
-	const flushTable = () => {
-		if (!inTable) return;
-		let html = "<table class=\"ai-md-table\">";
-		if (tableHeaders.length > 0) {
-			html += "<thead><tr>";
-			for (const th of tableHeaders) html += `<th>${formatInlineMarkdown(th)}</th>`;
-			html += "</tr></thead>";
-		}
-		if (tableRows.length > 0) {
-			html += "<tbody>";
-			for (const row of tableRows) {
-				html += "<tr>";
-				for (const cell of row) html += `<td>${formatInlineMarkdown(cell)}</td>`;
-				html += "</tr>";
-			}
-			html += "</tbody>";
-		}
-		html += "</table>";
-		out.push(html);
-		inTable = false;
-		tableHeaders = [];
-		tableRows = [];
-	};
-	const closeBlocks = () => {
-		flushPara();
-		flushTable();
-		if (inUl) {
-			out.push("</ul>");
-			inUl = false;
-		}
-		if (inOl) {
-			out.push("</ol>");
-			inOl = false;
-		}
-		if (inBlockquote) {
-			out.push("</blockquote>");
-			inBlockquote = false;
-		}
-	};
-	for (let i = 0; i < lines.length; i++) {
-		const rawLine = lines[i];
-		const trimmed = rawLine.trim();
-		if (!trimmed) {
-			closeBlocks();
-			continue;
-		}
-		if (trimmed.startsWith("|") && trimmed.endsWith("|") && trimmed.length > 2) {
-			flushPara();
-			if (inUl) {
-				out.push("</ul>");
-				inUl = false;
-			}
-			if (inOl) {
-				out.push("</ol>");
-				inOl = false;
-			}
-			if (inBlockquote) {
-				out.push("</blockquote>");
-				inBlockquote = false;
-			}
-			if (/^\|?(\s*:?-{2,}:?\s*\|)+\s*$/.test(trimmed)) continue;
-			const cells = trimmed.slice(1, -1).split("|").map((c) => c.trim());
-			if (!inTable) {
-				inTable = true;
-				tableHeaders = cells;
-			} else tableRows.push(cells);
-			continue;
-		} else if (inTable) flushTable();
-		if (/^(\-{3,}|\*{3,}|_{3,})$/.test(trimmed)) {
-			closeBlocks();
-			out.push("<hr class=\"ai-md-hr\">");
-			continue;
-		}
-		const headerMatch = trimmed.match(/^(#{1,6})\s+(.+)$/);
-		if (headerMatch) {
-			closeBlocks();
-			const level = Math.min(headerMatch[1].length + 2, 6);
-			out.push(`<h${level} class="ai-md-h ai-md-h${level}">${formatInlineMarkdown(headerMatch[2])}</h${level}>`);
-			continue;
-		}
-		const quoteMatch = trimmed.match(/^>\s?(.*)$/);
-		if (quoteMatch) {
-			flushPara();
-			if (inUl) {
-				out.push("</ul>");
-				inUl = false;
-			}
-			if (inOl) {
-				out.push("</ol>");
-				inOl = false;
-			}
-			if (!inBlockquote) {
-				out.push("<blockquote class=\"ai-md-quote\">");
-				inBlockquote = true;
-			}
-			out.push(`<p>${formatInlineMarkdown(quoteMatch[1])}</p>`);
-			continue;
-		} else if (inBlockquote) {
-			out.push("</blockquote>");
-			inBlockquote = false;
-		}
-		const ulMatch = trimmed.match(/^[-*+]\s+(.+)$/);
-		if (ulMatch) {
-			flushPara();
-			if (inOl) {
-				out.push("</ol>");
-				inOl = false;
-			}
-			if (!inUl) {
-				out.push("<ul class=\"ai-md-ul\">");
-				inUl = true;
-			}
-			out.push(`<li>${formatInlineMarkdown(ulMatch[1])}</li>`);
-			continue;
-		} else if (inUl && !rawLine.startsWith("  ") && !rawLine.startsWith("	")) {
-			out.push("</ul>");
-			inUl = false;
-		}
-		const olMatch = trimmed.match(/^\d+\.\s+(.+)$/);
-		if (olMatch) {
-			flushPara();
-			if (inUl) {
-				out.push("</ul>");
-				inUl = false;
-			}
-			if (!inOl) {
-				out.push("<ol class=\"ai-md-ol\">");
-				inOl = true;
-			}
-			out.push(`<li>${formatInlineMarkdown(olMatch[1])}</li>`);
-			continue;
-		} else if (inOl && !rawLine.startsWith("  ") && !rawLine.startsWith("	")) {
-			out.push("</ol>");
-			inOl = false;
-		}
-		paraLines.push(rawLine);
-	}
-	closeBlocks();
-	return out.join("");
-}
-//#endregion
 //#region default-plugins/ai-assistant/context-builder.ts
 var AI_TEMPLATES = [
 	{
@@ -406,36 +225,11 @@ async function callAiChatApi(options) {
 	return content;
 }
 //#endregion
-//#region default-plugins/ai-assistant/ui.ts
-function buildAiAssistantView(context, container) {
-	container.className = "sidebar-panel dynamic-plugin-panel plugin-subview ai-assistant-panel";
-	container.replaceChildren();
-	const subtabBar = document.createElement("div");
-	subtabBar.className = "ai-subtab-bar";
-	const btnTabAgent = document.createElement("button");
-	btnTabAgent.className = "ai-subtab-btn active";
-	btnTabAgent.textContent = "에이전트";
-	const btnTabSettings = document.createElement("button");
-	btnTabSettings.className = "ai-subtab-btn";
-	btnTabSettings.textContent = "설정";
-	subtabBar.append(btnTabAgent, btnTabSettings);
-	const agentPane = document.createElement("div");
-	agentPane.className = "ai-pane ai-agent-view";
+//#region default-plugins/ai-assistant/settings-view.ts
+function createSettingsPane(context) {
 	const settingsPane = document.createElement("div");
 	settingsPane.className = "ai-pane ai-settings-view";
 	settingsPane.hidden = true;
-	btnTabAgent.onclick = () => {
-		btnTabAgent.classList.add("active");
-		btnTabSettings.classList.remove("active");
-		agentPane.hidden = false;
-		settingsPane.hidden = true;
-	};
-	btnTabSettings.onclick = () => {
-		btnTabSettings.classList.add("active");
-		btnTabAgent.classList.remove("active");
-		settingsPane.hidden = false;
-		agentPane.hidden = true;
-	};
 	const urlInput = context.ui.createInput({
 		label: "API URL:",
 		placeholder: "https://generativelanguage.googleapis.com/v1beta/openai 또는 https://api.openai.com/v1",
@@ -573,6 +367,432 @@ function buildAiAssistantView(context, container) {
 		content: [guideDiv]
 	});
 	settingsPane.append(presetCard, configCard, guideCard);
+	return {
+		pane: settingsPane,
+		renderChips,
+		setModel: (modelName) => {
+			modelInput.setValue(modelName);
+			context.storage.set("model", modelName);
+			renderChips();
+		}
+	};
+}
+//#endregion
+//#region default-plugins/ai-assistant/status-card.ts
+function createStatusCard(options) {
+	const statusCard = document.createElement("div");
+	statusCard.className = "ai-status-card";
+	const statusHeader = document.createElement("div");
+	statusHeader.className = "ai-status-header";
+	const statusHeaderLeft = document.createElement("div");
+	statusHeaderLeft.className = "ai-status-header-left";
+	const spinner = document.createElement("span");
+	spinner.className = "ai-status-spinner";
+	const statusTitle = document.createElement("span");
+	statusTitle.className = "ai-status-title";
+	statusTitle.textContent = "요청 처리 준비 중...";
+	statusHeaderLeft.append(spinner, statusTitle);
+	const timerEl = document.createElement("span");
+	timerEl.className = "ai-status-timer";
+	timerEl.textContent = "0.0s";
+	statusHeader.append(statusHeaderLeft, timerEl);
+	const stepsContainer = document.createElement("div");
+	stepsContainer.className = "ai-status-steps";
+	const statusActions = document.createElement("div");
+	statusActions.className = "ai-status-actions";
+	const statusInfo = document.createElement("span");
+	statusInfo.className = "ai-status-info";
+	const abortBtn = document.createElement("button");
+	abortBtn.className = "small-btn ai-status-abort-btn";
+	abortBtn.textContent = "요청 중단";
+	abortBtn.onclick = () => {
+		options.onAbort();
+	};
+	statusActions.append(statusInfo, abortBtn);
+	statusCard.append(statusHeader, stepsContainer, statusActions);
+	const startTime = Date.now();
+	const timerInterval = setInterval(() => {
+		const elapsed = ((Date.now() - startTime) / 1e3).toFixed(1);
+		timerEl.textContent = `${elapsed}s`;
+	}, 100);
+	const stepElements = [
+		{
+			id: "ctx",
+			title: "에디터 컨텍스트 및 질의 분석"
+		},
+		{
+			id: "conn",
+			title: "AI 모델 엔드포인트 연결"
+		},
+		{
+			id: "gen",
+			title: "답변 생성 및 코드 스트리밍"
+		},
+		{
+			id: "render",
+			title: "마크다운 및 Diff 렌더링"
+		}
+	].map((step) => {
+		const el = document.createElement("div");
+		el.className = "ai-step-item pending";
+		el.innerHTML = `
+      <span class="ai-step-icon"></span>
+      <div class="ai-step-text-wrap">
+        <span class="ai-step-title">${step.title}</span>
+        <span class="ai-step-detail"></span>
+      </div>
+    `;
+		stepsContainer.append(el);
+		return el;
+	});
+	const updateStep = (index, state, title, detail) => {
+		const el = stepElements[index];
+		if (!el) return;
+		el.className = `ai-step-item ${state}`;
+		if (title) {
+			const tEl = el.querySelector(".ai-step-title");
+			if (tEl) tEl.textContent = title;
+		}
+		if (detail !== void 0) {
+			const dEl = el.querySelector(".ai-step-detail");
+			if (dEl) dEl.textContent = detail;
+		}
+	};
+	const stopTimer = () => {
+		clearInterval(timerInterval);
+		return ((Date.now() - startTime) / 1e3).toFixed(1);
+	};
+	const hideSpinnerAndAbort = () => {
+		spinner.style.display = "none";
+		abortBtn.style.display = "none";
+	};
+	const setStatusTitle = (title, color) => {
+		statusTitle.textContent = title;
+		if (color) statusTitle.style.color = color;
+	};
+	const setProviderInfo = (info) => {
+		statusInfo.textContent = info;
+	};
+	return {
+		element: statusCard,
+		updateStep,
+		setStatusTitle,
+		setProviderInfo,
+		stopTimer,
+		hideSpinnerAndAbort,
+		remove: () => statusCard.remove()
+	};
+}
+//#endregion
+//#region default-plugins/ai-assistant/markdown.ts
+/**
+* HTML 및 마크다운 렌더링 유틸리티
+*/
+function escapeHtml(str) {
+	return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+function formatInlineMarkdown(text) {
+	const safe = escapeHtml(text);
+	const codeTokens = [];
+	let formatted = safe.replace(/`([^`]+)`/g, (_match, codeContent) => {
+		const idx = codeTokens.length;
+		codeTokens.push(`<code class="ai-inline-code">${codeContent}</code>`);
+		return `\uFFF0CODE_${idx}\uFFF1`;
+	}).replace(/(\*\*\*|___)(.*?)\1/g, "<strong><em>$2</em></strong>");
+	formatted = formatted.replace(/(\*\*|__)(.*?)\1/g, "<strong>$2</strong>");
+	formatted = formatted.replace(/(?<!\w)(\*|_)(.*?)\1(?!\w)/g, "<em>$2</em>");
+	formatted = formatted.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, "<a href=\"$2\" target=\"_blank\" rel=\"noopener noreferrer\" class=\"ai-link\">$1</a>");
+	formatted = formatted.replace(/\uFFF0CODE_(\d+)\uFFF1/g, (_m, idxStr) => {
+		return codeTokens[parseInt(idxStr, 10)] || "";
+	});
+	return formatted;
+}
+function parseMarkdownToHtml(mdText) {
+	const lines = mdText.split(/\r?\n/);
+	const out = [];
+	let inUl = false;
+	let inOl = false;
+	let inBlockquote = false;
+	let inTable = false;
+	let tableHeaders = [];
+	let tableRows = [];
+	let paraLines = [];
+	const flushPara = () => {
+		if (paraLines.length > 0) {
+			const content = paraLines.map((l) => formatInlineMarkdown(l)).join("<br>");
+			out.push(`<p class="ai-md-p">${content}</p>`);
+			paraLines = [];
+		}
+	};
+	const flushTable = () => {
+		if (!inTable) return;
+		let html = "<table class=\"ai-md-table\">";
+		if (tableHeaders.length > 0) {
+			html += "<thead><tr>";
+			for (const th of tableHeaders) html += `<th>${formatInlineMarkdown(th)}</th>`;
+			html += "</tr></thead>";
+		}
+		if (tableRows.length > 0) {
+			html += "<tbody>";
+			for (const row of tableRows) {
+				html += "<tr>";
+				for (const cell of row) html += `<td>${formatInlineMarkdown(cell)}</td>`;
+				html += "</tr>";
+			}
+			html += "</tbody>";
+		}
+		html += "</table>";
+		out.push(html);
+		inTable = false;
+		tableHeaders = [];
+		tableRows = [];
+	};
+	const closeBlocks = () => {
+		flushPara();
+		flushTable();
+		if (inUl) {
+			out.push("</ul>");
+			inUl = false;
+		}
+		if (inOl) {
+			out.push("</ol>");
+			inOl = false;
+		}
+		if (inBlockquote) {
+			out.push("</blockquote>");
+			inBlockquote = false;
+		}
+	};
+	for (let i = 0; i < lines.length; i++) {
+		const rawLine = lines[i];
+		const trimmed = rawLine.trim();
+		if (!trimmed) {
+			closeBlocks();
+			continue;
+		}
+		if (trimmed.startsWith("|") && trimmed.endsWith("|") && trimmed.length > 2) {
+			flushPara();
+			if (inUl) {
+				out.push("</ul>");
+				inUl = false;
+			}
+			if (inOl) {
+				out.push("</ol>");
+				inOl = false;
+			}
+			if (inBlockquote) {
+				out.push("</blockquote>");
+				inBlockquote = false;
+			}
+			if (/^\|?(\s*:?-{2,}:?\s*\|)+\s*$/.test(trimmed)) continue;
+			const cells = trimmed.slice(1, -1).split("|").map((c) => c.trim());
+			if (!inTable) {
+				inTable = true;
+				tableHeaders = cells;
+			} else tableRows.push(cells);
+			continue;
+		} else if (inTable) flushTable();
+		if (/^(\-{3,}|\*{3,}|_{3,})$/.test(trimmed)) {
+			closeBlocks();
+			out.push("<hr class=\"ai-md-hr\">");
+			continue;
+		}
+		const headerMatch = trimmed.match(/^(#{1,6})\s+(.+)$/);
+		if (headerMatch) {
+			closeBlocks();
+			const level = Math.min(headerMatch[1].length + 2, 6);
+			out.push(`<h${level} class="ai-md-h ai-md-h${level}">${formatInlineMarkdown(headerMatch[2])}</h${level}>`);
+			continue;
+		}
+		const quoteMatch = trimmed.match(/^>\s?(.*)$/);
+		if (quoteMatch) {
+			flushPara();
+			if (inUl) {
+				out.push("</ul>");
+				inUl = false;
+			}
+			if (inOl) {
+				out.push("</ol>");
+				inOl = false;
+			}
+			if (!inBlockquote) {
+				out.push("<blockquote class=\"ai-md-quote\">");
+				inBlockquote = true;
+			}
+			out.push(`<p>${formatInlineMarkdown(quoteMatch[1])}</p>`);
+			continue;
+		} else if (inBlockquote) {
+			out.push("</blockquote>");
+			inBlockquote = false;
+		}
+		const ulMatch = trimmed.match(/^[-*+]\s+(.+)$/);
+		if (ulMatch) {
+			flushPara();
+			if (inOl) {
+				out.push("</ol>");
+				inOl = false;
+			}
+			if (!inUl) {
+				out.push("<ul class=\"ai-md-ul\">");
+				inUl = true;
+			}
+			out.push(`<li>${formatInlineMarkdown(ulMatch[1])}</li>`);
+			continue;
+		} else if (inUl && !rawLine.startsWith("  ") && !rawLine.startsWith("	")) {
+			out.push("</ul>");
+			inUl = false;
+		}
+		const olMatch = trimmed.match(/^\d+\.\s+(.+)$/);
+		if (olMatch) {
+			flushPara();
+			if (inUl) {
+				out.push("</ul>");
+				inUl = false;
+			}
+			if (!inOl) {
+				out.push("<ol class=\"ai-md-ol\">");
+				inOl = true;
+			}
+			out.push(`<li>${formatInlineMarkdown(olMatch[1])}</li>`);
+			continue;
+		} else if (inOl && !rawLine.startsWith("  ") && !rawLine.startsWith("	")) {
+			out.push("</ol>");
+			inOl = false;
+		}
+		paraLines.push(rawLine);
+	}
+	closeBlocks();
+	return out.join("");
+}
+//#endregion
+//#region default-plugins/ai-assistant/message-renderer.ts
+function executeSmartApply(context, codeContent, isAuto = false) {
+	const currentText = context.editor.getText();
+	const mergeResult = context.ini.merge(currentText, codeContent);
+	context.editor.setText(mergeResult.newText);
+	const prefix = isAuto ? "[자동 반영] " : "";
+	const replacedCount = mergeResult.replacedSections.length;
+	const addedCount = mergeResult.addedSections.length;
+	if (replacedCount > 0 && addedCount > 0) context.ui.showToast(`${prefix}${replacedCount}개 섹션 교체 및 ${addedCount}개 섹션이 추가되었습니다. (되돌리기: Ctrl+Z)`, "info");
+	else if (replacedCount > 0) context.ui.showToast(`${prefix}${replacedCount}개 섹션이 스마트 교체되었습니다. (되돌리기: Ctrl+Z)`, "info");
+	else if (addedCount > 0) context.ui.showToast(`${prefix}${addedCount}개 섹션이 파일에 추가되었습니다. (되돌리기: Ctrl+Z)`, "info");
+	else context.ui.showToast(`${prefix}파일 내용이 갱신되었습니다. (되돌리기: Ctrl+Z)`, "info");
+	return true;
+}
+function renderAssistantContent(context, targetEl, text, onSmartApply = (c, a) => executeSmartApply(context, c, a)) {
+	targetEl.replaceChildren();
+	const codeBlockRegex = /```(?:[a-zA-Z0-9_-]+)?([\s\S]*?)```/g;
+	let lastIdx = 0;
+	let match;
+	while ((match = codeBlockRegex.exec(text)) !== null) {
+		const textBefore = text.slice(lastIdx, match.index);
+		if (textBefore.trim()) {
+			const mdDiv = document.createElement("div");
+			mdDiv.className = "ai-md-content";
+			mdDiv.innerHTML = parseMarkdownToHtml(textBefore.trim());
+			targetEl.append(mdDiv);
+		}
+		const codeContent = match[1].trim();
+		const codeBox = document.createElement("div");
+		codeBox.className = "ai-code-block";
+		const pre = document.createElement("pre");
+		pre.textContent = codeContent;
+		codeBox.append(pre);
+		const btnBar = document.createElement("div");
+		btnBar.className = "ai-code-bar";
+		const applyBtn = document.createElement("button");
+		applyBtn.className = "small-btn ai-apply-btn";
+		applyBtn.textContent = "스마트 적용";
+		applyBtn.title = "현재 열린 파일의 해당 섹션을 찾아 스마트하게 교체/반영합니다";
+		applyBtn.onclick = () => {
+			onSmartApply(codeContent, false);
+		};
+		const insertBtn = document.createElement("button");
+		insertBtn.className = "small-btn";
+		insertBtn.textContent = "커서 삽입";
+		insertBtn.title = "현재 에디터 커서 위치에 코드를 삽입합니다";
+		insertBtn.onclick = () => {
+			context.editor.insertText(codeContent + "\n");
+			context.ui.showToast("에디터 커서에 코드가 삽입되었습니다.", "info");
+		};
+		const copyBtn = document.createElement("button");
+		copyBtn.className = "small-btn";
+		copyBtn.textContent = "복사";
+		copyBtn.onclick = () => {
+			navigator.clipboard.writeText(codeContent);
+			context.ui.showToast("클립보드에 복사되었습니다.", "info");
+		};
+		btnBar.append(applyBtn, insertBtn, copyBtn);
+		codeBox.append(btnBar);
+		targetEl.append(codeBox);
+		lastIdx = match.index + match[0].length;
+	}
+	const remaining = text.slice(lastIdx);
+	if (remaining.trim()) {
+		const mdDiv = document.createElement("div");
+		mdDiv.className = "ai-md-content";
+		mdDiv.innerHTML = parseMarkdownToHtml(remaining.trim());
+		targetEl.append(mdDiv);
+	}
+}
+function renderErrorActions(options) {
+	const { targetContainer, prompt, currentModel, reason, onSwitchModel, onRetry } = options;
+	const box = document.createElement("div");
+	box.className = "ai-error-actions-box";
+	const desc = document.createElement("div");
+	desc.className = "ai-error-actions-desc";
+	if (reason === "503") desc.textContent = "Google Gemini 무료 티어 트래픽 집중으로 인해 요청이 일시 지연되었습니다. 잠시 후 다시 시도하시거나 다른 모델로 변경해 보세요.";
+	else if (reason === "TIMEOUT") desc.textContent = "서버 응답이 45초 동안 지연되었습니다. 네트워크 상태를 확인하시거나 다시 시도해 보세요.";
+	else if (reason === "404") desc.textContent = "지정된 모델 또는 엔드포인트를 찾을 수 없습니다 (404). 공식 별칭인 gemini-flash-latest 또는 gemini-pro-latest를 사용하세요.";
+	else desc.textContent = "요청 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해 보세요.";
+	const btnRow = document.createElement("div");
+	btnRow.className = "ai-error-actions-btn-row";
+	const altModel = currentModel === "gemini-flash-latest" ? "gemini-pro-latest" : "gemini-flash-latest";
+	const switchBtn = document.createElement("button");
+	switchBtn.className = "small-btn";
+	switchBtn.textContent = `${altModel} 모델로 전환 후 재시도`;
+	switchBtn.onclick = () => {
+		onSwitchModel(altModel);
+	};
+	const retryBtn = document.createElement("button");
+	retryBtn.className = "small-btn";
+	retryBtn.textContent = "동일 모델로 다시 시도";
+	retryBtn.onclick = () => {
+		onRetry();
+	};
+	btnRow.append(switchBtn, retryBtn);
+	box.append(desc, btnRow);
+	targetContainer.append(box);
+}
+//#endregion
+//#region default-plugins/ai-assistant/ui.ts
+function buildAiAssistantView(context, container) {
+	container.className = "sidebar-panel dynamic-plugin-panel plugin-subview ai-assistant-panel";
+	container.replaceChildren();
+	const subtabBar = document.createElement("div");
+	subtabBar.className = "ai-subtab-bar";
+	const btnTabAgent = document.createElement("button");
+	btnTabAgent.className = "ai-subtab-btn active";
+	btnTabAgent.textContent = "에이전트";
+	const btnTabSettings = document.createElement("button");
+	btnTabSettings.className = "ai-subtab-btn";
+	btnTabSettings.textContent = "설정";
+	subtabBar.append(btnTabAgent, btnTabSettings);
+	const agentPane = document.createElement("div");
+	agentPane.className = "ai-pane ai-agent-view";
+	const settings = createSettingsPane(context);
+	btnTabAgent.onclick = () => {
+		btnTabAgent.classList.add("active");
+		btnTabSettings.classList.remove("active");
+		agentPane.hidden = false;
+		settings.pane.hidden = true;
+	};
+	btnTabSettings.onclick = () => {
+		btnTabSettings.classList.add("active");
+		btnTabAgent.classList.remove("active");
+		settings.pane.hidden = false;
+		agentPane.hidden = true;
+	};
 	const chatHistory = document.createElement("div");
 	chatHistory.className = "ai-chat-history";
 	const emptyState = document.createElement("div");
@@ -745,80 +965,11 @@ function buildAiAssistantView(context, container) {
 	dockMain.append(dockTextarea, sendBtn);
 	inputDock.append(dockTop, dockMain);
 	agentPane.append(chatHistory, dockResizer, inputDock);
-	container.append(subtabBar, agentPane, settingsPane);
+	container.append(subtabBar, agentPane, settings.pane);
 	const onDocClick = (e) => {
 		if (!templateMenu.hidden && !templateWrap.contains(e.target)) templateMenu.hidden = true;
 	};
 	document.addEventListener("click", onDocClick);
-	function executeSmartApply(codeContent, isAuto = false) {
-		const currentText = context.editor.getText();
-		const mergeResult = context.ini.merge(currentText, codeContent);
-		context.editor.setText(mergeResult.newText);
-		const prefix = isAuto ? "[자동 반영] " : "";
-		const replacedCount = mergeResult.replacedSections.length;
-		const addedCount = mergeResult.addedSections.length;
-		if (replacedCount > 0 && addedCount > 0) context.ui.showToast(`${prefix}${replacedCount}개 섹션 교체 및 ${addedCount}개 섹션이 추가되었습니다. (되돌리기: Ctrl+Z)`, "info");
-		else if (replacedCount > 0) context.ui.showToast(`${prefix}${replacedCount}개 섹션이 스마트 교체되었습니다. (되돌리기: Ctrl+Z)`, "info");
-		else if (addedCount > 0) context.ui.showToast(`${prefix}${addedCount}개 섹션이 파일에 추가되었습니다. (되돌리기: Ctrl+Z)`, "info");
-		else context.ui.showToast(`${prefix}파일 내용이 갱신되었습니다. (되돌리기: Ctrl+Z)`, "info");
-		return true;
-	}
-	function renderAssistantContent(targetEl, text) {
-		targetEl.replaceChildren();
-		const codeBlockRegex = /```(?:[a-zA-Z0-9_-]+)?([\s\S]*?)```/g;
-		let lastIdx = 0;
-		let match;
-		while ((match = codeBlockRegex.exec(text)) !== null) {
-			const textBefore = text.slice(lastIdx, match.index);
-			if (textBefore.trim()) {
-				const mdDiv = document.createElement("div");
-				mdDiv.className = "ai-md-content";
-				mdDiv.innerHTML = parseMarkdownToHtml(textBefore.trim());
-				targetEl.append(mdDiv);
-			}
-			const codeContent = match[1].trim();
-			const codeBox = document.createElement("div");
-			codeBox.className = "ai-code-block";
-			const pre = document.createElement("pre");
-			pre.textContent = codeContent;
-			codeBox.append(pre);
-			const btnBar = document.createElement("div");
-			btnBar.className = "ai-code-bar";
-			const applyBtn = document.createElement("button");
-			applyBtn.className = "small-btn ai-apply-btn";
-			applyBtn.textContent = "스마트 적용";
-			applyBtn.title = "현재 열린 파일의 해당 섹션을 찾아 스마트하게 교체/반영합니다";
-			applyBtn.onclick = () => {
-				executeSmartApply(codeContent, false);
-			};
-			const insertBtn = document.createElement("button");
-			insertBtn.className = "small-btn";
-			insertBtn.textContent = "커서 삽입";
-			insertBtn.title = "현재 에디터 커서 위치에 코드를 삽입합니다";
-			insertBtn.onclick = () => {
-				context.editor.insertText(codeContent + "\n");
-				context.ui.showToast("에디터 커서에 코드가 삽입되었습니다.", "info");
-			};
-			const copyBtn = document.createElement("button");
-			copyBtn.className = "small-btn";
-			copyBtn.textContent = "복사";
-			copyBtn.onclick = () => {
-				navigator.clipboard.writeText(codeContent);
-				context.ui.showToast("클립보드에 복사되었습니다.", "info");
-			};
-			btnBar.append(applyBtn, insertBtn, copyBtn);
-			codeBox.append(btnBar);
-			targetEl.append(codeBox);
-			lastIdx = match.index + match[0].length;
-		}
-		const remaining = text.slice(lastIdx);
-		if (remaining.trim()) {
-			const mdDiv = document.createElement("div");
-			mdDiv.className = "ai-md-content";
-			mdDiv.innerHTML = parseMarkdownToHtml(remaining.trim());
-			targetEl.append(mdDiv);
-		}
-	}
 	let activeAbortController = null;
 	function abortActiveRequest(reason = "USER") {
 		if (activeAbortController) {
@@ -881,106 +1032,29 @@ function buildAiAssistantView(context, container) {
 		turnGroup.append(userBubble);
 		const assistantBubble = document.createElement("div");
 		assistantBubble.className = "ai-assistant-bubble";
-		const statusCard = document.createElement("div");
-		statusCard.className = "ai-status-card";
-		const statusHeader = document.createElement("div");
-		statusHeader.className = "ai-status-header";
-		const statusHeaderLeft = document.createElement("div");
-		statusHeaderLeft.className = "ai-status-header-left";
-		const spinner = document.createElement("span");
-		spinner.className = "ai-status-spinner";
-		const statusTitle = document.createElement("span");
-		statusTitle.className = "ai-status-title";
-		statusTitle.textContent = "요청 처리 준비 중...";
-		statusHeaderLeft.append(spinner, statusTitle);
-		const timerEl = document.createElement("span");
-		timerEl.className = "ai-status-timer";
-		timerEl.textContent = "0.0s";
-		statusHeader.append(statusHeaderLeft, timerEl);
-		const stepsContainer = document.createElement("div");
-		stepsContainer.className = "ai-status-steps";
-		const statusActions = document.createElement("div");
-		statusActions.className = "ai-status-actions";
-		const statusInfo = document.createElement("span");
-		statusInfo.className = "ai-status-info";
-		const abortBtn = document.createElement("button");
-		abortBtn.className = "small-btn ai-status-abort-btn";
-		abortBtn.textContent = "요청 중단";
-		abortBtn.onclick = () => {
-			abortActiveRequest("USER");
-		};
-		statusActions.append(statusInfo, abortBtn);
-		statusCard.append(statusHeader, stepsContainer, statusActions);
-		assistantBubble.append(statusCard);
+		const status = createStatusCard({ onAbort: () => abortActiveRequest("USER") });
+		assistantBubble.append(status.element);
 		turnGroup.append(assistantBubble);
 		chatHistory.append(turnGroup);
 		chatHistory.scrollTop = chatHistory.scrollHeight;
-		const startTime = Date.now();
-		const timerInterval = setInterval(() => {
-			const elapsed = ((Date.now() - startTime) / 1e3).toFixed(1);
-			timerEl.textContent = `${elapsed}s`;
-		}, 100);
 		const timeoutTimer = setTimeout(() => {
 			if (activeAbortController === abortController) abortController.abort("TIMEOUT");
 		}, 45e3);
-		const stepElements = [
-			{
-				id: "ctx",
-				title: "에디터 컨텍스트 및 질의 분석"
-			},
-			{
-				id: "conn",
-				title: "AI 모델 엔드포인트 연결"
-			},
-			{
-				id: "gen",
-				title: "답변 생성 및 코드 스트리밍"
-			},
-			{
-				id: "render",
-				title: "마크다운 및 Diff 렌더링"
-			}
-		].map((step) => {
-			const el = document.createElement("div");
-			el.className = "ai-step-item pending";
-			el.innerHTML = `
-        <span class="ai-step-icon"></span>
-        <div class="ai-step-text-wrap">
-          <span class="ai-step-title">${step.title}</span>
-          <span class="ai-step-detail"></span>
-        </div>
-      `;
-			stepsContainer.append(el);
-			return el;
-		});
-		const updateStep = (index, state, title, detail) => {
-			const el = stepElements[index];
-			if (!el) return;
-			el.className = `ai-step-item ${state}`;
-			if (title) {
-				const tEl = el.querySelector(".ai-step-title");
-				if (tEl) tEl.textContent = title;
-			}
-			if (detail !== void 0) {
-				const dEl = el.querySelector(".ai-step-detail");
-				if (dEl) dEl.textContent = detail;
-			}
-		};
 		const apiUrl = (context.storage.get("api_url") || "https://generativelanguage.googleapis.com/v1beta/openai").trim().replace(/\/+$/, "");
 		const apiKey = (context.storage.get("api_key") || "").trim();
 		const model = (context.storage.get("model") || "gemini-flash-latest").trim();
 		const providerName = apiUrl.includes("generativelanguage.googleapis.com") ? "Google Gemini" : apiUrl.includes("openai.com") ? "OpenAI" : "로컬 LLM (Ollama 호환)";
-		statusInfo.textContent = `${providerName} • ${model}`;
+		status.setProviderInfo(`${providerName} • ${model}`);
 		const ctxResult = buildPromptContext(context, trimmedPrompt, contextSelect.value || "smart");
 		const promptWithContext = ctxResult.promptText;
-		updateStep(0, "completed", "컨텍스트 준비 완료", ctxResult.detail);
-		updateStep(1, "completed", "AI API 연결 준비 완료", `${providerName} (${model})`);
+		status.updateStep(0, "completed", "컨텍스트 준비 완료", ctxResult.detail);
+		status.updateStep(1, "completed", "AI API 연결 준비 완료", `${providerName} (${model})`);
 		sendBtn.textContent = "중단";
 		sendBtn.classList.remove("primary");
 		sendBtn.classList.add("danger");
 		sendBtn.onclick = () => abortActiveRequest("USER");
-		statusTitle.textContent = "답변 생성 중...";
-		updateStep(2, "active", "서버 응답 대기 중...", "AI 서버에 질의를 전송하고 답변 수신을 대기하고 있습니다.");
+		status.setStatusTitle("답변 생성 중...");
+		status.updateStep(2, "active", "서버 응답 대기 중...", "AI 서버에 질의를 전송하고 답변 수신을 대기하고 있습니다.");
 		try {
 			const reply = await callAiChatApi({
 				context,
@@ -990,64 +1064,103 @@ function buildAiAssistantView(context, container) {
 				userPromptWithContext: promptWithContext,
 				signal: abortController.signal,
 				onRetryStep: (attempt, maxRetries, waitSec, reason) => {
-					updateStep(2, "retry", reason, `트래픽 급증으로 인해 ${waitSec}초 후 자동으로 재시도합니다... (시도: ${attempt}/${maxRetries}회)`);
+					status.updateStep(2, "retry", reason, `트래픽 급증으로 인해 ${waitSec}초 후 자동으로 재시도합니다... (시도: ${attempt}/${maxRetries}회)`);
 				},
 				onRetryWaitDone: (attempt, maxRetries) => {
-					updateStep(2, "active", "서버 재요청 전송 중...", `재시도 (${attempt}/${maxRetries}) 응답 대기 중`);
+					status.updateStep(2, "active", "서버 재요청 전송 중...", `재시도 (${attempt}/${maxRetries}) 응답 대기 중`);
 				}
 			});
-			clearInterval(timerInterval);
+			const totalSec = status.stopTimer();
 			clearTimeout(timeoutTimer);
-			const totalSec = ((Date.now() - startTime) / 1e3).toFixed(1);
-			updateStep(2, "completed", "서버 응답 수신 완료", `응답 수신 (소요: ${totalSec}s)`);
-			updateStep(3, "active", "마크다운 렌더링 중...");
-			statusCard.remove();
+			status.updateStep(2, "completed", "서버 응답 수신 완료", `응답 수신 (소요: ${totalSec}s)`);
+			status.updateStep(3, "active", "마크다운 렌더링 중...");
+			status.remove();
 			const metaHeader = document.createElement("div");
 			metaHeader.className = "ai-completion-meta";
 			metaHeader.innerHTML = `<span>답변 생성 완료 (${totalSec}s 소요)</span><span>${providerName} / ${model}</span>`;
 			assistantBubble.append(metaHeader);
 			const replyBody = document.createElement("div");
 			replyBody.className = "ai-reply-body";
-			renderAssistantContent(replyBody, reply);
+			renderAssistantContent(context, replyBody, reply, (code, isAuto) => executeSmartApply(context, code, isAuto));
 			assistantBubble.append(replyBody);
 			if (isAutoApply) {
 				const codeBlocks = [];
 				const regex = /```(?:[a-zA-Z0-9_-]+)?([\s\S]*?)```/g;
 				let m;
 				while ((m = regex.exec(reply)) !== null) if (m[1].trim()) codeBlocks.push(m[1].trim());
-				if (codeBlocks.length > 0) executeSmartApply(codeBlocks.join("\n\n"), true);
+				if (codeBlocks.length > 0) executeSmartApply(context, codeBlocks.join("\n\n"), true);
 			}
 		} catch (err) {
-			clearInterval(timerInterval);
+			status.stopTimer();
 			clearTimeout(timeoutTimer);
-			spinner.style.display = "none";
-			abortBtn.style.display = "none";
+			status.hideSpinnerAndAbort();
 			if (abortController.signal.aborted) {
 				if (abortController.signal.reason === "TIMEOUT") {
-					statusTitle.textContent = "서버 응답 시간 초과 (45초)";
-					statusTitle.style.color = "#f87171";
-					updateStep(2, "error", "응답 대기 시간 초과 (45초)", "AI 서버가 지정된 시간 내에 응답하지 못했습니다.");
-					renderErrorActions(assistantBubble, trimmedPrompt, model, "TIMEOUT");
+					status.setStatusTitle("서버 응답 시간 초과 (45초)", "#f87171");
+					status.updateStep(2, "error", "응답 대기 시간 초과 (45초)", "AI 서버가 지정된 시간 내에 응답하지 못했습니다.");
+					renderErrorActions({
+						targetContainer: assistantBubble,
+						prompt: trimmedPrompt,
+						currentModel: model,
+						reason: "TIMEOUT",
+						onSwitchModel: (newModel) => {
+							settings.setModel(newModel);
+							context.ui.showToast(`모델이 ${newModel}(으)로 변경되었습니다.`, "info");
+							sendMessage(trimmedPrompt);
+						},
+						onRetry: () => sendMessage(trimmedPrompt)
+					});
 				} else {
-					statusTitle.textContent = "요청이 중단되었습니다";
-					statusTitle.style.color = "var(--fg-dim)";
-					updateStep(2, "error", "사용자에 의해 생성이 중단됨", "취소 버튼을 클릭하여 요청을 취소했습니다.");
+					status.setStatusTitle("요청이 중단되었습니다", "var(--fg-dim)");
+					status.updateStep(2, "error", "사용자에 의해 생성이 중단됨", "취소 버튼을 클릭하여 요청을 취소했습니다.");
 				}
 			} else {
 				const errMsg = err.message || String(err);
-				statusTitle.textContent = "오류 발생";
-				statusTitle.style.color = "#ef4444";
+				status.setStatusTitle("오류 발생", "#ef4444");
 				const is503 = errMsg.includes("503");
 				const is404 = errMsg.includes("404");
 				if (is503) {
-					updateStep(2, "error", "Google AI 서버 일시적 과부하 (503)", "무료 티어 트래픽 집중으로 인해 현재 모델이 일시 지연되었습니다.");
-					renderErrorActions(assistantBubble, trimmedPrompt, model, "503");
+					status.updateStep(2, "error", "Google AI 서버 일시적 과부하 (503)", "무료 티어 트래픽 집중으로 인해 현재 모델이 일시 지연되었습니다.");
+					renderErrorActions({
+						targetContainer: assistantBubble,
+						prompt: trimmedPrompt,
+						currentModel: model,
+						reason: "503",
+						onSwitchModel: (newModel) => {
+							settings.setModel(newModel);
+							context.ui.showToast(`모델이 ${newModel}(으)로 변경되었습니다.`, "info");
+							sendMessage(trimmedPrompt);
+						},
+						onRetry: () => sendMessage(trimmedPrompt)
+					});
 				} else if (is404) {
-					updateStep(2, "error", "모델 또는 엔드포인트를 찾을 수 없음 (404)", errMsg);
-					renderErrorActions(assistantBubble, trimmedPrompt, model, "404");
+					status.updateStep(2, "error", "모델 또는 엔드포인트를 찾을 수 없음 (404)", errMsg);
+					renderErrorActions({
+						targetContainer: assistantBubble,
+						prompt: trimmedPrompt,
+						currentModel: model,
+						reason: "404",
+						onSwitchModel: (newModel) => {
+							settings.setModel(newModel);
+							context.ui.showToast(`모델이 ${newModel}(으)로 변경되었습니다.`, "info");
+							sendMessage(trimmedPrompt);
+						},
+						onRetry: () => sendMessage(trimmedPrompt)
+					});
 				} else {
-					updateStep(2, "error", "요청 처리 실패", errMsg);
-					renderErrorActions(assistantBubble, trimmedPrompt, model, "GENERAL");
+					status.updateStep(2, "error", "요청 처리 실패", errMsg);
+					renderErrorActions({
+						targetContainer: assistantBubble,
+						prompt: trimmedPrompt,
+						currentModel: model,
+						reason: "GENERAL",
+						onSwitchModel: (newModel) => {
+							settings.setModel(newModel);
+							context.ui.showToast(`모델이 ${newModel}(으)로 변경되었습니다.`, "info");
+							sendMessage(trimmedPrompt);
+						},
+						onRetry: () => sendMessage(trimmedPrompt)
+					});
 				}
 			}
 		} finally {
@@ -1058,38 +1171,6 @@ function buildAiAssistantView(context, container) {
 			sendBtn.onclick = () => sendMessage(dockTextarea.value);
 			chatHistory.scrollTop = chatHistory.scrollHeight;
 		}
-	}
-	function renderErrorActions(targetContainer, prompt, currentModel, reason) {
-		const box = document.createElement("div");
-		box.className = "ai-error-actions-box";
-		const desc = document.createElement("div");
-		desc.className = "ai-error-actions-desc";
-		if (reason === "503") desc.textContent = "Google Gemini 무료 티어 트래픽 집중으로 인해 요청이 일시 지연되었습니다. 잠시 후 다시 시도하시거나 다른 모델로 변경해 보세요.";
-		else if (reason === "TIMEOUT") desc.textContent = "서버 응답이 45초 동안 지연되었습니다. 네트워크 상태를 확인하시거나 다시 시도해 보세요.";
-		else if (reason === "404") desc.textContent = "지정된 모델 또는 엔드포인트를 찾을 수 없습니다 (404). 공식 별칭인 gemini-flash-latest 또는 gemini-pro-latest를 사용하세요.";
-		else desc.textContent = "요청 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해 보세요.";
-		const btnRow = document.createElement("div");
-		btnRow.className = "ai-error-actions-btn-row";
-		const altModel = currentModel === "gemini-flash-latest" ? "gemini-pro-latest" : "gemini-flash-latest";
-		const switchBtn = document.createElement("button");
-		switchBtn.className = "small-btn";
-		switchBtn.textContent = `${altModel} 모델로 전환 후 재시도`;
-		switchBtn.onclick = () => {
-			context.storage.set("model", altModel);
-			modelInput.setValue(altModel);
-			renderChips();
-			context.ui.showToast(`모델이 ${altModel}(으)로 변경되었습니다.`, "info");
-			sendMessage(prompt);
-		};
-		const retryBtn = document.createElement("button");
-		retryBtn.className = "small-btn";
-		retryBtn.textContent = "동일 모델로 다시 시도";
-		retryBtn.onclick = () => {
-			sendMessage(prompt);
-		};
-		btnRow.append(switchBtn, retryBtn);
-		box.append(desc, btnRow);
-		targetContainer.append(box);
 	}
 	return () => {
 		if (activeAbortController) activeAbortController.abort("UNMOUNT");
