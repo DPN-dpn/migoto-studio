@@ -47,7 +47,7 @@ const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as 
 async function boot() {
   const urlParams = new URLSearchParams(window.location.search);
   if (urlParams.get('native_window') === 'true') {
-    const { bootNativeWindow } = await import('./plugins/native-window-boot');
+    const { bootNativeWindow } = await import('./window/native-boot');
     await bootNativeWindow(urlParams);
     return;
   }

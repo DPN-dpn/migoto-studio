@@ -19,8 +19,9 @@
 | 백업 | 저장 전 이전 파일을 `<앱데이터>/backups`에 보관. 기본 7일, 파일당 10개 |
 | 린트 | 고급 수준까지 검사하되 규칙별로 설정에서 켜고 끌 수 있음 |
 | 설정 | 가능한 한 많은 기능을 설정에서 조절 가능하게 함 |
-| 브랜치 및 릴리스 전략 | 개발 및 수정 작업은 반드시 `dev` 브랜치에서 진행하고 자체 빌드/테스트를 거침. 테스트 및 검증이 완료된 시점에만 `main` 브랜치로 병합하여 안정 배포판 릴리스 |
 | 플러그인 | 좌측 액티비티 바(🧩) 통합. 순수 TS 플러그인 엔진 + Rust 백엔드 프로세스/바이너리 브릿지. 기본 3종 플러그인(Python 실행기, DDS 뷰어, AI 에이전트) 제공 |
+| 윈도우 관리 시스템 | 플러그인 전용이 아닌 공통 윈도우 계층(`src/window/`)으로 분리. 내장 플로팅 창(`SubWindowManager`), 데스크톱 독립 OS 창(`NativeWindowManager`), 5kB 경량 런처(`bootNativeWindow`) 제공 |
+
 
 ## 구현 완료된 요구사항
 
@@ -168,6 +169,16 @@
      - 모딩 플러그인 빈출 UI 패턴 내장 위젯화 (`createBadge`, `createCodeBlock`, `createListItem`)를 통해 플러그인 측 수십 줄의 인라인 CSS 작성 부담 해소.
    8. **`python-runner` (v1.3.0) 외부 파일 경로 선택기(`createFilePicker`) 적용**:
       - 기존 수동 `input` + `button` + 이벤트 리스너 보일러플레이트를 단일 `createFilePicker` 위젯으로 간소화하여 네이티브 파일 탐색기와 자연스럽게 연동.
+
+### 범용 윈도우 관리 서브시스템 (`src/window/`) (완료)
+- **플러그인 및 코어 전역에서 재사용 가능한 내장 플로팅 서브 윈도우 및 독립 OS 윈도우 시스템.**
+- 코어 탈종속화 및 공통 계층화:
+  - 플러그인 폴더(`src/plugins/`)에 종속되지 않고 최상위 계층 `src/window/`로 완전히 독립 분리.
+  - `SubWindowManager`: 미고토 스튜디오 메인 창 내부에서 동작하는 드래그/리사이즈/도킹/최소화/최대화 플로팅 창 관리자.
+  - `NativeWindowManager`: 데스크톱(Tauri `WebviewWindow`) 및 웹(브라우저 팝업 창)을 투명하게 지원하는 진짜 독립 OS 윈도우 관리자.
+  - `bootNativeWindow` (`src/window/native-boot.ts`): 별도 창 실행 시 무거운 Monaco 에디터 번들을 완전히 배제하고 불과 4.35kB의 초경량 전용 번들로 수 밀리초 내에 즉시 실행되는 부트스트래퍼.
+  - 플러그인(`context.ui.openSubWindow`, `context.ui.openNativeWindow`)뿐만 아니라 코어 에디터의 뷰 분리, 로그 뷰어, 미리보기 창 등에서도 동일하게 재사용 가능.
+
 
 
 

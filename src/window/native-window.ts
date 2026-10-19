@@ -5,7 +5,7 @@ import { showToast } from '../ui/common/toast';
 
 interface ActiveNativeWindow {
   fullId: string;
-  pluginId: string;
+  ownerId: string;
   handle: NativeWindowHandle;
   channel: BroadcastChannel;
   tauriWindow?: any;
@@ -13,6 +13,10 @@ interface ActiveNativeWindow {
   cleanup?: () => void;
 }
 
+/**
+ * 범용 독립 OS 윈도우 관리자 (NativeWindowManager)
+ * 코어 에디터 분리, 로그 뷰어, 플러그인 등 모든 영역에서 독립 OS 윈도우를 제어합니다.
+ */
 export class NativeWindowManager {
   private activeWindows: Map<string, ActiveNativeWindow> = new Map();
 
@@ -25,16 +29,21 @@ export class NativeWindowManager {
   }
 
   /**
-   * 플러그인 전용 독립 OS 윈도우를 엽니다.
+   * 독립 OS 윈도우를 엽니다.
    * Tauri 데스크톱 환경에서는 완전한 독립 WebviewWindow를 생성하며,
    * 웹 브라우저 환경에서는 팝업 창으로 안전하게 폴백합니다.
+   *
+   * @param ownerId 창의 소유자 식별자 ('app', 'core' 또는 플러그인 ID)
+   * @param options 윈도우 생성 옵션
+   * @param onRegisterCleanup 정리 콜백 등록 함수 (선택)
    */
   async openNativeWindow(
-    pluginId: string,
+    ownerId: string = 'app',
     options: NativeWindowOptions,
     onRegisterCleanup?: (cleanup: () => void) => void
   ): Promise<NativeWindowHandle> {
-    const fullId = `plugin_${pluginId}_${options.id}`;
+    const fullId = `win_${ownerId}_${options.id}`;
+    const logCategory = (ownerId === 'app' || ownerId === 'core') ? 'ui' : 'plugin';
 
     // 1. 이미 열려 있는 창이 있으면 포커스 후 기존 핸들 반환
     const existing = this.activeWindows.get(fullId);
@@ -52,7 +61,7 @@ export class NativeWindowManager {
     const center = options.center !== false;
 
     // 양방향 통신 채널 생성
-    const channelName = `migoto_native_win_${pluginId}_${options.id}`;
+    const channelName = `migoto_native_win_${ownerId}_${options.id}`;
     const channel = new BroadcastChannel(channelName);
     const messageListeners = new Set<(data: any) => void>();
 
@@ -79,9 +88,9 @@ export class NativeWindowManager {
       } else if (msg.type === 'LOG') {
         const { level, args } = msg;
         const msgStr = Array.isArray(args) ? args.map((a) => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ') : String(args);
-        if (level === 'error') appLogger.error('plugin', `[OS창:${options.title}] ${msgStr}`);
-        else if (level === 'warn') appLogger.warn('plugin', `[OS창:${options.title}] ${msgStr}`);
-        else appLogger.info('plugin', `[OS창:${options.title}] ${msgStr}`);
+        if (level === 'error') appLogger.error(logCategory, `[OS창:${options.title}] ${msgStr}`);
+        else if (level === 'warn') appLogger.warn(logCategory, `[OS창:${options.title}] ${msgStr}`);
+        else appLogger.info(logCategory, `[OS창:${options.title}] ${msgStr}`);
       } else if (msg.type === 'WINDOW_CLOSED') {
         dispose();
       }
@@ -114,12 +123,13 @@ export class NativeWindowManager {
       }
 
       this.activeWindows.delete(fullId);
-      appLogger.info('plugin', `독립 OS 윈도우 닫힘: "${options.title}"`);
+      appLogger.info(logCategory, `독립 OS 윈도우 닫힘: "${options.title}"`);
     };
 
     const queryParams = new URLSearchParams({
       native_window: 'true',
-      plugin: pluginId,
+      owner: ownerId,
+      plugin: ownerId, // 하위 호환성 유지
       win_id: options.id,
       title: options.title,
       entry: options.entry || '',
@@ -131,7 +141,7 @@ export class NativeWindowManager {
     if (isTauriEnvironment()) {
       try {
         const { WebviewWindow } = await import('@tauri-apps/api/webviewWindow');
-        const sanitizedLabel = `migoto_win_${pluginId}_${options.id}`.replace(/[^a-zA-Z0-9_-]/g, '_');
+        const sanitizedLabel = `migoto_win_${ownerId}_${options.id}`.replace(/[^a-zA-Z0-9_-]/g, '_');
 
         tauriWindow = new WebviewWindow(sanitizedLabel, {
           url: targetUrl,
@@ -180,7 +190,7 @@ export class NativeWindowManager {
       ].join(',');
 
       try {
-        browserWindow = window.open(targetUrl, `migoto_win_${pluginId}_${options.id}`, features);
+        browserWindow = window.open(targetUrl, `migoto_win_${ownerId}_${options.id}`, features);
         if (!browserWindow || browserWindow.closed) {
           throw new Error('브라우저의 팝업 차단으로 인해 독립 창을 띄울 수 없습니다.');
         }
@@ -250,7 +260,7 @@ export class NativeWindowManager {
 
     this.activeWindows.set(fullId, {
       fullId,
-      pluginId,
+      ownerId,
       handle,
       channel,
       tauriWindow,
@@ -258,7 +268,7 @@ export class NativeWindowManager {
       cleanup: dispose,
     });
 
-    appLogger.info('plugin', `독립 OS 윈도우 생성 완료: "${options.title}"`);
+    appLogger.info(logCategory, `독립 OS 윈도우 생성 완료: "${options.title}"`);
     return handle;
   }
 

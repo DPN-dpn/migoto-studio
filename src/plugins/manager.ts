@@ -85,8 +85,7 @@ import type {
   NativeWindowHandle,
 } from './types';
 import { createUIBuilder } from './ui-builder';
-import { subWindowManager } from './sub-window';
-import { nativeWindowManager } from './native-window';
+import { subWindowManager, nativeWindowManager } from '../window';
 
 export { validatePluginZip, type ExtractedPlugin };
 

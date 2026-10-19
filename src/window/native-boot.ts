@@ -1,12 +1,17 @@
 import type { NativeSubWindowContext } from './types';
 import { initPlatform, platform, isTauriEnvironment } from '../platform/index';
 import { loadSettings } from '../core/workspace/settings';
-import { linkPluginModules } from './module-linker';
+import { linkPluginModules } from '../plugins/module-linker';
 import { openConfirmModal, openPromptModal } from '../ui/modals/confirm-ui';
 import { showToast } from '../ui/common/toast';
 
+/**
+ * 독립 OS 윈도우 프로세스 경량 부트스트래퍼
+ * 메인 에디터 및 Monaco 에디터를 일절 로드하지 않고 수 밀리초 내에 즉시 실행됩니다.
+ */
 export async function bootNativeWindow(params: URLSearchParams): Promise<void> {
-  const pluginId = params.get('plugin') || '';
+  const ownerId = params.get('owner') || params.get('plugin') || 'app';
+  const pluginId = params.get('plugin') || ownerId;
   const winId = params.get('win_id') || '';
   const title = params.get('title') || 'Migoto Studio Sub Window';
   const entryFile = params.get('entry') || '';
@@ -21,7 +26,7 @@ export async function bootNativeWindow(params: URLSearchParams): Promise<void> {
   document.documentElement.className = isLight ? 'theme-light' : 'theme-dark';
   document.documentElement.setAttribute('data-theme', isLight ? 'light' : 'dark');
 
-  // 메인 에디터 DOM 구조를 깨끗하게 비우고 독립 서브창 컨테이너 생성
+  // 메인 에디터 DOM 구조를 깨끗하게 비우고 독립 창 컨테이너 생성
   document.body.innerHTML = '';
   document.body.style.cssText = `
     margin: 0;
@@ -56,7 +61,7 @@ export async function bootNativeWindow(params: URLSearchParams): Promise<void> {
   document.body.appendChild(rootContainer);
 
   // 3. 메인 창과의 통신 채널 연결
-  const channelName = `migoto_native_win_${pluginId}_${winId}`;
+  const channelName = `migoto_native_win_${ownerId}_${winId}`;
   const channel = new BroadcastChannel(channelName);
   const userMessageListeners = new Set<(data: any) => void>();
 
@@ -68,7 +73,11 @@ export async function bootNativeWindow(params: URLSearchParams): Promise<void> {
 
     if (msg.type === 'USER_MESSAGE') {
       userMessageListeners.forEach((listener) => {
-        try { listener(msg.payload); } catch (e) { console.error('[NativeSubWindow] listener error:', e); }
+        try {
+          listener(msg.payload);
+        } catch (e) {
+          console.error('[NativeSubWindow] listener error:', e);
+        }
       });
     } else if (msg.type === 'INIT_DATA') {
       initialData = msg.data;
@@ -79,7 +88,9 @@ export async function bootNativeWindow(params: URLSearchParams): Promise<void> {
 
   const windowClose = async () => {
     channel.postMessage({ type: 'WINDOW_CLOSED' });
-    try { channel.close(); } catch {}
+    try {
+      channel.close();
+    } catch {}
     if (isTauriEnvironment()) {
       try {
         const { getCurrentWebviewWindow } = await import('@tauri-apps/api/webviewWindow');
@@ -94,7 +105,9 @@ export async function bootNativeWindow(params: URLSearchParams): Promise<void> {
 
   window.addEventListener('beforeunload', () => {
     channel.postMessage({ type: 'WINDOW_CLOSED' });
-    try { channel.close(); } catch {}
+    try {
+      channel.close();
+    } catch {}
   });
 
   // 4. 서브윈도우 전용 컨텍스트(NativeSubWindowContext) 구축
@@ -140,51 +153,14 @@ export async function bootNativeWindow(params: URLSearchParams): Promise<void> {
       },
       onMessage: (listener: (data: any) => void) => {
         userMessageListeners.add(listener);
-        return () => { userMessageListeners.delete(listener); };
+        return () => {
+          userMessageListeners.delete(listener);
+        };
       },
     },
-    workspace: {
-      readTextFile: async (path: string) => {
-        const ref = platform().refFromId(path);
-        const loaded = await platform().readFile(ref);
-        return loaded.text;
-      },
-      readBinaryFile: async (path: string) => {
-        if (platform().readBinaryFile) {
-          return platform().readBinaryFile!(path);
-        }
-        return new Uint8Array();
-      },
-      writeFile: async (path: string, content: string) => {
-        const ref = platform().refFromId(path);
-        await platform().writeFile(ref, content, 'utf-8', { enabled: false, keepDays: 0, maxPerFile: 0 });
-      },
-      writeBinaryFile: async (path: string, bytes: Uint8Array) => {
-        if (platform().writeBinaryFile) {
-          await platform().writeBinaryFile!(path, bytes);
-        }
-      },
-      getActiveFolder: () => {
-        return initialData?.folder || null;
-      },
-    },
-    logger: {
-      info: (...args: any[]) => {
-        console.log(`[${title}]`, ...args);
-        channel.postMessage({ type: 'LOG', level: 'info', args });
-      },
-      warn: (...args: any[]) => {
-        console.warn(`[${title}]`, ...args);
-        channel.postMessage({ type: 'LOG', level: 'warn', args });
-      },
-      error: (...args: any[]) => {
-        console.error(`[${title}]`, ...args);
-        channel.postMessage({ type: 'LOG', level: 'error', args });
-      },
-      debug: (...args: any[]) => {
-        console.debug(`[${title}]`, ...args);
-        channel.postMessage({ type: 'LOG', level: 'debug', args });
-      },
+    modals: {
+      confirm: (options: any) => openConfirmModal(options),
+      prompt: (options: any) => openPromptModal(options),
     },
     showToast: (message: string, type: 'info' | 'warn' | 'error' = 'info') => {
       showToast(message, type);
@@ -194,7 +170,7 @@ export async function bootNativeWindow(params: URLSearchParams): Promise<void> {
   // 5. 메인 창에 준비 완료 알림
   channel.postMessage({ type: 'WINDOW_READY' });
 
-  // 6. 엔트리 스크립트 실행
+  // 6. 엔트리 스크립트 실행 (플러그인인 경우)
   if (entryFile && platform().listDiskPlugins) {
     try {
       const diskList = await platform().listDiskPlugins!();
@@ -210,7 +186,7 @@ export async function bootNativeWindow(params: URLSearchParams): Promise<void> {
             await entryFn(context);
           }
         } else {
-          console.error(`[NativeSubWindow] 플러그인(${pluginId}) 내 엔트리 파일을 찾을 수 없습니다: ${entryFile}`);
+          console.error(`[NativeSubWindow] 모듈 내 엔트리 파일을 찾을 수 없습니다: ${entryFile}`);
         }
       }
     } catch (err) {
