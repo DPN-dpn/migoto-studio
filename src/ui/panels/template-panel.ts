@@ -1,4 +1,6 @@
 import { monaco } from '../../core/editor/monaco';
+import type { DocumentManager } from '../../core/workspace/documents';
+import { LANGUAGE_ID } from '../../core/editor/grammar';
 import {
   type Template,
   getAllTemplates,
@@ -62,10 +64,41 @@ export class TemplatePanel {
   constructor(
     private root: HTMLElement,
     private editor: monaco.editor.IStandaloneCodeEditor,
+    private doc?: DocumentManager,
   ) {
     this.loadCollapsedGroups();
     onTemplatesChange(() => this.renderList());
+    if (this.doc) {
+      this.doc.onChange(() => {
+        // 활성 탭 변경 시 필요에 따라 리스트 재검사
+      });
+    }
     this.render();
+  }
+
+  /**
+   * 현재 열린 활성 탭이 INI 텍스트 에디터 창인지 검증합니다.
+   * 다른 탭(커스텀 뷰어, diff 탭, 플러그인 탭 등)을 보고 있거나 INI 에디터가 아닐 때는 삽입하지 않습니다.
+   */
+  private canInsertSnippet(): boolean {
+    if (!this.doc) return true;
+    const activeTab = this.doc.activeTab;
+    if (!activeTab || activeTab.kind !== 'text') {
+      return false;
+    }
+    const curModel = this.editor.getModel();
+    if (!curModel || curModel !== activeTab.model) {
+      return false;
+    }
+    // 언어 ID 또는 확장자 검증
+    const lang = curModel.getLanguageId();
+    if (lang !== LANGUAGE_ID && lang !== 'ini') {
+      const fileName = activeTab.file?.name || activeTab.title || '';
+      if (!/\.(ini|3dm|migoto|txt)$/i.test(fileName)) {
+        return false;
+      }
+    }
+    return true;
   }
 
   private loadCollapsedGroups() {
@@ -408,6 +441,10 @@ export class TemplatePanel {
     card.append(preview);
 
     card.addEventListener('click', () => {
+      // INI 텍스트 창에 포커스와 커서가 올라가 있을 때만 동작 (다른 탭을 보고 있을 땐 무시)
+      if (!this.canInsertSnippet()) {
+        return;
+      }
       insertTemplate(this.editor, t);
     });
 

@@ -127,7 +127,7 @@ async function boot() {
   const outline = new OutlinePanel(editor, doc, $('sidebar'), $('sidebar-panel-outline'), $('sidebar-resizer'));
   const explorer = new FileExplorer($('sidebar-panel-explorer'), doc);
   const searchPanel = new SearchPanel($('sidebar-panel-search'), doc, editor, explorer);
-  new TemplatePanel($('sidebar-panel-templates'), editor);
+  new TemplatePanel($('sidebar-panel-templates'), editor, doc);
 
   let activityBar: ActivityBar;
 
