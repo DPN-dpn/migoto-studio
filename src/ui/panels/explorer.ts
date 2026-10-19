@@ -78,6 +78,7 @@ export class FileExplorer {
   private isLoading = false;
   private menuEl: HTMLElement;
   private compareCandidate: DirEntry | null = null;
+  private folderListeners = new Set<(folder: FolderRef | null) => void>();
 
   constructor(
     private root: HTMLElement,
@@ -107,6 +108,28 @@ export class FileExplorer {
 
   get folderName(): string {
     return this.currentFolder?.name ?? '';
+  }
+
+  /**
+   * 활성 작업 폴더 변경(열림 또는 닫힘) 리스너 등록
+   * @returns 리스너 해제(unlisten) 함수
+   */
+  onDidChangeFolder(listener: (folder: FolderRef | null) => void): () => void {
+    this.folderListeners.add(listener);
+    return () => {
+      this.folderListeners.delete(listener);
+    };
+  }
+
+  private notifyFolderChange(folder: FolderRef | null): void {
+    this.onFolderChange?.(folder);
+    this.folderListeners.forEach((listener) => {
+      try {
+        listener(folder);
+      } catch (err) {
+        console.error('[FileExplorer] onDidChangeFolder 리스너 오류:', err);
+      }
+    });
   }
 
   hasFile(relativePath: string): boolean {
@@ -242,7 +265,7 @@ export class FileExplorer {
     try {
       localStorage.setItem(STORAGE_LAST_FOLDER, folder.id);
     } catch {}
-    this.onFolderChange?.(folder);
+    this.notifyFolderChange(folder);
     await this.reload();
     appLogger.info('Workspace', `작업 폴더 열림: "${folder.name}" (${this.entries.length}개 최상위 항목)`);
 
@@ -285,7 +308,7 @@ export class FileExplorer {
     try {
       localStorage.removeItem(STORAGE_LAST_FOLDER);
     } catch {}
-    this.onFolderChange?.(null);
+    this.notifyFolderChange(null);
     this.render();
     if (prevName) {
       appLogger.info('Workspace', `작업 폴더 닫힘: "${prevName}"`);

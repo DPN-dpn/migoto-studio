@@ -1216,6 +1216,16 @@ await context.workspace.closeTab('tab_1'); // 해당 탭 닫기 (미저장 변�
 const unlisten = context.workspace.onDidChangeActiveFile((file) => {
   console.log('현재 작업 파일 변경됨:', file?.name);
 });
+
+// 모드 작업 폴더 변경(열림 또는 닫힘) 실시간 감지
+const unlistenFolder = context.workspace.onDidChangeActiveFolder((folderPath) => {
+  if (folderPath) {
+    console.log('새 모드 폴더 열림:', folderPath);
+  } else {
+    console.log('모드 폴더 닫힘 (null)');
+  }
+});
+// unlistenFolder(); // 필요 시 리스너 해제
 ```
 
 ---

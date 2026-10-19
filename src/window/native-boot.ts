@@ -191,6 +191,8 @@ export async function bootNativeWindow(params: URLSearchParams): Promise<void> {
       readDirectory: async (dirPath?: string) => platform().readDirectory(dirPath || ''),
       getCurrentFolder: () => null,
       getCurrentFile: () => null,
+      onDidChangeActiveFolder: () => () => {},
+      onDidChangeActiveFile: () => () => {},
     },
     logger: {
       info: (...args: any[]) => {

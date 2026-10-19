@@ -1304,6 +1304,16 @@ export default {
           callbacks.onRegisterCleanup(unlisten);
           return unlisten;
         },
+        onDidChangeActiveFolder: (listener: (folder: string | null) => void) => {
+          if (!this.explorer || typeof (this.explorer as any).onDidChangeFolder !== 'function') {
+            return () => {};
+          }
+          const unlisten = (this.explorer as any).onDidChangeFolder((folder: any) => {
+            listener(folder ? folder.id : null);
+          });
+          callbacks.onRegisterCleanup(unlisten);
+          return unlisten;
+        },
         search: async (query: string, options?: WorkspaceSearchOptions): Promise<WorkspaceSearchResult[]> => {
           if (!query) return [];
           const regex = buildSearchRegex(query, {

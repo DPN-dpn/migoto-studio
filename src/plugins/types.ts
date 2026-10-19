@@ -404,6 +404,8 @@ export interface PluginContext {
     pickFile(options?: { extensions?: string[]; title?: string }): Promise<string | null>;
     showInFolder(path: string): Promise<void>;
     onDidChangeActiveFile(listener: (file: { name: string; path: string; location: string } | null) => void): () => void;
+    /** 작업 폴더가 열리거나 닫힐 때 발생하는 이벤트 (열렸을 때 절대 경로 string, 닫혔을 때 null) */
+    onDidChangeActiveFolder(listener: (folder: string | null) => void): () => void;
     search(query: string, options?: WorkspaceSearchOptions): Promise<WorkspaceSearchResult[]>;
     createBackup(filePath?: string, label?: string): Promise<string | null>;
     getOpenTabs(): PluginTabInfo[];
