@@ -290,7 +290,55 @@ export default {
 
 ---
 
-### 템플릿 C: 다중 파일 모듈 분할 플러그인 (UI, 상수, 스타일 분리 - 번들러 불필요)
+### 템플릿 C: 독립 서브 윈도우 및 별도 OS 창 듀얼 지원 도구 (3D 뷰어 / 프리뷰)
+
+메인 에디터 화면과 분리된 독립 플로팅 창(`openSubWindow`)을 띄우고, 상단 PiP 버튼 클릭 시 완전히 독립된 데스크톱 OS 윈도우 창(`WebviewWindow`)으로 전환될 수 있도록 렌더링 함수를 분리·공유하는 표준 패턴입니다:
+
+```javascript
+// subwindow.js
+
+// 1. 공통 UI 렌더링 함수 (내장 창과 별도 OS 창 양쪽에서 호출)
+function renderViewer(container, context) {
+  container.innerHTML = `
+    <div style="padding: 16px; height: 100%; display: flex; flex-direction: column;">
+      <h3>🧊 3D 뷰어</h3>
+      <div id="viewport" style="flex: 1; min-height: 300px; background: #000; border-radius: 6px;"></div>
+    </div>
+  `;
+}
+
+// 2. [별도 OS 창 진입점] PiP로 분리되어 독립 OS 창으로 떴을 때 자동 실행
+export default async function runInNativeWindow(context) {
+  renderViewer(context.container, context);
+}
+
+// 3. [내장 서브 윈도우 진입점] 상단 메뉴 등에서 서브 윈도우를 열 때 호출
+export async function openViewerSubWindow(context) {
+  context.ui.openSubWindow({
+    id: 'my-viewer-subwin',
+    title: '🧊 3D 뷰어',
+    width: 900,
+    height: 650,
+    minWidth: 400,
+    minHeight: 300,
+    resizable: true,
+    focusMode: 'parentLinked', // 'parentLinked' | 'alwaysOnTop' | 'independent'
+    // ★ 별도 OS 창으로 분리될 때 실행할 스크립트 지정
+    entry: 'subwindow.js',
+    initialData: {
+      folder: context.workspace.getActiveFolder(),
+    },
+    // 내장 플로팅 창으로 떴을 때 호출
+    render(container, handle) {
+      renderViewer(container, context);
+    },
+  });
+}
+```
+
+---
+
+### 템플릿 D: 다중 파일 모듈 분할 플러그인 (UI, 상수, 스타일 분리 - 번들러 불필요)
 
 Migoto Studio는 내장 가상 모듈 링커를 제공하므로, Vite나 esbuild 없이 순수 JS/ESM 문법으로 코드를 여러 파일로 분할할 수 있습니다.
 

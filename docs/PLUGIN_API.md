@@ -312,10 +312,54 @@ const subWin = context.ui.openSubWindow({
 - **`'parentLinked'` (에디터 연동 - 기본값)**: 평소에는 다른 창 뒤로 갈 수 있지만, 메인 Migoto Studio 에디터를 클릭하거나 포커스하면 **서브창이 자동으로 메인 창과 함께 맨 위로 올라옵니다.**
 - **`'independent'` (독립 창)**: 메인 에디터와 완전히 독립된 창으로 동작합니다. 듀얼 모니터 환경에서 다른 모니터로 이동시켜 작업하기에 최적입니다.
 
-#### PiP 별도 OS 윈도우 분리 기능
-- 서브창 상단 컨트롤러의 **PiP 버튼**(`⧉`)을 클릭하면 즉시 독립된 OS 윈도우(`WebviewWindow`)로 분리(Pop-out)됩니다.
-- 듀얼 모니터 환경에서 서브창을 다른 모니터로 완전히 옮겨놓고 메인 에디터와 동시에 작업할 수 있습니다.
-- 분리된 창을 닫거나 상단 PiP 버튼/내장 창 가져오기 버튼을 누르면 다시 에디터 내장 플로팅 창으로 원상 복귀(Dock In)됩니다.
+#### PiP 별도 OS 윈도우 분리 기능 및 듀얼 렌더링 패턴
+- **원클릭 독립 OS 분리**: 서브창 상단 컨트롤러의 **PiP 버튼**(`⧉`)을 클릭하면 즉시 메인 에디터와 완전히 독립된 데스크톱 OS 윈도우(`WebviewWindow`)로 분리(Pop-out)됩니다.
+- **메인 화면 자동 숨김 & 우하단 복원 칩 전환**:
+  - 독립 OS 창으로 분리되는 즉시 메인 화면을 가로막던 커다란 플로팅 창은 **자동으로 숨겨집니다.**
+  - 대신 화면 우측 하단 도킹 바에 `⧉ 서브창 이름 (내장 창으로 복원 ↩)` 버튼 칩 하나만 컴팩트하게 남습니다.
+  - 별도 창을 닫거나 우하단의 복원 칩을 클릭하면 즉시 본래 크기의 내장 플로팅 창으로 원상 복귀(Dock In)됩니다.
+- **내장 창과 별도 OS 창 동시 지원 표준 패턴 (권장)**:
+  - 데스크톱 독립 창은 메인 창과 다른 별개의 프로세스/Webview이므로, 메인 창 메모리의 `render` 클로저 함수가 자동으로 복사되지 않습니다.
+  - 따라서 `openSubWindow` 호출 시 `entry: 'subwindow.js'`를 지정하고, 해당 파일에 `export default` 진입점을 두어 렌더링 로직을 공유하는 것을 권장합니다:
+
+```javascript
+// plugins/my-plugin/subwindow.js
+
+// 1. 공통 UI 렌더링 함수
+function renderViewer(container, contextOrHandle) {
+  container.innerHTML = `
+    <div style="padding: 16px;">
+      <h3>🧊 3D 뷰어</h3>
+      <div id="viewport" style="width: 100%; height: 400px;"></div>
+    </div>
+  `;
+}
+
+// 2. [별도 OS 창 진입점] PiP로 분리되어 독립 창으로 떴을 때 자동 실행
+export default async function runInNativeWindow(context) {
+  renderViewer(context.container, context);
+}
+
+// 3. [내장 서브 윈도우 진입점] 상단 메뉴 등에서 서브 윈도우를 열 때 호출
+export async function openViewerSubWindow(context) {
+  context.ui.openSubWindow({
+    id: 'my-viewer-subwin',
+    title: '🧊 3D 뷰어',
+    width: 900,
+    height: 650,
+    // ★ 별도 OS 창으로 분리될 때 실행할 엔트리 스크립트 지정
+    entry: 'subwindow.js',
+    // ★ 별도 OS 창으로 넘겨줄 초기 데이터
+    initialData: {
+      folder: context.workspace.getActiveFolder(),
+    },
+    // 내장 플로팅 창으로 떴을 때 호출
+    render(container, handle) {
+      renderViewer(container, handle);
+    },
+  });
+}
+```
 
 ---
 
