@@ -36,7 +36,7 @@ import {
 import { initPwa } from './pwa';
 import { checkOnStartup } from './updater/updater';
 import { CURRENT_APP_VERSION } from './updater/version';
-import { initStatusBarWindowsMenu } from './window';
+import { initStatusBarWindowsMenu, nativeWindowManager, subWindowManager } from './window';
 
 // Only the base editor worker is needed (no TS/JSON/CSS language services).
 (self as unknown as { MonacoEnvironment: monaco.Environment }).MonacoEnvironment = {
@@ -469,7 +469,18 @@ async function boot() {
   }, (hovering) => hint.classList.toggle('show', hovering));
 
   // ---- ask before closing with unsaved changes ----
-  await platform().onCloseRequest(() => doc.confirmDiscard());
+  await platform().onCloseRequest(async () => {
+    const shouldClose = await doc.confirmDiscard();
+    if (shouldClose) {
+      try {
+        await nativeWindowManager.closeAllWindows();
+      } catch {}
+      try {
+        subWindowManager.closeAllWindows();
+      } catch {}
+    }
+    return shouldClose;
+  });
 
   // ---- check for newer releases in background ----
   checkOnStartup();

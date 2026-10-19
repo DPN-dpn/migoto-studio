@@ -24,6 +24,11 @@ fn relaunch_app(app: tauri::AppHandle) {
   app.restart();
 }
 
+#[tauri::command]
+fn exit_app(app: tauri::AppHandle) {
+  app.exit(0);
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
   // Keep the WebView2 cache inside the portable data folder (unless a dev environment already set it).
@@ -65,7 +70,16 @@ pub fn run() {
       plugins::save_disk_plugin,
       open_in_browser,
       relaunch_app,
+      exit_app,
     ])
+    .on_window_event(|window, event| {
+      if window.label() == "main" {
+        if let tauri::WindowEvent::Destroyed = event {
+          use tauri::Manager;
+          window.app_handle().exit(0);
+        }
+      }
+    })
     .setup(|app| {
       if cfg!(debug_assertions) {
         app.handle().plugin(

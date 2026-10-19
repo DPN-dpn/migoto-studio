@@ -97,15 +97,21 @@ export async function bootNativeWindow(params: URLSearchParams): Promise<void> {
     }
   };
 
+  let isClosing = false;
   const windowClose = async () => {
-    channel.postMessage({ type: 'WINDOW_CLOSED' });
+    if (isClosing) return;
+    isClosing = true;
+    try {
+      channel.postMessage({ type: 'WINDOW_CLOSED' });
+    } catch {}
     try {
       channel.close();
     } catch {}
     if (isTauriEnvironment()) {
       try {
         const { getCurrentWebviewWindow } = await import('@tauri-apps/api/webviewWindow');
-        await getCurrentWebviewWindow().close();
+        const win = getCurrentWebviewWindow();
+        await win.destroy().catch(() => win.close());
       } catch {
         window.close();
       }
@@ -115,11 +121,64 @@ export async function bootNativeWindow(params: URLSearchParams): Promise<void> {
   };
 
   window.addEventListener('beforeunload', () => {
-    channel.postMessage({ type: 'WINDOW_CLOSED' });
+    try {
+      channel.postMessage({ type: 'WINDOW_CLOSED' });
+    } catch {}
     try {
       channel.close();
     } catch {}
   });
+
+  // 메인(마스터) 윈도우 생명주기 능동적 감시 (Master-Slave Watchdog)
+  // 메인 창이 종료되거나 파괴되면 서브 윈도우도 즉각 자신을 파괴/종료합니다.
+  if (isTauriEnvironment()) {
+    import('@tauri-apps/api/webviewWindow')
+      .then(async ({ getAllWebviewWindows }) => {
+        const allWins = await getAllWebviewWindows();
+        const mainWin = allWins.find((w) => w.label === 'main');
+        if (mainWin) {
+          mainWin.once('tauri://destroyed', () => {
+            windowClose();
+          });
+        }
+        const masterHeartbeat = setInterval(async () => {
+          if (isClosing) {
+            clearInterval(masterHeartbeat);
+            return;
+          }
+          try {
+            const { getAllWebviewWindows: getWins } = await import('@tauri-apps/api/webviewWindow');
+            const currentWins = await getWins();
+            if (!currentWins.some((w) => w.label === 'main')) {
+              clearInterval(masterHeartbeat);
+              windowClose();
+            }
+          } catch {
+            clearInterval(masterHeartbeat);
+            windowClose();
+          }
+        }, 250);
+        window.addEventListener('beforeunload', () => clearInterval(masterHeartbeat));
+      })
+      .catch(() => {});
+  } else if (typeof window !== 'undefined' && window.opener) {
+    const checkOpener = setInterval(() => {
+      if (isClosing) {
+        clearInterval(checkOpener);
+        return;
+      }
+      try {
+        if (!window.opener || window.opener.closed) {
+          clearInterval(checkOpener);
+          windowClose();
+        }
+      } catch {
+        clearInterval(checkOpener);
+        windowClose();
+      }
+    }, 250);
+    window.addEventListener('beforeunload', () => clearInterval(checkOpener));
+  }
 
   // 4. 서브윈도우 전용 컨텍스트(NativeSubWindowContext) 구축
   const context: NativeSubWindowContext = {

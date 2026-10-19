@@ -34,6 +34,9 @@ export class NativeWindowManager {
       window.addEventListener('beforeunload', () => {
         this.closeAllWindows();
       });
+      window.addEventListener('unload', () => {
+        this.closeAllWindows();
+      });
 
       // 2. 원본 메인 창의 최소화 및 복원 감지 (Master-Slave 윈도우 상태 동기화)
       this.initMasterWindowSync();
@@ -60,6 +63,10 @@ export class NativeWindowManager {
       import('@tauri-apps/api/window')
         .then(({ getCurrentWindow }) => {
           const appWin = getCurrentWindow();
+
+          appWin.once('tauri://destroyed', () => {
+            this.closeAllWindows();
+          });
 
           const checkState = async () => {
             try {
@@ -246,6 +253,10 @@ export class NativeWindowManager {
       isDisposed = true;
 
       try {
+        channel.postMessage({ type: 'CLOSE_WINDOW' });
+      } catch {}
+
+      try {
         channel.close();
       } catch {}
 
@@ -253,7 +264,9 @@ export class NativeWindowManager {
         const win = tauriWindow;
         tauriWindow = null;
         try {
-          if (typeof win.close === 'function') {
+          if (typeof win.destroy === 'function') {
+            Promise.resolve(win.destroy()).catch(() => {});
+          } else if (typeof win.close === 'function') {
             Promise.resolve(win.close()).catch(() => {});
           }
         } catch {}
@@ -427,14 +440,30 @@ export class NativeWindowManager {
   /**
    * 열려 있는 모든 독립 OS 윈도우를 안전하게 닫습니다.
    */
-  closeAllWindows() {
-    for (const [, item] of this.activeWindows) {
+  async closeAllWindows(): Promise<void> {
+    const items = Array.from(this.activeWindows.values());
+    this.activeWindows.clear();
+    for (const item of items) {
       if (item.cleanup) {
-        item.cleanup();
+        try {
+          item.cleanup();
+        } catch {}
       }
     }
-    this.activeWindows.clear();
     this.notifyWindowsChanged();
+
+    if (isTauriEnvironment()) {
+      try {
+        const { getAllWebviewWindows, getCurrentWebviewWindow } = await import('@tauri-apps/api/webviewWindow');
+        const current = getCurrentWebviewWindow();
+        const allWins = await getAllWebviewWindows();
+        for (const w of allWins) {
+          if (w.label !== current.label) {
+            await w.destroy().catch(() => {});
+          }
+        }
+      } catch {}
+    }
   }
 }
 

@@ -142,7 +142,28 @@ export const desktop: Platform = {
     const win = getCurrentWindow();
     await win.onCloseRequested(async (event) => {
       event.preventDefault();
-      if (await handler()) await win.destroy();
+      try {
+        const canClose = await handler();
+        if (canClose) {
+          try {
+            const { getAllWebviewWindows } = await import('@tauri-apps/api/webviewWindow');
+            const allWins = await getAllWebviewWindows();
+            for (const w of allWins) {
+              if (w.label !== win.label) {
+                await w.destroy().catch(() => {});
+              }
+            }
+          } catch {}
+          try {
+            await invoke('exit_app');
+          } catch {
+            await win.destroy();
+          }
+        }
+      } catch (err) {
+        console.error('[desktop] onCloseRequested error:', err);
+        await win.destroy().catch(() => {});
+      }
     });
   },
 
