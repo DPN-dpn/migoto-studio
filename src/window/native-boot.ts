@@ -171,24 +171,65 @@ export async function bootNativeWindow(params: URLSearchParams): Promise<void> {
   channel.postMessage({ type: 'WINDOW_READY' });
 
   // 6. 엔트리 스크립트 실행 (플러그인인 경우)
-  if (entryFile && platform().listDiskPlugins) {
+  if (platform().listDiskPlugins) {
     try {
       const diskList = await platform().listDiskPlugins!();
       const disk = diskList.find((p) => p.id === pluginId);
 
       if (disk && disk.files) {
-        const fileEntry = disk.files[entryFile] || disk.files[`./${entryFile}`];
-        if (fileEntry) {
-          const linked = linkPluginModules(fileEntry, entryFile, disk.files);
-          const mod = await import(/* @vite-ignore */ linked.entryUrl);
-          const entryFn = mod.default || mod.run || mod.open || mod;
-          if (typeof entryFn === 'function') {
-            await entryFn(context);
+        // 엔트리 파일 자동 탐색 폴백
+        let targetFile = entryFile;
+        if (!targetFile) {
+          const candidates = ['subwindow.js', 'sub-window.js', 'window.js', disk.entryPath || 'index.js'];
+          for (const cand of candidates) {
+            if (disk.files[cand] || disk.files[`./${cand}`]) {
+              targetFile = cand;
+              break;
+            }
           }
-        } else {
-          console.error(`[NativeSubWindow] 모듈 내 엔트리 파일을 찾을 수 없습니다: ${entryFile}`);
+        }
+
+        const fileEntry = targetFile ? (disk.files[targetFile] || disk.files[`./${targetFile}`]) : null;
+
+        if (fileEntry && targetFile) {
+          const linked = linkPluginModules(fileEntry, targetFile, disk.files);
+          const mod = await import(/* @vite-ignore */ linked.entryUrl);
+          const entryFn =
+            typeof mod.default === 'function'
+              ? mod.default
+              : typeof mod.run === 'function'
+              ? mod.run
+              : typeof mod.open === 'function'
+              ? mod.open
+              : typeof mod.render === 'function'
+              ? mod.render
+              : typeof mod === 'function'
+              ? mod
+              : null;
+
+          if (entryFn) {
+            await entryFn(context);
+            return;
+          }
         }
       }
+
+      // 엔트리 함수가 제공되지 않았을 때 친절한 가이드 화면 표시
+      rootContainer.innerHTML = `
+        <div style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 32px; text-align: center; box-sizing: border-box;">
+          <div style="font-size: 42px; margin-bottom: 12px; opacity: 0.85;">🗔</div>
+          <h2 style="margin: 0 0 8px 0; font-size: 18px; color: #e6edf3;">${title}</h2>
+          <p style="margin: 0 0 20px 0; color: #8b949e; font-size: 13px; max-width: 480px; line-height: 1.6;">
+            독립 OS 윈도우가 성공적으로 열렸습니다.<br/>
+            이 창에 UI를 렌더링하려면 스크립트에 <code>export default function(context) { ... }</code> 진입점이 정의되어 있어야 합니다.
+          </p>
+          <div style="background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 14px 18px; font-size: 12px; text-align: left; color: #c9d1d9; max-width: 520px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', monospace; line-height: 1.6;">
+            <div style="color: #58a6ff; font-weight: 600; margin-bottom: 6px;">💡 플러그인 연동 가이드:</div>
+            1. <code>openSubWindow</code> 옵션에 <code>entry: 'subwindow.js'</code>를 지정합니다.<br/>
+            2. <code>subwindow.js</code>에 <code>export default async function(context) { ... }</code>를 구현하면 독립 OS 창 생성 시 이 함수가 즉시 호출되어 <code>context.container</code>에 UI를 그립니다.
+          </div>
+        </div>
+      `;
     } catch (err) {
       console.error('[NativeSubWindow] 엔트리 모듈 실행 오류:', err);
       rootContainer.innerHTML = `

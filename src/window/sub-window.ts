@@ -859,10 +859,16 @@ export class SubWindowManager {
       }
       currentPipWin = null;
 
+      if (dockChip) {
+        dockChip.remove();
+        dockChip = null;
+      }
+
       // rootContainer를 다시 메인 floatingEl 내부로 복원
       if (rootContainer.parentElement !== floatingEl) {
         floatingEl.insertBefore(rootContainer, pipPlaceholder);
       }
+      floatingEl.style.display = 'flex';
       rootContainer.style.display = 'flex';
       pipPlaceholder.style.display = 'none';
       pipBtn.classList.remove('is-popped-out');
@@ -909,10 +915,26 @@ export class SubWindowManager {
       rootContainer.style.height = '100%';
       rootContainer.style.width = '100%';
 
-      // 기존 플로팅 창에는 플레이스홀더 표시
-      pipPlaceholder.style.display = 'flex';
+      // 기존 플로팅 창은 숨기고 도킹 바에 복원 칩 표시
+      floatingEl.style.display = 'none';
       pipBtn.classList.add('is-popped-out');
       pipBtn.title = '에디터 내 플로팅 창으로 복원 (Dock In)';
+
+      if (!this.dockBar || !document.body.contains(this.dockBar)) {
+        this.dockBar = document.createElement('div');
+        this.dockBar.className = 'migoto-subwindow-dock-bar';
+        document.body.appendChild(this.dockBar);
+      }
+
+      if (dockChip) dockChip.remove();
+      dockChip = document.createElement('div');
+      dockChip.className = 'migoto-subwindow-dock-chip is-native-popped-out';
+      dockChip.title = `클릭하여 내장 창으로 복원: ${options.title}`;
+      dockChip.innerHTML = `<span>⧉</span><span>${options.title}</span><span style="opacity: 0.75; font-size: 10px; margin-left: 4px;">(내장 창으로 복원 ↩)</span>`;
+      dockChip.onclick = () => {
+        dockIn();
+      };
+      this.dockBar.appendChild(dockChip);
 
       appLogger.info('plugin', `서브 윈도우 별도 OS 윈도우(PiP)로 분리 완료: "${options.title}"`);
 
@@ -959,21 +981,33 @@ export class SubWindowManager {
           });
 
           currentNativeHandle = nativeHandle;
-          pipPlaceholder.style.display = 'flex';
-          rootContainer.style.display = 'none';
+
+          // 기존 화면의 커다란 창은 숨기고, 우하단 도킹 바에 복원 칩 버튼만 표시
+          floatingEl.style.display = 'none';
           pipBtn.classList.add('is-popped-out');
           pipBtn.title = '에디터 내 플로팅 창으로 복원 (Dock In)';
+
+          if (!this.dockBar || !document.body.contains(this.dockBar)) {
+            this.dockBar = document.createElement('div');
+            this.dockBar.className = 'migoto-subwindow-dock-bar';
+            document.body.appendChild(this.dockBar);
+          }
+
+          if (dockChip) dockChip.remove();
+          dockChip = document.createElement('div');
+          dockChip.className = 'migoto-subwindow-dock-chip is-native-popped-out';
+          dockChip.title = `클릭하여 내장 창으로 복원: ${options.title}`;
+          dockChip.innerHTML = `<span>⧉</span><span>${options.title}</span><span style="opacity: 0.75; font-size: 10px; margin-left: 4px;">(내장 창으로 복원 ↩)</span>`;
+          dockChip.onclick = () => {
+            dockIn();
+          };
+          this.dockBar.appendChild(dockChip);
 
           const checkCloseTimer = setInterval(() => {
             if (!nativeHandle.isOpen()) {
               clearInterval(checkCloseTimer);
               if (currentNativeHandle === nativeHandle) {
-                currentNativeHandle = null;
-                rootContainer.style.display = 'flex';
-                pipPlaceholder.style.display = 'none';
-                pipBtn.classList.remove('is-popped-out');
-                pipBtn.title = '별도 윈도우로 분리 (PiP 팝아웃)';
-                bringToFront();
+                dockIn();
               }
             }
           }, 300);
