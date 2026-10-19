@@ -4,6 +4,7 @@ import { platform, type FileRef } from '../../platform/index';
 import type { FileExplorer } from './explorer';
 import { flashLineHighlight } from '../../core/ini/symbol-nav';
 import { showToast } from '../common/toast';
+import { openConfirmModal } from '../modals/confirm-ui';
 import { appLogger } from '../../core/logger';
 
 import {
@@ -574,7 +575,12 @@ export class SearchPanel {
     const totalMatches = this.results.reduce((acc, r) => acc + r.matches.length, 0);
     const confirmMsg = `${this.results.length}개 파일에서 총 ${totalMatches}개의 '${this.query}' 항목을 '${this.replaceText}'(으)로 모두 바꾸시겠습니까?`;
 
-    const confirmed = confirm(confirmMsg);
+    const confirmed = await openConfirmModal({
+      title: '일괄 바꾸기',
+      message: confirmMsg,
+      confirmText: '모두 바꾸기',
+      variant: 'primary',
+    });
     if (!confirmed) return;
 
     for (const fileResult of this.results) {

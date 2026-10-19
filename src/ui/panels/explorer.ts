@@ -4,6 +4,7 @@ import { showToast } from '../common/toast';
 import { promptFolderTrust } from '../modals/trust-modal';
 import { isFolderTrusted } from '../../core/workspace/trust';
 import { appLogger } from '../../core/logger';
+import { openConfirmModal, openPromptModal } from '../modals/confirm-ui';
 
 const STORAGE_LAST_FOLDER = 'migoto_last_folder';
 
@@ -692,7 +693,14 @@ export class FileExplorer {
         addDivider();
 
         addItem('삭제', async () => {
-          if (!confirm(`'${entry.name}' 파일을 삭제하시겠습니까?`)) return;
+          const ok = await openConfirmModal({
+            title: '파일 삭제',
+            message: `'${entry.name}' 파일을 삭제하시겠습니까?`,
+            confirmText: '삭제',
+            cancelText: '취소',
+            variant: 'danger',
+          });
+          if (!ok) return;
           try {
             await platform().deleteEntry?.(entry.path);
             await this.reload();
@@ -703,7 +711,13 @@ export class FileExplorer {
       } else {
         // Folder item
         addItem('새 INI 파일 만들기…', async () => {
-          const input = prompt('새 INI 파일 이름을 입력하세요:', 'mod.ini');
+          const input = await openPromptModal({
+            title: '새 INI 파일 만들기',
+            message: '새 INI 파일 이름을 입력하세요:',
+            defaultValue: 'mod.ini',
+            confirmText: '생성',
+            cancelText: '취소',
+          });
           if (!input) return;
           const cleanName = input.trim().endsWith('.ini') ? input.trim() : `${input.trim()}.ini`;
           try {
@@ -749,7 +763,14 @@ export class FileExplorer {
         addDivider();
 
         addItem('폴더 삭제', async () => {
-          if (!confirm(`'${entry.name}' 폴더와 내부 파일들을 모두 삭제하시겠습니까?`)) return;
+          const ok = await openConfirmModal({
+            title: '폴더 삭제',
+            message: `'${entry.name}' 폴더와 내부 파일들을 모두 삭제하시겠습니까?`,
+            confirmText: '폴더 삭제',
+            cancelText: '취소',
+            variant: 'danger',
+          });
+          if (!ok) return;
           try {
             await platform().deleteEntry?.(entry.path);
             await this.reload();
@@ -762,7 +783,13 @@ export class FileExplorer {
       // Empty area of tree
       addItem('새 INI 파일 만들기…', async () => {
         if (!this.currentFolder) return;
-        const input = prompt('새 INI 파일 이름을 입력하세요:', 'mod.ini');
+        const input = await openPromptModal({
+          title: '새 INI 파일 만들기',
+          message: '새 INI 파일 이름을 입력하세요:',
+          defaultValue: 'mod.ini',
+          confirmText: '생성',
+          cancelText: '취소',
+        });
         if (!input) return;
         const cleanName = input.trim().endsWith('.ini') ? input.trim() : `${input.trim()}.ini`;
         try {

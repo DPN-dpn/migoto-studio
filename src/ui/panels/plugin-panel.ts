@@ -1,5 +1,6 @@
 import { platform } from '../../platform';
 import { type PluginManager, type PluginInstance, renderPluginIcon } from '../../plugins';
+import { openConfirmModal } from '../modals/confirm-ui';
 
 const CHEVRON_SVG = `
   <svg viewBox="0 0 16 16" width="10" height="10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -432,7 +433,14 @@ export class PluginPanel {
     `;
     deleteBtn.onclick = async (e) => {
       e.stopPropagation();
-      if (confirm(`플러그인 "${p.manifest.name}"을(를) 삭제하시겠습니까?`)) {
+      const ok = await openConfirmModal({
+        title: '플러그인 삭제',
+        message: `플러그인 "${p.manifest.name}"을(를) 삭제하시겠습니까?`,
+        confirmText: '삭제',
+        cancelText: '취소',
+        variant: 'danger',
+      });
+      if (ok) {
         await this.manager.deletePlugin(p.manifest.id);
       }
     };

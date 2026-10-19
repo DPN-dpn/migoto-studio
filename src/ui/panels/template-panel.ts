@@ -16,6 +16,7 @@ import {
   toggleTemplateFavorite,
 } from '../../core/ini/templates';
 import { openModal } from '../modals/modal';
+import { openConfirmModal } from '../modals/confirm-ui';
 
 const STORAGE_TEMPLATE_COLLAPSED = 'migoto_template_collapsed_groups';
 const FAVORITES_GROUP_NAME = '⭐ 즐겨찾기';
@@ -378,9 +379,16 @@ export class TemplatePanel {
           <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
         </svg>
       `;
-      delBtn.addEventListener('click', (e) => {
+      delBtn.addEventListener('click', async (e) => {
         e.stopPropagation();
-        if (confirm(`'${t.label}' 템플릿을 삭제하시겠습니까?`)) {
+        const ok = await openConfirmModal({
+          title: '템플릿 삭제',
+          message: `'${t.label}' 템플릿을 삭제하시겠습니까?`,
+          confirmText: '삭제',
+          cancelText: '취소',
+          variant: 'danger',
+        });
+        if (ok) {
           if (t.id) deleteCustomTemplate(t.id);
           this.renderList();
         }
