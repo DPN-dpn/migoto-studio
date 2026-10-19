@@ -78,8 +78,11 @@ import type {
   LintDiagnostic,
   ProposeChangesOptions,
   ProposeChangesResult,
+  SubWindowOptions,
+  SubWindowHandle,
 } from './types';
 import { createUIBuilder } from './ui-builder';
+import { subWindowManager } from './sub-window';
 
 export { validatePluginZip, type ExtractedPlugin };
 
@@ -1796,6 +1799,9 @@ export default {
         },
         confirm: (options: ConfirmOptions) => openConfirmModal(options),
         prompt: (options: PromptOptions) => openPromptModal(options),
+        openSubWindow: (options: SubWindowOptions) => {
+          return subWindowManager.openSubWindow(manifest.id, options, callbacks.onRegisterCleanup);
+        },
       },
 
       system: {

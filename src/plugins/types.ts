@@ -342,6 +342,49 @@ export interface FormInstance {
   reset: () => void;
 }
 
+export interface SubWindowOptions {
+  /** 윈도우 고유 식별자 (동일 ID로 재호출 시 기존 창을 포커스) */
+  id: string;
+  /** 창 상단 타이틀 */
+  title: string;
+  /** 창 가로 너비 (기본값: 640) */
+  width?: number;
+  /** 창 세로 높이 (기본값: 520) */
+  height?: number;
+  /** 최소 가로 너비 (선택) */
+  minWidth?: number;
+  /** 최소 세로 높이 (선택) */
+  minHeight?: number;
+  /** 창 크기 조절(Resize) 가능 여부 (기본값: true) */
+  resizable?: boolean;
+  /**
+   * 창 포커스 및 레이어 배치 모드 (기본값: 'parentLinked')
+   * - 'alwaysOnTop': 다른 모든 창보다 항상 위에 고정
+   * - 'parentLinked': 미고토 스튜디오에 포커스가 오면 서브창도 함께 전면으로 정렬
+   * - 'independent': 메인 창과 완전히 분리되어 OS 작업표시줄에서 독립적으로 포커스
+   */
+  focusMode?: 'alwaysOnTop' | 'parentLinked' | 'independent';
+  /** 서브창 내부 UI 렌더링 함수 (정리용 cleanup 함수 반환 가능) */
+  render: (container: HTMLElement, subWin: SubWindowHandle) => void | (() => void);
+}
+
+export interface SubWindowHandle {
+  /** 서브창 닫기 */
+  close(): void;
+  /** 서브창으로 포커스 이동 */
+  focus(): void;
+  /** 창 타이틀 동적 변경 */
+  setTitle(title: string): void;
+  /** 창 크기 동적 조절 */
+  resize(width: number, height: number): void;
+  /** 포커스 모드 동적 변경 */
+  setFocusMode(mode: 'alwaysOnTop' | 'parentLinked' | 'independent'): void;
+  /** 창이 열려있는지 여부 */
+  isOpen(): boolean;
+  /** 창 Window 객체 취득 */
+  getWindow(): Window | null;
+}
+
 export interface PluginContext {
   manifest: PluginManifest;
 
@@ -498,6 +541,7 @@ export interface PluginContext {
     openKeyHelperModal(options?: KeyHelperModalOptions): Promise<string | null>;
     confirm(options: ConfirmOptions): Promise<boolean>;
     prompt(options: PromptOptions): Promise<string | null>;
+    openSubWindow(options: SubWindowOptions): SubWindowHandle;
   } & PluginUIBuilder;
 
   // ---- System execution (desktop) ----

@@ -3,6 +3,15 @@
 ## [다음 버전]
 
 ### 신규 기능
+- 플러그인 독립 서브 윈도우 생성 API (`context.ui.openSubWindow`):
+  - 메인 에디터 화면에 구애받지 않고 독립 팝업 창을 띄워 마법사, 실시간 프리뷰, 전용 도구를 구성할 수 있는 API 신설
+  - 창 크기(`width`, `height`, `minWidth`, `minHeight`) 및 크기 조절 가능 여부(`resizable`) 설정 지원
+  - 3대 포커스 및 레이어 모드(`focusMode`) 지원:
+    - `'alwaysOnTop'`: 화면 최상단 고정 유지
+    - `'parentLinked'`: 메인 Migoto Studio 포커스 시 서브창 자동 전면 연동
+    - `'independent'`: 메인 창과 완전히 분리된 독립 창 동작
+  - 메인 창 테마(다크 모드 등) 및 CSS 스타일시트 자동 복제 주입
+  - 플러그인 생명주기(`deactivate`) 및 앱 종료 시 열린 서브창 자동 정리 연동
 
 ### 기능 개선
 

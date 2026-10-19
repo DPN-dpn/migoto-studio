@@ -265,7 +265,51 @@ context.ui.openRestoreModal('d:/mods/Character/merged.ini');
 
 ---
 
-### 3.7 기본 폼 컨트롤 및 위젯 팩토리 (`context.ui.*`)
+### 3.7 독립 서브 윈도우 띄우기 (`context.ui.openSubWindow`)
+
+메인 에디터 화면(사이드바/메인 탭)에 구애받지 않고, **독립된 서브 윈도우(Pop-out Window)**를 띄워 넓은 마법사, 실시간 프리뷰 캔버스, 전용 도구 UI를 구성할 수 있습니다. 메인 창의 테마와 CSS 스타일이 자동으로 복제 주입됩니다.
+
+```typescript
+const subWin = context.ui.openSubWindow({
+  id: 'my-texture-tool',
+  title: '텍스처 오버라이드 실시간 도구',
+  width: 720,
+  height: 560,
+  minWidth: 400,
+  minHeight: 300,
+  resizable: true,
+  // 포커스 모드: 'alwaysOnTop' | 'parentLinked' | 'independent' (기본: 'parentLinked')
+  focusMode: 'parentLinked',
+  render(container, handle) {
+    const card = context.ui.createCard({
+      title: '실시간 프리뷰',
+      content: '독립된 서브창에서 자유롭게 UI를 구성할 수 있습니다.',
+    });
+    container.append(card.element);
+
+    return () => {
+      // 서브창이 닫힐 때 실행될 정리(cleanup) 로직
+      console.log('서브창 정리 완료');
+    };
+  },
+});
+
+// 프로그래밍 방식으로 서브창 제어
+// subWin.focus();
+// subWin.setTitle('새로운 타이틀');
+// subWin.resize(800, 600);
+// subWin.setFocusMode('alwaysOnTop');
+// subWin.close();
+```
+
+#### 포커스 및 레이어 모드 (`focusMode`)
+- **`'alwaysOnTop'` (항상 맨 위)**: 다른 외부 프로그램이나 게임 창보다 화면 최상단에 계속 유지됩니다. 실시간 모니터링이나 단축키 가이드에 유용합니다.
+- **`'parentLinked'` (에디터 연동 - 기본값)**: 평소에는 다른 창 뒤로 갈 수 있지만, 메인 Migoto Studio 에디터를 클릭하거나 포커스하면 **서브창이 자동으로 메인 창과 함께 맨 위로 올라옵니다.**
+- **`'independent'` (독립 창)**: 메인 에디터와 완전히 독립된 창으로 동작합니다. 듀얼 모니터 환경에서 다른 모니터로 이동시켜 작업하기에 최적입니다.
+
+---
+
+### 3.8 기본 폼 컨트롤 및 위젯 팩토리 (`context.ui.*`)
 
 빠르고 일관된 테마 디자인을 위해 내장 컴포넌트 팩토리 메서드를 제공합니다.
 
