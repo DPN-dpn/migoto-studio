@@ -210,6 +210,51 @@ export function getAllTemplates(): Template[] {
   return [...getCustomTemplates(), ...pluginTemplatesCache, ...OWN_TEMPLATES, ...upstreamTemplates()];
 }
 
+const STORAGE_TEMPLATE_FAVORITES = 'migoto_template_favorites';
+let favoriteIdsCache: Set<string> | null = null;
+
+export function getTemplateKey(t: Template): string {
+  return t.id || `${t.group}::${t.label}`;
+}
+
+export function getFavoriteTemplateIds(): Set<string> {
+  if (favoriteIdsCache) return new Set(favoriteIdsCache);
+  try {
+    const raw = localStorage.getItem(STORAGE_TEMPLATE_FAVORITES);
+    if (raw) {
+      const arr = JSON.parse(raw);
+      if (Array.isArray(arr)) {
+        favoriteIdsCache = new Set(arr);
+        return new Set(favoriteIdsCache);
+      }
+    }
+  } catch {}
+  favoriteIdsCache = new Set();
+  return new Set(favoriteIdsCache);
+}
+
+export function isTemplateFavorite(keyOrTemplate: string | Template): boolean {
+  const key = typeof keyOrTemplate === 'string' ? keyOrTemplate : getTemplateKey(keyOrTemplate);
+  return getFavoriteTemplateIds().has(key);
+}
+
+export function toggleTemplateFavorite(keyOrTemplate: string | Template): boolean {
+  const key = typeof keyOrTemplate === 'string' ? keyOrTemplate : getTemplateKey(keyOrTemplate);
+  const favs = getFavoriteTemplateIds();
+  const willBeFav = !favs.has(key);
+  if (willBeFav) {
+    favs.add(key);
+  } else {
+    favs.delete(key);
+  }
+  favoriteIdsCache = favs;
+  try {
+    localStorage.setItem(STORAGE_TEMPLATE_FAVORITES, JSON.stringify([...favs]));
+  } catch {}
+  notifyTemplatesChange();
+  return willBeFav;
+}
+
 /** Export ONLY custom/user-added templates belonging to a specific group as JSON string */
 export function exportGroupTemplates(groupName: string): string {
   const custom = getCustomTemplates();

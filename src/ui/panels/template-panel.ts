@@ -9,8 +9,13 @@ import {
   importTemplates,
   initCustomTemplates,
   onTemplatesChange,
+  isTemplateFavorite,
+  toggleTemplateFavorite,
 } from '../../core/ini/templates';
 import { openModal } from '../modals/modal';
+
+const STORAGE_TEMPLATE_COLLAPSED = 'migoto_template_collapsed_groups';
+const FAVORITES_GROUP_NAME = '⭐ 즐겨찾기';
 
 function downloadJsonFile(filename: string, content: string) {
   const blob = new Blob([content], { type: 'application/json;charset=utf-8' });
@@ -52,13 +57,43 @@ function pickJsonFile(): Promise<string | null> {
 
 export class TemplatePanel {
   private filter = '';
+  private collapsedGroups: Set<string> = new Set();
 
   constructor(
     private root: HTMLElement,
     private editor: monaco.editor.IStandaloneCodeEditor,
   ) {
-    onTemplatesChange(() => this.render());
+    this.loadCollapsedGroups();
+    onTemplatesChange(() => this.renderList());
     this.render();
+  }
+
+  private loadCollapsedGroups() {
+    try {
+      const raw = localStorage.getItem(STORAGE_TEMPLATE_COLLAPSED);
+      if (raw) {
+        const arr = JSON.parse(raw);
+        if (Array.isArray(arr)) {
+          this.collapsedGroups = new Set(arr);
+        }
+      }
+    } catch {}
+  }
+
+  private saveCollapsedGroups() {
+    try {
+      localStorage.setItem(STORAGE_TEMPLATE_COLLAPSED, JSON.stringify([...this.collapsedGroups]));
+    } catch {}
+  }
+
+  private toggleGroup(groupName: string) {
+    if (this.collapsedGroups.has(groupName)) {
+      this.collapsedGroups.delete(groupName);
+    } else {
+      this.collapsedGroups.add(groupName);
+    }
+    this.saveCollapsedGroups();
+    this.renderList();
   }
 
   private render() {
@@ -77,6 +112,21 @@ export class TemplatePanel {
 
     const actions = document.createElement('div');
     actions.className = 'template-header-actions';
+
+    // Toggle Collapse / Expand All button
+    const toggleAllBtn = document.createElement('button');
+    toggleAllBtn.className = 'template-add-btn';
+    toggleAllBtn.title = '모든 분류 접기 / 펼치기';
+    toggleAllBtn.innerHTML = `
+      <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="7 13 12 18 17 13"></polyline>
+        <polyline points="7 6 12 11 17 6"></polyline>
+      </svg>
+      <span>접기/펼치기</span>
+    `;
+    toggleAllBtn.addEventListener('click', () => {
+      this.toggleAllGroups();
+    });
 
     const importBtn = document.createElement('button');
     importBtn.className = 'template-add-btn';
@@ -98,7 +148,7 @@ export class TemplatePanel {
     `;
     addBtn.addEventListener('click', () => this.openAddModal());
 
-    actions.append(importBtn, addBtn);
+    actions.append(toggleAllBtn, importBtn, addBtn);
     titleRow.append(actions);
 
     header.append(titleRow);
@@ -123,6 +173,27 @@ export class TemplatePanel {
     container.className = 'template-list-container';
     this.root.append(container);
 
+    this.renderList();
+  }
+
+  private toggleAllGroups() {
+    const all = getAllTemplates();
+    const allGroupNames = new Set<string>();
+    if (all.some((t) => isTemplateFavorite(t))) {
+      allGroupNames.add(FAVORITES_GROUP_NAME);
+    }
+    for (const t of all) {
+      allGroupNames.add(t.group || '기타');
+    }
+
+    // 하나라도 펼쳐져 있으면 전체 접기, 모두 접혀 있으면 전체 펼치기
+    const hasExpanded = [...allGroupNames].some((g) => !this.collapsedGroups.has(g));
+    if (hasExpanded) {
+      this.collapsedGroups = allGroupNames;
+    } else {
+      this.collapsedGroups.clear();
+    }
+    this.saveCollapsedGroups();
     this.renderList();
   }
 
@@ -152,7 +223,14 @@ export class TemplatePanel {
       return;
     }
 
-    // Group items by group
+    // 1. 즐겨찾기 그룹 처리 (필터링된 결과 중 즐겨찾기된 항목 모음)
+    const favoriteItems = filtered.filter((t) => isTemplateFavorite(t));
+    if (favoriteItems.length > 0) {
+      const favGroupEl = this.renderGroupSection(FAVORITES_GROUP_NAME, favoriteItems, true);
+      container.append(favGroupEl);
+    }
+
+    // 2. 일반 그룹별 항목 모음
     const groups = new Map<string, Template[]>();
     for (const t of filtered) {
       const g = t.group || '기타';
@@ -161,114 +239,179 @@ export class TemplatePanel {
     }
 
     for (const [groupName, items] of groups.entries()) {
-      const groupEl = document.createElement('div');
-      groupEl.className = 'template-group';
-
-      const groupTitle = document.createElement('div');
-      groupTitle.className = 'template-group-title';
-
-      const groupNameSpan = document.createElement('span');
-      groupNameSpan.textContent = groupName;
-      groupTitle.append(groupNameSpan);
-
-      // Only show export / import buttons for user custom template groups!
-      const hasCustom = items.some((t) => t.isCustom);
-      if (hasCustom) {
-        const groupActions = document.createElement('div');
-        groupActions.className = 'template-group-actions';
-
-        const exportGrpBtn = document.createElement('button');
-        exportGrpBtn.className = 'template-group-btn';
-        exportGrpBtn.title = `'${groupName}' 그룹 템플릿 내보내기 (.json)`;
-        exportGrpBtn.textContent = '내보내기';
-        exportGrpBtn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          this.handleExportGroup(groupName);
-        });
-
-        const importGrpBtn = document.createElement('button');
-        importGrpBtn.className = 'template-group-btn';
-        importGrpBtn.title = `'${groupName}' 그룹으로 템플릿 불러오기 (.json)`;
-        importGrpBtn.textContent = '불러오기';
-        importGrpBtn.addEventListener('click', async (e) => {
-          e.stopPropagation();
-          await this.handleImport(groupName);
-        });
-
-        groupActions.append(exportGrpBtn, importGrpBtn);
-        groupTitle.append(groupActions);
-      }
-
-      groupEl.append(groupTitle);
-
-      for (const t of items) {
-        const card = document.createElement('div');
-        card.className = 'template-card';
-        card.title = '클릭하여 현재 커서 위치에 삽입';
-
-        const cardHeader = document.createElement('div');
-        cardHeader.className = 'template-card-header';
-
-        const label = document.createElement('span');
-        label.className = 'template-card-label';
-        label.textContent = t.label;
-        cardHeader.append(label);
-
-        const badgeBox = document.createElement('div');
-        badgeBox.className = 'template-card-actions';
-
-        if (t.isCustom) {
-          const customBadge = document.createElement('span');
-          customBadge.className = 'template-card-badge custom';
-          customBadge.textContent = '사용자';
-          badgeBox.append(customBadge);
-
-          const delBtn = document.createElement('button');
-          delBtn.className = 'template-card-del-btn';
-          delBtn.title = '템플릿 삭제';
-          delBtn.setAttribute('aria-label', '템플릿 삭제');
-          delBtn.innerHTML = `
-            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <polyline points="3 6 5 6 21 6"></polyline>
-              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-            </svg>
-          `;
-          delBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            if (confirm(`'${t.label}' 템플릿을 삭제하시겠습니까?`)) {
-              if (t.id) deleteCustomTemplate(t.id);
-              this.renderList();
-            }
-          });
-          badgeBox.append(delBtn);
-        }
-
-        cardHeader.append(badgeBox);
-        card.append(cardHeader);
-
-        if (t.description) {
-          const desc = document.createElement('p');
-          desc.className = 'template-card-desc';
-          desc.textContent = t.description;
-          card.append(desc);
-        }
-
-        // Preview snippet
-        const preview = document.createElement('pre');
-        preview.className = 'template-card-preview';
-        const lines = t.body.trim().split('\n').slice(0, 3);
-        preview.textContent = lines.join('\n') + (t.body.trim().split('\n').length > 3 ? '\n…' : '');
-        card.append(preview);
-
-        card.addEventListener('click', () => {
-          insertTemplate(this.editor, t);
-        });
-
-        groupEl.append(card);
-      }
-
+      const groupEl = this.renderGroupSection(groupName, items, false);
       container.append(groupEl);
     }
+  }
+
+  private renderGroupSection(groupName: string, items: Template[], isFavoritesGroup: boolean): HTMLElement {
+    // 검색어가 있으면 사용자가 결과를 볼 수 있도록 무조건 펼침
+    const isCollapsed = !this.filter && this.collapsedGroups.has(groupName);
+
+    const groupEl = document.createElement('div');
+    groupEl.className = `template-group${isCollapsed ? ' is-collapsed' : ''}`;
+
+    const groupTitle = document.createElement('div');
+    groupTitle.className = 'template-group-title';
+    groupTitle.title = isCollapsed ? `'${groupName}' 펼치기` : `'${groupName}' 접기`;
+
+    // Left area: Chevron, Name, Count badge
+    const groupLeft = document.createElement('div');
+    groupLeft.className = 'template-group-left';
+
+    const chevron = document.createElement('span');
+    chevron.className = `template-group-chevron${isCollapsed ? ' collapsed' : ''}`;
+    chevron.innerHTML = `
+      <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="6 9 12 15 18 9"></polyline>
+      </svg>
+    `;
+    groupLeft.append(chevron);
+
+    const groupNameSpan = document.createElement('span');
+    groupNameSpan.className = 'template-group-name';
+    groupNameSpan.textContent = groupName;
+    groupLeft.append(groupNameSpan);
+
+    const countBadge = document.createElement('span');
+    countBadge.className = 'template-group-count';
+    countBadge.textContent = String(items.length);
+    groupLeft.append(countBadge);
+
+    groupTitle.append(groupLeft);
+
+    // Group action buttons (Export / Import for custom templates)
+    const hasCustom = !isFavoritesGroup && items.some((t) => t.isCustom);
+    if (hasCustom) {
+      const groupActions = document.createElement('div');
+      groupActions.className = 'template-group-actions';
+
+      const exportGrpBtn = document.createElement('button');
+      exportGrpBtn.className = 'template-group-btn';
+      exportGrpBtn.title = `'${groupName}' 그룹 템플릿 내보내기 (.json)`;
+      exportGrpBtn.textContent = '내보내기';
+      exportGrpBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.handleExportGroup(groupName);
+      });
+
+      const importGrpBtn = document.createElement('button');
+      importGrpBtn.className = 'template-group-btn';
+      importGrpBtn.title = `'${groupName}' 그룹으로 템플릿 불러오기 (.json)`;
+      importGrpBtn.textContent = '불러오기';
+      importGrpBtn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        await this.handleImport(groupName);
+      });
+
+      groupActions.append(exportGrpBtn, importGrpBtn);
+      groupTitle.append(groupActions);
+    }
+
+    // Toggle collapse on header click
+    groupTitle.addEventListener('click', () => {
+      this.toggleGroup(groupName);
+    });
+
+    groupEl.append(groupTitle);
+
+    // Items container
+    const itemsContainer = document.createElement('div');
+    itemsContainer.className = 'template-group-items';
+    if (isCollapsed) {
+      itemsContainer.style.display = 'none';
+    }
+
+    for (const t of items) {
+      const card = this.renderCard(t);
+      itemsContainer.append(card);
+    }
+
+    groupEl.append(itemsContainer);
+    return groupEl;
+  }
+
+  private renderCard(t: Template): HTMLElement {
+    const card = document.createElement('div');
+    card.className = 'template-card';
+    card.title = '클릭하여 현재 커서 위치에 삽입';
+
+    const cardHeader = document.createElement('div');
+    cardHeader.className = 'template-card-header';
+
+    const label = document.createElement('span');
+    label.className = 'template-card-label';
+    label.textContent = t.label;
+    cardHeader.append(label);
+
+    const badgeBox = document.createElement('div');
+    badgeBox.className = 'template-card-actions';
+
+    // Favorite Star Button
+    const isFav = isTemplateFavorite(t);
+    const favBtn = document.createElement('button');
+    favBtn.className = `template-card-fav-btn${isFav ? ' active' : ''}`;
+    favBtn.title = isFav ? '즐겨찾기 해제' : '즐겨찾기에 추가';
+    favBtn.setAttribute('aria-label', favBtn.title);
+    favBtn.innerHTML = isFav
+      ? `<svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" stroke="currentColor" stroke-width="1.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>`
+      : `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>`;
+
+    favBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleTemplateFavorite(t);
+      this.renderList();
+    });
+    badgeBox.append(favBtn);
+
+    if (t.isCustom) {
+      const customBadge = document.createElement('span');
+      customBadge.className = 'template-card-badge custom';
+      customBadge.textContent = '사용자';
+      badgeBox.append(customBadge);
+
+      const delBtn = document.createElement('button');
+      delBtn.className = 'template-card-del-btn';
+      delBtn.title = '템플릿 삭제';
+      delBtn.setAttribute('aria-label', '템플릿 삭제');
+      delBtn.innerHTML = `
+        <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="3 6 5 6 21 6"></polyline>
+          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+        </svg>
+      `;
+      delBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (confirm(`'${t.label}' 템플릿을 삭제하시겠습니까?`)) {
+          if (t.id) deleteCustomTemplate(t.id);
+          this.renderList();
+        }
+      });
+      badgeBox.append(delBtn);
+    }
+
+    cardHeader.append(badgeBox);
+    card.append(cardHeader);
+
+    if (t.description) {
+      const desc = document.createElement('p');
+      desc.className = 'template-card-desc';
+      desc.textContent = t.description;
+      card.append(desc);
+    }
+
+    // Preview snippet
+    const preview = document.createElement('pre');
+    preview.className = 'template-card-preview';
+    const lines = t.body.trim().split('\n').slice(0, 3);
+    preview.textContent = lines.join('\n') + (t.body.trim().split('\n').length > 3 ? '\n…' : '');
+    card.append(preview);
+
+    card.addEventListener('click', () => {
+      insertTemplate(this.editor, t);
+    });
+
+    return card;
   }
 
   private openAddModal() {

@@ -1034,15 +1034,65 @@ body.resizing * {
 }
 
 .template-group-title {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.04em;
   color: var(--fg-dim);
-  text-transform: uppercase;
-  padding: 4px 4px 6px;
+  padding: 5px 6px;
   display: flex;
   align-items: center;
   justify-content: space-between;
+  cursor: pointer;
+  border-radius: 4px;
+  user-select: none;
+  transition: background 0.12s, color 0.12s;
+}
+
+.template-group-title:hover {
+  background: var(--bg-hover);
+  color: var(--fg);
+}
+
+.template-group-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.template-group-chevron {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.15s ease;
+  color: var(--fg-dim);
+  flex-shrink: 0;
+}
+
+.template-group-chevron.collapsed {
+  transform: rotate(-90deg);
+}
+
+.template-group-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.template-group-count {
+  font-size: 9px;
+  font-weight: 600;
+  padding: 1px 5px;
+  border-radius: 10px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--fg-dim);
+  flex-shrink: 0;
+}
+
+.template-group.is-collapsed {
+  margin-bottom: 4px;
 }
 
 .template-group-actions {
@@ -1124,6 +1174,35 @@ body.resizing * {
 .template-card-badge.custom {
   background: rgba(16, 185, 129, 0.15);
   color: #10b981;
+}
+
+.template-card-fav-btn {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 3px;
+  color: var(--fg-dim);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  opacity: 0.55;
+  transition: transform 0.12s ease, color 0.12s ease, opacity 0.12s ease;
+}
+.template-card-fav-btn:hover {
+  opacity: 1;
+  color: #eab308;
+  transform: scale(1.18);
+}
+.template-card-fav-btn.active {
+  color: #eab308;
+  opacity: 1;
+}
+.template-card-fav-btn.active:hover {
+  transform: scale(1.18);
+  color: #f59e0b;
 }
 
 .template-card-del-btn {
