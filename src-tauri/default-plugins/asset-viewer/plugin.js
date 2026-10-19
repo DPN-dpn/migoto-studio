@@ -3581,6 +3581,7 @@ var plugin = {
 				"gif"
 			],
 			render(container, file) {
+				context.logger?.info(`텍스처 에셋 열림: ${file.name} (${Math.round(file.bytes.length / 1024)} KB)`);
 				const viewer = new ImageViewer(container);
 				viewer.show({
 					name: file.name,

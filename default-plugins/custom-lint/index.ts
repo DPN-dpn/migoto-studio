@@ -22,6 +22,7 @@ let unregisterRefProvider: (() => void) | null = null;
 const plugin: MigotoPlugin = {
   activate(context: PluginContext) {
     isPluginActive = true;
+    context.logger?.info('커스텀 린터 및 크로스 파일 심볼 추적기 활성화됨');
 
     // 0. XXMI 표준 내장 커맨드리스트 허용 등록 (GIMI / ZZMI / XXMI 내장 함수: BuiltinCommandList~, CommandListSkinTexture 등)
     if (context.linter?.registerAllowedResource) {

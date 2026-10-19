@@ -353,6 +353,7 @@ async function callAiChatApi(options) {
 	const maxRetries = 2;
 	let attempt = 0;
 	let replyData = null;
+	context.logger?.info(`AI 요청 전송: 모델=${model}, 엔드포인트=${apiUrl}`);
 	while (attempt <= maxRetries) {
 		attempt++;
 		try {
@@ -400,7 +401,9 @@ async function callAiChatApi(options) {
 			onRetryWaitDone?.(attempt, maxRetries);
 		}
 	}
-	return replyData?.choices?.[0]?.message?.content || "(응답 없음)";
+	const content = replyData?.choices?.[0]?.message?.content || "(응답 없음)";
+	context.logger?.info(`AI 응답 수신 완료 (길이: ${content.length}자)`);
+	return content;
 }
 //#endregion
 //#region default-plugins/ai-assistant/ui.ts

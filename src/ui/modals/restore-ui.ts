@@ -1,6 +1,7 @@
 import { openModal } from './modal';
 import { platform, type FileRef } from '../../platform';
 import type { DocumentManager } from '../../core/workspace/documents';
+import { appLogger } from '../../core/logger';
 
 const fmtSize = (n: number) => (n < 1024 ? `${n} B` : `${(n / 1024).toFixed(1)} KB`);
 
@@ -43,6 +44,7 @@ export async function openRestore(doc: DocumentManager, targetRef?: FileRef | nu
         const text = await platform().readBackup(b);
         close();
         await doc.compareWithBackup(text, b.timestamp);
+        appLogger.info('Backup', `백업본 비교 탭 열림: ${targetName} (${new Date(b.timestamp).toLocaleString('ko-KR')})`);
       } catch (e) {
         await platform().showError('비교하지 못했습니다', String(e));
       }
@@ -54,6 +56,7 @@ export async function openRestore(doc: DocumentManager, targetRef?: FileRef | nu
       try {
         await doc.restoreText(await platform().readBackup(b));
         close();
+        appLogger.info('Backup', `백업 버전 복원됨: ${targetName} (${new Date(b.timestamp).toLocaleString('ko-KR')})`);
       } catch (e) {
         await platform().showError('복원하지 못했습니다', String(e));
       }

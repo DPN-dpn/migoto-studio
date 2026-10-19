@@ -13,6 +13,7 @@ const plugin: MigotoPlugin = {
       name: 'DDS / 텍스처 뷰어',
       extensions: ['dds', 'png', 'jpg', 'jpeg', 'bmp', 'webp', 'gif'],
       render(container, file) {
+        context.logger?.info(`텍스처 에셋 열림: ${file.name} (${Math.round(file.bytes.length / 1024)} KB)`);
         const viewer = new ImageViewer(container);
         viewer.show({
           name: file.name,

@@ -114,7 +114,10 @@ function buildPythonRunnerView(context, container) {
 			runBtn.textContent = "스크립트 실행";
 			return;
 		}
-		if (stdinText === void 0) consoleView.set("프로세스 시작...\n");
+		if (stdinText === void 0) {
+			consoleView.set("프로세스 시작...\n");
+			context.logger?.info(`Python 실행 시작: ${cmdSelect.getValue()} (모드: ${currentMode})`);
+		}
 		try {
 			const res = await executePythonScript(context, {
 				cmd: cmdSelect.getValue(),
@@ -130,11 +133,17 @@ function buildPythonRunnerView(context, container) {
 			if (res.stderr) consoleView.append((res.stdout ? "\n" : "") + res.stderr);
 			if (!res.stdout && !res.stderr) consoleView.set(`(출력 없음 - 종료 코드: ${res.exitCode})`);
 			insertBtn.disabled = !res.stdout;
-			if (res.exitCode === 0) context.ui.showToast("Python 실행 완료", "info");
-			else context.ui.showToast(`실행 실패 (종료 코드 ${res.exitCode})`, "warn");
+			if (res.exitCode === 0) {
+				context.ui.showToast("Python 실행 완료", "info");
+				context.logger?.info(`Python 실행 성공 (종료 코드: ${res.exitCode})`);
+			} else {
+				context.ui.showToast(`실행 실패 (종료 코드 ${res.exitCode})`, "warn");
+				context.logger?.warn(`Python 실행 비정상 종료 (코드 ${res.exitCode})`, res.stderr);
+			}
 		} catch (err) {
 			consoleView.append(`\n[오류] ${err}`);
 			context.ui.showToast("실행 오류 발생", "error");
+			context.logger?.error("Python 실행 예외 발생:", err);
 		} finally {
 			runBtn.disabled = false;
 			runBtn.textContent = "스크립트 실행";

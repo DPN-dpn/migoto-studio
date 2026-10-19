@@ -809,6 +809,7 @@ var unregisterRefProvider = null;
 var plugin = {
 	activate(context) {
 		isPluginActive = true;
+		context.logger?.info("커스텀 린터 및 크로스 파일 심볼 추적기 활성화됨");
 		if (context.linter?.registerAllowedResource) {
 			const u1 = context.linter.registerAllowedResource((name) => isBuiltinResource(name));
 			const u2 = context.linter.registerAllowedResource(/^builtincommandlist/i);
