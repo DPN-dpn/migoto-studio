@@ -352,7 +352,7 @@ export default __css;
       // Three.js 등 다중 번들 로드 시 발생하는 무해한 콘솔 경고를 자동으로 억제
       if (finalCode.includes('Multiple instances of Three.js being imported')) {
         finalCode = finalCode.replace(
-          /console\.warn\(\s*['"]WARNING:\s*Multiple instances of Three\.js being imported\.['"]\s*\);?/g,
+          /console\.warn\s*\(\s*['"]WARNING:\s*Multiple instances of Three\.js being imported\.['"]\s*\);?/g,
           '/* silenced Three.js duplicate instance warning */',
         );
       }
