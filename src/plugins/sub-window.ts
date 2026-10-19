@@ -1,14 +1,193 @@
 import type { SubWindowOptions, SubWindowHandle } from './types.ts';
+import { isTauriEnvironment } from '../platform/index';
+import { appLogger } from '../core/logger';
+
+interface ActiveWindowItem {
+  handle: SubWindowHandle;
+  cleanup?: () => void;
+  subWin?: Window | null;
+  floatingEl?: HTMLElement | null;
+  dockChip?: HTMLElement | null;
+}
+
+let floatingStylesInjected = false;
+let highestZIndex = 5000;
+
+function ensureFloatingStyles() {
+  if (floatingStylesInjected || typeof document === 'undefined') return;
+  floatingStylesInjected = true;
+
+  const style = document.createElement('style');
+  style.id = 'migoto-floating-subwindow-styles';
+  style.textContent = `
+    .migoto-subwindow-dock-bar {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      display: flex;
+      flex-direction: row-reverse;
+      gap: 8px;
+      z-index: 100001;
+      pointer-events: none;
+    }
+
+    .migoto-subwindow-dock-chip {
+      pointer-events: auto;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 12px;
+      background: var(--bg-secondary, #161b22);
+      border: 1px solid var(--border-color, #30363d);
+      border-radius: 20px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--text-color, #e6edf3);
+      cursor: pointer;
+      user-select: none;
+      transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+    }
+
+    .migoto-subwindow-dock-chip:hover {
+      transform: translateY(-2px);
+      background: var(--bg-primary, #0d1117);
+      border-color: var(--accent-color, #58a6ff);
+    }
+
+    .migoto-floating-subwindow {
+      position: fixed;
+      display: flex;
+      flex-direction: column;
+      background: var(--bg-primary, #0d1117);
+      border: 1px solid var(--border-color, #30363d);
+      border-radius: 8px;
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.06);
+      overflow: hidden;
+      box-sizing: border-box;
+      user-select: auto;
+      transition: box-shadow 0.15s ease;
+    }
+
+    .migoto-floating-subwindow.is-active {
+      box-shadow: 0 20px 48px rgba(0, 0, 0, 0.65), 0 0 0 1px var(--accent-color, #58a6ff);
+    }
+
+    .migoto-floating-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 12px;
+      background: var(--bg-secondary, #161b22);
+      border-bottom: 1px solid var(--border-color, #30363d);
+      cursor: grab;
+      user-select: none;
+      flex-shrink: 0;
+      gap: 8px;
+    }
+
+    .migoto-floating-header:active {
+      cursor: grabbing;
+    }
+
+    .migoto-floating-title-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+      flex: 1 1 auto;
+    }
+
+    .migoto-floating-title {
+      font-weight: 600;
+      font-size: 12px;
+      color: var(--text-color, #e6edf3);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .migoto-floating-controls {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      flex-shrink: 0;
+    }
+
+    .migoto-floating-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted, #8b949e);
+      width: 22px;
+      height: 22px;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 11px;
+      line-height: 1;
+      transition: background 0.15s ease, color 0.15s ease;
+      padding: 0;
+    }
+
+    .migoto-floating-btn:hover {
+      background: var(--bg-hover, rgba(255, 255, 255, 0.08));
+      color: var(--text-color, #e6edf3);
+    }
+
+    .migoto-floating-btn.close-btn:hover {
+      background: rgba(248, 81, 73, 0.25);
+      color: #ff7b72;
+    }
+
+    .migoto-floating-resize-r {
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 6px;
+      height: 100%;
+      cursor: ew-resize;
+      z-index: 10;
+    }
+
+    .migoto-floating-resize-b {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      height: 6px;
+      cursor: ns-resize;
+      z-index: 10;
+    }
+
+    .migoto-floating-resize-br {
+      position: absolute;
+      bottom: 2px;
+      right: 2px;
+      width: 14px;
+      height: 14px;
+      cursor: nwse-resize;
+      z-index: 11;
+      display: flex;
+      align-items: flex-end;
+      justify-content: flex-end;
+      color: var(--text-muted, #8b949e);
+      opacity: 0.6;
+    }
+
+    .migoto-floating-resize-br:hover {
+      opacity: 1;
+    }
+  `;
+  document.head.appendChild(style);
+}
 
 export class SubWindowManager {
-  private activeWindows: Map<string, {
-    subWin: Window;
-    handle: SubWindowHandle;
-    cleanup?: () => void;
-  }> = new Map();
+  private activeWindows: Map<string, ActiveWindowItem> = new Map();
+  private dockBar: HTMLElement | null = null;
 
   constructor() {
-    // 메인 창이 닫힐 때 모든 열린 서브창 일괄 닫기
     if (typeof window !== 'undefined') {
       window.addEventListener('beforeunload', () => {
         this.closeAllWindows();
@@ -17,7 +196,9 @@ export class SubWindowManager {
   }
 
   /**
-   * 플러그인 전용 서브 윈도우를 띄웁니다.
+   * 플러그인 전용 서브 윈도우를 엽니다.
+   * 브라우저 팝업 지원 시 팝업 창을 사용하며, Tauri 데스크톱 환경이거나
+   * 팝업이 차단된 경우 앱 내 네이티브 플로팅 윈도우로 안전하게 폴백합니다.
    */
   openSubWindow(
     pluginId: string,
@@ -28,60 +209,79 @@ export class SubWindowManager {
 
     // 1. 이미 열려 있는 서브창이 있으면 포커스 후 기존 핸들 반환
     const existing = this.activeWindows.get(fullId);
-    if (existing && !existing.subWin.closed) {
-      existing.subWin.focus();
+    if (existing && existing.handle.isOpen()) {
+      existing.handle.focus();
       return existing.handle;
     }
 
-    const width = Math.max(200, options.width ?? 640);
-    const height = Math.max(150, options.height ?? 520);
-    const resizable = options.resizable !== false;
+    // 2. 데스크톱(Tauri) 환경이 아닌 웹 브라우저 환경에서만 팝업 시도
+    let subWin: Window | null = null;
+    if (!isTauriEnvironment()) {
+      const width = Math.max(200, options.width ?? 640);
+      const height = Math.max(150, options.height ?? 520);
+      const resizable = options.resizable !== false;
+      const screenX = typeof window.screenX !== 'undefined' ? window.screenX : 0;
+      const screenY = typeof window.screenY !== 'undefined' ? window.screenY : 0;
+      const outerW = window.outerWidth || 1024;
+      const outerH = window.outerHeight || 768;
+      const left = Math.max(0, Math.round(screenX + (outerW - width) / 2));
+      const top = Math.max(0, Math.round(screenY + (outerH - height) / 2));
 
-    // 모니터 중앙 또는 메인 창 중앙 좌표 계산
-    const screenX = typeof window.screenX !== 'undefined' ? window.screenX : 0;
-    const screenY = typeof window.screenY !== 'undefined' ? window.screenY : 0;
-    const outerW = window.outerWidth || 1024;
-    const outerH = window.outerHeight || 768;
-    const left = Math.max(0, Math.round(screenX + (outerW - width) / 2));
-    const top = Math.max(0, Math.round(screenY + (outerH - height) / 2));
+      const features = [
+        `width=${width}`,
+        `height=${height}`,
+        `left=${left}`,
+        `top=${top}`,
+        `resizable=${resizable ? 'yes' : 'no'}`,
+        'scrollbars=yes',
+        'status=no',
+        'menubar=no',
+        'toolbar=no',
+        'location=no',
+      ].join(',');
 
-    const features = [
-      `width=${width}`,
-      `height=${height}`,
-      `left=${left}`,
-      `top=${top}`,
-      `resizable=${resizable ? 'yes' : 'no'}`,
-      'scrollbars=yes',
-      'status=no',
-      'menubar=no',
-      'toolbar=no',
-      'location=no',
-    ].join(',');
-
-    const subWin = window.open('about:blank', `migoto_subwin_${pluginId}_${options.id}`, features);
-    if (!subWin || subWin.closed || typeof subWin.closed === 'undefined') {
-      throw new Error('서브 윈도우 생성에 실패했습니다. 브라우저의 팝업 차단 설정을 확인해주세요.');
+      try {
+        subWin = window.open('about:blank', `migoto_subwin_${pluginId}_${options.id}`, features);
+      } catch {
+        subWin = null;
+      }
     }
 
+    // 3. 브라우저 팝업 창이 정상 생성된 경우
+    if (subWin && !subWin.closed && typeof subWin.closed !== 'undefined') {
+      return this.openBrowserSubWindow(fullId, pluginId, options, subWin, onRegisterCleanup);
+    }
+
+    // 4. Tauri 환경 또는 팝업 차단 환경 -> 내장 플로팅 서브 윈도우 생성
+    return this.openFloatingSubWindow(fullId, pluginId, options, onRegisterCleanup);
+  }
+
+  /**
+   * 브라우저 팝업 창을 통한 서브 윈도우 구현
+   */
+  private openBrowserSubWindow(
+    fullId: string,
+    _pluginId: string,
+    options: SubWindowOptions,
+    subWin: Window,
+    onRegisterCleanup?: (cleanup: () => void) => void
+  ): SubWindowHandle {
     const subDoc = subWin.document;
     subDoc.title = options.title || 'Migoto Studio Sub Window';
 
-    // 2. 메인 창의 CSS 스타일시트 및 테마 속성 복제
+    // 메인 창 스타일 복제
     try {
       const headElements = document.head.querySelectorAll('style, link[rel="stylesheet"]');
       headElements.forEach((el) => {
         const clone = el.cloneNode(true);
         subDoc.head.appendChild(clone);
       });
-
-      // 테마 클래스 및 인라인 스타일 동기화
       subDoc.documentElement.className = document.documentElement.className;
       subDoc.documentElement.style.cssText = document.documentElement.style.cssText;
     } catch (e) {
-      console.warn('[SubWindowManager] 스타일 복제 중 경고:', e);
+      console.warn('[SubWindowManager] 스타일 복제 경고:', e);
     }
 
-    // 3. 서브창 내부 기본 스타일 설정
     subDoc.body.style.cssText = `
       margin: 0;
       padding: 0;
@@ -99,7 +299,7 @@ export class SubWindowManager {
       user-select: auto;
     `;
 
-    // 4. 서브창 상단 유틸리티 헤더 (포커스 모드 배지 및 타이틀)
+    // 헤더 바
     const headerBar = subDoc.createElement('div');
     headerBar.className = 'subwindow-header-bar';
     headerBar.style.cssText = `
@@ -116,7 +316,6 @@ export class SubWindowManager {
     `;
 
     const titleEl = subDoc.createElement('span');
-    titleEl.className = 'subwindow-title-text';
     titleEl.textContent = options.title || '서브 윈도우';
     titleEl.style.cssText = `
       font-weight: 600;
@@ -125,9 +324,6 @@ export class SubWindowManager {
       text-overflow: ellipsis;
       white-space: nowrap;
     `;
-
-    const modeBadgeContainer = subDoc.createElement('div');
-    modeBadgeContainer.style.cssText = 'display: flex; align-items: center; gap: 6px;';
 
     const modeBadge = subDoc.createElement('span');
     modeBadge.className = 'subwindow-mode-badge';
@@ -140,12 +336,11 @@ export class SubWindowManager {
       transition: background 0.15s ease;
     `;
 
-    modeBadgeContainer.appendChild(modeBadge);
     headerBar.appendChild(titleEl);
-    headerBar.appendChild(modeBadgeContainer);
+    headerBar.appendChild(modeBadge);
     subDoc.body.appendChild(headerBar);
 
-    // 5. 플러그인 컨텐츠 루트 컨테이너
+    // 루트 컨텐츠
     const rootContainer = subDoc.createElement('div');
     rootContainer.className = 'plugin-subwindow-content';
     rootContainer.style.cssText = `
@@ -161,7 +356,6 @@ export class SubWindowManager {
     `;
     subDoc.body.appendChild(rootContainer);
 
-    // 6. 포커스 모드 핸들러
     let currentMode: 'alwaysOnTop' | 'parentLinked' | 'independent' = options.focusMode ?? 'parentLinked';
     let parentFocusCleanup: (() => void) | null = null;
     let subBlurCleanup: (() => void) | null = null;
@@ -171,17 +365,14 @@ export class SubWindowManager {
         modeBadge.textContent = '📌 항상 맨 위';
         modeBadge.style.background = 'rgba(240, 136, 62, 0.2)';
         modeBadge.style.color = '#f0883e';
-        modeBadge.title = '다른 모든 창보다 화면 최상단에 유지됩니다. (클릭하여 모드 전환)';
       } else if (currentMode === 'parentLinked') {
         modeBadge.textContent = '🔗 에디터 연동';
         modeBadge.style.background = 'rgba(56, 139, 253, 0.2)';
         modeBadge.style.color = '#58a6ff';
-        modeBadge.title = 'Migoto Studio 에디터에 포커스가 오면 서브창도 함께 전면으로 올라옵니다. (클릭하여 모드 전환)';
       } else {
         modeBadge.textContent = '🗗 독립 창';
         modeBadge.style.background = 'rgba(139, 148, 158, 0.2)';
         modeBadge.style.color = '#8b949e';
-        modeBadge.title = '메인 에디터와 완전히 독립적으로 동작합니다. (클릭하여 모드 전환)';
       }
     };
 
@@ -189,42 +380,27 @@ export class SubWindowManager {
       currentMode = mode;
       updateModeBadgeUi();
 
-      if (parentFocusCleanup) {
-        parentFocusCleanup();
-        parentFocusCleanup = null;
-      }
-      if (subBlurCleanup) {
-        subBlurCleanup();
-        subBlurCleanup = null;
-      }
+      if (parentFocusCleanup) { parentFocusCleanup(); parentFocusCleanup = null; }
+      if (subBlurCleanup) { subBlurCleanup(); subBlurCleanup = null; }
 
       if (mode === 'parentLinked') {
-        // 메인 창이 포커스되면 서브창도 함께 포커스하여 위로 올림
         const onMainFocus = () => {
-          if (subWin && !subWin.closed) {
-            subWin.focus();
-          }
+          if (subWin && !subWin.closed) subWin.focus();
         };
         window.addEventListener('focus', onMainFocus);
         parentFocusCleanup = () => window.removeEventListener('focus', onMainFocus);
       } else if (mode === 'alwaysOnTop') {
-        // 메인 창 포커스 시 서브창을 즉시 위로 복원
         const onMainFocus = () => {
-          if (currentMode === 'alwaysOnTop' && subWin && !subWin.closed) {
-            subWin.focus();
-          }
+          if (currentMode === 'alwaysOnTop' && subWin && !subWin.closed) subWin.focus();
         };
         window.addEventListener('focus', onMainFocus);
 
-        // 서브창 blur 시 포커스 복원 유지 (always-on-top 에뮬레이션)
         let blurTimer: any = null;
         const onSubBlur = () => {
           if (currentMode !== 'alwaysOnTop' || !subWin || subWin.closed) return;
           clearTimeout(blurTimer);
           blurTimer = setTimeout(() => {
-            if (currentMode === 'alwaysOnTop' && subWin && !subWin.closed) {
-              subWin.focus();
-            }
+            if (currentMode === 'alwaysOnTop' && subWin && !subWin.closed) subWin.focus();
           }, 80);
         };
         subWin.addEventListener('blur', onSubBlur);
@@ -238,80 +414,38 @@ export class SubWindowManager {
           subWin.removeEventListener('blur', onSubBlur);
         };
       }
-      // independent: 부모 포커스 리스너 없음
     };
 
-    // 배지 클릭 시 모드 순환 전환
     modeBadge.onclick = () => {
-      if (currentMode === 'parentLinked') {
-        applyFocusMode('alwaysOnTop');
-      } else if (currentMode === 'alwaysOnTop') {
-        applyFocusMode('independent');
-      } else {
-        applyFocusMode('parentLinked');
-      }
+      if (currentMode === 'parentLinked') applyFocusMode('alwaysOnTop');
+      else if (currentMode === 'alwaysOnTop') applyFocusMode('independent');
+      else applyFocusMode('parentLinked');
     };
 
     applyFocusMode(currentMode);
 
-    // 7. 최소 크기(minWidth, minHeight) 감시
-    if (options.minWidth || options.minHeight) {
-      const minW = options.minWidth ?? 200;
-      const minH = options.minHeight ?? 150;
-      let resizeTimer: any = null;
-      subWin.addEventListener('resize', () => {
-        clearTimeout(resizeTimer);
-        resizeTimer = setTimeout(() => {
-          if (subWin && !subWin.closed) {
-            const curW = subWin.outerWidth || subWin.innerWidth;
-            const curH = subWin.outerHeight || subWin.innerHeight;
-            if (curW < minW || curH < minH) {
-              subWin.resizeTo(Math.max(curW, minW), Math.max(curH, minH));
-            }
-          }
-        }, 100);
-      });
-    }
-
-    // 8. 윈도우 핸들 인터페이스
     let userCleanup: (() => void) | void;
     let isDisposed = false;
 
     const dispose = () => {
       if (isDisposed) return;
       isDisposed = true;
-
-      if (parentFocusCleanup) {
-        parentFocusCleanup();
-        parentFocusCleanup = null;
-      }
-      if (subBlurCleanup) {
-        subBlurCleanup();
-        subBlurCleanup = null;
-      }
-
+      if (parentFocusCleanup) { parentFocusCleanup(); parentFocusCleanup = null; }
+      if (subBlurCleanup) { subBlurCleanup(); subBlurCleanup = null; }
       this.activeWindows.delete(fullId);
-
       if (typeof userCleanup === 'function') {
-        try {
-          userCleanup();
-        } catch (e) {
-          console.error('[SubWindowManager] 플러그인 cleanup 실행 오류:', e);
-        }
+        try { userCleanup(); } catch (e) { console.error('[SubWindowManager] cleanup 오류:', e); }
       }
+      appLogger.info('plugin', `서브 윈도우 닫힘: "${options.title}"`);
     };
 
     const handle: SubWindowHandle = {
       close: () => {
-        if (subWin && !subWin.closed) {
-          subWin.close();
-        }
+        if (subWin && !subWin.closed) subWin.close();
         dispose();
       },
       focus: () => {
-        if (subWin && !subWin.closed) {
-          subWin.focus();
-        }
+        if (subWin && !subWin.closed) subWin.focus();
       },
       setTitle: (newTitle: string) => {
         if (subWin && !subWin.closed) {
@@ -324,42 +458,434 @@ export class SubWindowManager {
           subWin.resizeTo(Math.max(100, newW), Math.max(100, newH));
         }
       },
-      setFocusMode: (mode) => {
-        applyFocusMode(mode);
-      },
-      isOpen: () => {
-        return Boolean(subWin && !subWin.closed);
-      },
-      getWindow: () => {
-        return subWin && !subWin.closed ? subWin : null;
-      },
+      setFocusMode: (mode) => applyFocusMode(mode),
+      isOpen: () => Boolean(subWin && !subWin.closed),
+      getWindow: () => subWin && !subWin.closed ? subWin : null,
     };
 
-    // 사용자가 창의 [X]를 눌러 닫았을 때
-    subWin.addEventListener('beforeunload', () => {
-      dispose();
-    });
+    subWin.addEventListener('beforeunload', () => dispose());
 
-    // 플러그인 deactivate 시 자동 정리에 등록
     if (onRegisterCleanup) {
-      onRegisterCleanup(() => {
-        handle.close();
-      });
+      onRegisterCleanup(() => handle.close());
     }
 
     this.activeWindows.set(fullId, {
-      subWin,
       handle,
+      subWin,
       cleanup: dispose,
     });
 
-    // 9. 사용자 render 함수 호출
     try {
       userCleanup = options.render(rootContainer, handle);
     } catch (e) {
-      console.error('[SubWindowManager] 플러그인 render 함수 실행 오류:', e);
+      console.error('[SubWindowManager] render 실행 오류:', e);
     }
 
+    appLogger.info('plugin', `서브 윈도우 생성 (브라우저 팝업): "${options.title}"`);
+    return handle;
+  }
+
+  /**
+   * 앱 내 네이티브 플로팅 서브 윈도우 구현 (Tauri 데스크톱 및 팝업 차단 환경 완벽 호환)
+   */
+  private openFloatingSubWindow(
+    fullId: string,
+    _pluginId: string,
+    options: SubWindowOptions,
+    onRegisterCleanup?: (cleanup: () => void) => void
+  ): SubWindowHandle {
+    ensureFloatingStyles();
+
+    const minW = Math.max(240, options.minWidth ?? 280);
+    const minH = Math.max(160, options.minHeight ?? 200);
+    const width = Math.max(minW, options.width ?? 680);
+    const height = Math.max(minH, options.height ?? 540);
+    const resizable = options.resizable !== false;
+
+    // 윈도우 캐스케이드 배치 계산
+    const viewW = window.innerWidth || 1200;
+    const viewH = window.innerHeight || 800;
+    const cascadeOffset = (this.activeWindows.size % 8) * 26;
+    let posX = Math.max(20, Math.round((viewW - width) / 2) + cascadeOffset);
+    let posY = Math.max(40, Math.round((viewH - height) / 2) + cascadeOffset);
+
+    if (posX + width > viewW) posX = Math.max(10, viewW - width - 20);
+    if (posY + height > viewH) posY = Math.max(40, viewH - height - 20);
+
+    // 플로팅 창 컨테이너 DOM 생성
+    const floatingEl = document.createElement('div');
+    floatingEl.className = 'migoto-floating-subwindow';
+    floatingEl.style.width = `${width}px`;
+    floatingEl.style.height = `${height}px`;
+    floatingEl.style.left = `${posX}px`;
+    floatingEl.style.top = `${posY}px`;
+
+    let currentMode: 'alwaysOnTop' | 'parentLinked' | 'independent' = options.focusMode ?? 'parentLinked';
+
+    const bringToFront = () => {
+      highestZIndex += 1;
+      floatingEl.style.zIndex = currentMode === 'alwaysOnTop' ? '100000' : String(highestZIndex);
+      document.querySelectorAll('.migoto-floating-subwindow').forEach((el) => {
+        el.classList.remove('is-active');
+      });
+      floatingEl.classList.add('is-active');
+    };
+
+    bringToFront();
+    floatingEl.addEventListener('pointerdown', () => bringToFront());
+
+    // 타이틀 바 (드래그 핸들)
+    const headerBar = document.createElement('div');
+    headerBar.className = 'migoto-floating-header';
+
+    const titleGroup = document.createElement('div');
+    titleGroup.className = 'migoto-floating-title-group';
+
+    const iconEl = document.createElement('span');
+    iconEl.style.cssText = 'font-size: 13px; line-height: 1; flex-shrink: 0;';
+    iconEl.textContent = '🗔';
+
+    const titleEl = document.createElement('span');
+    titleEl.className = 'migoto-floating-title';
+    titleEl.textContent = options.title || '서브 윈도우';
+
+    const modeBadge = document.createElement('span');
+    modeBadge.className = 'subwindow-mode-badge';
+    modeBadge.style.cssText = `
+      padding: 2px 7px;
+      border-radius: 10px;
+      font-size: 10px;
+      font-weight: 500;
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: background 0.15s ease;
+    `;
+
+    titleGroup.appendChild(iconEl);
+    titleGroup.appendChild(titleEl);
+    titleGroup.appendChild(modeBadge);
+
+    // 창 제어 버튼들 (최소화, 최대화, 닫기)
+    const controls = document.createElement('div');
+    controls.className = 'migoto-floating-controls';
+
+    const minBtn = document.createElement('button');
+    minBtn.className = 'migoto-floating-btn';
+    minBtn.title = '최소화';
+    minBtn.textContent = '⚊';
+
+    const maxBtn = document.createElement('button');
+    maxBtn.className = 'migoto-floating-btn';
+    maxBtn.title = '최대화 / 복원';
+    maxBtn.textContent = '□';
+
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'migoto-floating-btn close-btn';
+    closeBtn.title = '닫기';
+    closeBtn.textContent = '✕';
+
+    controls.appendChild(minBtn);
+    controls.appendChild(maxBtn);
+    controls.appendChild(closeBtn);
+
+    headerBar.appendChild(titleGroup);
+    headerBar.appendChild(controls);
+    floatingEl.appendChild(headerBar);
+
+    // 플러그인 컨텐츠 렌더링 영역
+    const rootContainer = document.createElement('div');
+    rootContainer.className = 'plugin-subwindow-content';
+    rootContainer.style.cssText = `
+      flex: 1 1 0;
+      min-height: 0;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      overflow: auto;
+      padding: 12px 16px;
+      box-sizing: border-box;
+      position: relative;
+    `;
+    floatingEl.appendChild(rootContainer);
+
+    // 모드 배지 UI 갱신 함수
+    const updateModeBadgeUi = () => {
+      if (currentMode === 'alwaysOnTop') {
+        modeBadge.textContent = '📌 항상 맨 위';
+        modeBadge.style.background = 'rgba(240, 136, 62, 0.2)';
+        modeBadge.style.color = '#f0883e';
+        modeBadge.title = '다른 모든 패널과 대화상자보다 최상단에 고정됩니다. (클릭하여 전환)';
+      } else if (currentMode === 'parentLinked') {
+        modeBadge.textContent = '🔗 에디터 연동';
+        modeBadge.style.background = 'rgba(56, 139, 253, 0.2)';
+        modeBadge.style.color = '#58a6ff';
+        modeBadge.title = '에디터 작업 영역과 연동되어 포커스 시 함께 전면으로 정렬됩니다. (클릭하여 전환)';
+      } else {
+        modeBadge.textContent = '🗗 독립 창';
+        modeBadge.style.background = 'rgba(139, 148, 158, 0.2)';
+        modeBadge.style.color = '#8b949e';
+        modeBadge.title = '일반 플로팅 창 모드로 동작합니다. (클릭하여 전환)';
+      }
+    };
+
+    const applyFocusMode = (mode: 'alwaysOnTop' | 'parentLinked' | 'independent') => {
+      currentMode = mode;
+      updateModeBadgeUi();
+      bringToFront();
+    };
+
+    modeBadge.onclick = (e) => {
+      e.stopPropagation();
+      if (currentMode === 'parentLinked') applyFocusMode('alwaysOnTop');
+      else if (currentMode === 'alwaysOnTop') applyFocusMode('independent');
+      else applyFocusMode('parentLinked');
+    };
+
+    applyFocusMode(currentMode);
+
+    // 헤더 드래그 이동 로직
+    let isDragging = false;
+    let dragStartX = 0;
+    let dragStartY = 0;
+    let initialLeft = posX;
+    let initialTop = posY;
+
+    headerBar.addEventListener('pointerdown', (e) => {
+      // 버튼 또는 배지 클릭 시에는 드래그하지 않음
+      if ((e.target as HTMLElement).closest('.migoto-floating-btn') || (e.target as HTMLElement).closest('.subwindow-mode-badge')) {
+        return;
+      }
+      isDragging = true;
+      dragStartX = e.clientX;
+      dragStartY = e.clientY;
+      initialLeft = floatingEl.offsetLeft;
+      initialTop = floatingEl.offsetTop;
+      bringToFront();
+      e.preventDefault();
+
+      const onPointerMove = (ev: PointerEvent) => {
+        if (!isDragging) return;
+        const dx = ev.clientX - dragStartX;
+        const dy = ev.clientY - dragStartY;
+        const newLeft = Math.max(-floatingEl.offsetWidth + 80, Math.min(window.innerWidth - 80, initialLeft + dx));
+        const newTop = Math.max(0, Math.min(window.innerHeight - 36, initialTop + dy));
+        floatingEl.style.left = `${newLeft}px`;
+        floatingEl.style.top = `${newTop}px`;
+      };
+
+      const onPointerUp = () => {
+        isDragging = false;
+        window.removeEventListener('pointermove', onPointerMove);
+        window.removeEventListener('pointerup', onPointerUp);
+      };
+
+      window.addEventListener('pointermove', onPointerMove);
+      window.addEventListener('pointerup', onPointerUp);
+    });
+
+    // 최대화 및 복원 토글 로직
+    let isMaximized = false;
+    let normalBounds = { left: posX, top: posY, width, height };
+
+    const toggleMaximize = () => {
+      if (!isMaximized) {
+        normalBounds = {
+          left: floatingEl.offsetLeft,
+          top: floatingEl.offsetTop,
+          width: floatingEl.offsetWidth,
+          height: floatingEl.offsetHeight,
+        };
+        floatingEl.style.left = '16px';
+        floatingEl.style.top = '36px';
+        floatingEl.style.width = `calc(100vw - 32px)`;
+        floatingEl.style.height = `calc(100vh - 56px)`;
+        maxBtn.textContent = '❐';
+        maxBtn.title = '이전 크기로 복원';
+        isMaximized = true;
+      } else {
+        floatingEl.style.left = `${normalBounds.left}px`;
+        floatingEl.style.top = `${normalBounds.top}px`;
+        floatingEl.style.width = `${normalBounds.width}px`;
+        floatingEl.style.height = `${normalBounds.height}px`;
+        maxBtn.textContent = '□';
+        maxBtn.title = '최대화';
+        isMaximized = false;
+      }
+      bringToFront();
+    };
+
+    maxBtn.onclick = (e) => {
+      e.stopPropagation();
+      toggleMaximize();
+    };
+
+    headerBar.addEventListener('dblclick', (e) => {
+      if ((e.target as HTMLElement).closest('.migoto-floating-btn') || (e.target as HTMLElement).closest('.subwindow-mode-badge')) return;
+      toggleMaximize();
+    });
+
+    // 최소화 (하단 도크 칩으로 축소)
+    let dockChip: HTMLElement | null = null;
+
+    const restoreFromDock = () => {
+      floatingEl.style.display = 'flex';
+      if (dockChip) {
+        dockChip.remove();
+        dockChip = null;
+      }
+      bringToFront();
+    };
+
+    const minimizeToDock = () => {
+      floatingEl.style.display = 'none';
+
+      if (!this.dockBar || !document.body.contains(this.dockBar)) {
+        this.dockBar = document.createElement('div');
+        this.dockBar.className = 'migoto-subwindow-dock-bar';
+        document.body.appendChild(this.dockBar);
+      }
+
+      dockChip = document.createElement('div');
+      dockChip.className = 'migoto-subwindow-dock-chip';
+      dockChip.title = `클릭하여 복원: ${options.title}`;
+      dockChip.innerHTML = `<span>🗔</span><span>${options.title}</span><span style="opacity: 0.6; font-size: 10px;">↗</span>`;
+      dockChip.onclick = () => restoreFromDock();
+      this.dockBar.appendChild(dockChip);
+    };
+
+    minBtn.onclick = (e) => {
+      e.stopPropagation();
+      minimizeToDock();
+    };
+
+    // 크기 조절 (Resize) 핸들 생성
+    if (resizable) {
+      const resizeR = document.createElement('div');
+      resizeR.className = 'migoto-floating-resize-r';
+
+      const resizeB = document.createElement('div');
+      resizeB.className = 'migoto-floating-resize-b';
+
+      const resizeBR = document.createElement('div');
+      resizeBR.className = 'migoto-floating-resize-br';
+      resizeBR.innerHTML = `
+        <svg viewBox="0 0 10 10" width="8" height="8" fill="currentColor">
+          <circle cx="8" cy="8" r="1.2" />
+          <circle cx="4" cy="8" r="1.2" />
+          <circle cx="8" cy="4" r="1.2" />
+        </svg>
+      `;
+
+      const setupResizer = (handleEl: HTMLElement, onMove: (dx: number, dy: number, startW: number, startH: number) => void) => {
+        handleEl.addEventListener('pointerdown', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          bringToFront();
+          const startX = e.clientX;
+          const startY = e.clientY;
+          const startW = floatingEl.offsetWidth;
+          const startH = floatingEl.offsetHeight;
+
+          const onPointerMove = (ev: PointerEvent) => {
+            const dx = ev.clientX - startX;
+            const dy = ev.clientY - startY;
+            onMove(dx, dy, startW, startH);
+          };
+
+          const onPointerUp = () => {
+            window.removeEventListener('pointermove', onPointerMove);
+            window.removeEventListener('pointerup', onPointerUp);
+          };
+
+          window.addEventListener('pointermove', onPointerMove);
+          window.addEventListener('pointerup', onPointerUp);
+        });
+      };
+
+      setupResizer(resizeR, (dx, _dy, startW) => {
+        floatingEl.style.width = `${Math.max(minW, startW + dx)}px`;
+      });
+
+      setupResizer(resizeB, (_dx, dy, _startW, startH) => {
+        floatingEl.style.height = `${Math.max(minH, startH + dy)}px`;
+      });
+
+      setupResizer(resizeBR, (dx, dy, startW, startH) => {
+        floatingEl.style.width = `${Math.max(minW, startW + dx)}px`;
+        floatingEl.style.height = `${Math.max(minH, startH + dy)}px`;
+      });
+
+      floatingEl.appendChild(resizeR);
+      floatingEl.appendChild(resizeB);
+      floatingEl.appendChild(resizeBR);
+    }
+
+    document.body.appendChild(floatingEl);
+
+    let userCleanup: (() => void) | void;
+    let isDisposed = false;
+
+    const dispose = () => {
+      if (isDisposed) return;
+      isDisposed = true;
+
+      floatingEl.remove();
+      if (dockChip) {
+        dockChip.remove();
+        dockChip = null;
+      }
+      this.activeWindows.delete(fullId);
+
+      if (typeof userCleanup === 'function') {
+        try { userCleanup(); } catch (e) { console.error('[SubWindowManager] cleanup 오류:', e); }
+      }
+      appLogger.info('plugin', `서브 윈도우 닫힘: "${options.title}"`);
+    };
+
+    closeBtn.onclick = (e) => {
+      e.stopPropagation();
+      dispose();
+    };
+
+    const handle: SubWindowHandle = {
+      close: () => dispose(),
+      focus: () => {
+        if (floatingEl.style.display === 'none') restoreFromDock();
+        bringToFront();
+      },
+      setTitle: (newTitle: string) => {
+        titleEl.textContent = newTitle;
+        if (dockChip) {
+          dockChip.querySelector('span:nth-child(2)')!.textContent = newTitle;
+        }
+      },
+      resize: (newW: number, newH: number) => {
+        floatingEl.style.width = `${Math.max(minW, newW)}px`;
+        floatingEl.style.height = `${Math.max(minH, newH)}px`;
+      },
+      setFocusMode: (mode) => applyFocusMode(mode),
+      isOpen: () => !isDisposed,
+      getWindow: () => (typeof window !== 'undefined' ? window : null),
+    };
+
+    if (onRegisterCleanup) {
+      onRegisterCleanup(() => handle.close());
+    }
+
+    this.activeWindows.set(fullId, {
+      handle,
+      floatingEl,
+      dockChip,
+      cleanup: dispose,
+    });
+
+    try {
+      userCleanup = options.render(rootContainer, handle);
+    } catch (e) {
+      console.error('[SubWindowManager] render 실행 오류:', e);
+    }
+
+    appLogger.info('plugin', `서브 윈도우 생성 (플로팅 윈도우): "${options.title}" (모드: ${currentMode})`);
     return handle;
   }
 
@@ -369,15 +895,23 @@ export class SubWindowManager {
   closeAllWindows() {
     for (const [, item] of this.activeWindows) {
       if (item.subWin && !item.subWin.closed) {
-        try {
-          item.subWin.close();
-        } catch {}
+        try { item.subWin.close(); } catch {}
+      }
+      if (item.floatingEl) {
+        try { item.floatingEl.remove(); } catch {}
+      }
+      if (item.dockChip) {
+        try { item.dockChip.remove(); } catch {}
       }
       if (item.cleanup) {
         item.cleanup();
       }
     }
     this.activeWindows.clear();
+    if (this.dockBar) {
+      try { this.dockBar.remove(); } catch {}
+      this.dockBar = null;
+    }
   }
 }
 
