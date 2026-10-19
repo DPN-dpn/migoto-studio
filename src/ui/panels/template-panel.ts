@@ -146,21 +146,6 @@ export class TemplatePanel {
     const actions = document.createElement('div');
     actions.className = 'template-header-actions';
 
-    // Toggle Collapse / Expand All button
-    const toggleAllBtn = document.createElement('button');
-    toggleAllBtn.className = 'template-add-btn';
-    toggleAllBtn.title = '모든 분류 접기 / 펼치기';
-    toggleAllBtn.innerHTML = `
-      <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <polyline points="7 13 12 18 17 13"></polyline>
-        <polyline points="7 6 12 11 17 6"></polyline>
-      </svg>
-      <span>접기/펼치기</span>
-    `;
-    toggleAllBtn.addEventListener('click', () => {
-      this.toggleAllGroups();
-    });
-
     const importBtn = document.createElement('button');
     importBtn.className = 'template-add-btn';
     importBtn.title = '템플릿 JSON 파일 불러오기';
@@ -181,7 +166,7 @@ export class TemplatePanel {
     `;
     addBtn.addEventListener('click', () => this.openAddModal());
 
-    actions.append(toggleAllBtn, importBtn, addBtn);
+    actions.append(importBtn, addBtn);
     titleRow.append(actions);
 
     header.append(titleRow);
@@ -206,27 +191,6 @@ export class TemplatePanel {
     container.className = 'template-list-container';
     this.root.append(container);
 
-    this.renderList();
-  }
-
-  private toggleAllGroups() {
-    const all = getAllTemplates();
-    const allGroupNames = new Set<string>();
-    if (all.some((t) => isTemplateFavorite(t))) {
-      allGroupNames.add(FAVORITES_GROUP_NAME);
-    }
-    for (const t of all) {
-      allGroupNames.add(t.group || '기타');
-    }
-
-    // 하나라도 펼쳐져 있으면 전체 접기, 모두 접혀 있으면 전체 펼치기
-    const hasExpanded = [...allGroupNames].some((g) => !this.collapsedGroups.has(g));
-    if (hasExpanded) {
-      this.collapsedGroups = allGroupNames;
-    } else {
-      this.collapsedGroups.clear();
-    }
-    this.saveCollapsedGroups();
     this.renderList();
   }
 
