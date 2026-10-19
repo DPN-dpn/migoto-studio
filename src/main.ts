@@ -36,6 +36,7 @@ import {
 import { initPwa } from './pwa';
 import { checkOnStartup } from './updater/updater';
 import { CURRENT_APP_VERSION } from './updater/version';
+import { initStatusBarWindowsMenu } from './window';
 
 // Only the base editor worker is needed (no TS/JSON/CSS language services).
 (self as unknown as { MonacoEnvironment: monaco.Environment }).MonacoEnvironment = {
@@ -275,6 +276,7 @@ async function boot() {
   appLogger.subscribe(updateStatusConsole);
   appLogger.onClear(updateStatusConsole);
   updateStatusConsole();
+  initStatusBarWindowsMenu();
 
   // ---- Top Menu Bar ----
   new MenuBar($('menubar'), {

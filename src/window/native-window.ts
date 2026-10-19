@@ -1,4 +1,4 @@
-import type { NativeWindowOptions, NativeWindowHandle } from './types';
+import type { NativeWindowOptions, NativeWindowHandle, ActiveNativeWindowInfo } from './types';
 import { isTauriEnvironment } from '../platform/index';
 import { appLogger } from '../core/logger';
 import { showToast } from '../ui/common/toast';
@@ -6,26 +6,167 @@ import { showToast } from '../ui/common/toast';
 interface ActiveNativeWindow {
   fullId: string;
   ownerId: string;
+  id: string;
+  title: string;
+  isSubWindowPopout?: boolean;
+  restoreToSubWindow?: () => void;
   handle: NativeWindowHandle;
   channel: BroadcastChannel;
   tauriWindow?: any;
   browserWindow?: Window | null;
   cleanup?: () => void;
+  minimizedByMaster?: boolean;
 }
 
 /**
  * 범용 독립 OS 윈도우 관리자 (NativeWindowManager)
  * 코어 에디터 분리, 로그 뷰어, 플러그인 등 모든 영역에서 독립 OS 윈도우를 제어합니다.
+ * 마스터(메인 에디터) 창과 종속 생명주기(종료, 최소화, 복원)를 동기화합니다.
  */
 export class NativeWindowManager {
   private activeWindows: Map<string, ActiveNativeWindow> = new Map();
+  private windowChangeListeners: Set<(windows: ActiveNativeWindowInfo[]) => void> = new Set();
+  private isMasterMinimized = false;
 
   constructor() {
     if (typeof window !== 'undefined') {
+      // 1. 원본 창이 닫히면 모든 별도 OS 창도 강제 종료
       window.addEventListener('beforeunload', () => {
         this.closeAllWindows();
       });
+
+      // 2. 원본 메인 창의 최소화 및 복원 감지 (Master-Slave 윈도우 상태 동기화)
+      this.initMasterWindowSync();
     }
+  }
+
+  /**
+   * 메인 창의 상태 변화(최소화 / 복원)를 감지하여 서브 OS 창들과 동기화
+   */
+  private initMasterWindowSync() {
+    if (typeof document === 'undefined') return;
+
+    // A. 웹 표준 visibilitychange 이벤트 (최소화/가려짐 감지)
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') {
+        this.handleMasterMinimized();
+      } else if (document.visibilityState === 'visible') {
+        this.handleMasterRestored();
+      }
+    });
+
+    // B. 데스크톱(Tauri) 환경: Tauri 윈도우 상태 정밀 동기화
+    if (isTauriEnvironment()) {
+      import('@tauri-apps/api/window')
+        .then(({ getCurrentWindow }) => {
+          const appWin = getCurrentWindow();
+
+          const checkState = async () => {
+            try {
+              const min = await appWin.isMinimized();
+              if (min && !this.isMasterMinimized) {
+                this.handleMasterMinimized();
+              } else if (!min && this.isMasterMinimized) {
+                this.handleMasterRestored();
+              }
+            } catch {}
+          };
+
+          window.addEventListener('focus', () => {
+            this.handleMasterRestored();
+          });
+          window.addEventListener('blur', () => {
+            setTimeout(checkState, 150);
+          });
+          // 0.5초 간격 안전 폴링 (OS 최소화 버튼 클릭 감지)
+          setInterval(checkState, 500);
+        })
+        .catch(() => {});
+    }
+  }
+
+  /**
+   * 메인 창이 최소화되었을 때 모든 서브 윈도우도 함께 최소화
+   */
+  async handleMasterMinimized() {
+    if (this.isMasterMinimized) return;
+    this.isMasterMinimized = true;
+
+    for (const item of this.activeWindows.values()) {
+      if (item.tauriWindow) {
+        try {
+          const isMin = await item.tauriWindow.isMinimized();
+          if (!isMin) {
+            item.minimizedByMaster = true;
+            await item.tauriWindow.minimize();
+          }
+        } catch {}
+      }
+    }
+  }
+
+  /**
+   * 메인 창이 복원되었을 때, 메인 창에 의해 최소화되었던 서브 윈도우들도 함께 복원
+   */
+  async handleMasterRestored() {
+    if (!this.isMasterMinimized) return;
+    this.isMasterMinimized = false;
+
+    for (const item of this.activeWindows.values()) {
+      if (item.minimizedByMaster) {
+        item.minimizedByMaster = false;
+        if (item.tauriWindow) {
+          try {
+            await item.tauriWindow.unminimize();
+            await item.tauriWindow.show();
+          } catch {}
+        }
+      }
+    }
+  }
+
+  /**
+   * 열려 있는 윈도우 목록 변경 구독 (상태바 드롭다운 등에 실시간 반영)
+   */
+  onWindowsChange(listener: (windows: ActiveNativeWindowInfo[]) => void): () => void {
+    this.windowChangeListeners.add(listener);
+    // 즉시 현재 상태 발행
+    try {
+      listener(this.getActiveWindows());
+    } catch (e) {
+      console.error(e);
+    }
+    return () => {
+      this.windowChangeListeners.delete(listener);
+    };
+  }
+
+  private notifyWindowsChanged() {
+    const list = this.getActiveWindows();
+    this.windowChangeListeners.forEach((listener) => {
+      try {
+        listener(list);
+      } catch (e) {
+        console.error('[NativeWindowManager] 리스너 호출 오류:', e);
+      }
+    });
+  }
+
+  /**
+   * 현재 열려 있는 모든 별도 OS 창 목록 반환
+   */
+  getActiveWindows(): ActiveNativeWindowInfo[] {
+    return Array.from(this.activeWindows.values()).map((w) => ({
+      fullId: w.fullId,
+      ownerId: w.ownerId,
+      id: w.id,
+      title: w.title,
+      isSubWindowPopout: w.isSubWindowPopout,
+      restoreToSubWindow: w.restoreToSubWindow,
+      handle: w.handle,
+      close: () => w.handle.close(),
+      focus: () => w.handle.focus(),
+    }));
   }
 
   /**
@@ -43,7 +184,7 @@ export class NativeWindowManager {
     onRegisterCleanup?: (cleanup: () => void) => void
   ): Promise<NativeWindowHandle> {
     const fullId = `win_${ownerId}_${options.id}`;
-    const logCategory = (ownerId === 'app' || ownerId === 'core') ? 'ui' : 'plugin';
+    const logCategory = ownerId === 'app' || ownerId === 'core' ? 'ui' : 'plugin';
 
     // 1. 이미 열려 있는 창이 있으면 포커스 후 기존 핸들 반환
     const existing = this.activeWindows.get(fullId);
@@ -126,6 +267,7 @@ export class NativeWindowManager {
       }
 
       this.activeWindows.delete(fullId);
+      this.notifyWindowsChanged();
       appLogger.info(logCategory, `독립 OS 윈도우 닫힘: "${options.title}"`);
     };
 
@@ -213,6 +355,8 @@ export class NativeWindowManager {
       focus: async () => {
         if (tauriWindow) {
           try {
+            await tauriWindow.unminimize().catch(() => {});
+            await tauriWindow.show().catch(() => {});
             await tauriWindow.setFocus();
           } catch {}
         } else if (browserWindow && !browserWindow.closed) {
@@ -264,6 +408,10 @@ export class NativeWindowManager {
     this.activeWindows.set(fullId, {
       fullId,
       ownerId,
+      id: options.id,
+      title: options.title,
+      isSubWindowPopout: options.isSubWindowPopout,
+      restoreToSubWindow: options.onRestoreToSubWindow,
       handle,
       channel,
       tauriWindow,
@@ -271,6 +419,7 @@ export class NativeWindowManager {
       cleanup: dispose,
     });
 
+    this.notifyWindowsChanged();
     appLogger.info(logCategory, `독립 OS 윈도우 생성 완료: "${options.title}"`);
     return handle;
   }
@@ -285,6 +434,7 @@ export class NativeWindowManager {
       }
     }
     this.activeWindows.clear();
+    this.notifyWindowsChanged();
   }
 }
 

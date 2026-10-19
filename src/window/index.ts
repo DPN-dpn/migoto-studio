@@ -10,3 +10,4 @@
 export * from './types';
 export { nativeWindowManager, NativeWindowManager } from './native-window';
 export { subWindowManager, SubWindowManager } from './sub-window';
+export { initStatusBarWindowsMenu } from './status-bar-windows';

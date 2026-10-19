@@ -81,6 +81,22 @@ export interface NativeWindowOptions {
   html?: string;
   /** 메인 창에서 별도 창으로 전달할 초기 데이터 (선택) */
   initialData?: any;
+  /** 서브윈도우에서 분리된 창인지 여부 (내부 관리용) */
+  isSubWindowPopout?: boolean;
+  /** 내장 창으로 복원하는 콜백 (서브윈도우 팝아웃용) */
+  onRestoreToSubWindow?: () => void;
+}
+
+export interface ActiveNativeWindowInfo {
+  fullId: string;
+  ownerId: string;
+  id: string;
+  title: string;
+  isSubWindowPopout?: boolean;
+  handle: NativeWindowHandle;
+  restoreToSubWindow?: () => void;
+  close: () => Promise<void>;
+  focus: () => Promise<void>;
 }
 
 export interface NativeWindowHandle {

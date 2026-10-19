@@ -915,26 +915,15 @@ export class SubWindowManager {
       rootContainer.style.height = '100%';
       rootContainer.style.width = '100%';
 
-      // 기존 플로팅 창은 숨기고 도킹 바에 복원 칩 표시
+      // 기존 플로팅 창은 화면을 가리지 않도록 숨김 (우측 하단 칩 대신 하단 상태표시줄의 열린 창 드롭다운 연동)
       floatingEl.style.display = 'none';
       pipBtn.classList.add('is-popped-out');
       pipBtn.title = '에디터 내 플로팅 창으로 복원 (Dock In)';
 
-      if (!this.dockBar || !document.body.contains(this.dockBar)) {
-        this.dockBar = document.createElement('div');
-        this.dockBar.className = 'migoto-subwindow-dock-bar';
-        document.body.appendChild(this.dockBar);
+      if (dockChip) {
+        dockChip.remove();
+        dockChip = null;
       }
-
-      if (dockChip) dockChip.remove();
-      dockChip = document.createElement('div');
-      dockChip.className = 'migoto-subwindow-dock-chip is-native-popped-out';
-      dockChip.title = `클릭하여 내장 창으로 복원: ${options.title}`;
-      dockChip.innerHTML = `<span>⧉</span><span>${options.title}</span><span style="opacity: 0.75; font-size: 10px; margin-left: 4px;">(내장 창으로 복원 ↩)</span>`;
-      dockChip.onclick = () => {
-        dockIn();
-      };
-      this.dockBar.appendChild(dockChip);
 
       appLogger.info('plugin', `서브 윈도우 별도 OS 윈도우(PiP)로 분리 완료: "${options.title}"`);
 
@@ -978,30 +967,21 @@ export class SubWindowManager {
             alwaysOnTop: currentMode === 'alwaysOnTop',
             entry: options.entry,
             initialData: options.initialData,
+            isSubWindowPopout: true,
+            onRestoreToSubWindow: () => dockIn(),
           });
 
           currentNativeHandle = nativeHandle;
 
-          // 기존 화면의 커다란 창은 숨기고, 우하단 도킹 바에 복원 칩 버튼만 표시
+          // 기존 화면의 플로팅 창은 숨김 (우하단 칩 대신 하단 상태표시줄에서 드롭다운으로 관리)
           floatingEl.style.display = 'none';
           pipBtn.classList.add('is-popped-out');
           pipBtn.title = '에디터 내 플로팅 창으로 복원 (Dock In)';
 
-          if (!this.dockBar || !document.body.contains(this.dockBar)) {
-            this.dockBar = document.createElement('div');
-            this.dockBar.className = 'migoto-subwindow-dock-bar';
-            document.body.appendChild(this.dockBar);
+          if (dockChip) {
+            dockChip.remove();
+            dockChip = null;
           }
-
-          if (dockChip) dockChip.remove();
-          dockChip = document.createElement('div');
-          dockChip.className = 'migoto-subwindow-dock-chip is-native-popped-out';
-          dockChip.title = `클릭하여 내장 창으로 복원: ${options.title}`;
-          dockChip.innerHTML = `<span>⧉</span><span>${options.title}</span><span style="opacity: 0.75; font-size: 10px; margin-left: 4px;">(내장 창으로 복원 ↩)</span>`;
-          dockChip.onclick = () => {
-            dockIn();
-          };
-          this.dockBar.appendChild(dockChip);
 
           const checkCloseTimer = setInterval(() => {
             if (!nativeHandle.isOpen()) {
