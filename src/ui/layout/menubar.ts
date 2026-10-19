@@ -213,17 +213,18 @@ export class MenuBar {
           const s = getSettings();
           return [
             {
-              label: '사이드바 표시/숨기기',
+              label: '사이드바 표시',
               shortcut: 'Ctrl+B',
               checked: () => s.showOutline,
               action: () => this.cb.activityBar.toggleSidebar(),
             },
             {
-              label: '콘솔창 보기',
+              label: '콘솔창 표시',
               shortcut: 'Ctrl+`',
               checked: () => Boolean(this.cb.consolePanel?.isOpen()),
               action: () => this.cb.consolePanel?.toggle(),
             },
+            { divider: true },
             {
               label: '탐색기 열기',
               shortcut: 'Ctrl+Shift+E',
@@ -236,15 +237,6 @@ export class MenuBar {
             {
               label: '코드 템플릿 열기',
               action: () => this.cb.activityBar.switchTo('templates'),
-            },
-            { divider: true },
-            {
-              label: '모든 섹션 접기',
-              action: () => this.cb.editor.getAction('editor.foldAll')?.run(),
-            },
-            {
-              label: '모든 섹션 펴기',
-              action: () => this.cb.editor.getAction('editor.unfoldAll')?.run(),
             },
             { divider: true },
             {
