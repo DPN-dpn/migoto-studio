@@ -430,24 +430,6 @@ export class PluginManager {
     this.notify();
   }
 
-  resetPluginOrder(): void {
-    const allIds = Array.from(this.plugins.keys());
-    const newOrder: string[] = [];
-    for (const defId of DEFAULT_PLUGIN_ORDER) {
-      if (allIds.includes(defId)) {
-        newOrder.push(defId);
-      }
-    }
-    for (const id of allIds) {
-      if (!newOrder.includes(id)) {
-        newOrder.push(id);
-      }
-    }
-    this.saveStoredPluginOrder(newOrder);
-    this.activityBar?.reorderDynamicTabs(newOrder);
-    this.notify();
-    this.showToast('플러그인 순서가 기본값으로 초기화되었습니다.', 'info');
-  }
 
   async checkFileExists(relPath: string): Promise<boolean> {
     if (this.explorer && this.explorer.hasFolder) {
