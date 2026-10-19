@@ -1,7 +1,7 @@
-import type { NativeWindowOptions, NativeWindowHandle, ActiveNativeWindowInfo } from './types';
-import { isTauriEnvironment } from '../platform/index';
-import { appLogger } from '../core/logger';
-import { showToast } from '../ui/common/toast';
+import type { NativeWindowOptions, NativeWindowHandle, ActiveNativeWindowInfo } from './types.ts';
+import { isTauriEnvironment } from '../platform/index.ts';
+import { appLogger } from '../core/logger.ts';
+import { showToast } from '../ui/common/toast.ts';
 
 interface ActiveNativeWindow {
   fullId: string;
@@ -44,7 +44,7 @@ export class NativeWindowManager {
    * 메인 창의 상태 변화(최소화 / 복원)를 감지하여 서브 OS 창들과 동기화
    */
   private initMasterWindowSync() {
-    if (typeof document === 'undefined') return;
+    if (typeof document === 'undefined' || typeof document.addEventListener !== 'function') return;
 
     // A. 웹 표준 visibilitychange 이벤트 (최소화/가려짐 감지)
     document.addEventListener('visibilitychange', () => {

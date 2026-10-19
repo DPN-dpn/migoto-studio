@@ -1,8 +1,8 @@
 import type { SubWindowOptions, SubWindowHandle, NativeWindowHandle } from './types.ts';
-import { isTauriEnvironment } from '../platform/index';
-import { appLogger } from '../core/logger';
-import { showToast } from '../ui/common/toast';
-import { nativeWindowManager } from './native-window';
+import { isTauriEnvironment } from '../platform/index.ts';
+import { appLogger } from '../core/logger.ts';
+import { showToast } from '../ui/common/toast.ts';
+import { nativeWindowManager } from './native-window.ts';
 
 interface ActiveWindowItem {
   handle: SubWindowHandle;
@@ -518,6 +518,9 @@ export class SubWindowManager {
       getWindow: () => subWin && !subWin.closed ? subWin : null,
       togglePopout: async () => false,
       isPoppedOut: () => true,
+      setInitialData: (_data: any) => {},
+      postMessage: (_data: any) => {},
+      onMessage: (_listener: (data: any) => void) => () => {},
     };
 
     subWin.addEventListener('beforeunload', () => dispose());
@@ -843,8 +846,15 @@ export class SubWindowManager {
     // PiP (별도 OS 윈도우 팝아웃) 관리 로직
     let currentPipWin: Window | null = null;
     let currentNativeHandle: NativeWindowHandle | null = null;
+    let currentInitialData: any = options.initialData;
+    const userMessageListeners = new Set<(data: any) => void>();
+    let unlistenNativeMsg: (() => void) | null = null;
 
     const dockIn = () => {
+      if (unlistenNativeMsg) {
+        unlistenNativeMsg();
+        unlistenNativeMsg = null;
+      }
       if (currentNativeHandle && currentNativeHandle.isOpen()) {
         try {
           currentNativeHandle.close();
@@ -966,12 +976,21 @@ export class SubWindowManager {
             resizable: options.resizable,
             alwaysOnTop: currentMode === 'alwaysOnTop',
             entry: options.entry,
-            initialData: options.initialData,
+            initialData: currentInitialData,
             isSubWindowPopout: true,
             onRestoreToSubWindow: () => dockIn(),
           });
 
           currentNativeHandle = nativeHandle;
+          unlistenNativeMsg = nativeHandle.onMessage((msg) => {
+            userMessageListeners.forEach((listener) => {
+              try {
+                listener(msg);
+              } catch (e) {
+                console.error('[SubWindow] listener error:', e);
+              }
+            });
+          });
 
           // 기존 화면의 플로팅 창은 숨김 (우하단 칩 대신 하단 상태표시줄에서 드롭다운으로 관리)
           floatingEl.style.display = 'none';
@@ -1116,6 +1135,11 @@ export class SubWindowManager {
       if (isDisposed) return;
       isDisposed = true;
 
+      if (unlistenNativeMsg) {
+        unlistenNativeMsg();
+        unlistenNativeMsg = null;
+      }
+
       if (currentNativeHandle && currentNativeHandle.isOpen()) {
         try { currentNativeHandle.close(); } catch {}
         currentNativeHandle = null;
@@ -1175,7 +1199,25 @@ export class SubWindowManager {
       isOpen: () => !isDisposed,
       getWindow: () => (currentPipWin && !currentPipWin.closed ? currentPipWin : (typeof window !== 'undefined' ? window : null)),
       togglePopout: () => togglePopout(),
-      isPoppedOut: () => Boolean(currentPipWin && !currentPipWin.closed),
+      isPoppedOut: () => Boolean((currentPipWin && !currentPipWin.closed) || (currentNativeHandle && currentNativeHandle.isOpen())),
+      setInitialData: (data: any) => {
+        currentInitialData = data;
+        options.initialData = data;
+        if (currentNativeHandle && currentNativeHandle.isOpen()) {
+          currentNativeHandle.postMessage({ type: 'UPDATE_INITIAL_DATA', data });
+        }
+      },
+      postMessage: (data: any) => {
+        if (currentNativeHandle && currentNativeHandle.isOpen()) {
+          currentNativeHandle.postMessage(data);
+        }
+      },
+      onMessage: (listener: (data: any) => void) => {
+        userMessageListeners.add(listener);
+        return () => {
+          userMessageListeners.delete(listener);
+        };
+      },
     };
 
     if (onRegisterCleanup) {

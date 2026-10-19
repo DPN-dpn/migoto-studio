@@ -406,6 +406,8 @@ export interface PluginContext {
     onDidChangeActiveFile(listener: (file: { name: string; path: string; location: string } | null) => void): () => void;
     /** 작업 폴더가 열리거나 닫힐 때 발생하는 이벤트 (열렸을 때 절대 경로 string, 닫혔을 때 null) */
     onDidChangeActiveFolder(listener: (folder: string | null) => void): () => void;
+    /** glob 패턴(예: '**\/*.ini')을 기준으로 워크스페이스 내 파일 목록을 고속 검색하여 반환 */
+    findFiles(globPattern: string, options?: { cwd?: string; maxResults?: number }): Promise<string[]>;
     search(query: string, options?: WorkspaceSearchOptions): Promise<WorkspaceSearchResult[]>;
     createBackup(filePath?: string, label?: string): Promise<string | null>;
     getOpenTabs(): PluginTabInfo[];

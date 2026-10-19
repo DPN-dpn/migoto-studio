@@ -1,5 +1,6 @@
 import { monaco } from '../core/editor/monaco';
 import { platform } from '../platform';
+import type { DirEntry } from '../platform/types';
 import { validatePluginZip, type ExtractedPlugin } from './zip';
 import { linkPluginModules } from './module-linker';
 import { appLogger } from '../core/logger';
@@ -50,6 +51,7 @@ import {
   searchInText,
   buildSearchRegex,
   matchesPattern,
+  globToRegex,
   BINARY_EXTENSIONS as SEARCH_BINARY_EXTENSIONS,
 } from '../core/workspace/search';
 import { extractSymbols } from '../core/ini/symbols';
@@ -1313,6 +1315,34 @@ export default {
           });
           callbacks.onRegisterCleanup(unlisten);
           return unlisten;
+        },
+        findFiles: async (globPattern: string, options?: { cwd?: string; maxResults?: number }): Promise<string[]> => {
+          const targetCwd = options?.cwd || (this.explorer && this.explorer.hasFolder ? (this.explorer as any).currentFolder?.id : null);
+          if (!targetCwd) return [];
+          try {
+            const allEntries = await platform().readDirectory(targetCwd);
+            const filePaths: string[] = [];
+            const traverse = (items: DirEntry[]) => {
+              for (const it of items) {
+                if ((it.isDir || it.isDirectory) && it.children) {
+                  traverse(it.children);
+                } else if (!it.isDir && !it.isDirectory) {
+                  filePaths.push((it.id || it.path).replace(/\\/g, '/'));
+                }
+              }
+            };
+            traverse(allEntries);
+            const re = globToRegex(globPattern);
+            const normCwd = targetCwd.replace(/\\/g, '/').replace(/\/+$/, '');
+            const matched = filePaths.filter((p) => {
+              const rel = p.startsWith(normCwd + '/') ? p.slice(normCwd.length + 1) : p;
+              const name = p.split('/').pop() || p;
+              return re.test(rel) || re.test(p) || re.test(name);
+            });
+            return options?.maxResults && options.maxResults > 0 ? matched.slice(0, options.maxResults) : matched;
+          } catch {
+            return [];
+          }
         },
         search: async (query: string, options?: WorkspaceSearchOptions): Promise<WorkspaceSearchResult[]> => {
           if (!query) return [];

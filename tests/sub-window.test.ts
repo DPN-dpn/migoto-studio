@@ -42,7 +42,7 @@ if (typeof globalThis.window === 'undefined') {
   };
 }
 
-const { SubWindowManager } = await import('../src/plugins/sub-window.ts');
+const { SubWindowManager } = await import('../src/window/sub-window.ts');
 
 describe('SubWindowManager', () => {
   test('SubWindowManager initializes and controls sub-windows cleanly', () => {
@@ -73,6 +73,14 @@ describe('SubWindowManager', () => {
 
     handle.setTitle('새 제목');
     handle.setFocusMode('parentLinked');
+    assert.strictEqual(typeof handle.setInitialData, 'function', 'setInitialData method exists');
+    assert.strictEqual(typeof handle.postMessage, 'function', 'postMessage method exists');
+    assert.strictEqual(typeof handle.onMessage, 'function', 'onMessage method exists');
+    handle.setInitialData({ folder: 'd:/test/folder' });
+    handle.postMessage({ type: 'TEST' });
+    const unlisten = handle.onMessage(() => {});
+    assert.strictEqual(typeof unlisten, 'function', 'onMessage returns unsubscribe function');
+    unlisten();
     handle.close();
 
     assert.strictEqual(handle.isOpen(), false, 'Window is closed');

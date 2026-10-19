@@ -38,6 +38,7 @@ export interface DirEntry {
   path: string;
   id?: string;
   isDir: boolean;
+  isDirectory?: boolean;
   size?: number;
   children?: DirEntry[];
 }

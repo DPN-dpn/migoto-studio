@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   buildSearchRegex,
   matchesPattern,
+  globToRegex,
   searchInText,
   replaceAllInText,
   escapeRegex,
@@ -147,5 +148,28 @@ test('workspace global search scans both open tabs and unopened folder files', a
   assert.equal(results[1].fileName, 'unopened.ini');
   assert.equal(results[1].matches.length, 1);
   assert.equal(results[1].matches[0].lineNumber, 2);
+});
+
+test('globToRegex converts glob patterns and matches paths accurately', () => {
+  const reIni = globToRegex('**/*.ini');
+  assert.ok(reIni.test('mod.ini'));
+  assert.ok(reIni.test('sub/weapon.ini'));
+  assert.ok(reIni.test('a/b/c/d.ini'));
+  assert.ok(!reIni.test('sub/weapon.buf'));
+  assert.ok(!reIni.test('sub/mod.ini.bak'));
+
+  const reBuf = globToRegex('*.buf');
+  assert.ok(reBuf.test('mesh.buf'));
+  assert.ok(!reBuf.test('sub/mesh.buf'));
+
+  const reTextures = globToRegex('textures/**/*.dds');
+  assert.ok(reTextures.test('textures/diffuse.dds'));
+  assert.ok(reTextures.test('textures/sub/normal.dds'));
+  assert.ok(!reTextures.test('models/body.dds'));
+
+  const reSpecific = globToRegex('**/Roxy.ini');
+  assert.ok(reSpecific.test('Roxy.ini'));
+  assert.ok(reSpecific.test('d:/mods/Roxy.ini'));
+  assert.ok(!reSpecific.test('d:/mods/Other.ini'));
 });
 

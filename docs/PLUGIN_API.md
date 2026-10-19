@@ -304,6 +304,9 @@ const subWin = context.ui.openSubWindow({
 // subWin.setFocusMode('alwaysOnTop');
 // await subWin.togglePopout(); // 별도 OS 윈도우(PiP) 팝아웃 토글
 // const isPopped = subWin.isPoppedOut();
+// subWin.setInitialData({ folder: currentFolder }); // 초기 데이터 동적 갱신 (PiP 분리 시 전달 및 열려있는 독립 OS창 실시간 동기화)
+// subWin.postMessage({ type: 'RELOAD', data }); // 서브윈도우 및 PiP 분리된 독립 OS 창으로 메시지 전송
+// const unlisten = subWin.onMessage((msg) => { ... }); // 서브윈도우 및 독립 OS 창으로부터 수신된 메시지 리스너
 // subWin.close();
 ```
 
@@ -1190,7 +1193,19 @@ await context.workspace.writeBinaryFile('d:/mods/character/output.bin', new Uint
 
 // 디렉토리 목록 읽기
 const entries = await context.workspace.readDirectory(folder);
-// entries: Array of { name, isDirectory, isFile, path }
+// entries: Array of { name, path, id, isDir, isDirectory, size, children }
+// ※ readDirectory는 기본적으로 최대 8단계(maxDepth: 8)까지 하위 디렉터리 및 파일을 children 트리로 재귀 수집하여 단 한 번의 호출로 반환합니다.
+// ※ 디렉터리 여부 판별 시 `isDir`과 `isDirectory`를 모두 지원하여 하위 호환성을 완벽하게 보장합니다.
+
+// 고속 glob 파일 검색 (모든 하위 디렉터리 재귀 탐색)
+const iniFiles = await context.workspace.findFiles('**/*.ini');
+// ['d:/mods/Roxy/Roxy.ini', 'd:/mods/Roxy/RoxyWeapon/weapon.ini']
+
+// 특정 폴더(cwd) 지정 및 최대 결과 개수 제한
+const ddsFiles = await context.workspace.findFiles('textures/**/*.dds', {
+  cwd: 'd:/mods/Roxy',
+  maxResults: 50,
+});
 
 // 워크스페이스 전역 텍스트 검색 (열린 탭 + 미열린 모드 폴더 파일 통합 검색)
 const matches = await context.workspace.search('CommandList', {

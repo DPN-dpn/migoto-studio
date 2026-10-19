@@ -48,6 +48,38 @@ export function matchesPattern(path: string, pattern: string): boolean {
   });
 }
 
+/**
+ * glob 패턴(예: '**\/*.ini', '*.buf', 'textures/**\/*.dds')을 정규표현식으로 변환합니다.
+ */
+export function globToRegex(glob: string): RegExp {
+  const cleanGlob = glob.replace(/\\/g, '/').replace(/^\/+/, '');
+  let reStr = '^';
+  let i = 0;
+  while (i < cleanGlob.length) {
+    if (cleanGlob.slice(i, i + 3) === '**/') {
+      reStr += '(?:.+/)?';
+      i += 3;
+    } else if (cleanGlob.slice(i, i + 2) === '**') {
+      reStr += '.*';
+      i += 2;
+    } else if (cleanGlob[i] === '*') {
+      reStr += '[^/]*';
+      i += 1;
+    } else if (cleanGlob[i] === '?') {
+      reStr += '[^/]';
+      i += 1;
+    } else if (['.', '+', '^', '$', '{', '}', '(', ')', '|', '[', ']', '\\'].includes(cleanGlob[i])) {
+      reStr += '\\' + cleanGlob[i];
+      i += 1;
+    } else {
+      reStr += cleanGlob[i];
+      i += 1;
+    }
+  }
+  reStr += '$';
+  return new RegExp(reStr, 'i');
+}
+
 export function searchInText(text: string, regex: RegExp): SearchMatch[] {
   const matches: SearchMatch[] = [];
   const lines = text.split('\n');

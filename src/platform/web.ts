@@ -41,6 +41,7 @@ async function scanDirHandle(handle: any, depth: number, basePath: string): Prom
           path: currentPath,
           id: currentPath,
           isDir: true,
+          isDirectory: true,
           children,
         });
       } else {
@@ -56,6 +57,7 @@ async function scanDirHandle(handle: any, depth: number, basePath: string): Prom
           path: currentPath,
           id: fileId,
           isDir: false,
+          isDirectory: false,
           size,
         });
       }
@@ -145,6 +147,7 @@ function buildTreeFromFiles(files: FileList, rootId: string): { rootName: string
           path: node.path,
           id: `${rootId}:${node.path}`,
           isDir: true,
+          isDirectory: true,
           children: node.children ? convert(node.children) : [],
         });
       } else {
@@ -155,6 +158,7 @@ function buildTreeFromFiles(files: FileList, rootId: string): { rootName: string
           path: node.path,
           id: fileId,
           isDir: false,
+          isDirectory: false,
           size: node.size,
         });
       }

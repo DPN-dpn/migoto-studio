@@ -1,10 +1,12 @@
 import type { NativeSubWindowContext } from './types';
+import type { DirEntry } from '../platform/types';
 import { initPlatform, platform, isTauriEnvironment } from '../platform/index';
 import { loadSettings } from '../core/workspace/settings';
 import { linkPluginModules } from '../plugins/module-linker';
 import { openConfirmModal, openPromptModal } from '../ui/modals/confirm-ui';
 import { showToast } from '../ui/common/toast';
 import { createUIBuilder } from '../plugins/ui-builder';
+import { globToRegex } from '../core/workspace/search';
 
 /**
  * 독립 OS 윈도우 프로세스 경량 부트스트래퍼
@@ -80,8 +82,16 @@ export async function bootNativeWindow(params: URLSearchParams): Promise<void> {
           console.error('[NativeSubWindow] listener error:', e);
         }
       });
-    } else if (msg.type === 'INIT_DATA') {
+    } else if (msg.type === 'INIT_DATA' || msg.type === 'UPDATE_INITIAL_DATA') {
       initialData = msg.data;
+      if (typeof context !== 'undefined' && context) {
+        context.initialData = msg.data;
+      }
+      userMessageListeners.forEach((listener) => {
+        try {
+          listener({ type: msg.type, data: msg.data });
+        } catch (e) {}
+      });
     } else if (msg.type === 'CLOSE_WINDOW') {
       windowClose();
     }
@@ -114,7 +124,12 @@ export async function bootNativeWindow(params: URLSearchParams): Promise<void> {
   // 4. 서브윈도우 전용 컨텍스트(NativeSubWindowContext) 구축
   const context: NativeSubWindowContext = {
     container: rootContainer,
-    initialData,
+    get initialData() {
+      return initialData;
+    },
+    set initialData(val: any) {
+      initialData = val;
+    },
     window: {
       close: async () => windowClose(),
       focus: async () => {
@@ -189,6 +204,34 @@ export async function bootNativeWindow(params: URLSearchParams): Promise<void> {
         }
       },
       readDirectory: async (dirPath?: string) => platform().readDirectory(dirPath || ''),
+      findFiles: async (globPattern: string, options?: { cwd?: string; maxResults?: number }) => {
+        const targetCwd = options?.cwd;
+        if (!targetCwd) return [];
+        try {
+          const allEntries = await platform().readDirectory(targetCwd);
+          const filePaths: string[] = [];
+          const traverse = (items: DirEntry[]) => {
+            for (const it of items) {
+              if ((it.isDir || it.isDirectory) && it.children) {
+                traverse(it.children);
+              } else if (!it.isDir && !it.isDirectory) {
+                filePaths.push((it.id || it.path).replace(/\\/g, '/'));
+              }
+            }
+          };
+          traverse(allEntries);
+          const re = globToRegex(globPattern);
+          const normCwd = targetCwd.replace(/\\/g, '/').replace(/\/+$/, '');
+          const matched = filePaths.filter((p) => {
+            const rel = p.startsWith(normCwd + '/') ? p.slice(normCwd.length + 1) : p;
+            const name = p.split('/').pop() || p;
+            return re.test(rel) || re.test(p) || re.test(name);
+          });
+          return options?.maxResults && options.maxResults > 0 ? matched.slice(0, options.maxResults) : matched;
+        } catch {
+          return [];
+        }
+      },
       getCurrentFolder: () => null,
       getCurrentFile: () => null,
       onDidChangeActiveFolder: () => () => {},

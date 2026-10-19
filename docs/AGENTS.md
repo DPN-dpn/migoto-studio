@@ -37,7 +37,7 @@
    - 변수/리소스/섹션 구조 파악 시 `context.ini.extractSymbols`를 사용하세요.
 5. 에디터 텍스트 수정 및 작업영역:
    - Monaco 에디터의 실행 취소(`Ctrl+Z`) 기록을 온전히 보존하는 `context.editor.setText(text)` 또는 `context.editor.replaceSelection(text)`를 사용하세요.
-   - 워크스페이스 전역 검색은 `context.workspace.search`, 탭 제어는 `context.workspace.getOpenTabs / focusTab / closeTab`, 안전 백업은 `context.workspace.createBackup`을 활용하세요.
+   - 워크스페이스 전역 검색은 `context.workspace.search`, 고속 glob 파일 탐색은 `context.workspace.findFiles('**/*.ini')`, 작업 폴더 실시간 감지는 `context.workspace.onDidChangeActiveFolder`, 탭 제어는 `context.workspace.getOpenTabs / focusTab / closeTab`, 안전 백업은 `context.workspace.createBackup`을 활용하세요.
 6. 로깅 및 디버깅:
    - 플러그인 동작 상태나 오류, 디버그 정보는 브라우저 console 대신 `context.logger`(`info`, `warn`, `error`, `debug`)를 사용하면 에디터 하단 [출력 콘솔](Ctrl+`)에 플러그인 태그와 함께 실시간 출력됩니다.
 7. API 상세 레퍼런스:
@@ -331,6 +331,12 @@ export async function openViewerSubWindow(context) {
     // 내장 플로팅 창으로 떴을 때 호출
     render(container, handle) {
       renderViewer(container, context);
+
+      // 모드 폴더가 바뀔 때 서브창 초기 데이터 및 독립 OS 창 실시간 갱신
+      context.workspace.onDidChangeActiveFolder((newFolder) => {
+        handle.setInitialData({ folder: newFolder });
+        handle.postMessage({ type: 'CHANGE_FOLDER', folder: newFolder });
+      });
     },
   });
 }

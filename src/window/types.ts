@@ -54,6 +54,12 @@ export interface SubWindowHandle {
   togglePopout(): Promise<boolean>;
   /** 현재 별도 OS 윈도우(PiP 팝아웃) 상태인지 여부 */
   isPoppedOut(): boolean;
+  /** 초기 데이터 동적 갱신 (PiP 분리 시 전달되거나 이미 열려 있는 독립 OS 창에 실시간 동기화) */
+  setInitialData(data: any): void;
+  /** 서브윈도우 및 PiP 분리된 독립 OS 창으로 메시지 전송 */
+  postMessage(data: any): void;
+  /** 서브윈도우 및 PiP 분리된 독립 OS 창으로부터 수신된 메시지 리스너 등록 (해제 함수 반환) */
+  onMessage(listener: (data: any) => void): () => void;
 }
 
 export interface NativeWindowOptions {

@@ -48,6 +48,7 @@ export const desktop: Platform = {
       path: e.path,
       id: e.id || e.path,
       isDir: Boolean(e.isDir ?? e.is_dir),
+      isDirectory: Boolean(e.isDir ?? e.is_dir),
       size: typeof e.size === 'number' ? e.size : 0,
       children: Array.isArray(e.children) ? e.children.map(mapEntry) : undefined,
     });
