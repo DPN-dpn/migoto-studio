@@ -268,6 +268,7 @@ context.ui.openRestoreModal('d:/mods/Character/merged.ini');
 ### 3.7 독립 서브 윈도우 띄우기 (`context.ui.openSubWindow`)
 
 메인 에디터 화면(사이드바/메인 탭)에 구애받지 않고, **독립된 서브 윈도우(Pop-out Window)**를 띄워 넓은 마법사, 실시간 프리뷰 캔버스, 전용 도구 UI를 구성할 수 있습니다. 메인 창의 테마와 CSS 스타일이 자동으로 복제 주입됩니다.
+창 상단의 **PiP(별도 창 분리)** 버튼을 누르면 즉시 **독립된 OS 윈도우(Document Picture-in-Picture / Pop-out Window)**로 분리되어 듀얼 모니터로 이동하거나 자유롭게 배치할 수 있습니다.
 
 ```typescript
 const subWin = context.ui.openSubWindow({
@@ -280,6 +281,8 @@ const subWin = context.ui.openSubWindow({
   resizable: true,
   // 포커스 모드: 'alwaysOnTop' | 'parentLinked' | 'independent' (기본: 'parentLinked')
   focusMode: 'parentLinked',
+  // 초기 실행 시 별도 OS 윈도우(PiP 팝아웃)로 우선 분리할지 여부 (선택)
+  preferPopout: false,
   render(container, handle) {
     const card = context.ui.createCard({
       title: '실시간 프리뷰',
@@ -299,6 +302,8 @@ const subWin = context.ui.openSubWindow({
 // subWin.setTitle('새로운 타이틀');
 // subWin.resize(800, 600);
 // subWin.setFocusMode('alwaysOnTop');
+// await subWin.togglePopout(); // 별도 OS 윈도우(PiP) 팝아웃 토글
+// const isPopped = subWin.isPoppedOut();
 // subWin.close();
 ```
 
@@ -306,6 +311,11 @@ const subWin = context.ui.openSubWindow({
 - **`'alwaysOnTop'` (항상 맨 위)**: 다른 외부 프로그램이나 게임 창보다 화면 최상단에 계속 유지됩니다. 실시간 모니터링이나 단축키 가이드에 유용합니다.
 - **`'parentLinked'` (에디터 연동 - 기본값)**: 평소에는 다른 창 뒤로 갈 수 있지만, 메인 Migoto Studio 에디터를 클릭하거나 포커스하면 **서브창이 자동으로 메인 창과 함께 맨 위로 올라옵니다.**
 - **`'independent'` (독립 창)**: 메인 에디터와 완전히 독립된 창으로 동작합니다. 듀얼 모니터 환경에서 다른 모니터로 이동시켜 작업하기에 최적입니다.
+
+#### PiP 별도 OS 윈도우 분리 기능
+- 서브창 상단 컨트롤러의 **PiP 버튼**(`⧉`)을 클릭하면 즉시 독립된 OS 윈도우로 분리(Pop-out)됩니다.
+- 듀얼 모니터 환경에서 서브창을 다른 모니터로 완전히 옮겨놓고 메인 에디터와 동시에 작업할 수 있습니다.
+- 분리된 창을 닫거나 상단 PiP 버튼/내장 창 가져오기 버튼을 누르면 캔버스 상태(Three.js/WebGL context)를 유지한 채 다시 에디터 내장 플로팅 창으로 원상 복귀(Dock In)됩니다.
 
 ---
 
