@@ -929,8 +929,10 @@ export class SubWindowManager {
       const reqWidth = floatingEl.offsetWidth || width;
       const reqHeight = floatingEl.offsetHeight || height;
 
-      // 1. Document Picture-in-Picture 시도 (Chromium / WebView2 116+)
-      if ('documentPictureInPicture' in window && typeof (window as any).documentPictureInPicture?.requestWindow === 'function') {
+      // 1. Document Picture-in-Picture 시도 (일반 브라우저 환경에서만 시도)
+      // 주의: Windows WebView2 (Tauri 데스크톱) 환경에서는 브라우저 쉘 프레임 부재로 인해
+      // "Internal error: no window" 예외가 발생하므로 제외
+      if (!isTauriEnvironment() && 'documentPictureInPicture' in window && typeof (window as any).documentPictureInPicture?.requestWindow === 'function') {
         try {
           const pip = await (window as any).documentPictureInPicture.requestWindow({
             width: reqWidth,
@@ -943,23 +945,30 @@ export class SubWindowManager {
         }
       }
 
-      // 2. Fallback: window.open popup 시도
-      try {
-        const screenX = typeof window.screenX !== 'undefined' ? window.screenX : 0;
-        const screenY = typeof window.screenY !== 'undefined' ? window.screenY : 0;
-        const left = Math.max(0, Math.round(screenX + ((window.outerWidth || 1200) - reqWidth) / 2));
-        const top = Math.max(0, Math.round(screenY + ((window.outerHeight || 800) - reqHeight) / 2));
-        const features = `width=${reqWidth},height=${reqHeight},left=${left},top=${top},resizable=yes,scrollbars=yes`;
-        const popWin = window.open('about:blank', `migoto_pip_${fullId}`, features);
-        if (popWin && !popWin.closed) {
-          setupPopoutWindow(popWin);
-          return true;
+      // 2. Fallback: window.open popup 시도 (일반 웹 브라우저 환경)
+      if (!isTauriEnvironment()) {
+        try {
+          const screenX = typeof window.screenX !== 'undefined' ? window.screenX : 0;
+          const screenY = typeof window.screenY !== 'undefined' ? window.screenY : 0;
+          const left = Math.max(0, Math.round(screenX + ((window.outerWidth || 1200) - reqWidth) / 2));
+          const top = Math.max(0, Math.round(screenY + ((window.outerHeight || 800) - reqHeight) / 2));
+          const features = `width=${reqWidth},height=${reqHeight},left=${left},top=${top},resizable=yes,scrollbars=yes`;
+          const popWin = window.open('about:blank', `migoto_pip_${fullId}`, features);
+          if (popWin && !popWin.closed) {
+            setupPopoutWindow(popWin);
+            return true;
+          }
+        } catch (e) {
+          console.warn('[SubWindowManager] window.open popup fallback 실패:', e);
         }
-      } catch (e) {
-        console.warn('[SubWindowManager] window.open popup fallback 실패:', e);
       }
 
-      showToast('현재 환경에서는 별도 OS 윈도우(PiP) 팝아웃이 지원되지 않아 내장 플로팅 창으로 유지됩니다.', 'warn');
+      showToast(
+        isTauriEnvironment()
+          ? 'Tauri 데스크톱(WebView2) 환경에서는 OS 웹뷰 제약으로 인해 실시간 DOM의 별도 창 분리가 지원되지 않습니다. 에디터 내 플로팅 창을 자유롭게 이동 및 최대화하여 사용해주세요.'
+          : '현재 브라우저 환경에서는 별도 OS 윈도우(PiP) 팝아웃이 지원되지 않아 내장 플로팅 창으로 유지됩니다.',
+        'warn'
+      );
       return false;
     };
 
