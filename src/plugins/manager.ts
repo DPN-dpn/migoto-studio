@@ -101,6 +101,15 @@ export interface CreatePluginTemplateOptions {
 }
 
 const STORAGE_ENABLED_PLUGINS = 'migoto_plugins_enabled';
+const STORAGE_PLUGIN_ORDER_VERSION = 'migoto_plugin_order_v';
+
+export const DEFAULT_PLUGIN_ORDER: readonly string[] = [
+  'custom-lint',
+  'zzmi-support',
+  'asset-viewer',
+  'python-runner',
+  'ai-assistant',
+];
 
 export class PluginManager {
   private plugins: Map<string, PluginInstance> = new Map();
@@ -359,16 +368,16 @@ export class PluginManager {
   private getStoredPluginOrder(): string[] {
     try {
       const raw = localStorage.getItem('migoto_plugin_order');
-      if (!raw) return [];
+      if (!raw) return [...DEFAULT_PLUGIN_ORDER];
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) {
+      if (Array.isArray(parsed) && parsed.length > 0) {
         return parsed
           .map((id) => (id === 'resource-checker' ? 'custom-lint' : id))
           .filter((id, idx, arr) => arr.indexOf(id) === idx);
       }
-      return [];
+      return [...DEFAULT_PLUGIN_ORDER];
     } catch {
-      return [];
+      return [...DEFAULT_PLUGIN_ORDER];
     }
   }
 
@@ -382,6 +391,11 @@ export class PluginManager {
     const stored = this.getStoredPluginOrder();
     const allIds = Array.from(this.plugins.keys());
     const valid = stored.filter((id) => allIds.includes(id));
+    for (const defId of DEFAULT_PLUGIN_ORDER) {
+      if (allIds.includes(defId) && !valid.includes(defId)) {
+        valid.push(defId);
+      }
+    }
     for (const id of allIds) {
       if (!valid.includes(id)) valid.push(id);
     }
@@ -414,6 +428,25 @@ export class PluginManager {
     this.saveStoredPluginOrder(order);
     this.activityBar?.reorderDynamicTabs(order);
     this.notify();
+  }
+
+  resetPluginOrder(): void {
+    const allIds = Array.from(this.plugins.keys());
+    const newOrder: string[] = [];
+    for (const defId of DEFAULT_PLUGIN_ORDER) {
+      if (allIds.includes(defId)) {
+        newOrder.push(defId);
+      }
+    }
+    for (const id of allIds) {
+      if (!newOrder.includes(id)) {
+        newOrder.push(id);
+      }
+    }
+    this.saveStoredPluginOrder(newOrder);
+    this.activityBar?.reorderDynamicTabs(newOrder);
+    this.notify();
+    this.showToast('플러그인 순서가 기본값으로 초기화되었습니다.', 'info');
   }
 
   async checkFileExists(relPath: string): Promise<boolean> {
@@ -627,7 +660,19 @@ export class PluginManager {
       } catch {}
     }
 
-    const storedOrder = this.getStoredPluginOrder();
+    const orderVersion = localStorage.getItem(STORAGE_PLUGIN_ORDER_VERSION);
+    let storedOrder = this.getStoredPluginOrder();
+    if (!orderVersion) {
+      // 기존에 기본 플러그인들만 있었거나 순서를 직접 변경하지 않은 경우, 신규 DEFAULT_PLUGIN_ORDER로 마이그레이션
+      const isOnlyDefaults = storedOrder.every((id) => DEFAULT_PLUGIN_ORDER.includes(id));
+      if (isOnlyDefaults) {
+        storedOrder = DEFAULT_PLUGIN_ORDER.filter((id) => currentPluginIds.has(id));
+      }
+      try {
+        localStorage.setItem(STORAGE_PLUGIN_ORDER_VERSION, '1');
+      } catch {}
+    }
+
     const cleanedOrder = storedOrder.filter((id) => currentPluginIds.has(id));
     for (const id of currentPluginIds) {
       if (!cleanedOrder.includes(id)) {

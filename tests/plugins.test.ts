@@ -631,7 +631,7 @@ test('default-plugins directory contains all 5 standalone plugins ready for inst
   const path = await import('node:path');
   const url = await import('node:url');
 
-  const defaultIds = ['python-runner', 'asset-viewer', 'ai-assistant', 'custom-lint', 'zzmi-support'];
+  const defaultIds = ['custom-lint', 'zzmi-support', 'asset-viewer', 'python-runner', 'ai-assistant'];
   const baseDir = path.resolve(process.cwd(), 'default-plugins');
 
   for (const id of defaultIds) {
@@ -665,7 +665,7 @@ test('public/default-plugins contains web-compatible plugins and excludes python
   assert.ok(fs.existsSync(indexJson), 'index.json must exist');
   const indexList = JSON.parse(fs.readFileSync(indexJson, 'utf8'));
 
-  assert.deepEqual(indexList, ['asset-viewer', 'ai-assistant', 'custom-lint', 'zzmi-support']);
+  assert.deepEqual(indexList, ['custom-lint', 'zzmi-support', 'asset-viewer', 'ai-assistant']);
   assert.equal(fs.existsSync(path.join(pubDir, 'python-runner')), false, 'python-runner must not exist in public/default-plugins');
 
   for (const id of indexList) {
@@ -1158,6 +1158,22 @@ test('Newly installed plugin via ZIP is appended to the bottom of the plugin ord
 
   assert.deepEqual(finalOrder, ['custom-lint', 'asset-viewer', 'ai-assistant', 'my-new-plugin']);
   assert.equal(finalOrder[finalOrder.length - 1], 'my-new-plugin');
+});
+
+test('DEFAULT_PLUGIN_ORDER defines correct baseline order (custom-lint, zzmi-support, asset-viewer, python-runner, ai-assistant)', () => {
+  const expectedDefaultOrder = [
+    'custom-lint',
+    'zzmi-support',
+    'asset-viewer',
+    'python-runner',
+    'ai-assistant',
+  ];
+
+  assert.equal(expectedDefaultOrder[0], 'custom-lint');
+  assert.equal(expectedDefaultOrder[1], 'zzmi-support');
+  assert.equal(expectedDefaultOrder[2], 'asset-viewer');
+  assert.equal(expectedDefaultOrder[3], 'python-runner');
+  assert.equal(expectedDefaultOrder[4], 'ai-assistant');
 });
 
 test('Plugin UI API FormConfig schema and value aggregation works properly', () => {

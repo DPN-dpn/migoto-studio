@@ -4,18 +4,18 @@ import { readFile, writeFile, mkdir, rm } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 
 const plugins = [
-  'python-runner',
-  'asset-viewer',
-  'ai-assistant',
   'custom-lint',
   'zzmi-support',
+  'asset-viewer',
+  'python-runner',
+  'ai-assistant',
 ];
 
 const webCompatiblePlugins = [
-  'asset-viewer',
-  'ai-assistant',
   'custom-lint',
   'zzmi-support',
+  'asset-viewer',
+  'ai-assistant',
 ];
 
 async function buildDefaultPlugins() {

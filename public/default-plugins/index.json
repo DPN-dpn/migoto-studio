@@ -1,6 +1,6 @@
 [
-  "asset-viewer",
-  "ai-assistant",
   "custom-lint",
-  "zzmi-support"
+  "zzmi-support",
+  "asset-viewer",
+  "ai-assistant"
 ]

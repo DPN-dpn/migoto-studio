@@ -300,10 +300,10 @@ function pickOpenWithFileInput(): Promise<FileRef | null> {
 const hasFSAccess = typeof window !== 'undefined' && 'showOpenFilePicker' in window;
 
 export const DEFAULT_WEB_PLUGINS = [
-  'asset-viewer',
-  'ai-assistant',
   'custom-lint',
   'zzmi-support',
+  'asset-viewer',
+  'ai-assistant',
 ];
 
 export const STORAGE_WEB_PLUGINS = 'migoto_studio_web_plugins';
