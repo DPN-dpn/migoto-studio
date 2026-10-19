@@ -25,37 +25,37 @@ let isTemplatesInitialized = false;
 export const OWN_TEMPLATES: Template[] = [
   {
     id: 'builtin_key_cycle',
-    group: '자주 쓰는 섹션', label: '키 전환 (토글)', description: '키를 누를 때마다 값이 바뀌는 변수',
+    group: 'XXMI', label: '키 전환 (토글)', description: '키를 누를 때마다 값이 바뀌는 변수',
     body: '[Key${1:Toggle}]\nkey = ${2:no_modifiers} ${3:VK_F1}\ntype = cycle\n\\$${4:myvar} = ${5:0,1}\n',
   },
   {
     id: 'builtin_constants',
-    group: '자주 쓰는 섹션', label: '변수 선언 (Constants)', description: '전역 변수 선언 섹션',
+    group: 'XXMI', label: '변수 선언 (Constants)', description: '전역 변수 선언 섹션',
     body: '[Constants]\nglobal persist \\$${1:myvar} = ${2:0}\n',
   },
   {
     id: 'builtin_texture_override',
-    group: '자주 쓰는 섹션', label: 'TextureOverride', description: '해시로 텍스처/버퍼를 찾아 덮어쓰기',
+    group: 'XXMI', label: 'TextureOverride', description: '해시로 텍스처/버퍼를 찾아 덮어쓰기',
     body: '[TextureOverride${1:Name}]\nhash = ${2:00000000}\nmatch_priority = ${3:0}\n',
   },
   {
     id: 'builtin_shader_override',
-    group: '자주 쓰는 섹션', label: 'ShaderOverride', description: '해시로 셰이더를 찾아 동작 변경',
+    group: 'XXMI', label: 'ShaderOverride', description: '해시로 셰이더를 찾아 동작 변경',
     body: '[ShaderOverride${1:Name}]\nhash = ${2:0000000000000000}\n',
   },
   {
     id: 'builtin_resource_buffer',
-    group: '자주 쓰는 섹션', label: '리소스 (Buffer)', description: '메시 버퍼 파일을 가리키는 리소스',
+    group: 'XXMI', label: '리소스 (Buffer)', description: '메시 버퍼 파일을 가리키는 리소스',
     body: '[Resource${1:Name}]\ntype = Buffer\nstride = ${2:12}\nfilename = ${3:Meshes/File.buf}\n',
   },
   {
     id: 'builtin_resource_texture',
-    group: '자주 쓰는 섹션', label: '리소스 (텍스처)', description: '텍스처 파일을 가리키는 리소스',
+    group: 'XXMI', label: '리소스 (텍스처)', description: '텍스처 파일을 가리키는 리소스',
     body: '[Resource${1:Name}]\nfilename = ${2:Textures/File.dds}\n',
   },
   {
     id: 'builtin_commandlist',
-    group: '자주 쓰는 섹션', label: '커맨드 리스트', description: '여러 곳에서 재사용하는 명령 모음',
+    group: 'XXMI', label: '커맨드 리스트', description: '여러 곳에서 재사용하는 명령 모음',
     body: '[CommandList${1:Name}]\n${0}\n',
   },
 ];
