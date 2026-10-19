@@ -2032,6 +2032,14 @@ export function createUIBuilder() {
       const minFirst = opts.minFirstSize ?? 50;
       const minSecond = opts.minSecondSize ?? 50;
 
+      if (isHorizontal) {
+        firstPane.style.minWidth = `${minFirst}px`;
+        secondPane.style.minWidth = `${minSecond}px`;
+      } else {
+        firstPane.style.minHeight = `${minFirst}px`;
+        secondPane.style.minHeight = `${minSecond}px`;
+      }
+
       const applySize = (size: number | string) => {
         const val = typeof size === 'number' ? `${size}px` : size;
         if (isHorizontal) {
@@ -2048,11 +2056,17 @@ export function createUIBuilder() {
         try {
           const saved = localStorage.getItem(opts.storageKey);
           if (saved !== null && saved !== '') {
-            const num = parseFloat(saved);
-            if (!Number.isNaN(num) && num >= minFirst) {
-              initialVal = num;
-            } else {
+            if (saved.endsWith('%')) {
               initialVal = saved;
+            } else {
+              const num = parseFloat(saved);
+              if (!Number.isNaN(num)) {
+                if (num > 0 && num <= 1) {
+                  initialVal = `${(num * 100).toFixed(2)}%`;
+                } else if (num >= minFirst) {
+                  initialVal = num;
+                }
+              }
             }
           }
         } catch {}
@@ -2072,16 +2086,27 @@ export function createUIBuilder() {
         const maxFirst = Math.max(minFirst, containerSize - resizerSize - minSecond);
         const newSize = Math.max(minFirst, Math.min(maxFirst, startSize + delta));
 
-        applySize(newSize);
+        // 전체 창크기/컨테이너 크기에서 비율(%)로 조절하여 전체화면 및 창모드 전환 시에도 비율 유지
+        if (containerSize > 0) {
+          const ratio = Math.max(0.1, Math.min(99.9, (newSize / containerSize) * 100));
+          const percentStr = `${ratio.toFixed(2)}%`;
+          applySize(percentStr);
+          if (opts.storageKey) {
+            try {
+              localStorage.setItem(opts.storageKey, percentStr);
+            } catch {}
+          }
+        } else {
+          applySize(newSize);
+          if (opts.storageKey) {
+            try {
+              localStorage.setItem(opts.storageKey, String(Math.round(newSize)));
+            } catch {}
+          }
+        }
 
         const secondSize = Math.max(0, containerSize - resizerSize - newSize);
         opts.onResize?.(newSize, secondSize);
-
-        if (opts.storageKey) {
-          try {
-            localStorage.setItem(opts.storageKey, String(Math.round(newSize)));
-          } catch {}
-        }
       };
 
       const onMouseUp = () => {

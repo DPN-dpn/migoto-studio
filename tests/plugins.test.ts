@@ -1577,6 +1577,11 @@ test('Plugin UI Builder layout components (split, row, column, grid, divider, sc
     assert.equal(split.firstPane.style.width, '250px');
     assert.equal(split.getSize(), 400);
 
+    // Test ratio-based resizing
+    split.setSize('35.5%');
+    assert.equal(split.firstPane.style.width, '35.5%');
+    assert.equal(split.firstPane.style.flexBasis, '35.5%');
+
     // Test createSplitView vertical
     const splitV = builder.createSplitView({ direction: 'vertical', initialSize: '40%' });
     assert.ok(splitV.container.className.includes('plugin-split-vertical'));

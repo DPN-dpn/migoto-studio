@@ -34,6 +34,7 @@ const MIN_WIDTH = 160;
 const MAX_WIDTH = 650;
 const MIN_EDITOR_WIDTH = 240;
 const STORAGE_KEY = 'migoto_sidebar_width';
+const STORAGE_RATIO_KEY = 'migoto_sidebar_ratio';
 
 /** Left-hand section list: grouped, searchable, click to jump, follows the cursor, resizable split panel. */
 export class OutlinePanel {
@@ -42,6 +43,7 @@ export class OutlinePanel {
   private activeLine = 0;
   private timer = 0;
   private currentWidth = DEFAULT_WIDTH;
+  private currentRatio: number | null = null;
   private readonly list: HTMLElement;
   private readonly searchInput: HTMLInputElement;
   private readonly docTitle: HTMLElement;
@@ -110,9 +112,21 @@ export class OutlinePanel {
     this.list.className = 'outline-list';
     this.contentRoot.append(header, this.searchInput, this.list);
 
-    // Restore saved width
-    const savedWidth = Number(localStorage.getItem(STORAGE_KEY)) || DEFAULT_WIDTH;
-    this.applyWidth(savedWidth);
+    // Restore saved width or ratio
+    const savedRatio = parseFloat(localStorage.getItem(STORAGE_RATIO_KEY) || '');
+    if (!Number.isNaN(savedRatio) && savedRatio > 0 && savedRatio < 1) {
+      this.currentRatio = savedRatio;
+      const workspace = this.root.parentElement;
+      const workspaceWidth = workspace ? workspace.clientWidth : window.innerWidth;
+      const activityBar = document.getElementById('activity-bar');
+      const activityBarWidth = activityBar && !activityBar.hidden ? activityBar.offsetWidth : 0;
+      const availableWidth = Math.max(0, workspaceWidth - activityBarWidth);
+      const targetWidth = Math.round(availableWidth * savedRatio);
+      this.applyWidth(targetWidth, false);
+    } else {
+      const savedWidth = Number(localStorage.getItem(STORAGE_KEY)) || DEFAULT_WIDTH;
+      this.applyWidth(savedWidth);
+    }
     requestAnimationFrame(() => this.layoutEditor());
 
     if (this.resizer) {
@@ -202,7 +216,7 @@ export class OutlinePanel {
     }
   }
 
-  private applyWidth(width: number) {
+  private applyWidth(width: number, updateRatio: boolean = true) {
     const workspace = this.root.parentElement;
     const workspaceWidth = workspace ? workspace.clientWidth : window.innerWidth;
     const workspaceHeight = workspace ? workspace.clientHeight : window.innerHeight;
@@ -212,11 +226,20 @@ export class OutlinePanel {
     const resizerWidth = this.resizer && !this.resizer.hidden ? this.resizer.offsetWidth : 0;
     const activityBar = document.getElementById('activity-bar');
     const activityBarWidth = activityBar && !activityBar.hidden ? activityBar.offsetWidth : 0;
-    const maxAllowed = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, workspaceWidth - activityBarWidth - MIN_EDITOR_WIDTH - resizerWidth));
+    const availableWidth = Math.max(0, workspaceWidth - activityBarWidth);
+    const maxAllowed = Math.max(MIN_WIDTH, availableWidth - MIN_EDITOR_WIDTH - resizerWidth);
     const clamped = Math.max(MIN_WIDTH, Math.min(width, maxAllowed));
 
     this.currentWidth = clamped;
     this.root.style.width = `${clamped}px`;
+
+    if (updateRatio && availableWidth > 0) {
+      this.currentRatio = clamped / availableWidth;
+      try {
+        localStorage.setItem(STORAGE_RATIO_KEY, this.currentRatio.toFixed(4));
+      } catch {}
+    }
+
     try {
       localStorage.setItem(STORAGE_KEY, String(clamped));
     } catch {}
@@ -229,7 +252,7 @@ export class OutlinePanel {
     const onMouseMove = (e: MouseEvent) => {
       const sidebarRect = this.root.getBoundingClientRect();
       const targetWidth = e.clientX - sidebarRect.left;
-      this.applyWidth(targetWidth);
+      this.applyWidth(targetWidth, true);
     };
 
     const onMouseUp = () => {
@@ -249,12 +272,26 @@ export class OutlinePanel {
     });
 
     resizer.addEventListener('dblclick', () => {
+      this.currentRatio = null;
+      try {
+        localStorage.removeItem(STORAGE_RATIO_KEY);
+      } catch {}
       this.applyWidth(DEFAULT_WIDTH);
     });
 
     window.addEventListener('resize', () => {
       if (!this.root.hidden) {
-        this.applyWidth(this.currentWidth);
+        if (this.currentRatio !== null) {
+          const workspace = this.root.parentElement;
+          const workspaceWidth = workspace ? workspace.clientWidth : window.innerWidth;
+          const activityBar = document.getElementById('activity-bar');
+          const activityBarWidth = activityBar && !activityBar.hidden ? activityBar.offsetWidth : 0;
+          const availableWidth = Math.max(0, workspaceWidth - activityBarWidth);
+          const targetWidth = Math.round(availableWidth * this.currentRatio);
+          this.applyWidth(targetWidth, false);
+        } else {
+          this.applyWidth(this.currentWidth);
+        }
       } else {
         this.layoutEditor();
       }
