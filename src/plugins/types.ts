@@ -56,6 +56,15 @@ import type {
   TooltipOptions,
   DropZoneOptions,
   DropZoneInstance,
+  ButtonOptions,
+  IconButtonOptions,
+  ButtonInstance,
+  ChipOption,
+  ChipGroupOptions,
+  ChipGroupInstance,
+  ModalWidth,
+  ModalOptions,
+  ModalInstance,
 } from './ui-builder.ts';
 export type {
   ConfirmOptions,
@@ -83,6 +92,15 @@ export type {
   TooltipOptions,
   DropZoneOptions,
   DropZoneInstance,
+  ButtonOptions,
+  IconButtonOptions,
+  ButtonInstance,
+  ChipOption,
+  ChipGroupOptions,
+  ChipGroupInstance,
+  ModalWidth,
+  ModalOptions,
+  ModalInstance,
 };
 import type { KeyHelperModalOptions } from '../ui/modals/key-helper.ts';
 export type { KeyHelperModalOptions };

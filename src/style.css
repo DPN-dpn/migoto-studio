@@ -6164,6 +6164,162 @@ body.plugin-split-resizing-v * {
   overflow: hidden !important;
 }
 
+/* 5. Plugin Icon Buttons & Button Icons */
+.plugin-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  min-width: 28px;
+  box-sizing: border-box;
+  border-radius: 6px;
+  cursor: pointer;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  color: var(--fg);
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+.plugin-icon-btn:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--fg-bright);
+}
+.plugin-icon-btn.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.plugin-icon-btn.primary:hover:not(:disabled) {
+  filter: brightness(1.1);
+}
+.plugin-icon-btn.danger {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.4);
+  color: #ef4444;
+}
+.plugin-icon-btn.danger:hover:not(:disabled) {
+  background: #ef4444;
+  color: #fff;
+}
+.plugin-icon-btn.ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--fg-dim);
+}
+.plugin-icon-btn.ghost:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--fg);
+}
+.plugin-icon-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.plugin-icon-btn svg,
+.plugin-btn-icon svg {
+  display: block;
+  pointer-events: none;
+}
+.plugin-btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+button.has-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+/* 6. Plugin Chip Group (Multi / Single selection tags) */
+.plugin-chip-group-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  box-sizing: border-box;
+}
+.plugin-chip-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+.plugin-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: 6px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--fg-dim);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+  box-sizing: border-box;
+  white-space: nowrap;
+}
+.plugin-chip:hover:not(:disabled) {
+  color: var(--fg);
+  background: var(--bg-hover);
+  border-color: var(--border-hover, var(--border));
+}
+.plugin-chip.is-selected {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #ffffff;
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+}
+.plugin-chip.is-selected:hover:not(:disabled) {
+  filter: brightness(1.1);
+}
+.plugin-chip:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.plugin-chip-group.is-compact .plugin-chip {
+  padding: 2px 7px;
+  font-size: 11px;
+  border-radius: 4px;
+}
+
+/* 7. Plugin Modal Dialog */
+.plugin-modal-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--fg);
+}
+.plugin-modal-description {
+  margin: 3px 0 0 0;
+  font-size: 12px;
+  color: var(--fg-dim);
+  line-height: 1.4;
+}
+.plugin-modal-body {
+  padding: 14px 18px 18px;
+  box-sizing: border-box;
+  gap: 12px;
+}
+.plugin-modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 18px;
+  border-top: 1px solid var(--border);
+  background: var(--bg);
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
 /* ==========================================================================
    Inline Diff Review (proposeChanges)
    ========================================================================== */

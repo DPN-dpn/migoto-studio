@@ -149,6 +149,137 @@ export interface StatusBarInstance {
   removeItem(id: string): void;
 }
 
+export interface ButtonOptions {
+  text?: string;
+  icon?: string;
+  iconOnly?: boolean;
+  title?: string;
+  variant?: 'primary' | 'secondary' | 'small' | 'danger' | 'ghost';
+  disabled?: boolean;
+  className?: string;
+  style?: Record<string, string>;
+  onClick?: (e: MouseEvent) => void | Promise<void>;
+}
+
+export interface IconButtonOptions {
+  icon: string;
+  title?: string;
+  variant?: 'primary' | 'secondary' | 'small' | 'danger' | 'ghost';
+  disabled?: boolean;
+  className?: string;
+  style?: Record<string, string>;
+  onClick?: (e: MouseEvent) => void | Promise<void>;
+}
+
+export interface ButtonInstance extends HTMLButtonElement {
+  element: HTMLButtonElement;
+  getElement(): HTMLElement;
+  setText(text: string): void;
+  setIcon(icon: string): void;
+  setDisabled(disabled: boolean): void;
+}
+
+export interface ChipOption {
+  value: string;
+  label: string;
+  tooltip?: string;
+  disabled?: boolean;
+}
+
+export interface ChipGroupOptions {
+  label?: string;
+  multiple?: boolean;
+  options: Array<string | ChipOption>;
+  value?: string | string[];
+  onChange?: (value: any) => void;
+  variant?: 'default' | 'compact' | 'segmented';
+  disabled?: boolean;
+  className?: string;
+  style?: Record<string, string>;
+}
+
+export interface ChipGroupInstance {
+  element: HTMLElement;
+  container: HTMLElement;
+  getValue(): string | string[];
+  setValue(val: string | string[]): void;
+  setOptions(newOpts: Array<string | ChipOption>): void;
+  setDisabled(disabled: boolean): void;
+  getElement(): HTMLElement;
+}
+
+export type ModalWidth = 'small' | 'medium' | 'large' | number | string;
+
+export interface ModalOptions {
+  title?: string;
+  description?: string;
+  content?: HTMLElement | any | (HTMLElement | any)[];
+  actions?: (HTMLElement | any)[];
+  width?: ModalWidth;
+  closeOnBackdrop?: boolean;
+  closeOnEsc?: boolean;
+  showCloseButton?: boolean;
+  className?: string;
+  style?: Record<string, string>;
+  onOpen?: () => void;
+  onClose?: () => void;
+}
+
+export interface ModalInstance {
+  element: HTMLElement;
+  panel: HTMLElement;
+  header: HTMLElement;
+  body: HTMLElement;
+  footer?: HTMLElement;
+  getElement(): HTMLElement;
+  open(): void;
+  close(): void;
+  isOpen(): boolean;
+  setTitle(title: string): void;
+  setDescription(description?: string): void;
+  setContent(content: HTMLElement | any | (HTMLElement | any)[]): void;
+  setActions(actions: (HTMLElement | any)[]): void;
+}
+
+export const BUILTIN_ICONS: Record<string, string> = {
+  refresh: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2v4h-4"/><path d="M2 14v-4h4"/><path d="M3.51 6.5A6 6 0 0 1 13.4 4.6L14 6"/><path d="M12.49 9.5A6 6 0 0 1 2.6 11.4L2 10"/></svg>',
+  plus: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="3" x2="8" y2="13"/><line x1="3" y1="8" x2="13" y2="8"/></svg>',
+  trash: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 4 5 4 13 4"/><path d="M6 4V2.5A1.5 1.5 0 0 1 7.5 1h1A1.5 1.5 0 0 1 10 2.5V4"/><path d="M4.5 4l.8 9.2A1.5 1.5 0 0 0 6.8 14.5h2.4a1.5 1.5 0 0 0 1.5-1.3l.8-9.2"/><line x1="6.5" y1="7" x2="6.5" y2="11.5"/><line x1="9.5" y1="7" x2="9.5" y2="11.5"/></svg>',
+  copy: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="5.5" y="5.5" width="8" height="8" rx="1.5"/><path d="M3.5 10.5h-1A1.5 1.5 0 0 1 1 9V3A1.5 1.5 0 0 1 2.5 1.5h6A1.5 1.5 0 0 1 10 3v1"/></svg>',
+  check: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="2.5 8.5 6 12 13.5 4.5"/></svg>',
+  edit: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M11 1.5l3.5 3.5-9 9H2v-3.5l9-9z"/></svg>',
+  folder: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 3.5A1.5 1.5 0 0 1 3 2h3l2 2h5A1.5 1.5 0 0 1 14.5 5.5v7A1.5 1.5 0 0 1 13 14H3a1.5 1.5 0 0 1-1.5-1.5v-9z"/></svg>',
+  file: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 1.5h6l4 4V14a1.5 1.5 0 0 1-1.5 1.5h-8.5A1.5 1.5 0 0 1 1.5 14V3A1.5 1.5 0 0 1 3 1.5z"/><polyline points="9 1.5 9 5.5 13 5.5"/></svg>',
+  play: '<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><polygon points="3.5,2 13.5,8 3.5,14"/></svg>',
+  settings: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="2.5"/><path d="M13.8 6.5l-1-.6a4.8 4.8 0 0 0-.6-1.5l.4-1.1a1 1 0 0 0-.3-1.1l-1.1-.7a1 1 0 0 0-1.2.1l-.9.8a5 5 0 0 0-1.5-.3V1a1 1 0 0 0-1-1h-1.3a1 1 0 0 0-1 1v1.1a5 5 0 0 0-1.5.3l-.9-.8a1 1 0 0 0-1.2-.1l-1.1.7a1 1 0 0 0-.3 1.1l.4 1.1a4.8 4.8 0 0 0-.6 1.5l-1 .6a1 1 0 0 0-.5 1v1.3a1 1 0 0 0 .5 1l1 .6a4.8 4.8 0 0 0 .6 1.5l-.4 1.1a1 1 0 0 0 .3 1.1l1.1.7a1 1 0 0 0 1.2-.1l.9-.8a5 5 0 0 0 1.5.3V15a1 1 0 0 0 1 1h1.3a1 1 0 0 0 1-1v-1.1a5 5 0 0 0 1.5-.3l.9.8a1 1 0 0 0 1.2.1l1.1-.7a1 1 0 0 0 .3-1.1l-.4-1.1a4.8 4.8 0 0 0 .6-1.5l1-.6a1 1 0 0 0 .5-1V7.5a1 1 0 0 0-.5-1z"/></svg>',
+  search: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="7" cy="7" r="4.5"/><line x1="10.5" y1="10.5" x2="14.5" y2="14.5"/></svg>',
+  close: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="3" x2="13" y2="13"/><line x1="13" y1="3" x2="3" y2="13"/></svg>',
+  info: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6"/><line x1="8" y1="7" x2="8" y2="11.5"/><circle cx="8" cy="4.5" r=".5" fill="currentColor"/></svg>',
+};
+BUILTIN_ICONS.reload = BUILTIN_ICONS.refresh;
+BUILTIN_ICONS.add = BUILTIN_ICONS.plus;
+BUILTIN_ICONS.delete = BUILTIN_ICONS.trash;
+BUILTIN_ICONS.remove = BUILTIN_ICONS.trash;
+BUILTIN_ICONS.run = BUILTIN_ICONS.play;
+BUILTIN_ICONS.gear = BUILTIN_ICONS.settings;
+BUILTIN_ICONS.find = BUILTIN_ICONS.search;
+BUILTIN_ICONS.cross = BUILTIN_ICONS.close;
+BUILTIN_ICONS.x = BUILTIN_ICONS.close;
+
+export function resolveIconSvg(icon: string): string | null {
+  if (!icon) return null;
+  const trimmed = icon.trim();
+  if (!trimmed) return null;
+  if (trimmed.startsWith('<svg') || trimmed.startsWith('<span') || trimmed.startsWith('<i') || trimmed.startsWith('<img')) {
+    return trimmed;
+  }
+  const key = trimmed.toLowerCase();
+  if (BUILTIN_ICONS[key]) {
+    return BUILTIN_ICONS[key];
+  }
+  return null;
+}
+
 /**
  * 플러그인 위젯 인스턴스 또는 원시 DOM 엘리먼트로부터
  * 표준 최상위 HTMLElement를 안전하게 추출합니다.
@@ -363,7 +494,7 @@ export function createUIBuilder() {
 
       const validation = attachValidation(wrapper, select);
 
-      return {
+      return Object.assign(wrapper, {
         element: wrapper,
         row: wrapper,
         select,
@@ -379,7 +510,7 @@ export function createUIBuilder() {
         },
         getElement: () => wrapper,
         ...validation,
-      };
+      }) as any;
     },
 
     createInput(options: {
@@ -416,7 +547,7 @@ export function createUIBuilder() {
 
       const validation = attachValidation(row, input);
 
-      return {
+      return Object.assign(row, {
         element: row,
         row,
         input,
@@ -426,7 +557,7 @@ export function createUIBuilder() {
         },
         getElement: () => row,
         ...validation,
-      };
+      }) as any;
     },
 
     /**
@@ -640,7 +771,7 @@ export function createUIBuilder() {
       const element = row;
       const validation = attachValidation(row, input);
 
-      return {
+      return Object.assign(element, {
         element,
         row,
         container,
@@ -679,7 +810,7 @@ export function createUIBuilder() {
           stopInc();
         },
         ...validation,
-      };
+      }) as any;
     },
 
     createCheckbox(options: {
@@ -706,7 +837,7 @@ export function createUIBuilder() {
 
       row.append(checkbox, label);
 
-      return {
+      return Object.assign(row, {
         element: row,
         row,
         checkbox,
@@ -715,41 +846,432 @@ export function createUIBuilder() {
           checkbox.checked = c;
         },
         getElement: () => row,
-      };
+      }) as any;
     },
 
-    createButton(options: {
-      text: string;
-      variant?: 'primary' | 'secondary' | 'small' | 'danger';
+    createButton(options: ButtonOptions | {
+      text?: string;
+      variant?: 'primary' | 'secondary' | 'small' | 'danger' | 'ghost';
       disabled?: boolean;
       onClick?: (e: MouseEvent) => void | Promise<void>;
-    }): HTMLButtonElement {
-      const btn = document.createElement('button');
-      btn.textContent = options.text;
-      const variant = options.variant || 'secondary';
+      icon?: string;
+      iconOnly?: boolean;
+      title?: string;
+      className?: string;
+      style?: Record<string, string>;
+    }): HTMLButtonElement & ButtonInstance {
+      const opts = options || {};
+      const btn = document.createElement('button') as any;
+      btn.type = 'button';
+      const variant = opts.variant || 'secondary';
+      const classes = ['plugin-btn'];
       if (variant === 'small') {
-        btn.className = 'small-btn';
+        classes.push('small-btn');
       } else {
-        btn.className = variant;
+        classes.push(variant);
+      }
+      if (opts.iconOnly) {
+        classes.push('plugin-icon-btn');
+      }
+      if (opts.className) {
+        classes.push(opts.className);
+      }
+      btn.className = classes.join(' ');
+
+      if (opts.style) {
+        Object.assign(btn.style, opts.style);
       }
 
-      if (options.disabled !== undefined) btn.disabled = options.disabled;
-
-      if (options.onClick) {
-        btn.onclick = (e) => options.onClick!(e);
+      if (opts.title) {
+        btn.title = opts.title;
+        btn.setAttribute('aria-label', opts.title);
+      } else if (opts.iconOnly && opts.text) {
+        btn.title = opts.text;
+        btn.setAttribute('aria-label', opts.text);
       }
+
+      let currentIcon = opts.icon;
+      let currentText = opts.text || '';
+
+      const renderContent = () => {
+        btn.replaceChildren();
+        const resolvedSvg = currentIcon ? resolveIconSvg(currentIcon) : null;
+        if (opts.iconOnly) {
+          if (resolvedSvg) {
+            btn.innerHTML = resolvedSvg;
+          } else if (currentIcon) {
+            btn.textContent = currentIcon;
+          }
+        } else {
+          if (resolvedSvg) {
+            const iconSpan = document.createElement('span');
+            iconSpan.className = 'plugin-btn-icon';
+            iconSpan.innerHTML = resolvedSvg;
+            const textSpan = document.createElement('span');
+            textSpan.className = 'plugin-btn-text';
+            textSpan.textContent = currentText;
+            btn.append(iconSpan, textSpan);
+            btn.classList.add('has-icon');
+          } else {
+            btn.textContent = currentText;
+            btn.classList.remove('has-icon');
+          }
+        }
+      };
+
+      renderContent();
+
+      if (opts.disabled !== undefined) btn.disabled = opts.disabled;
+
+      if (opts.onClick) {
+        btn.onclick = (e: MouseEvent) => opts.onClick!(e);
+      }
+
+      btn.element = btn;
+      btn.getElement = () => btn;
+      btn.setText = (text: string) => {
+        currentText = text;
+        renderContent();
+      };
+      btn.setIcon = (icon: string) => {
+        currentIcon = icon;
+        renderContent();
+      };
+      btn.setDisabled = (disabled: boolean) => {
+        btn.disabled = disabled;
+      };
 
       return btn;
+    },
+
+    createIconButton(options: IconButtonOptions): HTMLButtonElement & ButtonInstance {
+      return this.createButton({
+        ...options,
+        iconOnly: true,
+      });
     },
 
     createButtonRow(buttons: (HTMLElement | any)[]): HTMLElement {
       const row = document.createElement('div');
       row.className = 'plugin-actions-row';
       buttons.forEach((b) => {
-        const el = toElement(b);
+        const el = toElement(b) || b;
         if (el) row.append(el);
       });
       return row;
+    },
+
+    createChipGroup(options: ChipGroupOptions): ChipGroupInstance & HTMLElement {
+      const opts = options || {};
+      const isMultiple = Boolean(opts.multiple);
+      let currentOptions: ChipOption[] = (opts.options || []).map((o) =>
+        typeof o === 'string' ? { value: o, label: o } : o
+      );
+      let isDisabled = Boolean(opts.disabled);
+
+      const selectedSet = new Set<string>();
+      let singleSelected = '';
+
+      if (isMultiple) {
+        if (Array.isArray(opts.value)) {
+          opts.value.forEach((v) => selectedSet.add(String(v)));
+        } else if (opts.value !== undefined && opts.value !== null) {
+          selectedSet.add(String(opts.value));
+        }
+      } else {
+        if (opts.value !== undefined && opts.value !== null) {
+          singleSelected = Array.isArray(opts.value) ? String(opts.value[0] || '') : String(opts.value);
+        }
+      }
+
+      const chipsContainer = document.createElement('div');
+      chipsContainer.className = `plugin-chip-group${opts.variant === 'compact' ? ' is-compact' : ''}${opts.className ? ` ${opts.className}` : ''}`;
+      if (opts.style) {
+        Object.assign(chipsContainer.style, opts.style);
+      }
+
+      const chipButtons = new Map<string, HTMLButtonElement>();
+
+      const updateActiveStates = () => {
+        chipButtons.forEach((btn, val) => {
+          const isSelected = isMultiple ? selectedSet.has(val) : singleSelected === val;
+          if (isSelected) {
+            btn.classList.add('is-selected');
+            btn.setAttribute('aria-pressed', 'true');
+          } else {
+            btn.classList.remove('is-selected');
+            btn.setAttribute('aria-pressed', 'false');
+          }
+          btn.disabled = isDisabled;
+        });
+      };
+
+      const renderChips = () => {
+        chipsContainer.replaceChildren();
+        chipButtons.clear();
+
+        currentOptions.forEach((opt) => {
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'plugin-chip';
+          btn.textContent = opt.label;
+          if (opt.tooltip) btn.title = opt.tooltip;
+          if (opt.disabled) btn.disabled = true;
+
+          btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (isDisabled || opt.disabled) return;
+            const val = opt.value;
+            if (isMultiple) {
+              if (selectedSet.has(val)) {
+                selectedSet.delete(val);
+              } else {
+                selectedSet.add(val);
+              }
+              updateActiveStates();
+              opts.onChange?.(Array.from(selectedSet));
+            } else {
+              singleSelected = val;
+              updateActiveStates();
+              opts.onChange?.(singleSelected);
+            }
+          });
+
+          chipButtons.set(opt.value, btn);
+          chipsContainer.append(btn);
+        });
+
+        updateActiveStates();
+      };
+
+      renderChips();
+
+      let wrapper: HTMLElement;
+      if (opts.label) {
+        wrapper = this.createFormRow(opts.label, chipsContainer);
+      } else {
+        wrapper = chipsContainer;
+      }
+
+      const instance: ChipGroupInstance = {
+        element: wrapper,
+        container: chipsContainer,
+        getValue: () => (isMultiple ? Array.from(selectedSet) : singleSelected),
+        setValue: (v: string | string[]) => {
+          if (isMultiple) {
+            selectedSet.clear();
+            if (Array.isArray(v)) {
+              v.forEach((item) => selectedSet.add(String(item)));
+            } else if (v !== undefined && v !== null && v !== '') {
+              selectedSet.add(String(v));
+            }
+          } else {
+            singleSelected = Array.isArray(v) ? String(v[0] || '') : String(v || '');
+          }
+          updateActiveStates();
+        },
+        setOptions: (newOpts: Array<string | ChipOption>) => {
+          currentOptions = (newOpts || []).map((o) =>
+            typeof o === 'string' ? { value: o, label: o } : o
+          );
+          renderChips();
+        },
+        setDisabled: (disabled: boolean) => {
+          isDisabled = disabled;
+          updateActiveStates();
+        },
+        getElement: () => wrapper,
+      };
+
+      return Object.assign(wrapper, instance) as ChipGroupInstance & HTMLElement;
+    },
+
+    createModal(options: ModalOptions): ModalInstance & HTMLElement {
+      const opts = options || {};
+      const backdrop = document.createElement('div');
+      backdrop.className = `modal-backdrop plugin-modal-backdrop${opts.className ? ` ${opts.className}` : ''}`;
+
+      const panel = document.createElement('section');
+      panel.className = 'modal modal-auto plugin-modal';
+      panel.setAttribute('role', 'dialog');
+
+      const width = opts.width;
+      if (width === 'small') {
+        panel.style.width = 'min(400px, 92vw)';
+      } else if (width === 'medium') {
+        panel.style.width = 'min(560px, 92vw)';
+      } else if (width === 'large') {
+        panel.style.width = 'min(780px, 92vw)';
+      } else if (typeof width === 'number') {
+        panel.style.width = `min(${width}px, 96vw)`;
+      } else if (typeof width === 'string') {
+        panel.style.width = width;
+      } else {
+        panel.style.width = 'min(480px, 92vw)';
+      }
+
+      if (opts.style) {
+        Object.assign(panel.style, opts.style);
+      }
+
+      const header = document.createElement('header');
+      const titleWrap = document.createElement('div');
+      titleWrap.className = 'plugin-modal-title-wrap';
+      titleWrap.style.display = 'flex';
+      titleWrap.style.flexDirection = 'column';
+      titleWrap.style.gap = '2px';
+
+      const titleEl = document.createElement('h2');
+      titleEl.className = 'plugin-modal-title';
+      titleEl.textContent = opts.title || '';
+      titleWrap.append(titleEl);
+
+      let descEl: HTMLElement | null = null;
+      if (opts.description) {
+        descEl = document.createElement('div');
+        descEl.className = 'plugin-modal-description';
+        descEl.textContent = opts.description;
+        titleWrap.append(descEl);
+      }
+
+      header.append(titleWrap);
+
+      const body = document.createElement('div');
+      body.className = 'modal-body plugin-modal-body';
+
+      const appendContentNodes = (c: any) => {
+        if (!c) return;
+        const items = Array.isArray(c) ? c : [c];
+        items.forEach((item) => {
+          const el = toElement(item) || item;
+          if (el) body.append(el);
+        });
+      };
+      if (opts.content) {
+        appendContentNodes(opts.content);
+      }
+
+      let footer: HTMLElement | undefined = undefined;
+      const renderActions = (actions?: (HTMLElement | any)[]) => {
+        if (!actions || actions.length === 0) {
+          if (footer) {
+            footer.remove();
+            footer = undefined;
+          }
+          return;
+        }
+        if (!footer) {
+          footer = document.createElement('div');
+          footer.className = 'modal-footer plugin-modal-footer';
+          panel.append(footer);
+        } else {
+          footer.replaceChildren();
+        }
+        actions.forEach((act) => {
+          const el = toElement(act) || act;
+          if (el) footer!.append(el);
+        });
+      };
+
+      panel.append(header, body);
+      if (opts.actions && opts.actions.length > 0) {
+        renderActions(opts.actions);
+      }
+      backdrop.append(panel);
+
+      let isOpenState = false;
+      const closeOnBackdrop = opts.closeOnBackdrop !== false;
+      const closeOnEsc = opts.closeOnEsc !== false;
+
+      const onKey = (e: KeyboardEvent) => {
+        if (closeOnEsc && e.key === 'Escape') {
+          e.stopPropagation();
+          close();
+        }
+      };
+
+      const close = () => {
+        if (!isOpenState && !backdrop.parentElement) return;
+        isOpenState = false;
+        if (closeOnEsc && typeof document !== 'undefined') {
+          document.removeEventListener?.('keydown', onKey, true);
+        }
+        backdrop.remove();
+        opts.onClose?.();
+      };
+
+      const open = () => {
+        if (isOpenState) return;
+        isOpenState = true;
+        if (typeof document !== 'undefined') {
+          document.body?.append(backdrop);
+          if (closeOnEsc) {
+            document.addEventListener?.('keydown', onKey, true);
+          }
+        }
+        const firstInput = panel.querySelector?.('input, select, textarea, button.primary, button.btn-primary') as HTMLElement | null;
+        if (firstInput && typeof firstInput.focus === 'function') {
+          setTimeout(() => firstInput.focus(), 30);
+        }
+        opts.onOpen?.();
+      };
+
+      if (opts.showCloseButton !== false) {
+        const closeBtn = document.createElement('button');
+        closeBtn.className = 'modal-close';
+        closeBtn.textContent = '✕';
+        closeBtn.title = '닫기 (Esc)';
+        closeBtn.addEventListener('click', () => close());
+        header.append(closeBtn);
+      }
+
+      if (closeOnBackdrop) {
+        backdrop.addEventListener('mousedown', (e) => {
+          if (e.target === backdrop) {
+            close();
+          }
+        });
+      }
+
+      const instance: ModalInstance = {
+        element: backdrop,
+        panel,
+        header,
+        body,
+        footer,
+        getElement: () => backdrop,
+        open,
+        close,
+        isOpen: () => isOpenState,
+        setTitle: (title: string) => {
+          titleEl.textContent = title;
+          panel.setAttribute('aria-label', title);
+        },
+        setDescription: (desc?: string) => {
+          if (!desc) {
+            if (descEl) {
+              descEl.remove();
+              descEl = null;
+            }
+          } else {
+            if (!descEl) {
+              descEl = document.createElement('div');
+              descEl.className = 'plugin-modal-description';
+              titleWrap.append(descEl);
+            }
+            descEl.textContent = desc;
+          }
+        },
+        setContent: (newContent: any) => {
+          body.replaceChildren();
+          appendContentNodes(newContent);
+        },
+        setActions: (actions: (HTMLElement | any)[]) => {
+          renderActions(actions);
+        },
+      };
+
+      return Object.assign(backdrop, instance) as ModalInstance & HTMLElement;
     },
 
     createToggleButton(options: ToggleButtonOptions): ToggleButtonInstance {
@@ -825,7 +1347,7 @@ export function createUIBuilder() {
         options.onChange?.(currentActive);
       });
 
-      return {
+      return Object.assign(btn, {
         element: btn,
         button: btn,
         getElement: () => btn,
@@ -848,7 +1370,7 @@ export function createUIBuilder() {
         setDisabled: (disabled: boolean) => {
           btn.disabled = disabled;
         },
-      };
+      }) as any;
     },
 
     createToolbar(options: ToolbarOptions = {}): ToolbarInstance {
@@ -904,19 +1426,19 @@ export function createUIBuilder() {
         Object.assign(bar.style, options.style);
       }
 
-      return {
+      return Object.assign(bar, {
         element: bar,
         getElement: () => bar,
         leftContainer: leftGrp,
         centerContainer: centerGrp,
         rightContainer: rightGrp,
-        appendLeft: (...items) => appendTo(leftGrp, items),
-        appendCenter: (...items) => appendTo(centerGrp, items),
-        appendRight: (...items) => appendTo(rightGrp, items),
+        appendLeft: (...items: (HTMLElement | any)[]) => appendTo(leftGrp, items),
+        appendCenter: (...items: (HTMLElement | any)[]) => appendTo(centerGrp, items),
+        appendRight: (...items: (HTMLElement | any)[]) => appendTo(rightGrp, items),
         clearLeft: () => leftGrp.replaceChildren(),
         clearCenter: () => centerGrp.replaceChildren(),
         clearRight: () => rightGrp.replaceChildren(),
-      };
+      }) as any;
     },
 
     createStatusBar(options: StatusBarOptions = {}): StatusBarInstance {
@@ -1007,7 +1529,7 @@ export function createUIBuilder() {
         Object.assign(bar.style, options.style);
       }
 
-      return {
+      return Object.assign(bar, {
         element: bar,
         getElement: () => bar,
         setValue: (id: string, value: string | number) => {
@@ -1045,7 +1567,7 @@ export function createUIBuilder() {
             itemMap.delete(id);
           }
         },
-      };
+      }) as any;
     },
 
     createCodeEditor(options: {
@@ -1378,7 +1900,7 @@ export function createUIBuilder() {
 
       container.append(header, track);
 
-      return {
+      return Object.assign(container, {
         element: container,
         container,
         setProgress(val: number, max?: number) {
@@ -1390,7 +1912,7 @@ export function createUIBuilder() {
           labelSpan.textContent = text;
         },
         getElement: () => container,
-      };
+      }) as any;
     },
 
     createDivider(options?: DividerOptions): HTMLElement {
@@ -1596,7 +2118,7 @@ export function createUIBuilder() {
 
       const validation = attachValidation(row, input);
 
-      return {
+      return Object.assign(row, {
         element: row,
         row,
         input,
@@ -1608,7 +2130,7 @@ export function createUIBuilder() {
         getDisplayValue: () => formatDisplayKey(input.value),
         getElement: () => row,
         ...validation,
-      };
+      }) as any;
     },
 
     createCard(options: {
@@ -1902,7 +2424,7 @@ export function createUIBuilder() {
 
       form.append(actionsRow);
 
-      return {
+      return Object.assign(form, {
         element: form,
         getValues: () => {
           fieldControls.forEach((ctl, id) => {
@@ -1924,7 +2446,7 @@ export function createUIBuilder() {
             values[id] = defVal;
           });
         },
-      };
+      }) as any;
     },
 
     /**
@@ -2144,7 +2666,7 @@ export function createUIBuilder() {
 
       container.append(firstPane, splitter, secondPane);
 
-      return {
+      return Object.assign(container, {
         element: container,
         container,
         firstPane,
@@ -2167,7 +2689,7 @@ export function createUIBuilder() {
         dispose: () => {
           onMouseUp();
         },
-      };
+      }) as any;
     },
 
     /**
@@ -2365,7 +2887,7 @@ export function createUIBuilder() {
         content.replaceChildren();
       };
 
-      return {
+      return Object.assign(container, {
         element: container,
         container,
         content,
@@ -2378,7 +2900,7 @@ export function createUIBuilder() {
           container.scrollTop = val;
         },
         getElement: () => container,
-      };
+      }) as any;
     },
 
     /**
@@ -2532,7 +3054,7 @@ export function createUIBuilder() {
 
       container.append(tabNav, tabContent);
 
-      return {
+      return Object.assign(container, {
         element: container,
         container,
         tabNav,
@@ -2561,7 +3083,7 @@ export function createUIBuilder() {
           if (tab) tab.disabled = disabled;
         },
         getElement: () => container,
-      };
+      }) as any;
     },
 
     /**
@@ -2643,7 +3165,7 @@ export function createUIBuilder() {
 
       container.append(header, body);
 
-      return {
+      return Object.assign(container, {
         element: container,
         container,
         header,
@@ -2656,7 +3178,7 @@ export function createUIBuilder() {
           titleEl.textContent = title;
         },
         getElement: () => container,
-      };
+      }) as any;
     },
 
     /**
@@ -2718,7 +3240,7 @@ export function createUIBuilder() {
 
       const row = options.label ? this.createFormRow(options.label, ctrl) : ctrl;
 
-      return {
+      return Object.assign(row, {
         element: row,
         row,
         container: ctrl,
@@ -2730,7 +3252,7 @@ export function createUIBuilder() {
           });
         },
         getElement: () => row,
-      };
+      }) as any;
     },
 
     /**
@@ -2796,7 +3318,7 @@ export function createUIBuilder() {
 
       const validation = attachValidation(row, input);
 
-      return {
+      return Object.assign(row, {
         element: row,
         row,
         input,
@@ -2811,7 +3333,7 @@ export function createUIBuilder() {
         focus: () => input.focus(),
         getElement: () => row,
         ...validation,
-      };
+      }) as any;
     },
 
     /**
@@ -2864,7 +3386,7 @@ export function createUIBuilder() {
 
       const validation = attachValidation(row, input);
 
-      return {
+      return Object.assign(row, {
         element: row,
         row,
         input,
@@ -2876,7 +3398,7 @@ export function createUIBuilder() {
         },
         getElement: () => row,
         ...validation,
-      };
+      }) as any;
     },
 
     /**
@@ -3017,7 +3539,7 @@ export function createUIBuilder() {
         container.addEventListener('click', opts.onClick);
       }
 
-      return {
+      return Object.assign(container, {
         element: container,
         container,
         setLabel: (newLabel: string, newSublabel?: string) => {
@@ -3038,7 +3560,7 @@ export function createUIBuilder() {
           container.removeEventListener('dragleave', onDragLeave);
           container.removeEventListener('drop', onDrop);
         },
-      };
+      }) as any;
     },
 
     /**
@@ -3096,7 +3618,7 @@ export function createUIBuilder() {
         container.append(copyBtn);
       }
 
-      return {
+      return Object.assign(container, {
         element: container,
         container,
         pre,
@@ -3106,7 +3628,7 @@ export function createUIBuilder() {
           currentCode = newCode;
           pre.textContent = newCode;
         },
-      };
+      }) as any;
     },
 
     /**
@@ -3189,7 +3711,7 @@ export function createUIBuilder() {
         };
       }
 
-      return {
+      return Object.assign(itemEl, {
         element: itemEl,
         getElement: () => itemEl,
         setSelected: (selected: boolean) => {
@@ -3220,7 +3742,7 @@ export function createUIBuilder() {
             headerRow.append(rightArea);
           }
         },
-      };
+      }) as any;
     },
   };
 }

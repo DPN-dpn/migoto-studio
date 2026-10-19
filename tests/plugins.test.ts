@@ -2163,5 +2163,199 @@ test('PluginContext editor exposes proposeChanges method', () => {
   assert.ok(tested);
 });
 
+test('Plugin UI Builder modal, icon button, chip group, and direct HTMLElement return work properly', () => {
+  const createElement = (tag: string) => {
+    const el: any = {
+      tagName: tag.toUpperCase(),
+      className: '',
+      children: [] as any[],
+      childNodes: [] as any[],
+      style: {} as Record<string, string>,
+      classList: {
+        add: (...cls: string[]) => { el.className = `${el.className} ${cls.join(' ')}`.trim(); },
+        remove: (...cls: string[]) => {
+          cls.forEach((c) => { el.className = el.className.replace(new RegExp(`\\b${c}\\b`, 'g'), '').trim(); });
+        },
+        toggle: (c: string, force?: boolean) => {
+          const has = el.className.split(/\s+/).includes(c);
+          const shouldAdd = force !== undefined ? force : !has;
+          if (shouldAdd) el.classList.add(c);
+          else el.classList.remove(c);
+        },
+        contains: (c: string) => el.className.split(/\s+/).includes(c),
+      },
+      attributes: {} as Record<string, string>,
+      setAttribute: (k: string, v: string) => { el.attributes[k] = v; },
+      removeAttribute: (k: string) => { delete el.attributes[k]; },
+      append: (...nodes: any[]) => {
+        el.children.push(...nodes);
+        el.childNodes.push(...nodes);
+        nodes.forEach((n) => { if (n && typeof n === 'object') n.parentElement = el; });
+      },
+      appendChild: (node: any) => {
+        el.children.push(node);
+        el.childNodes.push(node);
+        if (node && typeof node === 'object') node.parentElement = el;
+        return node;
+      },
+      replaceChildren: (...nodes: any[]) => {
+        el.children = [...nodes];
+        el.childNodes = [...nodes];
+      },
+      remove: () => {
+        if (el.parentElement) {
+          el.parentElement.children = el.parentElement.children.filter((c: any) => c !== el);
+          el.parentElement.childNodes = el.parentElement.childNodes.filter((c: any) => c !== el);
+          el.parentElement = null;
+        }
+      },
+      querySelector: (selector: string) => null,
+      querySelectorAll: (selector: string) => [],
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    };
+    return el;
+  };
+
+  const origDocument = (globalThis as any).document;
+  const mockBody = createElement('body');
+  (globalThis as any).document = {
+    createElement,
+    body: mockBody,
+    addEventListener: () => {},
+    removeEventListener: () => {},
+  };
+
+  try {
+    const ui = createUIBuilder();
+
+    // 1. createModal
+    let openCallbackFired = false;
+    let closeCallbackFired = false;
+    const testContent = createElement('div');
+    const testAction = createElement('button');
+
+    const modal = ui.createModal({
+      title: '해시 스킵 섹션 추가',
+      description: '특정 부위를 지우기 위한 섹션을 등록합니다.',
+      content: testContent,
+      actions: [testAction],
+      width: 400,
+      onOpen: () => { openCallbackFired = true; },
+      onClose: () => { closeCallbackFired = true; },
+    });
+
+    assert.equal(typeof modal.open, 'function');
+    assert.equal(typeof modal.close, 'function');
+    assert.equal(modal.isOpen(), false);
+    assert.equal(modal.panel.style.width, 'min(400px, 96vw)');
+
+    modal.open();
+    assert.equal(modal.isOpen(), true);
+    assert.equal(openCallbackFired, true);
+
+    modal.setTitle('새로운 모달 제목');
+    modal.setDescription('새로운 모달 설명');
+    modal.close();
+    assert.equal(modal.isOpen(), false);
+    assert.equal(closeCallbackFired, true);
+
+    // Direct HTMLElement check & toElement unwrapping
+    assert.equal(modal.tagName, 'DIV');
+    assert.equal(toElement(modal), modal);
+
+    // 2. createButton & createIconButton
+    const refreshBtn = ui.createButton({
+      icon: 'refresh',
+      iconOnly: true,
+      title: '문서 새로고침',
+      variant: 'secondary',
+    });
+    assert.equal(refreshBtn.tagName, 'BUTTON');
+    assert.ok(refreshBtn.className.includes('plugin-icon-btn'));
+    assert.equal(refreshBtn.title, '문서 새로고침');
+    assert.ok(refreshBtn.innerHTML.includes('<svg'));
+
+    const iconBtn = ui.createIconButton({
+      icon: 'trash',
+      title: '삭제',
+      variant: 'danger',
+    });
+    assert.equal(iconBtn.tagName, 'BUTTON');
+    assert.ok(iconBtn.className.includes('plugin-icon-btn'));
+    assert.ok(iconBtn.className.includes('danger'));
+
+    const textIconBtn = ui.createButton({
+      text: '추가',
+      icon: 'plus',
+      variant: 'primary',
+    });
+    assert.ok(textIconBtn.className.includes('has-icon'));
+    assert.equal(textIconBtn.children.length, 2);
+
+    // 3. createChipGroup (multi & single select)
+    let selectedResult: any = null;
+    const chipGroup = ui.createChipGroup({
+      label: '상태값 다중 선택',
+      multiple: true,
+      options: [
+        { value: '0', label: '0' },
+        { value: '1', label: '1' },
+        { value: '2', label: '2' },
+      ],
+      value: ['0', '1'],
+      onChange: (vals) => {
+        selectedResult = vals;
+      },
+    });
+
+    assert.equal(typeof chipGroup.getValue, 'function');
+    assert.deepEqual(chipGroup.getValue(), ['0', '1']);
+    chipGroup.setValue(['1', '2']);
+    assert.deepEqual(chipGroup.getValue(), ['1', '2']);
+
+    const singleChipGroup = ui.createChipGroup({
+      options: ['OptionA', 'OptionB', 'OptionC'],
+      value: 'OptionB',
+      multiple: false,
+    });
+    assert.equal(singleChipGroup.getValue(), 'OptionB');
+    singleChipGroup.setValue('OptionC');
+    assert.equal(singleChipGroup.getValue(), 'OptionC');
+
+    // 4. Widget DOM Consistency: directly appendable without toElement()
+    const container = createElement('div');
+    const inputWidget = ui.createInput({ label: '입력창', value: 'hello' });
+    const numberWidget = ui.createNumberInput({ value: 42 });
+    const checkboxWidget = ui.createCheckbox({ label: '활성화', checked: true });
+
+    // Directly append instances to DOM container
+    container.append(inputWidget);
+    container.append(numberWidget);
+    container.append(checkboxWidget);
+    container.append(refreshBtn);
+    container.append(chipGroup);
+
+    assert.equal(container.children.length, 5);
+    assert.equal(container.children[0], inputWidget);
+    assert.equal(container.children[1], numberWidget);
+    assert.equal(container.children[2], checkboxWidget);
+    assert.equal(container.children[3], refreshBtn);
+    assert.equal(container.children[4], chipGroup);
+
+    // Also verify container auto-unwrapping when passing to createColumn
+    const col = ui.createColumn({
+      children: [inputWidget, refreshBtn, chipGroup],
+    });
+    assert.equal(col.children.length, 3);
+    assert.equal(col.children[0], inputWidget);
+    assert.equal(col.children[1], refreshBtn);
+    assert.equal(col.children[2], chipGroup);
+  } finally {
+    (globalThis as any).document = origDocument;
+  }
+});
+
+
 
 

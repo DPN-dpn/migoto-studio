@@ -473,17 +473,35 @@ const card = context.ui.createCard({
 });
 ```
 
-#### 2) 버튼, 토글 버튼 및 액션 행 (`createButton`, `createToggleButton`, `createButtonRow`)
-테마 일관 스타일의 액션 버튼 및 상태 토글 버튼을 생성합니다.
+#### 2) 버튼, 아이콘 버튼, 토글 버튼 및 액션 행 (`createButton`, `createIconButton`, `createToggleButton`, `createButtonRow`)
+테마 일관 스타일의 액션 버튼, 컴팩트 정사각형 아이콘 버튼 및 상태 토글 버튼을 생성합니다.
 ```typescript
-// 1회성 액션 버튼
+// 1. 기본 액션 버튼 (텍스트 + 내장 아이콘)
 const btnSave = context.ui.createButton({
   text: '설정 저장',
-  variant: 'primary', // 'primary' | 'secondary' | 'danger' | 'small'
+  icon: 'check',      // 내장 아이콘 ('refresh', 'plus', 'trash', 'copy', 'check', 'edit', 'folder', 'play', 'settings', 'search', 'close') 또는 커스텀 SVG
+  variant: 'primary', // 'primary' | 'secondary' | 'danger' | 'small' | 'ghost'
   onClick: () => saveSettings(),
 });
 
-// 활성/비활성 상태가 토글되는 버튼 (3D 와이어프레임, 그리드, 자동회전 등에 최적)
+// 2. 텍스트 없는 컴팩트 정사각형 아이콘 버튼 (툴바 / 퀵 액션 전용)
+const btnRefresh = context.ui.createButton({
+  icon: 'refresh',
+  iconOnly: true,
+  title: '문서 새로고침 (Ctrl+R)', // 툴팁 및 aria-label 자동 적용
+  variant: 'secondary',
+  onClick: () => refresh(),
+});
+
+// 또는 createIconButton 편의 헬퍼 사용:
+const btnDelete = context.ui.createIconButton({
+  icon: 'trash',
+  title: '섹션 삭제',
+  variant: 'danger',
+  onClick: () => deleteSection(),
+});
+
+// 3. 활성/비활성 상태가 토글되는 버튼 (3D 와이어프레임, 그리드, 자동회전 등에 최적)
 const btnWireframe = context.ui.createToggleButton({
   text: '와이어프레임',
   icon: '📐',
@@ -493,7 +511,7 @@ const btnWireframe = context.ui.createToggleButton({
 // btnWireframe.setActive(true); // 프로그래밍 방식 상태 전환
 // btnWireframe.isActive(); // true/false 반환
 
-const btnRow = context.ui.createButtonRow([btnSave, btnWireframe]);
+const btnRow = context.ui.createButtonRow([btnSave, btnRefresh, btnDelete, btnWireframe]);
 ```
 
 #### 3) 기본 폼 입력 컨트롤 (`createInput`, `createSelect`, `createCheckbox`, `createSlider`, `createNumberInput`)
@@ -1056,6 +1074,79 @@ item.setBadge({ text: '상시', variant: 'muted' });
 container.append(item.element);
 ```
 
+#### L. 커스텀 모달 다이얼로그 (`context.ui.createModal`)
+플러그인 설정, 해시 스킵 섹션 추가 폼, 확인/취소 팝업 등 플로팅 다이얼로그 창을 손쉽게 생성합니다. 배경 딤(`backdrop`), ESC 키 및 배경 클릭 자동 닫기, 반응형 너비(`small` 360px, `medium` 480px, `large` 640px 또는 직접 지정), 하단 액션 버튼 행을 표준 탑재합니다.
+
+```typescript
+const modal = context.ui.createModal({
+  title: '해시 스킵 섹션 추가',
+  description: '특정 부위를 투명화/제거하기 위한 섹션을 등록합니다.',
+  width: 'medium', // 'small' | 'medium' | 'large' | 500 | '500px'
+  closeOnBackdrop: true,
+  closeOnEsc: true,
+  content: formContainer,
+  actions: [
+    context.ui.createButton({
+      text: '취소',
+      variant: 'ghost',
+      onClick: () => modal.close(),
+    }),
+    context.ui.createButton({
+      text: '추가',
+      variant: 'primary',
+      onClick: () => {
+        saveSection();
+        modal.close();
+      },
+    }),
+  ],
+  onOpen: () => console.log('모달 열림'),
+  onClose: () => console.log('모달 닫힘'),
+});
+
+modal.open();
+// modal.close();
+// modal.isOpen();
+// modal.setTitle('새 제목');
+// modal.setDescription('새 설명');
+// modal.setContent(newContent);
+```
+
+#### M. 다중 / 단일 선택 칩 그룹 (`context.ui.createChipGroup`)
+태그 필터링, 활성 부위 다중 선택, 토글 상태 그룹 선택 등에 최적화된 칩/배지 버튼 그룹입니다. `multiple: true`로 다중 선택 태그 모드를 켜거나, `multiple: false`로 단일 라디오/세그먼트 칩 모드로 작동할 수 있습니다.
+
+```typescript
+// 다중 선택 태그 칩
+const tagGroup = context.ui.createChipGroup({
+  label: '적용 부위',
+  multiple: true,
+  options: [
+    { value: 'head', label: '머리' },
+    { value: 'body', label: '몸체' },
+    { value: 'dress', label: '의상' },
+    { value: 'extra', label: '장신구', disabled: true },
+  ],
+  value: ['head', 'body'],
+  onChange: (selectedValues) => {
+    console.log('선택된 부위:', selectedValues); // ['head', 'body']
+  },
+});
+
+// 단일 선택 세그먼트 칩
+const modeGroup = context.ui.createChipGroup({
+  label: '표시 모드',
+  multiple: false,
+  variant: 'compact',
+  options: ['전체', '활성만', '비활성만'],
+  value: '전체',
+  onChange: (selected) => console.log('선택 모드:', selected),
+});
+
+// 동적 제어
+tagGroup.setValue(['head']);
+console.log(tagGroup.getValue()); // ['head']
+```
+
 ---
 
 ### 3.11 플러그인 레이아웃 및 폼 반응형 표준 규칙 (코어 기본 탑재)
@@ -1070,6 +1161,9 @@ Migoto Studio 코어 UI 빌더는 플러그인 개발자가 불필요한 인라�
    - 좁은 스플릿 패널이나 `createRow` 내부에 배치해도 내용물의 긴 텍스트로 인해 부모 너비를 뚫고 나가 옆 요소를 찌그러뜨리지 않습니다.
 3. **컴포넌트 외곽 마진 제로화 (Gap 기반 정렬 표준화)**:
    - 모든 위젯은 기본적으로 `margin: 0`을 유지합니다. 요소 간의 상하/좌우 여백은 부모 컨테이너(`createColumn({ gap: 8 })`, `createRow({ gap: 6 })`)의 `gap` 속성에 의해서만 일관되게 제어되므로, 패널 최상단에 위젯을 단독 배치했을 때 상단이 불필요하게 붕 뜨는 현상이 원천 차단됩니다.
+4. **위젯 DOM 일관성 (모든 create... 함수의 HTMLElement 직접 반환 및 toElement 제거)**:
+   - 모든 UI 빌더 함수(`createButton`, `createInput`, `createSelect`, `createModal`, `createChipGroup` 등)가 반환하는 인스턴스는 최상위 `HTMLElement`를 직접 상속/확장(`Object.assign`)합니다.
+   - 따라서 별도로 `.element`나 `.toElement()`를 추출할 필요 없이 `container.append(widget)`처럼 네이티브 DOM 함수에 그대로 전달할 수 있습니다. (기존 `.element`, `.getElement()` 속성 또한 100% 호환성 유지)
 
 ---
 
