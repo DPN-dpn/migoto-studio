@@ -470,20 +470,31 @@ const card = context.ui.createCard({
 });
 ```
 
-#### 2) 버튼 및 버튼 행 (`context.ui.createButton`, `context.ui.createButtonRow`)
-테마 일관 스타일의 액션 버튼을 생성합니다.
+#### 2) 버튼, 토글 버튼 및 액션 행 (`createButton`, `createToggleButton`, `createButtonRow`)
+테마 일관 스타일의 액션 버튼 및 상태 토글 버튼을 생성합니다.
 ```typescript
+// 1회성 액션 버튼
 const btnSave = context.ui.createButton({
   text: '설정 저장',
   variant: 'primary', // 'primary' | 'secondary' | 'danger' | 'small'
   onClick: () => saveSettings(),
 });
 
-const btnRow = context.ui.createButtonRow([btnSave, btnCancel]);
+// 활성/비활성 상태가 토글되는 버튼 (3D 와이어프레임, 그리드, 자동회전 등에 최적)
+const btnWireframe = context.ui.createToggleButton({
+  text: '와이어프레임',
+  icon: '📐',
+  active: false,
+  onChange: (isActive) => viewer.setWireframe(isActive),
+});
+// btnWireframe.setActive(true); // 프로그래밍 방식 상태 전환
+// btnWireframe.isActive(); // true/false 반환
+
+const btnRow = context.ui.createButtonRow([btnSave, btnWireframe]);
 ```
 
 #### 3) 기본 폼 입력 컨트롤 (`createInput`, `createSelect`, `createCheckbox`, `createSlider`, `createNumberInput`)
-라벨이 자동으로 결합된 표준 입력 필드들이며, 에러 피드백(`.setError`)을 기본 지원합니다.
+라벨이 자동으로 결합된 표준 입력 필드들이며, 에러 피드백(`.setError`) 및 인라인/컴팩트 모드를 지원합니다.
 ```typescript
 // 텍스트 입력창
 const nameInput = context.ui.createInput({
@@ -499,7 +510,7 @@ const nameInput = context.ui.createInput({
   },
 });
 
-// 드롭다운 선택 필드
+// 드롭다운 선택 필드 (기본 폼 모드)
 const selectBox = context.ui.createSelect({
   label: '토글 방식',
   options: [
@@ -509,6 +520,18 @@ const selectBox = context.ui.createSelect({
   value: 'cycle',
   onChange: (val) => console.log('선택:', val),
 });
+
+// 드롭다운 선택 필드 (툴바 전용 인라인 / 컴팩트 모드)
+const axisUpSelect = context.ui.createSelect({
+  variant: 'compact', // 또는 inline: true
+  prefix: '위',        // 앞쪽에 붙는 컴팩트 태그 배지
+  options: ['+Y', '-Y', '+Z', '-Z', '+X', '-X'],
+  value: '+Y',
+  onChange: (up) => viewer.setUpAxis(up),
+});
+// axisUpSelect.setOptions(['+Y', '+Z']); // 동적 옵션 교체
+// axisUpSelect.setValue('+Z');
+```
 
 // 체크박스
 const check = context.ui.createCheckbox({
@@ -700,6 +723,53 @@ scroll.append(logItem1, logItem2);
 // scroll.clear();              // 내용 비우기
 
 container.append(scroll.container);
+```
+
+#### F. 상단 툴바 / 액션 바 (`context.ui.createToolbar`)
+서브창이나 뷰어 상단에 좌측 타이틀, 중앙 제어부, 우측 액션 버튼들을 한 줄로 깔끔하게 배치할 수 있는 전용 툴바 컨테이너입니다.
+```typescript
+const toolbar = context.ui.createToolbar({
+  left: [
+    titleSpan,
+    context.ui.createBadge({ text: '3D 뷰어', variant: 'accent' }),
+  ],
+  center: [
+    axisUpSelect,      // 컴팩트 셀렉트
+    axisForwardSelect,
+  ],
+  right: [
+    btnWireframe,      // 상태 토글 버튼
+    btnGrid,
+    btnRotate,
+    btnResetCam,
+  ],
+});
+
+// 프로그래밍 방식으로 동적 항목 추가/제거
+// toolbar.appendRight(btnReload);
+// toolbar.clearLeft();
+// container.append(toolbar.element); // .getElement() 지원
+```
+
+#### G. 하단 상태 표시줄 (`context.ui.createStatusBar`)
+서브창이나 패널 하단에 실시간 수치(정점, 삼각형 수, 파츠 등)와 상태 메시지를 표시하고, 60fps로 즉시 갱신할 수 있는 하단 바입니다.
+```typescript
+const statusbar = context.ui.createStatusBar({
+  items: [
+    { id: 'vertex', label: '버텍스', value: '70,511' },
+    { id: 'tris', label: '삼각형', value: '35,000' },
+    { id: 'parts', label: '파츠', value: '12개' },
+  ],
+  rightItems: [
+    { id: 'status', label: '상태', value: '준비 완료' },
+  ],
+});
+
+// 고속 실시간 수치 갱신 (60fps DOM 부하 없음)
+statusbar.setValue('tris', '42,000 / 70,000');
+statusbar.setLabel('tris', '활성 폴리곤');
+// statusbar.setItemVisible('parts', false); // 보이기/숨기기
+// container.append(statusbar.element); // .getElement() 지원
 ```
 
 ---

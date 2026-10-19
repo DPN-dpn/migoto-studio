@@ -76,6 +76,79 @@ export interface ListItemInstance {
   setBadge(badge?: string | HTMLElement | BadgeOptions): void;
 }
 
+export interface ToolbarOptions {
+  left?: (HTMLElement | any)[];
+  center?: (HTMLElement | any)[];
+  right?: (HTMLElement | any)[];
+  className?: string;
+  style?: Record<string, string>;
+}
+
+export interface ToolbarInstance {
+  element: HTMLElement;
+  getElement(): HTMLElement;
+  leftContainer: HTMLElement;
+  centerContainer: HTMLElement;
+  rightContainer: HTMLElement;
+  appendLeft(...items: (HTMLElement | any)[]): void;
+  appendCenter(...items: (HTMLElement | any)[]): void;
+  appendRight(...items: (HTMLElement | any)[]): void;
+  clearLeft(): void;
+  clearCenter(): void;
+  clearRight(): void;
+}
+
+export interface ToggleButtonOptions {
+  text?: string;
+  icon?: string;
+  active?: boolean;
+  title?: string;
+  variant?: 'default' | 'small' | 'accent';
+  disabled?: boolean;
+  className?: string;
+  style?: Record<string, string>;
+  onChange?: (isActive: boolean) => void;
+}
+
+export interface ToggleButtonInstance {
+  element: HTMLButtonElement;
+  button: HTMLButtonElement;
+  getElement(): HTMLElement;
+  isActive(): boolean;
+  setActive(active: boolean, triggerOnChange?: boolean): void;
+  setText(text: string): void;
+  setIcon(icon: string): void;
+  setDisabled(disabled: boolean): void;
+}
+
+export interface StatusBarItemDef {
+  id: string;
+  label: string;
+  value?: string | number;
+  icon?: string;
+  tooltip?: string;
+  visible?: boolean;
+  onClick?: () => void;
+}
+
+export interface StatusBarOptions {
+  items?: StatusBarItemDef[];
+  rightItems?: StatusBarItemDef[];
+  className?: string;
+  style?: Record<string, string>;
+}
+
+export interface StatusBarInstance {
+  element: HTMLElement;
+  getElement(): HTMLElement;
+  setValue(id: string, value: string | number): void;
+  setLabel(id: string, label: string): void;
+  setItemVisible(id: string, visible: boolean): void;
+  getItemValue(id: string): string | number | undefined;
+  addItem(item: StatusBarItemDef, position?: 'left' | 'right'): void;
+  removeItem(id: string): void;
+}
+
 /**
  * 플러그인 위젯 인스턴스 또는 원시 DOM 엘리먼트로부터
  * 표준 최상위 HTMLElement를 안전하게 추출합니다.
@@ -180,31 +253,60 @@ export function createUIBuilder() {
       onChange?: (value: string) => void;
       className?: string;
       style?: Record<string, string>;
+      variant?: 'default' | 'compact';
+      inline?: boolean;
+      prefix?: string;
+      title?: string;
+      disabled?: boolean;
     }) {
+      const isCompact = options.variant === 'compact' || options.inline === true;
       const select = document.createElement('select');
-      select.className = `plugin-select${options.className ? ` ${options.className}` : ''}`;
-      select.style.width = '100%';
-      select.style.maxWidth = '100%';
-      select.style.minWidth = '0';
-      select.style.boxSizing = 'border-box';
-      select.style.textOverflow = 'ellipsis';
-      select.style.margin = '0';
+      select.className = `plugin-select${isCompact ? ' is-compact' : ''}${options.className ? ` ${options.className}` : ''}`;
 
-      options.options.forEach((opt) => {
-        const optEl = document.createElement('option');
-        if (typeof opt === 'string') {
-          optEl.value = opt;
-          optEl.textContent = opt;
-        } else {
-          optEl.value = opt.value;
-          optEl.textContent = opt.label;
-        }
-        select.append(optEl);
-      });
-
-      if (options.value !== undefined) {
-        select.value = options.value;
+      if (isCompact) {
+        select.style.width = 'auto';
+        select.style.minWidth = '0';
+        select.style.height = '26px';
+        select.style.padding = '2px 8px';
+        select.style.fontSize = '11px';
+        select.style.borderRadius = '4px';
+        select.style.background = 'var(--bg-tertiary, #21262d)';
+        select.style.border = '1px solid var(--border-color, #30363d)';
+        select.style.color = 'var(--text-color, #e6edf3)';
+        select.style.cursor = 'pointer';
+        select.style.outline = 'none';
+        select.style.boxSizing = 'border-box';
+      } else {
+        select.style.width = '100%';
+        select.style.maxWidth = '100%';
+        select.style.minWidth = '0';
+        select.style.boxSizing = 'border-box';
+        select.style.textOverflow = 'ellipsis';
+        select.style.margin = '0';
       }
+
+      if (options.title) select.title = options.title;
+      if (options.disabled !== undefined) select.disabled = options.disabled;
+
+      const populateOptions = (opts: Array<string | SelectOption>, selectedVal?: string) => {
+        select.replaceChildren();
+        opts.forEach((opt) => {
+          const optEl = document.createElement('option');
+          if (typeof opt === 'string') {
+            optEl.value = opt;
+            optEl.textContent = opt;
+          } else {
+            optEl.value = opt.value;
+            optEl.textContent = opt.label;
+          }
+          select.append(optEl);
+        });
+        if (selectedVal !== undefined) {
+          select.value = selectedVal;
+        }
+      };
+
+      populateOptions(options.options, options.value);
 
       if (options.onChange) {
         select.onchange = () => options.onChange!(select.value);
@@ -214,21 +316,68 @@ export function createUIBuilder() {
         Object.assign(select.style, options.style);
       }
 
-      const row = options.label
-        ? this.createFormRow(options.label, select)
-        : select;
+      let wrapper: HTMLElement;
+      if (isCompact) {
+        wrapper = document.createElement('div');
+        wrapper.className = `plugin-select-compact-wrapper${options.className ? ` ${options.className}` : ''}`;
+        wrapper.style.display = 'inline-flex';
+        wrapper.style.alignItems = 'center';
+        wrapper.style.gap = '4px';
+        wrapper.style.verticalAlign = 'middle';
 
-      const validation = attachValidation(row, select);
+        if (options.prefix) {
+          const prefixBadge = document.createElement('span');
+          prefixBadge.className = 'plugin-select-prefix';
+          prefixBadge.textContent = options.prefix;
+          prefixBadge.style.cssText = `
+            font-size: 11px;
+            font-weight: 500;
+            color: var(--text-muted, #8b949e);
+            padding: 1px 5px;
+            border-radius: 3px;
+            background: rgba(110, 118, 129, 0.15);
+            user-select: none;
+            white-space: nowrap;
+          `;
+          wrapper.appendChild(prefixBadge);
+        }
+
+        if (options.label) {
+          const lbl = document.createElement('span');
+          lbl.className = 'plugin-select-inline-label';
+          lbl.textContent = options.label;
+          lbl.style.cssText = `
+            font-size: 11px;
+            color: var(--text-muted, #8b949e);
+            white-space: nowrap;
+          `;
+          wrapper.appendChild(lbl);
+        }
+
+        wrapper.appendChild(select);
+      } else {
+        wrapper = options.label
+          ? this.createFormRow(options.label, select)
+          : select;
+      }
+
+      const validation = attachValidation(wrapper, select);
 
       return {
-        element: row,
-        row,
+        element: wrapper,
+        row: wrapper,
         select,
         getValue: () => select.value,
         setValue: (v: string) => {
           select.value = v;
         },
-        getElement: () => row,
+        setOptions: (newOpts: Array<string | SelectOption>, selectedVal?: string) => {
+          populateOptions(newOpts, selectedVal ?? select.value);
+        },
+        setDisabled: (disabled: boolean) => {
+          select.disabled = disabled;
+        },
+        getElement: () => wrapper,
         ...validation,
       };
     },
@@ -593,11 +742,310 @@ export function createUIBuilder() {
       return btn;
     },
 
-    createButtonRow(buttons: HTMLElement[]): HTMLElement {
+    createButtonRow(buttons: (HTMLElement | any)[]): HTMLElement {
       const row = document.createElement('div');
       row.className = 'plugin-actions-row';
-      buttons.forEach((b) => row.append(b));
+      buttons.forEach((b) => {
+        const el = toElement(b);
+        if (el) row.append(el);
+      });
       return row;
+    },
+
+    createToggleButton(options: ToggleButtonOptions): ToggleButtonInstance {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      const isSmall = options.variant === 'small';
+      btn.className = `plugin-toggle-btn${isSmall ? ' small-btn' : ''}${options.className ? ` ${options.className}` : ''}`;
+
+      let currentActive = Boolean(options.active);
+      let currentText = options.text || '';
+      let currentIcon = options.icon || '';
+
+      const renderContent = () => {
+        btn.replaceChildren();
+        if (currentIcon) {
+          const iconSpan = document.createElement('span');
+          iconSpan.className = 'toggle-btn-icon';
+          iconSpan.style.display = 'inline-block';
+          iconSpan.style.lineHeight = '1';
+          iconSpan.textContent = currentIcon;
+          btn.appendChild(iconSpan);
+        }
+        if (currentText) {
+          const textSpan = document.createElement('span');
+          textSpan.className = 'toggle-btn-text';
+          textSpan.textContent = currentText;
+          btn.appendChild(textSpan);
+        }
+      };
+
+      const updateVisualState = () => {
+        if (currentActive) {
+          btn.classList.add('is-active');
+          btn.style.backgroundColor = 'var(--accent-subtle, rgba(56, 139, 253, 0.18))';
+          btn.style.borderColor = 'var(--accent-color, #58a6ff)';
+          btn.style.color = 'var(--accent-color, #58a6ff)';
+        } else {
+          btn.classList.remove('is-active');
+          btn.style.backgroundColor = 'var(--bg-tertiary, #21262d)';
+          btn.style.borderColor = 'var(--border-color, #30363d)';
+          btn.style.color = 'var(--text-color, #e6edf3)';
+        }
+      };
+
+      btn.style.cssText = `
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        height: ${isSmall ? '24px' : '28px'};
+        padding: ${isSmall ? '2px 8px' : '4px 10px'};
+        font-size: ${isSmall ? '11px' : '12px'};
+        font-weight: 500;
+        border-radius: 4px;
+        border: 1px solid var(--border-color, #30363d);
+        cursor: pointer;
+        transition: all 0.15s ease;
+        box-sizing: border-box;
+        white-space: nowrap;
+        user-select: none;
+      `;
+
+      if (options.title) btn.title = options.title;
+      if (options.disabled !== undefined) btn.disabled = options.disabled;
+      if (options.style) Object.assign(btn.style, options.style);
+
+      renderContent();
+      updateVisualState();
+
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        currentActive = !currentActive;
+        updateVisualState();
+        options.onChange?.(currentActive);
+      });
+
+      return {
+        element: btn,
+        button: btn,
+        getElement: () => btn,
+        isActive: () => currentActive,
+        setActive: (active: boolean, triggerOnChange = false) => {
+          if (currentActive !== active) {
+            currentActive = active;
+            updateVisualState();
+            if (triggerOnChange) options.onChange?.(currentActive);
+          }
+        },
+        setText: (text: string) => {
+          currentText = text;
+          renderContent();
+        },
+        setIcon: (icon: string) => {
+          currentIcon = icon;
+          renderContent();
+        },
+        setDisabled: (disabled: boolean) => {
+          btn.disabled = disabled;
+        },
+      };
+    },
+
+    createToolbar(options: ToolbarOptions = {}): ToolbarInstance {
+      const bar = document.createElement('div');
+      bar.className = `plugin-toolbar${options.className ? ` ${options.className}` : ''}`;
+      bar.style.cssText = `
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        padding: 6px 12px;
+        min-height: 38px;
+        background-color: var(--bg-secondary, #161b22);
+        border-bottom: 1px solid var(--border-color, #30363d);
+        box-sizing: border-box;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        overflow-y: hidden;
+      `;
+
+      const makeGroup = (cls: string, justify: string = 'flex-start') => {
+        const grp = document.createElement('div');
+        grp.className = `plugin-toolbar-group ${cls}`;
+        grp.style.cssText = `
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          justify-content: ${justify};
+          flex-shrink: 0;
+        `;
+        return grp;
+      };
+
+      const leftGrp = makeGroup('plugin-toolbar-left', 'flex-start');
+      const centerGrp = makeGroup('plugin-toolbar-center', 'center');
+      const rightGrp = makeGroup('plugin-toolbar-right', 'flex-end');
+
+      const appendTo = (grp: HTMLElement, items?: (HTMLElement | any)[]) => {
+        if (!items) return;
+        items.forEach((item) => {
+          const el = toElement(item);
+          if (el) grp.appendChild(el);
+        });
+      };
+
+      appendTo(leftGrp, options.left);
+      appendTo(centerGrp, options.center);
+      appendTo(rightGrp, options.right);
+
+      bar.append(leftGrp, centerGrp, rightGrp);
+
+      if (options.style) {
+        Object.assign(bar.style, options.style);
+      }
+
+      return {
+        element: bar,
+        getElement: () => bar,
+        leftContainer: leftGrp,
+        centerContainer: centerGrp,
+        rightContainer: rightGrp,
+        appendLeft: (...items) => appendTo(leftGrp, items),
+        appendCenter: (...items) => appendTo(centerGrp, items),
+        appendRight: (...items) => appendTo(rightGrp, items),
+        clearLeft: () => leftGrp.replaceChildren(),
+        clearCenter: () => centerGrp.replaceChildren(),
+        clearRight: () => rightGrp.replaceChildren(),
+      };
+    },
+
+    createStatusBar(options: StatusBarOptions = {}): StatusBarInstance {
+      const bar = document.createElement('div');
+      bar.className = `plugin-statusbar${options.className ? ` ${options.className}` : ''}`;
+      bar.style.cssText = `
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        padding: 4px 12px;
+        min-height: 24px;
+        font-size: 11px;
+        background-color: var(--bg-tertiary, #161b22);
+        border-top: 1px solid var(--border-color, #30363d);
+        color: var(--text-muted, #8b949e);
+        box-sizing: border-box;
+        user-select: none;
+        overflow: hidden;
+      `;
+
+      const leftContainer = document.createElement('div');
+      leftContainer.className = 'plugin-statusbar-left';
+      leftContainer.style.cssText = 'display: flex; align-items: center; gap: 12px; flex-wrap: nowrap; overflow: hidden;';
+
+      const rightContainer = document.createElement('div');
+      rightContainer.className = 'plugin-statusbar-right';
+      rightContainer.style.cssText = 'display: flex; align-items: center; gap: 12px; flex-shrink: 0;';
+
+      bar.append(leftContainer, rightContainer);
+
+      interface InternalItem {
+        container: HTMLElement;
+        labelEl: HTMLElement;
+        valueEl: HTMLElement;
+        value?: string | number;
+      }
+      const itemMap = new Map<string, InternalItem>();
+
+      const createItemEl = (def: StatusBarItemDef): HTMLElement => {
+        const itemEl = document.createElement('span');
+        itemEl.className = `plugin-statusbar-item item-${def.id}`;
+        itemEl.style.cssText = 'display: inline-flex; align-items: center; gap: 4px; white-space: nowrap;';
+        if (def.tooltip) itemEl.title = def.tooltip;
+        if (def.visible === false) itemEl.style.display = 'none';
+
+        if (def.icon) {
+          const iconSpan = document.createElement('span');
+          iconSpan.style.opacity = '0.8';
+          iconSpan.textContent = def.icon;
+          itemEl.appendChild(iconSpan);
+        }
+
+        const labelSpan = document.createElement('span');
+        labelSpan.style.opacity = '0.75';
+        labelSpan.textContent = `${def.label}:`;
+        itemEl.appendChild(labelSpan);
+
+        const valStrong = document.createElement('strong');
+        valStrong.style.color = 'var(--text-color, #e6edf3)';
+        valStrong.style.fontWeight = '600';
+        valStrong.textContent = def.value !== undefined ? String(def.value) : '-';
+        itemEl.appendChild(valStrong);
+
+        if (def.onClick) {
+          itemEl.style.cursor = 'pointer';
+          itemEl.onclick = () => def.onClick!();
+        }
+
+        itemMap.set(def.id, {
+          container: itemEl,
+          labelEl: labelSpan,
+          valueEl: valStrong,
+          value: def.value,
+        });
+
+        return itemEl;
+      };
+
+      if (options.items) {
+        options.items.forEach((item) => leftContainer.appendChild(createItemEl(item)));
+      }
+      if (options.rightItems) {
+        options.rightItems.forEach((item) => rightContainer.appendChild(createItemEl(item)));
+      }
+
+      if (options.style) {
+        Object.assign(bar.style, options.style);
+      }
+
+      return {
+        element: bar,
+        getElement: () => bar,
+        setValue: (id: string, value: string | number) => {
+          const item = itemMap.get(id);
+          if (item) {
+            item.value = value;
+            item.valueEl.textContent = String(value);
+          }
+        },
+        setLabel: (id: string, label: string) => {
+          const item = itemMap.get(id);
+          if (item) {
+            item.labelEl.textContent = `${label}:`;
+          }
+        },
+        setItemVisible: (id: string, visible: boolean) => {
+          const item = itemMap.get(id);
+          if (item) {
+            item.container.style.display = visible ? 'inline-flex' : 'none';
+          }
+        },
+        getItemValue: (id: string) => itemMap.get(id)?.value,
+        addItem: (item: StatusBarItemDef, position: 'left' | 'right' = 'left') => {
+          const el = createItemEl(item);
+          if (position === 'right') {
+            rightContainer.appendChild(el);
+          } else {
+            leftContainer.appendChild(el);
+          }
+        },
+        removeItem: (id: string) => {
+          const item = itemMap.get(id);
+          if (item) {
+            item.container.remove();
+            itemMap.delete(id);
+          }
+        },
+      };
     },
 
     createCodeEditor(options: {

@@ -140,4 +140,10 @@ export interface NativeSubWindowContext {
   };
   /** 토스트 알림 */
   showToast(message: string, type?: 'info' | 'warn' | 'error'): void;
+  /** UI 빌더 인스턴스 (createToolbar, createSelect, createToggleButton, createStatusBar 등) */
+  ui?: any;
+  /** 파일 및 디렉터리 I/O 지원 */
+  workspace?: any;
+  /** 로거 지원 */
+  logger?: any;
 }

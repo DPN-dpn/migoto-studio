@@ -4,6 +4,7 @@ import { loadSettings } from '../core/workspace/settings';
 import { linkPluginModules } from '../plugins/module-linker';
 import { openConfirmModal, openPromptModal } from '../ui/modals/confirm-ui';
 import { showToast } from '../ui/common/toast';
+import { createUIBuilder } from '../plugins/ui-builder';
 
 /**
  * 독립 OS 윈도우 프로세스 경량 부트스트래퍼
@@ -164,6 +165,49 @@ export async function bootNativeWindow(params: URLSearchParams): Promise<void> {
     },
     showToast: (message: string, type: 'info' | 'warn' | 'error' = 'info') => {
       showToast(message, type);
+    },
+    ui: createUIBuilder(),
+    workspace: {
+      readTextFile: async (path: string) => {
+        const ref = platform().refFromId(path);
+        const loaded = await platform().readFile(ref);
+        return loaded.text;
+      },
+      writeTextFile: async (path: string, text: string) => {
+        const ref = platform().refFromId(path);
+        await platform().writeFile(ref, text, 'utf-8', { enabled: false, keepDays: 0, maxPerFile: 0 });
+      },
+      readBinaryFile: async (path: string) => {
+        if (platform().readBinaryFile) {
+          return platform().readBinaryFile!(path);
+        }
+        return new Uint8Array();
+      },
+      writeBinaryFile: async (path: string, bytes: Uint8Array) => {
+        if (platform().writeBinaryFile) {
+          await platform().writeBinaryFile!(path, bytes);
+        }
+      },
+      readDirectory: async (dirPath?: string) => platform().readDirectory(dirPath || ''),
+      getCurrentFolder: () => null,
+      getCurrentFile: () => null,
+    },
+    logger: {
+      info: (...args: any[]) => {
+        console.log(`[OS창:${title}]`, ...args);
+        channel.postMessage({ type: 'LOG', level: 'info', args });
+      },
+      warn: (...args: any[]) => {
+        console.warn(`[OS창:${title}]`, ...args);
+        channel.postMessage({ type: 'LOG', level: 'warn', args });
+      },
+      error: (...args: any[]) => {
+        console.error(`[OS창:${title}]`, ...args);
+        channel.postMessage({ type: 'LOG', level: 'error', args });
+      },
+      debug: (...args: any[]) => {
+        console.debug(`[OS창:${title}]`, ...args);
+      },
     },
   };
 
