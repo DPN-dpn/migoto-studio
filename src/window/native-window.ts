@@ -109,10 +109,13 @@ export class NativeWindowManager {
       } catch {}
 
       if (tauriWindow) {
-        try {
-          tauriWindow.close();
-        } catch {}
+        const win = tauriWindow;
         tauriWindow = null;
+        try {
+          if (typeof win.close === 'function') {
+            Promise.resolve(win.close()).catch(() => {});
+          }
+        } catch {}
       }
 
       if (browserWindow && !browserWindow.closed) {

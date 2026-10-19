@@ -45,7 +45,7 @@ import { CURRENT_APP_VERSION } from './updater/version';
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
 async function boot() {
-  const urlParams = new URLSearchParams(window.location.search);
+  const urlParams = new URLSearchParams(window.location.search || window.location.hash.replace(/^#\??/, ''));
   if (urlParams.get('native_window') === 'true') {
     const { bootNativeWindow } = await import('./window/native-boot');
     await bootNativeWindow(urlParams);
