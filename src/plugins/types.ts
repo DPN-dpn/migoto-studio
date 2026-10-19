@@ -366,6 +366,8 @@ export interface SubWindowOptions {
    * - 'independent': 메인 창과 완전히 분리되어 OS 작업표시줄에서 독립적으로 포커스
    */
   focusMode?: 'alwaysOnTop' | 'parentLinked' | 'independent';
+  /** 초기 실행 시 별도 OS 윈도우(PiP 팝아웃)로 우선 분리할지 여부 (기본값: false) */
+  preferPopout?: boolean;
   /** 서브창 내부 UI 렌더링 함수 (정리용 cleanup 함수 반환 가능) */
   render: (container: HTMLElement, subWin: SubWindowHandle) => void | (() => void);
 }
@@ -385,6 +387,10 @@ export interface SubWindowHandle {
   isOpen(): boolean;
   /** 창 Window 객체 취득 */
   getWindow(): Window | null;
+  /** 별도 OS 윈도우(PiP 팝아웃) 토글 */
+  togglePopout(): Promise<boolean>;
+  /** 현재 별도 OS 윈도우(PiP 팝아웃) 상태인지 여부 */
+  isPoppedOut(): boolean;
 }
 
 export interface PluginContext {
