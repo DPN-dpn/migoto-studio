@@ -313,13 +313,89 @@ const subWin = context.ui.openSubWindow({
 - **`'independent'` (독립 창)**: 메인 에디터와 완전히 독립된 창으로 동작합니다. 듀얼 모니터 환경에서 다른 모니터로 이동시켜 작업하기에 최적입니다.
 
 #### PiP 별도 OS 윈도우 분리 기능
-- 서브창 상단 컨트롤러의 **PiP 버튼**(`⧉`)을 클릭하면 즉시 독립된 OS 윈도우로 분리(Pop-out)됩니다.
+- 서브창 상단 컨트롤러의 **PiP 버튼**(`⧉`)을 클릭하면 즉시 독립된 OS 윈도우(`WebviewWindow`)로 분리(Pop-out)됩니다.
 - 듀얼 모니터 환경에서 서브창을 다른 모니터로 완전히 옮겨놓고 메인 에디터와 동시에 작업할 수 있습니다.
-- 분리된 창을 닫거나 상단 PiP 버튼/내장 창 가져오기 버튼을 누르면 캔버스 상태(Three.js/WebGL context)를 유지한 채 다시 에디터 내장 플로팅 창으로 원상 복귀(Dock In)됩니다.
+- 분리된 창을 닫거나 상단 PiP 버튼/내장 창 가져오기 버튼을 누르면 다시 에디터 내장 플로팅 창으로 원상 복귀(Dock In)됩니다.
 
 ---
 
-### 3.8 기본 폼 컨트롤 및 위젯 팩토리 (`context.ui.*`)
+### 3.8 독립 OS 윈도우 띄우기 (`context.ui.openNativeWindow`)
+
+서브 윈도우(내장 플로팅 창)를 거치지 않고, **처음부터 메인 에디터와 완전히 분리된 별도의 독립 Windows OS 창**을 띄워 듀얼 모니터 전용 도구(3D 뷰어, 전용 사운드 플레이어, 외부 모니터 프리뷰 등)를 구성할 수 있습니다.
+
+```typescript
+const nativeWin = await context.ui.openNativeWindow({
+  id: 'my-dual-screen-viewer',
+  title: '3D 모드 뷰어 (독립 윈도우)',
+  width: 900,
+  height: 650,
+  minWidth: 400,
+  minHeight: 300,
+  resizable: true,
+  alwaysOnTop: false,
+  center: true,
+  // 독립 OS 창에서 실행될 플러그인 엔트리 스크립트 (플러그인 폴더 기준 상대 경로)
+  entry: 'subwindow.js',
+  // 메인 창에서 별도 OS 창으로 전달할 초기 데이터
+  initialData: {
+    folder: context.workspace.getActiveFolder(),
+  },
+});
+
+// 메인 창에서 독립 OS 창으로 실시간 메시지 전송
+nativeWin.postMessage({ type: 'CHANGE_FOLDER', folder: '...' });
+
+// 독립 OS 창에서 보낸 메시지 수신
+const unlisten = nativeWin.onMessage((msg) => {
+  console.log('서브창에서 받은 데이터:', msg);
+});
+
+// 프로그래밍 방식으로 창 제어
+// await nativeWin.focus();
+// await nativeWin.setTitle('새로운 타이틀');
+// await nativeWin.setSize(1024, 768);
+// await nativeWin.close();
+```
+
+#### 독립 OS 창 엔트리 스크립트 작성 규격 (`entry: 'subwindow.js'`)
+별도 OS 창으로 실행될 스크립트는 `default` 함수 또는 `run` 함수를 export하며, 가벼운 전용 컨텍스트(`NativeSubWindowContext`)를 인자로 받습니다:
+
+```javascript
+// plugins/my-plugin/subwindow.js
+export default async function(context) {
+  // 1. context.container: 별도 OS 창의 전체 화면 루트 DOM 요소
+  context.container.innerHTML = `
+    <div style="padding: 16px;">
+      <h2>🧊 3D 뷰어 독립 윈도우</h2>
+      <div id="viewport" style="width: 100%; height: 500px;"></div>
+    </div>
+  `;
+
+  // 2. context.workspace: 별도 창에서도 Tauri 네이티브 파일 읽기/쓰기 100% 동작
+  const folder = context.initialData?.folder;
+  if (folder) {
+    const iniText = await context.workspace.readTextFile(`${folder}/mod.ini`);
+    // ...
+  }
+
+  // 3. context.channel: 메인 창과의 실시간 통신
+  context.channel.onMessage((data) => {
+    if (data.type === 'CHANGE_FOLDER') {
+      // 메인 창에서 폴더가 변경되었을 때 실시간 갱신
+    }
+  });
+
+  // 메인 창으로 데이터 전송
+  context.channel.postMessage({ type: 'LOADED', time: Date.now() });
+
+  // 4. context.logger: 별도 창 콘솔 및 메인 에디터 콘솔 패널로 동시 전송
+  context.logger.info('독립 3D 뷰어 창이 정상적으로 시작되었습니다.');
+}
+```
+
+---
+
+### 3.9 기본 폼 컨트롤 및 위젯 팩토리 (`context.ui.*`)
 
 빠르고 일관된 테마 디자인을 위해 내장 컴포넌트 팩토리 메서드를 제공합니다.
 

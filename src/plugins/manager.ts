@@ -81,9 +81,12 @@ import type {
   ProposeChangesResult,
   SubWindowOptions,
   SubWindowHandle,
+  NativeWindowOptions,
+  NativeWindowHandle,
 } from './types';
 import { createUIBuilder } from './ui-builder';
 import { subWindowManager } from './sub-window';
+import { nativeWindowManager } from './native-window';
 
 export { validatePluginZip, type ExtractedPlugin };
 
@@ -1804,6 +1807,9 @@ export default {
         prompt: (options: PromptOptions) => openPromptModal(options),
         openSubWindow: (options: SubWindowOptions) => {
           return subWindowManager.openSubWindow(manifest.id, options, callbacks.onRegisterCleanup);
+        },
+        openNativeWindow: (options: NativeWindowOptions) => {
+          return nativeWindowManager.openNativeWindow(manifest.id, options, callbacks.onRegisterCleanup);
         },
       },
 

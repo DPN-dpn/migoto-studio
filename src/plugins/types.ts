@@ -368,6 +368,10 @@ export interface SubWindowOptions {
   focusMode?: 'alwaysOnTop' | 'parentLinked' | 'independent';
   /** 초기 실행 시 별도 OS 윈도우(PiP 팝아웃)로 우선 분리할지 여부 (기본값: false) */
   preferPopout?: boolean;
+  /** PiP 별도 OS 윈도우 팝아웃 시 독립 실행할 엔트리 스크립트 파일명 (예: 'subwindow.js') */
+  entry?: string;
+  /** PiP 별도 OS 윈도우로 전달할 초기 데이터 */
+  initialData?: any;
   /** 서브창 내부 UI 렌더링 함수 (정리용 cleanup 함수 반환 가능) */
   render: (container: HTMLElement, subWin: SubWindowHandle) => void | (() => void);
 }
@@ -391,6 +395,86 @@ export interface SubWindowHandle {
   togglePopout(): Promise<boolean>;
   /** 현재 별도 OS 윈도우(PiP 팝아웃) 상태인지 여부 */
   isPoppedOut(): boolean;
+}
+
+export interface NativeWindowOptions {
+  /** 윈도우 고유 식별자 (동일 ID로 재호출 시 기존 창을 포커스) */
+  id: string;
+  /** OS 창 상단 타이틀 */
+  title: string;
+  /** 창 가로 너비 (기본값: 800) */
+  width?: number;
+  /** 창 세로 높이 (기본값: 600) */
+  height?: number;
+  /** 최소 가로 너비 */
+  minWidth?: number;
+  /** 최소 세로 높이 */
+  minHeight?: number;
+  /** 창 크기 조절 가능 여부 (기본값: true) */
+  resizable?: boolean;
+  /** 항상 맨 위 고정 여부 (기본값: false) */
+  alwaysOnTop?: boolean;
+  /** 화면 중앙 배치 여부 (기본값: true) */
+  center?: boolean;
+  /** 별도 창에서 독립 실행할 플러그인 스크립트 파일명 (예: 'subwindow.js') */
+  entry?: string;
+  /** 직접 주입할 초기 HTML 본문 내용 (선택) */
+  html?: string;
+  /** 메인 창에서 별도 창으로 전달할 초기 데이터 (선택) */
+  initialData?: any;
+}
+
+export interface NativeWindowHandle {
+  /** OS 창 닫기 */
+  close(): Promise<void>;
+  /** OS 창으로 포커스 이동 */
+  focus(): Promise<void>;
+  /** 창 타이틀 변경 */
+  setTitle(title: string): Promise<void>;
+  /** 창 크기 변경 */
+  setSize(width: number, height: number): Promise<void>;
+  /** 메인 창에서 별도 창으로 메시지 전송 */
+  postMessage(data: any): void;
+  /** 별도 창에서 메인 창으로 보낸 메시지 수신 리스너 등록 (해제 함수 반환) */
+  onMessage(listener: (data: any) => void): () => void;
+  /** 창이 열려 있는지 여부 */
+  isOpen(): boolean;
+}
+
+export interface NativeSubWindowContext {
+  /** 별도 OS 창의 루트 DOM 컨테이너 */
+  container: HTMLElement;
+  /** OS 창 제어 핸들 */
+  window: {
+    close(): Promise<void>;
+    focus(): Promise<void>;
+    setTitle(title: string): Promise<void>;
+    setSize(width: number, height: number): Promise<void>;
+  };
+  /** 메인 창과의 실시간 양방향 통신 채널 */
+  channel: {
+    postMessage(data: any): void;
+    onMessage(listener: (data: any) => void): () => void;
+  };
+  /** 메인 창에서 전달된 초기 데이터 */
+  initialData?: any;
+  /** 워크스페이스 파일 입출력 API (Tauri IPC 네이티브 실행) */
+  workspace: {
+    readTextFile(path: string): Promise<string>;
+    readBinaryFile(path: string): Promise<Uint8Array>;
+    writeFile(path: string, content: string): Promise<void>;
+    writeBinaryFile(path: string, bytes: Uint8Array): Promise<void>;
+    getActiveFolder(): string | null;
+  };
+  /** 로거 (별도 창 및 메인 콘솔 동시 출력) */
+  logger: {
+    info(...args: any[]): void;
+    warn(...args: any[]): void;
+    error(...args: any[]): void;
+    debug(...args: any[]): void;
+  };
+  /** 알림 토스트 */
+  showToast(message: string, type?: 'info' | 'warn' | 'error'): void;
 }
 
 export interface PluginContext {
@@ -550,6 +634,7 @@ export interface PluginContext {
     confirm(options: ConfirmOptions): Promise<boolean>;
     prompt(options: PromptOptions): Promise<string | null>;
     openSubWindow(options: SubWindowOptions): SubWindowHandle;
+    openNativeWindow(options: NativeWindowOptions): Promise<NativeWindowHandle>;
   } & PluginUIBuilder;
 
   // ---- System execution (desktop) ----

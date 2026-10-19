@@ -1,7 +1,8 @@
-import type { SubWindowOptions, SubWindowHandle } from './types.ts';
+import type { SubWindowOptions, SubWindowHandle, NativeWindowHandle } from './types.ts';
 import { isTauriEnvironment } from '../platform/index';
 import { appLogger } from '../core/logger';
 import { showToast } from '../ui/common/toast';
+import { nativeWindowManager } from './native-window';
 
 interface ActiveWindowItem {
   handle: SubWindowHandle;
@@ -841,8 +842,16 @@ export class SubWindowManager {
 
     // PiP (별도 OS 윈도우 팝아웃) 관리 로직
     let currentPipWin: Window | null = null;
+    let currentNativeHandle: NativeWindowHandle | null = null;
 
     const dockIn = () => {
+      if (currentNativeHandle && currentNativeHandle.isOpen()) {
+        try {
+          currentNativeHandle.close();
+        } catch {}
+      }
+      currentNativeHandle = null;
+
       if (currentPipWin && !currentPipWin.closed) {
         try {
           currentPipWin.close();
@@ -921,6 +930,10 @@ export class SubWindowManager {
     };
 
     const togglePopout = async (): Promise<boolean> => {
+      if (currentNativeHandle && currentNativeHandle.isOpen()) {
+        dockIn();
+        return false;
+      }
       if (currentPipWin && !currentPipWin.closed) {
         dockIn();
         return false;
@@ -929,10 +942,53 @@ export class SubWindowManager {
       const reqWidth = floatingEl.offsetWidth || width;
       const reqHeight = floatingEl.offsetHeight || height;
 
-      // 1. Document Picture-in-Picture 시도 (일반 브라우저 환경에서만 시도)
-      // 주의: Windows WebView2 (Tauri 데스크톱) 환경에서는 브라우저 쉘 프레임 부재로 인해
-      // "Internal error: no window" 예외가 발생하므로 제외
-      if (!isTauriEnvironment() && 'documentPictureInPicture' in window && typeof (window as any).documentPictureInPicture?.requestWindow === 'function') {
+      // 1. 데스크톱(Tauri) 환경인 경우 -> NativeWindowManager를 통해 진짜 독립 OS 윈도우 창 띄우기
+      if (isTauriEnvironment()) {
+        try {
+          const nativeHandle = await nativeWindowManager.openNativeWindow(_pluginId, {
+            id: options.id,
+            title: options.title,
+            width: reqWidth,
+            height: reqHeight,
+            minWidth: options.minWidth,
+            minHeight: options.minHeight,
+            resizable: options.resizable,
+            alwaysOnTop: currentMode === 'alwaysOnTop',
+            entry: options.entry,
+            initialData: options.initialData,
+          });
+
+          currentNativeHandle = nativeHandle;
+          pipPlaceholder.style.display = 'flex';
+          rootContainer.style.display = 'none';
+          pipBtn.classList.add('is-popped-out');
+          pipBtn.title = '에디터 내 플로팅 창으로 복원 (Dock In)';
+
+          const checkCloseTimer = setInterval(() => {
+            if (!nativeHandle.isOpen()) {
+              clearInterval(checkCloseTimer);
+              if (currentNativeHandle === nativeHandle) {
+                currentNativeHandle = null;
+                rootContainer.style.display = 'flex';
+                pipPlaceholder.style.display = 'none';
+                pipBtn.classList.remove('is-popped-out');
+                pipBtn.title = '별도 윈도우로 분리 (PiP 팝아웃)';
+                bringToFront();
+              }
+            }
+          }, 300);
+
+          appLogger.info('plugin', `서브 윈도우 독립 OS 윈도우 전환: "${options.title}"`);
+          return true;
+        } catch (err: any) {
+          console.error('[SubWindowManager] NativeWindow 열기 오류:', err);
+          showToast(`독립 OS 윈도우 열기 오류: ${err.message || String(err)}`, 'error');
+          return false;
+        }
+      }
+
+      // 2. 웹 브라우저 환경인 경우: Document Picture-in-Picture 시도
+      if ('documentPictureInPicture' in window && typeof (window as any).documentPictureInPicture?.requestWindow === 'function') {
         try {
           const pip = await (window as any).documentPictureInPicture.requestWindow({
             width: reqWidth,
@@ -945,30 +1001,23 @@ export class SubWindowManager {
         }
       }
 
-      // 2. Fallback: window.open popup 시도 (일반 웹 브라우저 환경)
-      if (!isTauriEnvironment()) {
-        try {
-          const screenX = typeof window.screenX !== 'undefined' ? window.screenX : 0;
-          const screenY = typeof window.screenY !== 'undefined' ? window.screenY : 0;
-          const left = Math.max(0, Math.round(screenX + ((window.outerWidth || 1200) - reqWidth) / 2));
-          const top = Math.max(0, Math.round(screenY + ((window.outerHeight || 800) - reqHeight) / 2));
-          const features = `width=${reqWidth},height=${reqHeight},left=${left},top=${top},resizable=yes,scrollbars=yes`;
-          const popWin = window.open('about:blank', `migoto_pip_${fullId}`, features);
-          if (popWin && !popWin.closed) {
-            setupPopoutWindow(popWin);
-            return true;
-          }
-        } catch (e) {
-          console.warn('[SubWindowManager] window.open popup fallback 실패:', e);
+      // 3. Fallback: window.open popup 시도 (일반 웹 브라우저 환경)
+      try {
+        const screenX = typeof window.screenX !== 'undefined' ? window.screenX : 0;
+        const screenY = typeof window.screenY !== 'undefined' ? window.screenY : 0;
+        const left = Math.max(0, Math.round(screenX + ((window.outerWidth || 1200) - reqWidth) / 2));
+        const top = Math.max(0, Math.round(screenY + ((window.outerHeight || 800) - reqHeight) / 2));
+        const features = `width=${reqWidth},height=${reqHeight},left=${left},top=${top},resizable=yes,scrollbars=yes`;
+        const popWin = window.open('about:blank', `migoto_pip_${fullId}`, features);
+        if (popWin && !popWin.closed) {
+          setupPopoutWindow(popWin);
+          return true;
         }
+      } catch (e) {
+        console.warn('[SubWindowManager] window.open popup fallback 실패:', e);
       }
 
-      showToast(
-        isTauriEnvironment()
-          ? 'Tauri 데스크톱(WebView2) 환경에서는 OS 웹뷰 제약으로 인해 실시간 DOM의 별도 창 분리가 지원되지 않습니다. 에디터 내 플로팅 창을 자유롭게 이동 및 최대화하여 사용해주세요.'
-          : '현재 브라우저 환경에서는 별도 OS 윈도우(PiP) 팝아웃이 지원되지 않아 내장 플로팅 창으로 유지됩니다.',
-        'warn'
-      );
+      showToast('현재 환경에서는 별도 OS 윈도우(PiP) 팝아웃이 지원되지 않아 내장 플로팅 창으로 유지됩니다.', 'warn');
       return false;
     };
 
@@ -1052,6 +1101,11 @@ export class SubWindowManager {
     const dispose = () => {
       if (isDisposed) return;
       isDisposed = true;
+
+      if (currentNativeHandle && currentNativeHandle.isOpen()) {
+        try { currentNativeHandle.close(); } catch {}
+        currentNativeHandle = null;
+      }
 
       if (currentPipWin && !currentPipWin.closed) {
         try { currentPipWin.close(); } catch {}

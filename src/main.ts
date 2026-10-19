@@ -45,6 +45,13 @@ import { CURRENT_APP_VERSION } from './updater/version';
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
 async function boot() {
+  const urlParams = new URLSearchParams(window.location.search);
+  if (urlParams.get('native_window') === 'true') {
+    const { bootNativeWindow } = await import('./plugins/native-window-boot');
+    await bootNativeWindow(urlParams);
+    return;
+  }
+
   await initPlatform();
   initPwa();
   appLogger.info('App', `Migoto Studio v${CURRENT_APP_VERSION} 시작됨 (${platform().kind} 환경)`);
