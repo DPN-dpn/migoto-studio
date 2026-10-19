@@ -1107,6 +1107,59 @@ test('Plugin menu items render directly when 1 item, and bundle into submenu whe
   assert.equal(sub[1].label, '프롬프트 설정');
 });
 
+test('Plugin menu items strictly follow plugin order', () => {
+  const pluginMenuItems: Map<string, { manifest: any; items: any[] }> = new Map();
+  pluginMenuItems.set('plugin-b', { manifest: { id: 'plugin-b', name: '플러그인 B' }, items: [{ label: 'B 액션' }] });
+  pluginMenuItems.set('plugin-a', { manifest: { id: 'plugin-a', name: '플러그인 A' }, items: [{ label: 'A 액션' }] });
+
+  const getSortedMenuItems = (order: string[]) => {
+    const groups: any[] = [];
+    for (const [pluginId, group] of pluginMenuItems) {
+      groups.push({ pluginId, pluginName: group.manifest.name, items: [...group.items] });
+    }
+    return groups.sort((a, b) => {
+      const idxA = order.indexOf(a.pluginId);
+      const idxB = order.indexOf(b.pluginId);
+      return (idxA === -1 ? 999 : idxA) - (idxB === -1 ? 999 : idxB);
+    });
+  };
+
+  // Order: A before B
+  const order1 = ['plugin-a', 'plugin-b'];
+  const res1 = getSortedMenuItems(order1);
+  assert.equal(res1[0].pluginId, 'plugin-a');
+  assert.equal(res1[1].pluginId, 'plugin-b');
+
+  // Order: B before A
+  const order2 = ['plugin-b', 'plugin-a'];
+  const res2 = getSortedMenuItems(order2);
+  assert.equal(res2[0].pluginId, 'plugin-b');
+  assert.equal(res2[1].pluginId, 'plugin-a');
+});
+
+test('Newly installed plugin via ZIP is appended to the bottom of the plugin order', () => {
+  const prevOrder = ['custom-lint', 'asset-viewer', 'ai-assistant'];
+  const newPluginId = 'my-new-plugin';
+  const isAlreadyInstalled = false;
+
+  const currentIds = [...prevOrder, newPluginId];
+  let finalOrder: string[];
+
+  if (!isAlreadyInstalled) {
+    const order = prevOrder.filter((id) => id !== newPluginId);
+    order.push(newPluginId);
+    for (const id of currentIds) {
+      if (!order.includes(id)) order.push(id);
+    }
+    finalOrder = order;
+  } else {
+    finalOrder = prevOrder;
+  }
+
+  assert.deepEqual(finalOrder, ['custom-lint', 'asset-viewer', 'ai-assistant', 'my-new-plugin']);
+  assert.equal(finalOrder[finalOrder.length - 1], 'my-new-plugin');
+});
+
 test('Plugin UI API FormConfig schema and value aggregation works properly', () => {
   const formConfig: any = {
     title: '토글 키 설정',

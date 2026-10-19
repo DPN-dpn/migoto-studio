@@ -391,7 +391,7 @@ export class PluginPanel {
 
     const upBtn = document.createElement('button');
     upBtn.className = 'plugin-order-btn up-btn';
-    upBtn.title = '위로 이동 (툴바 순서)';
+    upBtn.title = '위로 이동 (툴바 및 상단 메뉴 순서)';
     upBtn.setAttribute('aria-label', '위로 이동');
     upBtn.innerHTML = `
       <svg viewBox="0 0 8 5" width="7" height="4.5" fill="currentColor">
@@ -406,7 +406,7 @@ export class PluginPanel {
 
     const downBtn = document.createElement('button');
     downBtn.className = 'plugin-order-btn down-btn';
-    downBtn.title = '아래로 이동 (툴바 순서)';
+    downBtn.title = '아래로 이동 (툴바 및 상단 메뉴 순서)';
     downBtn.setAttribute('aria-label', '아래로 이동');
     downBtn.innerHTML = `
       <svg viewBox="0 0 8 5" width="7" height="4.5" fill="currentColor">

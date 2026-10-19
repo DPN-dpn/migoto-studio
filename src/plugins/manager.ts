@@ -167,6 +167,7 @@ export class PluginManager {
   }
 
   getPluginMenuItems(): PluginMenuGroup[] {
+    const order = this.getPluginOrder();
     const groups: PluginMenuGroup[] = [];
     for (const [pluginId, group] of this.pluginMenuItems) {
       const pluginInstance = this.plugins.get(pluginId);
@@ -179,7 +180,11 @@ export class PluginManager {
         });
       }
     }
-    return groups;
+    return groups.sort((a, b) => {
+      const idxA = order.indexOf(a.pluginId);
+      const idxB = order.indexOf(b.pluginId);
+      return (idxA === -1 ? 999 : idxA) - (idxB === -1 ? 999 : idxB);
+    });
   }
 
   setActivityBar(ab: ActivityBar) {
@@ -624,9 +629,12 @@ export class PluginManager {
 
     const storedOrder = this.getStoredPluginOrder();
     const cleanedOrder = storedOrder.filter((id) => currentPluginIds.has(id));
-    if (cleanedOrder.length !== storedOrder.length) {
-      this.saveStoredPluginOrder(cleanedOrder);
+    for (const id of currentPluginIds) {
+      if (!cleanedOrder.includes(id)) {
+        cleanedOrder.push(id);
+      }
     }
+    this.saveStoredPluginOrder(cleanedOrder);
 
     this.activityBar?.reorderDynamicTabs(this.getPluginOrder());
     this.notify();
@@ -925,6 +933,8 @@ export class PluginManager {
     }
 
     const { manifest, files, manifestJson, scriptContent } = extracted;
+    const isAlreadyInstalled = this.plugins.has(manifest.id);
+    const prevOrder = this.getPluginOrder();
 
     const textFiles: Record<string, string> = {};
     const textDecoder = new TextDecoder('utf-8');
@@ -964,6 +974,20 @@ export class PluginManager {
     }
 
     await this.init();
+
+    if (!isAlreadyInstalled) {
+      // 신규 추가된 플러그인은 항상 플러그인 목록의 맨 밑(끝)에 위치하도록 보장
+      const order = prevOrder.filter((id) => id !== manifest.id);
+      order.push(manifest.id);
+      for (const id of this.plugins.keys()) {
+        if (!order.includes(id)) {
+          order.push(id);
+        }
+      }
+      this.saveStoredPluginOrder(order);
+      this.activityBar?.reorderDynamicTabs(order);
+      this.notify();
+    }
 
     if (!this.isEnabled(manifest.id)) {
       await this.togglePlugin(manifest.id, true);
@@ -1056,9 +1080,22 @@ export default {
 
     if (platform().saveDiskPlugin) {
       try {
+        const prevOrder = this.getPluginOrder();
         await platform().saveDiskPlugin!(cleanId, JSON.stringify(manifest, null, 2), starterScript);
         this.showToast(`플러그인 "${manifest.name}"이(가) 생성되었습니다.`, 'info');
         await this.init();
+
+        const order = prevOrder.filter((id) => id !== cleanId);
+        order.push(cleanId);
+        for (const id of this.plugins.keys()) {
+          if (!order.includes(id)) {
+            order.push(id);
+          }
+        }
+        this.saveStoredPluginOrder(order);
+        this.activityBar?.reorderDynamicTabs(order);
+        this.notify();
+
         return true;
       } catch (err) {
         this.showToast(`플러그인 생성 실패: ${err}`, 'error');
