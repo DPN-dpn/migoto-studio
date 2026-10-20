@@ -528,6 +528,58 @@ export class DocumentManager {
     return true;
   }
 
+  /**
+   * 작업 폴더 변경 또는 닫기 시 작업 영역 탭 및 메모리를 완전히 초기화합니다.
+   */
+  async resetWorkspace(discardUnsaved = true): Promise<void> {
+    if (!discardUnsaved) {
+      const ok = await this.promptSaveDirty();
+      if (!ok) return;
+    }
+
+    for (const tab of this.tabs) {
+      if (tab.kind === 'custom') {
+        if (typeof tab.customCleanup === 'function') {
+          try { tab.customCleanup(); } catch {}
+        }
+        tab.customCleanup = undefined;
+        if (tab.customElement) {
+          tab.customElement.remove();
+          tab.customElement = undefined;
+        }
+        tab.savedScrolls = undefined;
+      }
+      if (tab.kind === 'diff' && tab.diffInfo) {
+        tab.diffInfo.originalModel.dispose();
+        tab.diffInfo.modifiedModel.dispose();
+      }
+      tab.model.dispose();
+    }
+
+    this.tabs = [];
+    this.activeTabId = '';
+    this.newFile();
+    this.emit();
+    appLogger.info('Workspace', '작업 영역 닫힘: 모든 작업 탭 및 메모리가 초기화되었습니다.');
+  }
+
+  /**
+   * 활성 탭이 미저장(dirty) 상태가 아닐 때, 디스크의 최신 내용과 비교하여 변경되었으면 자동으로 새로고침합니다.
+   */
+  async syncActiveTabWithDisk(): Promise<void> {
+    const tab = this.activeTab;
+    if (!tab || !tab.file || this.isTabDirty(tab) || tab.kind !== 'text') return;
+    try {
+      const loaded = await platform().readFile(tab.file);
+      if (loaded && loaded.text !== tab.model.getValue()) {
+        tab.model.setValue(loaded.text);
+        tab.encoding = loaded.encoding;
+        tab.savedVersion = tab.model.getAlternativeVersionId();
+        appLogger.info('File', `외부 변경 감지: ${tab.file.name} 디스크 최신 내용으로 동기화됨`);
+      }
+    } catch {}
+  }
+
   async restoreText(text: string) {
     if (!this.activeTab) return;
     this.editor.pushUndoStop();
@@ -558,10 +610,21 @@ export class DocumentManager {
       return this.openCustomViewerFile(ref);
     }
 
-    // 1. If already open in any tab, switch to it
+    // 1. If already open in any tab, switch to it and sync with disk if clean
     const existing = this.tabs.find((t) => t.file?.id === ref.id);
     if (existing) {
       this.switchTab(existing.id);
+      if (!this.isTabDirty(existing) && existing.kind === 'text') {
+        try {
+          const loaded = await platform().readFile(ref);
+          if (loaded && loaded.text !== existing.model.getValue()) {
+            existing.model.setValue(loaded.text);
+            existing.encoding = loaded.encoding;
+            existing.savedVersion = existing.model.getAlternativeVersionId();
+            appLogger.info('File', `디스크 변경 감지: ${ref.name} 최신 내용으로 동기화됨`);
+          }
+        } catch {}
+      }
       return;
     }
 

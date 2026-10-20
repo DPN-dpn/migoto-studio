@@ -87,6 +87,13 @@ export class MenuBar {
               await this.cb.explorer.openFolderDialog();
             },
           },
+          {
+            label: '모드 폴더 닫기',
+            action: async () => {
+              await this.cb.explorer.closeFolder();
+            },
+            disabled: !this.cb.explorer.hasFolder,
+          },
           { divider: true },
           {
             label: '최근 파일',

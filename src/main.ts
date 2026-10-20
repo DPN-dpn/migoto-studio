@@ -482,6 +482,11 @@ async function boot() {
     return shouldClose;
   });
 
+  // ---- sync active tab when window gains focus ----
+  window.addEventListener('focus', () => {
+    doc.syncActiveTabWithDisk();
+  });
+
   // ---- check for newer releases in background ----
   checkOnStartup();
 }

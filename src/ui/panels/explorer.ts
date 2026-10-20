@@ -259,6 +259,11 @@ export class FileExplorer {
       const trusted = await promptFolderTrust(folder);
       if (!trusted) return;
     }
+
+    if (this.currentFolder && this.currentFolder.id !== folder.id) {
+      await this.doc.resetWorkspace(true);
+    }
+
     this.currentFolder = folder;
     this.expandedDirs.clear();
     this.filter = '';
@@ -299,7 +304,7 @@ export class FileExplorer {
     this.renderTreeContainer();
   }
 
-  closeFolder(): void {
+  async closeFolder(discardTabs = true): Promise<void> {
     const prevName = this.currentFolder?.name;
     this.currentFolder = null;
     this.entries = [];
@@ -310,8 +315,11 @@ export class FileExplorer {
     } catch {}
     this.notifyFolderChange(null);
     this.render();
+    if (discardTabs) {
+      await this.doc.resetWorkspace(true);
+    }
     if (prevName) {
-      appLogger.info('Workspace', `작업 폴더 닫힘: "${prevName}"`);
+      appLogger.info('Workspace', `작업 폴더 닫힘: "${prevName}" (작업 메모리 및 탭 초기화됨)`);
     }
   }
 
