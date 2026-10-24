@@ -39,6 +39,7 @@ Migoto Studio는 개발자가 에디터의 기능을 자유롭게 확장하고 �
   "author": "Modder",
   "icon": "🎛️",
   "category": "tools",
+  "location": "좌측 사이드바 탭",
   "main": "index.js"
 }
 ```

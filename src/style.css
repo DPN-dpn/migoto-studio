@@ -1741,6 +1741,8 @@ select.status-btn option { background: var(--bg-elev); color: var(--fg); }
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 4px 6px;
   font-size: 11px;
   color: var(--fg-dim);
 }
@@ -1754,6 +1756,16 @@ select.status-btn option { background: var(--bg-elev); color: var(--fg); }
 .plugin-badge.user {
   background: rgba(34, 197, 94, 0.15);
   color: #22c55e;
+}
+.plugin-badge.user.github {
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  transition: opacity 0.15s ease, filter 0.15s ease;
+}
+.plugin-badge.user.github:hover {
+  filter: brightness(1.2);
+  text-decoration: underline;
 }
 .plugin-error-notice {
   margin-top: 6px;

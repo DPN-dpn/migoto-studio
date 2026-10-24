@@ -40,6 +40,7 @@ my-advanced-plugin/
   "author": "제작자명",
   "icon": "🎛️",
   "category": "tools",
+  "location": "좌측 사이드바 탭",
   "main": "index.js"
 }
 ```
@@ -48,6 +49,7 @@ my-advanced-plugin/
 - `main`: 플러그인의 엔트리 스크립트 경로 (생략 시 `index.js`, `plugin.js`, `main.js` 순으로 자동 탐색)
 - `icon`: 이모지(`🎛️`), SVG 마크업 문자열(`<svg>...</svg>`), 이미지 URL 또는 Base64 Data URI를 지원합니다.
 - `category`: `'tools'` | `'assets'` | `'ai'` | `'general'`
+- `location`: 플러그인의 주요 UI 배치 위치 안내 문구 (선택 사항, 예: `'좌측 사이드바 탭'`, `'상단 메뉴 바'`, `'에디터 린터'` 등, 생략 시 기본값 `'좌측 사이드바 탭'`)
 
 ---
 

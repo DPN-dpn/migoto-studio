@@ -79,12 +79,14 @@ my-plugin/
   "author": "제작자명",
   "icon": "🎛️",
   "category": "tools",
+  "location": "좌측 사이드바 탭",
   "main": "index.js"
 }
 ```
 - `id`: 고유 ID (소문자, 숫자, 하이픈)
 - `icon`: 이모지 문자열(`🎛️`), 인라인 SVG 태그(`<svg ...>`), 또는 로컬 아이콘 경로(`icon.svg`)
 - `category`: `"tools"` | `"assets"` | `"ai"` | `"general"`
+- `location`: 주요 UI 배치 위치 설명 (예: `"좌측 사이드바 탭"`, `"상단 메뉴 바"`, `"에디터 린터"` 등, 선택 사항)
 - `main`: 기본값 `"index.js"`
 
 ---
