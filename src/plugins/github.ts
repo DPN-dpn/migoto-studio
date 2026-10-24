@@ -128,7 +128,12 @@ export async function fetchGitHubPluginRelease(ref: GitHubRepoRef): Promise<GitH
 
   try {
     const res = await fetch(releaseApiUrl, {
-      headers: { Accept: 'application/vnd.github.v3+json' },
+      headers: {
+        Accept: 'application/vnd.github.v3+json',
+        'Cache-Control': 'no-cache',
+        Pragma: 'no-cache',
+      },
+      cache: 'no-store',
     });
 
     if (res.ok) {
@@ -183,9 +188,14 @@ export async function fetchGitHubPluginRelease(ref: GitHubRepoRef): Promise<GitH
   for (const branch of candidateBranches) {
     for (const manifestName of ['plugin.json', 'manifest.json']) {
       try {
-        const manifestRes = await fetch(
-          `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${manifestName}`,
-        );
+        const rawUrl = `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${manifestName}?t=${Date.now()}`;
+        const manifestRes = await fetch(rawUrl, {
+          headers: {
+            'Cache-Control': 'no-cache',
+            Pragma: 'no-cache',
+          },
+          cache: 'no-store',
+        });
         if (manifestRes.ok) {
           const manifest = await manifestRes.json();
           if (manifest.version) {

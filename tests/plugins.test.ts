@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { isNewerVersion } from '../src/updater/version.ts';
 import { decodeDDS } from '../default-plugins/texture-library/dds-decoder.ts';
 import pythonRunnerPlugin from '../default-plugins/python-runner/index.ts';
 import textureLibraryPlugin from '../default-plugins/texture-library/index.ts';
@@ -2322,5 +2323,16 @@ test('Plugin menu items deduplication and lifecycle cleanup', () => {
   menuItems.delete('test-plugin');
   assert.equal(menuItems.has('test-plugin'), false);
 });
+
+test('checkGitHubPluginUpdate detection logic with semver version comparison', () => {
+  // Test version comparison for plugin update detection
+  assert.equal(isNewerVersion('1.2.0', '1.2.1'), true);
+  assert.equal(isNewerVersion('1.2.1', '1.2.0'), false);
+  assert.equal(isNewerVersion('1.2.0', '1.2.0'), false);
+  assert.equal(isNewerVersion('1.2.0', 'v1.2.1'), true);
+  assert.equal(isNewerVersion('v1.2.0', '1.2.1'), true);
+  assert.equal(isNewerVersion('1.2.0', '2.0.0'), true);
+});
+
 
 

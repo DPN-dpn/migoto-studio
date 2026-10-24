@@ -150,6 +150,7 @@ export class PluginManager {
   private pluginMenuItems: Map<string, { manifest: PluginManifest; items: PluginMenuItemDef[] }> = new Map();
   private githubSources: Map<string, PluginGitHubSource> = new Map();
   private isCheckingUpdates = false;
+  private checkUpdatesPromise?: Promise<{ updatesFound: Array<{ name: string; oldVer: string; newVer: string }> }>;
   private pluginApis: Map<string, any> = new Map();
 
   private doc: DocumentManager;
@@ -1301,13 +1302,54 @@ export class PluginManager {
   }
 
   /**
+   * 플러그인 시스템을 다시 로드하고, 옵션에 따라 GitHub 출처 플러그인 업데이트를 확인합니다.
+   */
+  async reloadPlugins(options?: { checkUpdates?: boolean; showToast?: boolean }): Promise<void> {
+    await this.init();
+    if (options?.checkUpdates) {
+      await this.checkPluginUpdates({ showToast: options.showToast });
+    }
+  }
+
+  /**
    * GitHub 출처가 등록된 플러그인들의 최신 버전을 비동기로 확인합니다.
    */
-  async checkPluginUpdates(): Promise<void> {
-    if (this.isCheckingUpdates || this.githubSources.size === 0) return;
-    this.isCheckingUpdates = true;
+  async checkPluginUpdates(options?: { showToast?: boolean }): Promise<void> {
+    if (this.githubSources.size === 0) {
+      if (options?.showToast) {
+        this.showToast('GitHub로 설치된 플러그인이 없습니다.', 'info');
+      }
+      return;
+    }
 
+    if (!this.checkUpdatesPromise) {
+      this.checkUpdatesPromise = this.performCheckPluginUpdates().finally(() => {
+        this.checkUpdatesPromise = undefined;
+      });
+    }
+
+    const { updatesFound } = await this.checkUpdatesPromise;
+
+    if (options?.showToast) {
+      if (updatesFound.length > 0) {
+        const msg =
+          updatesFound.length === 1
+            ? `플러그인 새 버전 발견: "${updatesFound[0].name}" (v${updatesFound[0].oldVer} → v${updatesFound[0].newVer})`
+            : `${updatesFound.length}개 플러그인 업데이트가 있습니다 (${updatesFound.map((u) => u.name).join(', ')})`;
+        this.showToast(msg, 'info');
+      } else {
+        this.showToast('모든 GitHub 플러그인이 최신 버전입니다.', 'info');
+      }
+    }
+  }
+
+  private async performCheckPluginUpdates(): Promise<{
+    updatesFound: Array<{ name: string; oldVer: string; newVer: string }>;
+  }> {
+    this.isCheckingUpdates = true;
     let changed = false;
+    const updatesFound: Array<{ name: string; oldVer: string; newVer: string }> = [];
+
     try {
       for (const [pluginId, source] of Array.from(this.githubSources.entries())) {
         if (!this.plugins.has(pluginId)) {
@@ -1321,21 +1363,28 @@ export class PluginManager {
 
         const update = await checkGitHubPluginUpdate(source);
         if (update) {
-          if (
-            source.updateAvailable !== update.updateAvailable ||
-            source.lastCheckedVersion !== update.latestVersion
-          ) {
-            source.updateAvailable = update.updateAvailable;
-            source.lastCheckedVersion = update.latestVersion;
-            source.latestZipUrl = update.zipUrl;
-            source.checkedAt = Date.now();
+          const hadUpdate = source.updateAvailable;
+          const prevVersion = source.lastCheckedVersion;
+
+          source.updateAvailable = update.updateAvailable;
+          source.lastCheckedVersion = update.latestVersion;
+          source.latestZipUrl = update.zipUrl;
+          source.checkedAt = Date.now();
+
+          if (hadUpdate !== update.updateAvailable || prevVersion !== update.latestVersion) {
             changed = true;
-            if (update.updateAvailable) {
-              appLogger.info(
-                'Plugin',
-                `플러그인 "${inst.manifest.name}" 새 업데이트 발견: v${source.installedVersion} -> v${update.latestVersion}`,
-              );
-            }
+          }
+
+          if (update.updateAvailable) {
+            updatesFound.push({
+              name: inst.manifest.name,
+              oldVer: source.installedVersion,
+              newVer: update.latestVersion,
+            });
+            appLogger.info(
+              'Plugin',
+              `플러그인 "${inst.manifest.name}" 새 업데이트 발견: v${source.installedVersion} -> v${update.latestVersion}`,
+            );
           }
         }
       }
@@ -1348,6 +1397,8 @@ export class PluginManager {
         this.notify();
       }
     }
+
+    return { updatesFound };
   }
 
   /**
