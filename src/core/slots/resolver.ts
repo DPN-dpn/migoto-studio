@@ -113,35 +113,131 @@ export function cleanSectionName(sectionName: string): string {
 }
 
 /**
+ * 주어진 문자열이 독립된 부위명이 아닌 단순 서브메시 인덱스나 변형 식별자(A, B, 1, 2, _A 등)인지 판별합니다.
+ */
+export function isSubmeshVariantOnly(str: string): boolean {
+  if (!str) return true;
+  const s = str.trim();
+  // 1글자 알파벳 (A, B, C...)
+  if (/^[a-zA-Z]$/.test(s)) return true;
+  // 1~2자리 숫자 (0, 1, 2... 99)
+  if (/^\d{1,2}$/.test(s)) return true;
+  // 밑줄이나 하이픈으로 시작하는 1~2글자 인덱스 (_A, _1, -B, _01)
+  if (/^[-_][a-zA-Z0-9]{1,2}$/.test(s)) return true;
+  // 단독 2글자 영숫자 인덱스 (A1, 1A, a1, b2)
+  if (/^[a-zA-Z]\d$/.test(s) || /^\d[a-zA-Z]$/.test(s)) return true;
+  return false;
+}
+
+/**
+ * 공통 접두사가 부위 어간(stem)까지 과도하게 포함한 경우,
+ * 실제 캐릭터/모더 접두사 경계로 안전하게 후퇴(back-off)시킵니다.
+ */
+export function backOffPrefix(prefix: string): string {
+  if (!prefix || prefix.length <= 2) return prefix;
+
+  // 1. 구분자(_ 또는 -)가 있는 경우 마지막 구분자 경계로 후퇴
+  const lastDelim = Math.max(prefix.lastIndexOf('_'), prefix.lastIndexOf('-'));
+  if (lastDelim >= 1) {
+    return prefix.slice(0, lastDelim + 1);
+  }
+
+  // 2. PascalCase / CamelCase 대문자 경계가 여러 개 있는 경우 (예: PearlBody -> Pearl)
+  const upperIndices: number[] = [];
+  for (let i = 0; i < prefix.length; i++) {
+    if (/[A-Z]/.test(prefix[i])) {
+      upperIndices.push(i);
+    }
+  }
+  if (upperIndices.length >= 2) {
+    const lastUpper = upperIndices[upperIndices.length - 1];
+    if (lastUpper >= 2) {
+      return prefix.slice(0, lastUpper);
+    }
+  }
+
+  // 3. 알려진 부위 키워드(PART_LABELS)로 끝나는지 검사 (예: Pearlbody -> body로 끝나므로 Pearl)
+  const lower = prefix.toLowerCase();
+  for (const partKey of Object.keys(PART_LABELS)) {
+    if (partKey.length >= 3 && lower.endsWith(partKey) && prefix.length > partKey.length) {
+      const cutPos = prefix.length - partKey.length;
+      return prefix.slice(0, cutPos);
+    }
+  }
+
+  // 4. 일반적인 단어 분절: 첫 번째 PascalCase 단어 분리 (예: Pearlbody -> Pearl + body)
+  const match = prefix.match(/^([A-Z][a-z]{2,})([a-z]{2,})$/);
+  if (match) {
+    return match[1];
+  }
+
+  return prefix;
+}
+
+/**
  * 단일 섹션명에서 캐릭터/모드 접두사를 분리하고 모더가 명명한 부위 이름을 추출합니다.
  */
 export function extractPartName(name: string): string {
   const cleaned = cleanSectionName(name);
   if (!cleaned) return 'unknown';
 
+  const lower = cleaned.toLowerCase();
+  if (
+    lower.includes('random') ||
+    lower.includes('dummy') ||
+    lower.includes('mysterious') ||
+    lower.includes('unknown') ||
+    /^(temp|test|mesh)\d*$/i.test(cleaned) ||
+    /^[a-f0-9]{8,}$/i.test(cleaned)
+  ) {
+    return 'unknown';
+  }
+
   // 언더스코어 또는 하이픈 구분자가 있는 경우 마지막 세그먼트를 부위명으로 사용
-  // 예: JaneDoe_Tail -> Tail, Mod_Char_Coat -> Coat
+  // 예: JaneDoe_Tail -> Tail, Mod_Char_Coat -> Coat, Jane_Body_A -> BodyA
   if (cleaned.includes('_') || cleaned.includes('-')) {
     const parts = cleaned.split(/[-_]+/).filter(Boolean);
     if (parts.length >= 2) {
       const last = parts[parts.length - 1];
+      if (parts.length >= 3 && isSubmeshVariantOnly(last)) {
+        const prev = parts[parts.length - 2];
+        return refinePartName(`${prev}${last}`);
+      }
       if (last && !/^\d+$/.test(last)) {
         return refinePartName(last);
       }
     }
   }
 
-  // CamelCase 분절 탐색 (예: HeroHead -> Head, AnbyBody -> Body, RoxyHair -> Hair)
+  // 끝부분이 서브메시 인덱스(A, B, 1, 2)로 끝나는 경우 어간 탐색
+  // 예: PearlbodyA -> Pearlbody + A
+  const endVariantMatch = cleaned.match(/^(.+?)([A-Z]|\d{1,2})$/);
+  if (endVariantMatch) {
+    const stem = endVariantMatch[1];
+    const variant = endVariantMatch[2];
+
+    if (isSubmeshVariantOnly(variant)) {
+      const lowerStem = stem.toLowerCase();
+      for (const partKey of Object.keys(PART_LABELS)) {
+        if (partKey.length >= 3 && lowerStem.endsWith(partKey)) {
+          const matchedPart = stem.slice(stem.length - partKey.length);
+          return refinePartName(`${matchedPart}${variant}`);
+        }
+      }
+    }
+  }
+
+  // CamelCase 분절 탐색 (예: HeroHead -> Head, AnbyBody -> Body, PearlBodyA -> BodyA)
   const tokens = cleaned.match(/[A-Z][a-z0-9]*/g);
   if (tokens && tokens.length >= 2) {
     const last = tokens[tokens.length - 1];
-    // 3개 이상 토큰일 때 (예: JaneDoeTail): 마지막 토큰이 부위인 경우 우선
+    if (isSubmeshVariantOnly(last)) {
+      const prev = tokens[tokens.length - 2];
+      return refinePartName(`${prev}${last}`);
+    }
     if (tokens.length >= 3) {
-      const rest = tokens.slice(tokens.length - 2).join('');
-      // 마지막 1단어가 흔히 쓰이는 부위명이거나 구체적 이름인 경우
       return refinePartName(last);
     }
-    // 2개 토큰일 때 (예: HeroHead, AnbyBody, CorinSaw, BillyJacket): 두 번째 토큰이 부위
     return refinePartName(last);
   }
 
@@ -163,7 +259,7 @@ export function discoverModParts(sectionNames: string[]): Map<string, string> {
     entries.push({ original: name, cleaned });
   }
 
-  // 2. 모드 내 섹션들이 공유하는 공통 캐릭터/모드 접두사 탐색 (예: 'Roxy', 'JaneDoe_', 'Ellen')
+  // 2. 모드 내 섹션들이 공유하는 공통 캐릭터/모드 접두사 탐색 (예: 'Roxy', 'JaneDoe_', 'Ellen', 'Pearl')
   const valid = entries.map((e) => e.cleaned).filter((s) => s.length > 0 && refinePartName(s) !== 'unknown');
   let commonPrefix = '';
 
@@ -181,10 +277,28 @@ export function discoverModParts(sectionNames: string[]): Map<string, string> {
 
     if (maxLen >= 2) {
       commonPrefix = first.slice(0, maxLen);
-      // 언더스코어나 하이픈이 있다면 구분자까지를 접두사 경계로 깔끔하게 정리
+      // 언더스코어나 하이픈이 있다면 구분자까지를 접두사 경계로 정리
       const lastDelim = Math.max(commonPrefix.lastIndexOf('_'), commonPrefix.lastIndexOf('-'));
       if (lastDelim >= 2) {
         commonPrefix = commonPrefix.slice(0, lastDelim + 1);
+      }
+    }
+  }
+
+  // 공통 접두사가 너무 많은 부분(부위 어간)까지 삼켜서 남은 문자열이 단순 인덱스(A, B, 1 등)만 남는 경우 back-off
+  if (commonPrefix && valid.length >= 1) {
+    const remnants = valid.map((v) => {
+      if (v.toLowerCase().startsWith(commonPrefix.toLowerCase())) {
+        return v.slice(commonPrefix.length).replace(/^[_-\s]+/, '');
+      }
+      return v;
+    });
+
+    const isAllVariant = remnants.every((r) => isSubmeshVariantOnly(r));
+    if (isAllVariant) {
+      const backed = backOffPrefix(commonPrefix);
+      if (backed !== commonPrefix && backed.length > 0) {
+        commonPrefix = backed;
       }
     }
   }
@@ -196,8 +310,11 @@ export function discoverModParts(sectionNames: string[]): Map<string, string> {
     // 공통 접두사가 존재하면 제거하여 모더가 부여한 실제 부위명만 추출
     if (commonPrefix && part.toLowerCase().startsWith(commonPrefix.toLowerCase())) {
       const rest = part.slice(commonPrefix.length).replace(/^[_-\s]+/, '');
-      if (rest.length > 0 && !/^\d+$/.test(rest)) {
+      if (rest.length > 0 && !isSubmeshVariantOnly(rest)) {
         part = rest;
+      } else if (isSubmeshVariantOnly(rest)) {
+        // 혹시라도 여전히 서브메시 인덱스만 남은 경우 fallback
+        part = extractPartName(entry.cleaned);
       }
     } else {
       // 공통 접두사가 적용되지 않는 개별 섹션은 CamelCase / 구분자 분절 적용
@@ -223,7 +340,7 @@ export function discoverModParts(sectionNames: string[]): Map<string, string> {
 function refinePartName(part: string): string {
   const lower = part.toLowerCase();
 
-  // 부위명이 아니거나 의미를 알 수 없는 모호한 명칭은 unknown으로 처리하여 수동 매칭 패널로 유도
+  // 부위명이 아니거나 의미를 알 수 없는 모호한 명칭, 또는 단독 서브메시 인덱스는 unknown 처리
   if (
     !part ||
     lower === 'mesh' ||
@@ -233,7 +350,8 @@ function refinePartName(part: string): string {
     lower.includes('dummy') ||
     lower.includes('unknown') ||
     /^(temp|test|mesh)\d*$/i.test(part) ||
-    /^[a-f0-9]{8,}$/i.test(part)
+    /^[a-f0-9]{8,}$/i.test(part) ||
+    isSubmeshVariantOnly(part)
   ) {
     return 'unknown';
   }

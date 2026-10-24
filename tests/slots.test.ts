@@ -157,6 +157,26 @@ test('discoverModParts dynamically extracts arbitrary modder-defined parts per m
   assert.equal(map.get('TextureOverrideJaneDoeKnife'), 'Knife');
 });
 
+test('discoverModParts correctly distinguishes submesh variants like PearlbodyA and PearlbodyB without collapsing to A and B', () => {
+  const iniSections = [
+    'TextureOverridePearlbodyA',
+    'TextureOverridePearlbodyB',
+  ];
+
+  const map = discoverModParts(iniSections);
+  assert.equal(map.get('TextureOverridePearlbodyA'), 'BodyA');
+  assert.equal(map.get('TextureOverridePearlbodyB'), 'BodyB');
+
+  // Separated variants (e.g. Jane_Body_1, Jane_Body_2)
+  const sepSections = [
+    'TextureOverrideJane_Body_A',
+    'TextureOverrideJane_Body_B',
+  ];
+  const sepMap = discoverModParts(sepSections);
+  assert.equal(sepMap.get('TextureOverrideJane_Body_A'), 'BodyA');
+  assert.equal(sepMap.get('TextureOverrideJane_Body_B'), 'BodyB');
+});
+
 test('SlotManager supports arbitrary dynamic part names in analyzeDocuments and setPartMapping', () => {
   const sm = new SlotManager();
   const iniText = `
