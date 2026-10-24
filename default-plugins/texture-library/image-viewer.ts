@@ -22,7 +22,7 @@ for (let i = 0; i < 256; i++) {
 }
 
 /**
- * Interactive Image / Texture Viewer component for plugins (e.g. asset-viewer).
+ * Interactive Image / Texture Viewer component for plugins (e.g. texture-library).
  * Supports DDS (BC1, BC2, BC3, BC4, BC5, BC7, RGBA) and standard web images (PNG, JPG, BMP, WebP).
  * Features color space modes (sRGB, Linear, Raw), channel inspection (RGBA, RGB, R, G, B, A),
  * checkerboard transparency, smooth pan/drag, zoom (wheel & buttons), and format metadata.

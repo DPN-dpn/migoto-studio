@@ -302,7 +302,7 @@ const hasFSAccess = typeof window !== 'undefined' && 'showOpenFilePicker' in win
 export const DEFAULT_WEB_PLUGINS = [
   'custom-lint',
   'zzmi-support',
-  'asset-viewer',
+  'texture-library',
   'ai-assistant',
 ];
 

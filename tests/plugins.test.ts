@@ -1,8 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { decodeDDS } from '../default-plugins/asset-viewer/dds-decoder.ts';
+import { decodeDDS } from '../default-plugins/texture-library/dds-decoder.ts';
 import pythonRunnerPlugin from '../default-plugins/python-runner/index.ts';
-import assetViewerPlugin from '../default-plugins/asset-viewer/index.ts';
+import textureLibraryPlugin from '../default-plugins/texture-library/index.ts';
 import aiAssistantPlugin from '../default-plugins/ai-assistant/index.ts';
 import customLintPlugin from '../default-plugins/custom-lint/index.ts';
 import zzmiSupportPlugin from '../default-plugins/zzmi-support/index.ts';
@@ -11,7 +11,7 @@ import { resolve } from 'node:path';
 
 const BUILTIN_PLUGINS = [
   { manifest: JSON.parse(readFileSync(resolve(process.cwd(), 'default-plugins/python-runner/plugin.json'), 'utf8')), createPlugin: () => pythonRunnerPlugin },
-  { manifest: JSON.parse(readFileSync(resolve(process.cwd(), 'default-plugins/asset-viewer/plugin.json'), 'utf8')), createPlugin: () => assetViewerPlugin },
+  { manifest: JSON.parse(readFileSync(resolve(process.cwd(), 'default-plugins/texture-library/plugin.json'), 'utf8')), createPlugin: () => textureLibraryPlugin },
   { manifest: JSON.parse(readFileSync(resolve(process.cwd(), 'default-plugins/ai-assistant/plugin.json'), 'utf8')), createPlugin: () => aiAssistantPlugin },
   { manifest: JSON.parse(readFileSync(resolve(process.cwd(), 'default-plugins/custom-lint/plugin.json'), 'utf8')), createPlugin: () => customLintPlugin },
   { manifest: JSON.parse(readFileSync(resolve(process.cwd(), 'default-plugins/zzmi-support/plugin.json'), 'utf8')), createPlugin: () => zzmiSupportPlugin },
@@ -182,9 +182,9 @@ test('builtin plugins activate with expected behavior', () => {
   assert.ok(registeredViews[0].icon.startsWith('<svg'));
 
   registeredViews.length = 0;
-  const asset = BUILTIN_PLUGINS.find((p) => p.manifest.id === 'asset-viewer')!;
+  const asset = BUILTIN_PLUGINS.find((p) => p.manifest.id === 'texture-library')!;
   asset.createPlugin().activate(mockContext);
-  // Asset viewer should NOT register sidebar views (opens directly in editor tabs via registerCustomViewer)
+  // Texture library should NOT register sidebar views (opens directly in editor tabs via registerCustomViewer)
   assert.equal(registeredViews.length, 0);
   assert.equal(registeredCustomViewers.length, 1);
   assert.deepEqual(registeredCustomViewers[0].extensions, ['dds', 'png', 'jpg', 'jpeg', 'bmp', 'webp', 'gif']);
@@ -564,7 +564,7 @@ test('default-plugins directory contains all 5 standalone plugins ready for inst
   const path = await import('node:path');
   const url = await import('node:url');
 
-  const defaultIds = ['custom-lint', 'zzmi-support', 'asset-viewer', 'python-runner', 'ai-assistant'];
+  const defaultIds = ['custom-lint', 'zzmi-support', 'texture-library', 'python-runner', 'ai-assistant'];
   const baseDir = path.resolve(process.cwd(), 'default-plugins');
 
   for (const id of defaultIds) {
@@ -598,7 +598,7 @@ test('public/default-plugins contains web-compatible plugins and excludes python
   assert.ok(fs.existsSync(indexJson), 'index.json must exist');
   const indexList = JSON.parse(fs.readFileSync(indexJson, 'utf8'));
 
-  assert.deepEqual(indexList, ['custom-lint', 'zzmi-support', 'asset-viewer', 'ai-assistant']);
+  assert.deepEqual(indexList, ['custom-lint', 'zzmi-support', 'texture-library', 'ai-assistant']);
   assert.equal(fs.existsSync(path.join(pubDir, 'python-runner')), false, 'python-runner must not exist in public/default-plugins');
 
   for (const id of indexList) {
@@ -617,9 +617,9 @@ test('web listDiskPlugins sanitizes stale localStorage, purges python-runner, an
         manifestJson: JSON.stringify({ id: 'python-runner', name: 'Python Runner' }),
         scriptContent: 'export default {}',
       },
-      'asset-viewer': {
-        id: 'asset-viewer',
-        manifestJson: JSON.stringify({ id: 'asset-viewer', name: 'Old Asset Viewer' }),
+      'texture-library': {
+        id: 'texture-library',
+        manifestJson: JSON.stringify({ id: 'texture-library', name: 'Old Texture Library' }),
         scriptContent: 'export default {}',
       },
       'corrupt-plugin': {
@@ -670,17 +670,17 @@ test('web listDiskPlugins sanitizes stale localStorage, purges python-runner, an
 
     const savedWebPlugins = JSON.parse(mockStorage[STORAGE_WEB_PLUGINS] || '{}');
     assert.equal(savedWebPlugins['python-runner'], undefined, 'python-runner must be removed from localStorage');
-    assert.equal(savedWebPlugins['asset-viewer'], undefined, 'default plugins must be removed from localStorage');
+    assert.equal(savedWebPlugins['texture-library'], undefined, 'default plugins must be removed from localStorage');
     assert.equal(savedWebPlugins['corrupt-plugin'], undefined, 'corrupt entries must be removed from localStorage');
     assert.ok(savedWebPlugins['my-custom-plugin'], 'my-custom-plugin must remain in localStorage');
 
-    await web.deleteEntry!('default-plugins/asset-viewer');
+    await web.deleteEntry!('default-plugins/texture-library');
     const deletedList = JSON.parse(mockStorage[STORAGE_DELETED_DEFAULTS] || '[]');
-    assert.ok(deletedList.includes('asset-viewer'), 'asset-viewer must be recorded in deleted defaults');
+    assert.ok(deletedList.includes('texture-library'), 'texture-library must be recorded in deleted defaults');
 
     const refreshedList = await web.listDiskPlugins!();
     const refreshedIds = refreshedList.map((p) => p.id);
-    assert.ok(!refreshedIds.includes('asset-viewer'), 'deleted default plugin must not be returned');
+    assert.ok(!refreshedIds.includes('texture-library'), 'deleted default plugin must not be returned');
   } finally {
     (globalThis as any).fetch = originalFetch;
   }

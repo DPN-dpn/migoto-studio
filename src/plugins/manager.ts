@@ -129,7 +129,7 @@ const STORAGE_PLUGIN_GITHUB_SOURCES = 'migoto_plugin_github_sources';
 export const DEFAULT_PLUGIN_ORDER: readonly string[] = [
   'custom-lint',
   'zzmi-support',
-  'asset-viewer',
+  'texture-library',
   'python-runner',
   'ai-assistant',
 ];
@@ -188,6 +188,7 @@ export class PluginManager {
   }
 
   private isLinting = false;
+  private lintTrigger?: () => void;
 
   setLintTrigger(fn: () => void): void {
     this.lintTrigger = fn;

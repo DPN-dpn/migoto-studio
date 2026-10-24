@@ -9,8 +9,8 @@ const plugin: MigotoPlugin = {
   activate(context: PluginContext) {
     // 에디터 커스텀 뷰어 등록
     context.editor.registerCustomViewer({
-      id: 'asset-viewer',
-      name: 'DDS / 텍스처 뷰어',
+      id: 'texture-library',
+      name: '텍스처 라이브러리',
       extensions: ['dds', 'png', 'jpg', 'jpeg', 'bmp', 'webp', 'gif'],
       render(container, file) {
         context.logger?.info(`텍스처 에셋 열림: ${file.name} (${Math.round(file.bytes.length / 1024)} KB)`);

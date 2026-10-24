@@ -112,7 +112,7 @@
   - **기본 3대 내장 플러그인 (`src/plugins/builtin/<plugin-id>/`)**:
     - 외부 플러그인과 동일한 규격(`plugin.json`, `index.ts`, `README.md`)으로 완전히 분리되어 새 플러그인 제작 시 모범 참조 예제 역할을 수행합니다.
     1. **Python Runner (`python-runner`)**: 인라인 코드/스크립트 파일 실행, 실시간 stdin/stdout 콘솔 출력, 에디터 커서 결과 삽입. (`src/plugins/builtin/python-runner/`)
-    2. **Asset Viewer (`asset-viewer` v1.1.0)**: 외부 의존성 없는 자체 순수 TS 디코더로 BC1~BC7, DX10 확장 헤더, sRGB/Linear 실시간 감마 전환 및 채널 필터링 지원 체커보드 캔버스 렌더링. (`src/plugins/builtin/asset-viewer/`)
+    2. **Texture Library (`texture-library` v1.3.0)**: 외부 의존성 없는 자체 순수 TS 디코더로 BC1~BC7, DX10 확장 헤더, sRGB/Linear 실시간 감마 전환 및 채널 필터링 지원 체커보드 캔버스 렌더링. (`default-plugins/texture-library/`)
     3. **AI Assistant (`ai-assistant`)**: OpenAI/Ollama 호환 엔드포인트 대화형 모딩 어시스턴트, 코드 원클릭 삽입. (`src/plugins/builtin/ai-assistant/`)
   - **UI 통합 (`src/plugin-panel.ts`, `index.html`, `src/activitybar.ts`)**:
     - 좌측 액티비티 바 4번째 탭 `act-plugins` (`Ctrl+Shift+X`).

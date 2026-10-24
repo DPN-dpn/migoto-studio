@@ -6,7 +6,7 @@ import { existsSync } from 'node:fs';
 const plugins = [
   'custom-lint',
   'zzmi-support',
-  'asset-viewer',
+  'texture-library',
   'python-runner',
   'ai-assistant',
 ];
@@ -14,7 +14,7 @@ const plugins = [
 const webCompatiblePlugins = [
   'custom-lint',
   'zzmi-support',
-  'asset-viewer',
+  'texture-library',
   'ai-assistant',
 ];
 

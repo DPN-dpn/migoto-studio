@@ -1,4 +1,4 @@
-//#region default-plugins/asset-viewer/dxt-decoder.ts
+//#region default-plugins/texture-library/dxt-decoder.ts
 /**
 * dxt-decoder.ts
 * BC1(DXT1), BC2(DXT3), BC3(DXT5), BC4, BC5 및 비압축(RGBA/BGRA/BGR) 텍스처 디코더
@@ -279,7 +279,7 @@ function decodeBGR24(src, offset, width, height, dest) {
 	}
 }
 //#endregion
-//#region default-plugins/asset-viewer/bc7-decoder.ts
+//#region default-plugins/texture-library/bc7-decoder.ts
 /**
 * bc7-decoder.ts
 * BC7 (DirectX 11 Block Compression 7) 텍스처 디코더 - Modes 0 to 7
@@ -2964,7 +2964,7 @@ function unpackBC7Mode6(lowChunk, highChunk, outPixels) {
 	}
 }
 //#endregion
-//#region default-plugins/asset-viewer/dds-decoder.ts
+//#region default-plugins/texture-library/dds-decoder.ts
 /**
 * dds-decoder.ts
 * Zero-dependency pure TypeScript DDS (DirectDraw Surface) texture decoder.
@@ -3149,7 +3149,7 @@ function decodeDDS(buffer) {
 	};
 }
 //#endregion
-//#region default-plugins/asset-viewer/image-viewer.ts
+//#region default-plugins/texture-library/image-viewer.ts
 var SRGB_TO_LINEAR_LUT = /* @__PURE__ */ new Uint8Array(256);
 var LINEAR_TO_SRGB_LUT = /* @__PURE__ */ new Uint8Array(256);
 for (let i = 0; i < 256; i++) {
@@ -3160,7 +3160,7 @@ for (let i = 0; i < 256; i++) {
 	LINEAR_TO_SRGB_LUT[i] = Math.round(Math.min(1, Math.max(0, srgb)) * 255);
 }
 /**
-* Interactive Image / Texture Viewer component for plugins (e.g. asset-viewer).
+* Interactive Image / Texture Viewer component for plugins (e.g. texture-library).
 * Supports DDS (BC1, BC2, BC3, BC4, BC5, BC7, RGBA) and standard web images (PNG, JPG, BMP, WebP).
 * Features color space modes (sRGB, Linear, Raw), channel inspection (RGBA, RGB, R, G, B, A),
 * checkerboard transparency, smooth pan/drag, zoom (wheel & buttons), and format metadata.
@@ -3579,7 +3579,7 @@ var ImageViewer = class {
 	}
 };
 //#endregion
-//#region default-plugins/asset-viewer/index.ts
+//#region default-plugins/texture-library/index.ts
 /**
 * DDS 및 이미지 에셋 뷰어 플러그인
 * 탐색기에서 지원되는 이미지 확장자 클릭 시 에디터 탭 내에서 인터랙티브 캔버스 뷰어로 엽니다.
@@ -3587,8 +3587,8 @@ var ImageViewer = class {
 var plugin = {
 	activate(context) {
 		context.editor.registerCustomViewer({
-			id: "asset-viewer",
-			name: "DDS / 텍스처 뷰어",
+			id: "texture-library",
+			name: "텍스처 라이브러리",
 			extensions: [
 				"dds",
 				"png",

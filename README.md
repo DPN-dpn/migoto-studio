@@ -40,7 +40,7 @@ XXMI / 3DMigoto `.ini` 파일을 위한 가벼운 에디터입니다.
     - 자세한 플러그인 제작 방법과 API 레퍼런스는 [docs/PLUGIN_API.md](docs/PLUGIN_API.md)를 참고하세요.
   - **기본 내장 플러그인 탑재**:
     1. **🐍 Python 스크립트 실행기 (`python-runner`)**: 외부 콘솔 창 깜빡임 없이 파이썬 코드/스크립트를 백그라운드에서 실행하고, 결과 콘솔 출력 확인 및 실행 결과를 현재 에디터 커서에 바로 삽입할 수 있습니다.
-    2. **DDS / 텍스처 뷰어 (`asset-viewer` v1.1.1)**: 외부 프로그램 없이 순수 자체 디코더로 현대 게임 규격인 BC7(Modes 0~7), DX10 확장 헤더, BC1~BC5 포맷, 실시간 sRGB/Linear 감마 변환 및 RGBA 채널 격리 필터를 완벽 지원하며, DirectDraw Surface(`.dds`) 및 PNG 이미지를 체커보드 캔버스에 즉시 시각화합니다.
+    2. **텍스처 라이브러리 (`texture-library` v1.3.0)**: 외부 프로그램 없이 순수 자체 디코더로 현대 게임 규격인 BC7(Modes 0~7), DX10 확장 헤더, BC1~BC5 포맷, 실시간 sRGB/Linear 감마 변환 및 RGBA 채널 격리 필터를 완벽 지원하며, DirectDraw Surface(`.dds`) 및 PNG 이미지를 체커보드 캔버스에 즉시 시각화합니다.
     3. **🤖 AI 어시스턴트 / 모딩 에이전트 연동 (`ai-assistant`)**: OpenAI, 로컬 Ollama, vLLM 등 호환 엔드포인트를 연결하여 대화형으로 INI 모딩 문법을 질문하거나 복잡한 모딩 코드를 생성받고, 원클릭으로 에디터에 삽입할 수 있습니다.
 - **코드 템플릿 패널 및 사용자 정의 템플릿 (Snippets)**:
   - 자주 쓰는 INI 섹션(KeyToggle, TextureOverride 등) 및 조건문(if/else)을 탐색하고 클릭 한 번으로 에디터에 삽입할 수 있습니다.

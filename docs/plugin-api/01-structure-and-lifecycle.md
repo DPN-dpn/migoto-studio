@@ -44,7 +44,7 @@ my-advanced-plugin/
   "main": "index.js",
   "dependencies": {
     "shared-lib": "^1.0.0",
-    "asset-viewer": "https://github.com/owner/asset-viewer#>=1.2.0"
+    "texture-library": "https://github.com/owner/texture-library#>=1.2.0"
   }
 }
 ```

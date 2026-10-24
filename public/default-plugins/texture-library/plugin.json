@@ -1,6 +1,6 @@
 {
-  "id": "asset-viewer",
-  "name": "DDS / 텍스처 뷰어",
+  "id": "texture-library",
+  "name": "텍스처 라이브러리",
   "version": "1.3.0",
   "description": "탐색기에서 DDS/PNG/JPG 에셋 클릭 시 에디터 탭에서 인터랙티브 캔버스 뷰어로 고해상도 미리보기를 제공합니다. (BC1-BC7, sRGB/Linear, 채널 필터링 지원)",
   "author": "Migoto Studio",

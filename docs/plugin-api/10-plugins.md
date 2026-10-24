@@ -46,8 +46,8 @@ const unlisten = context.plugins.onDidChangePlugins((event) => {
   switch (event.action) {
     case 'activated':
       // 특정 플러그인이 활성화되었을 때 연동 설정 활성화
-      if (event.pluginId === 'asset-viewer') {
-        context.logger.info('3D 에셋 뷰어가 활성화되어 연동 기능을 준비합니다.');
+      if (event.pluginId === 'texture-library') {
+        context.logger.info('텍스처 라이브러리가 활성화되어 연동 기능을 준비합니다.');
       }
       break;
 
