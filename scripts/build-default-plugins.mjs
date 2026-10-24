@@ -103,9 +103,13 @@ async function buildDefaultPlugins() {
     resolve(rootDir, 'public/default-plugins', 'resource-checker'),
     resolve(rootDir, 'src-tauri/default-plugins', 'resource-checker'),
     resolve(rootDir, 'data/plugins', 'resource-checker'),
+    resolve(rootDir, 'public/default-plugins', 'asset-viewer'),
+    resolve(rootDir, 'src-tauri/default-plugins', 'asset-viewer'),
+    resolve(rootDir, 'data/plugins', 'asset-viewer'),
   ];
   if (process.env.APPDATA) {
     pruneDirs.push(resolve(process.env.APPDATA, 'MigotoStudio', 'plugins', 'resource-checker'));
+    pruneDirs.push(resolve(process.env.APPDATA, 'MigotoStudio', 'plugins', 'asset-viewer'));
   }
   for (const dir of pruneDirs) {
     if (existsSync(dir)) {

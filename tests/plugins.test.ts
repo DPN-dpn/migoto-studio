@@ -166,6 +166,13 @@ test('builtin plugins activate with expected behavior', () => {
     },
     workspace: { getCurrentFolder: () => null, readBinaryFile: async () => new Uint8Array() },
     storage: { get: () => null, set: () => {} },
+    plugins: {
+      registerApi: () => {},
+      getPluginApi: () => undefined,
+      hasPluginApi: () => false,
+      checkDependencies: () => [],
+      installDependency: async () => false,
+    },
   };
 
   const py = BUILTIN_PLUGINS.find((p) => p.manifest.id === 'python-runner')!;

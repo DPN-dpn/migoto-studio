@@ -68,6 +68,48 @@ pub fn plugins_dir() -> PathBuf {
     );
   }
 
+  // Auto-prune legacy "asset-viewer" folder and ensure "texture-library" is freshly installed
+  let legacy_asset_viewer = p.join("asset-viewer");
+  let had_legacy_asset = legacy_asset_viewer.exists();
+  if had_legacy_asset {
+    let _ = fs::remove_dir_all(&legacy_asset_viewer);
+  }
+
+  let texture_lib_dir = p.join("texture-library");
+  let need_reinstall_texture = had_legacy_asset || !texture_lib_dir.exists() || {
+    let bundled_manifest = include_str!("../default-plugins/texture-library/plugin.json");
+    let installed_manifest_file = texture_lib_dir.join("plugin.json");
+    if let Ok(content) = fs::read_to_string(&installed_manifest_file) {
+      let b_val: Option<String> = serde_json::from_str::<serde_json::Value>(bundled_manifest)
+        .ok()
+        .and_then(|v| v.get("version").and_then(|s| s.as_str()).map(|s| s.to_string()));
+      let i_val: Option<String> = serde_json::from_str::<serde_json::Value>(&content)
+        .ok()
+        .and_then(|v| v.get("version").and_then(|s| s.as_str()).map(|s| s.to_string()));
+      match (b_val, i_val) {
+        (Some(b), Some(i)) => b != i,
+        _ => false,
+      }
+    } else {
+      true
+    }
+  };
+
+  if need_reinstall_texture {
+    if texture_lib_dir.exists() {
+      let _ = fs::remove_dir_all(&texture_lib_dir);
+    }
+    let _ = fs::create_dir_all(&texture_lib_dir);
+    let _ = fs::write(
+      texture_lib_dir.join("plugin.json"),
+      include_str!("../default-plugins/texture-library/plugin.json"),
+    );
+    let _ = fs::write(
+      texture_lib_dir.join("plugin.js"),
+      include_str!("../default-plugins/texture-library/plugin.js"),
+    );
+  }
+
   p
 }
 
@@ -372,7 +414,7 @@ pub fn list_disk_plugins() -> Result<Vec<PluginDiskInfo>, String> {
         };
 
         let id = p.file_name().unwrap_or_default().to_string_lossy().to_string();
-        if id == "resource-checker" {
+        if id == "resource-checker" || id == "asset-viewer" {
           continue;
         }
 

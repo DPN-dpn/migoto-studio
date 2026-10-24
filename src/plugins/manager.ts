@@ -666,6 +666,17 @@ export class PluginManager {
       } catch {}
     }
 
+    // Migrate saved state from legacy 'asset-viewer' to 'texture-library'
+    if (savedStates['asset-viewer'] !== undefined) {
+      if (savedStates['texture-library'] === undefined) {
+        savedStates['texture-library'] = savedStates['asset-viewer'];
+      }
+      delete savedStates['asset-viewer'];
+      try {
+        localStorage.setItem(STORAGE_ENABLED_PLUGINS, JSON.stringify(savedStates));
+      } catch {}
+    }
+
     for (const p of this.plugins.values()) {
       try {
         p.cleanup?.();
@@ -734,6 +745,18 @@ export class PluginManager {
               await platform().deleteEntry!(disk.path || disk.id);
             } catch (err) {
               console.warn('[plugins] Failed to prune legacy resource-checker folder:', err);
+            }
+          }
+          continue;
+        }
+
+        // Prune legacy asset-viewer plugin if still present on disk
+        if (disk.id === 'asset-viewer' || disk.path.toLowerCase().endsWith('asset-viewer')) {
+          if (platform().deleteEntry) {
+            try {
+              await platform().deleteEntry!(disk.path || disk.id);
+            } catch (err) {
+              console.warn('[plugins] Failed to prune legacy asset-viewer folder:', err);
             }
           }
           continue;

@@ -1,5 +1,6 @@
 import type { PluginContext, MigotoPlugin } from '../../src/plugins/types.ts';
 import { ImageViewer } from './image-viewer.ts';
+import { decodeDDS } from './dds-decoder.ts';
 
 /**
  * DDS 및 이미지 에셋 뷰어 플러그인
@@ -7,6 +8,13 @@ import { ImageViewer } from './image-viewer.ts';
  */
 const plugin: MigotoPlugin = {
   activate(context: PluginContext) {
+    // 공개 API 등록 (타 플러그인에서 getPluginApi('texture-library')로 접근 가능)
+    const api = {
+      decodeDDS,
+      ImageViewer,
+    };
+    context.plugins?.registerApi?.(api);
+
     // 에디터 커스텀 뷰어 등록
     context.editor.registerCustomViewer({
       id: 'texture-library',
@@ -23,6 +31,8 @@ const plugin: MigotoPlugin = {
         return () => viewer.dispose();
       },
     });
+
+    return api;
   },
   deactivate() {},
 };

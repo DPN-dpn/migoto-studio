@@ -3586,6 +3586,11 @@ var ImageViewer = class {
 */
 var plugin = {
 	activate(context) {
+		const api = {
+			decodeDDS,
+			ImageViewer
+		};
+		context.plugins?.registerApi?.(api);
 		context.editor.registerCustomViewer({
 			id: "texture-library",
 			name: "텍스처 라이브러리",
@@ -3609,6 +3614,7 @@ var plugin = {
 				return () => viewer.dispose();
 			}
 		});
+		return api;
 	},
 	deactivate() {}
 };
