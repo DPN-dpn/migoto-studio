@@ -99,7 +99,6 @@ export class SlotMatchingPanel {
     header.className = 'slot-panel-header';
     header.innerHTML = `
       <div class="slot-header-title">
-        <span class="slot-header-icon">🧩</span>
         <span class="slot-header-text">모델/텍스처 슬롯 매칭</span>
       </div>
       <div class="slot-header-actions">
@@ -176,7 +175,7 @@ export class SlotMatchingPanel {
 
       const matchedHeader = document.createElement('div');
       matchedHeader.className = 'slot-group-title';
-      matchedHeader.innerHTML = `<span>✨ 모델 슬롯 및 매칭 텍스처 (${matchedCount})</span>`;
+      matchedHeader.innerHTML = `<span>모델 슬롯 및 매칭 텍스처 (${matchedCount})</span>`;
       matchedGroup.appendChild(matchedHeader);
 
       for (const slot of slots) {
@@ -456,6 +455,6 @@ export class SlotMatchingPanel {
         this.editor.focus();
         flashLineHighlight(this.editor, line);
       }
-    } catch {}
+    } catch { }
   }
 }
