@@ -91,6 +91,8 @@ export class DocumentManager {
   private untitledSeq = 0;
   private listeners = new Set<() => void>();
   private resetListeners = new Set<(event: { reason: 'folder_closed' | 'folder_changed' | 'reset' }) => void>();
+  private saveListeners = new Set<(file: { path: string; name: string }) => void>();
+  private closeTabListeners = new Set<(tab: { tabId: string; filePath: string | null; title: string }) => void>();
   private beforeSwitchHandlers = new Set<(fromTabId: string, toTabId: string) => void>();
   private viewerProvider?: CustomViewerProvider;
   private diffViewer?: DiffViewerHandler;
@@ -164,6 +166,26 @@ export class DocumentManager {
   onDidResetWorkspace(listener: (event: { reason: 'folder_closed' | 'folder_changed' | 'reset' }) => void): () => void {
     this.resetListeners.add(listener);
     return () => this.resetListeners.delete(listener);
+  }
+
+  onDidSaveFile(listener: (file: { path: string; name: string }) => void): () => void {
+    this.saveListeners.add(listener);
+    return () => this.saveListeners.delete(listener);
+  }
+
+  notifyFileSaved(path: string, name: string): void {
+    this.saveListeners.forEach((l) => {
+      try {
+        l({ path, name });
+      } catch (err) {
+        console.warn('[DocumentManager] saveListener error:', err);
+      }
+    });
+  }
+
+  onDidCloseTab(listener: (tab: { tabId: string; filePath: string | null; title: string }) => void): () => void {
+    this.closeTabListeners.add(listener);
+    return () => this.closeTabListeners.delete(listener);
   }
 
   onBeforeSwitchTab(handler: (fromTabId: string, toTabId: string) => void): () => void {
@@ -466,9 +488,22 @@ export class DocumentManager {
       target.diffInfo.modifiedModel.dispose();
     }
 
+    const closedTabInfo = {
+      tabId: target.id,
+      filePath: target.file ? target.file.id : null,
+      title: target.title,
+    };
+
     const wasActive = target.id === this.activeTabId;
     this.tabs.splice(idx, 1);
     target.model.dispose();
+    this.closeTabListeners.forEach((l) => {
+      try {
+        l(closedTabInfo);
+      } catch (err) {
+        console.warn('[DocumentManager] closeTabListener error:', err);
+      }
+    });
     appLogger.debug('File', `탭 닫힘: ${target.title}`);
 
     if (this.tabs.length === 0) {
@@ -843,6 +878,7 @@ export class DocumentManager {
       tab.savedVersion = tab.model.getAlternativeVersionId();
       await this.rememberRecent(ref);
       this.emit();
+      this.notifyFileSaved(ref.id, ref.name);
       appLogger.info('File', `파일 저장 완료: ${ref.name} (${tab.encoding})`);
       return true;
     } catch (e) {

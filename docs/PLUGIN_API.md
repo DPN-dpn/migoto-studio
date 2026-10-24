@@ -1145,6 +1145,13 @@ const modeGroup = context.ui.createChipGroup({
 // 동적 제어
 tagGroup.setValue(['head']);
 console.log(tagGroup.getValue()); // ['head']
+
+// 에디터 테마 조회 및 변경 감지 ('dark' | 'light')
+const theme = context.ui.getTheme();
+const unlistenTheme = context.ui.onDidChangeTheme(({ theme }) => {
+  console.log('테마 변경됨:', theme);
+});
+// unlistenTheme();
 ```
 
 ---
@@ -1342,6 +1349,18 @@ const unlistenClear = context.workspace.onDidClearMemory(({ reason }) => {
   myPluginCache.clear();
 });
 // unlistenClear();
+
+// 파일 저장 완료 감지 (에디터 Ctrl+S 저장 또는 플러그인 파일 쓰기 시)
+const unlistenSave = context.workspace.onDidSaveFile(({ path, name }) => {
+  console.log('파일 저장 완료:', name, path);
+});
+// unlistenSave();
+
+// 에디터 탭 닫힘 감지 (닫힌 탭 ID, 연결 파일 경로, 제목 전달)
+const unlistenCloseTab = context.workspace.onDidCloseTab(({ tabId, filePath, title }) => {
+  console.log('탭 닫힘:', title, filePath);
+});
+// unlistenCloseTab();
 ```
 
 ---

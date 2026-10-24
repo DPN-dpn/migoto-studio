@@ -424,6 +424,10 @@ export interface PluginContext {
     onDidChangeActiveFile(listener: (file: { name: string; path: string; location: string } | null) => void): () => void;
     /** 작업 폴더가 열리거나 닫힐 때 발생하는 이벤트 (열렸을 때 절대 경로 string, 닫혔을 때 null) */
     onDidChangeActiveFolder(listener: (folder: string | null) => void): () => void;
+    /** 파일 저장이 완료되었을 때 발생하는 이벤트 (저장된 파일의 절대 경로와 파일명 전달) */
+    onDidSaveFile(listener: (file: { path: string; name: string }) => void): () => void;
+    /** 에디터 탭이 닫혔을 때 발생하는 이벤트 (닫힌 탭 ID, 파일 경로, 탭 제목 전달) */
+    onDidCloseTab(listener: (tab: { tabId: string; filePath: string | null; title: string }) => void): () => void;
     /** 모드 폴더 닫기/변경 또는 작업 영역 초기화로 메모리가 제거될 때 발생하는 이벤트 (플러그인 자체 캐시/메모리 정리용) */
     onDidClearMemory(listener: (event: { reason: 'folder_closed' | 'folder_changed' | 'reset' }) => void): () => void;
     /** onDidClearMemory의 별칭 (작업 영역 탭 및 메모리 초기화 감지) */
@@ -544,6 +548,10 @@ export interface PluginContext {
     prompt(options: PromptOptions): Promise<string | null>;
     openSubWindow(options: SubWindowOptions): SubWindowHandle;
     openNativeWindow(options: NativeWindowOptions): Promise<NativeWindowHandle>;
+    /** 현재 에디터 테마 조회 ('dark' | 'light') */
+    getTheme(): 'dark' | 'light';
+    /** 에디터 테마 변경 시 발생하는 이벤트 ('dark' | 'light') */
+    onDidChangeTheme(listener: (event: { theme: 'dark' | 'light' }) => void): () => void;
   } & PluginUIBuilder;
 
   // ---- System execution (desktop) ----

@@ -8,6 +8,7 @@ import type { DocumentManager } from '../core/workspace/documents';
 import type { FileExplorer } from '../ui/panels/explorer';
 import { openModal } from '../ui/modals/modal';
 import { showToast } from '../ui/common/toast';
+import { getSettings, onSettingsChange } from '../core/workspace/settings';
 import {
   flashLineHighlight,
   setCustomDefinitionResolver,
@@ -1324,6 +1325,7 @@ export default {
         writeTextFile: async (path: string, text: string) => {
           const ref = platform().refFromId(path);
           await platform().writeFile(ref, text, 'utf-8', { enabled: false, keepDays: 0, maxPerFile: 0 });
+          this.doc.notifyFileSaved(path, ref.name);
         },
         readBinaryFile: async (path: string) => {
           if (platform().readBinaryFile) {
@@ -1377,6 +1379,16 @@ export default {
           const unlisten = (this.explorer as any).onDidChangeFolder((folder: any) => {
             listener(folder ? folder.id : null);
           });
+          callbacks.onRegisterCleanup(unlisten);
+          return unlisten;
+        },
+        onDidSaveFile: (listener: (file: { path: string; name: string }) => void) => {
+          const unlisten = this.doc.onDidSaveFile(listener);
+          callbacks.onRegisterCleanup(unlisten);
+          return unlisten;
+        },
+        onDidCloseTab: (listener: (tab: { tabId: string; filePath: string | null; title: string }) => void) => {
+          const unlisten = this.doc.onDidCloseTab(listener);
           callbacks.onRegisterCleanup(unlisten);
           return unlisten;
         },
@@ -1923,6 +1935,21 @@ export default {
         },
         openNativeWindow: (options: NativeWindowOptions) => {
           return nativeWindowManager.openNativeWindow(manifest.id, options, callbacks.onRegisterCleanup);
+        },
+        getTheme: (): 'dark' | 'light' => {
+          return getSettings().theme || 'dark';
+        },
+        onDidChangeTheme: (listener: (event: { theme: 'dark' | 'light' }) => void) => {
+          let lastTheme = getSettings().theme || 'dark';
+          const unlisten = onSettingsChange((s) => {
+            const currentTheme = s.theme || 'dark';
+            if (currentTheme !== lastTheme) {
+              lastTheme = currentTheme;
+              listener({ theme: currentTheme });
+            }
+          });
+          callbacks.onRegisterCleanup(unlisten);
+          return unlisten;
         },
       },
 

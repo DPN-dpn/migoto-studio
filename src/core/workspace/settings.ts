@@ -111,8 +111,11 @@ export async function loadSettings(): Promise<Settings> {
 
 export const getSettings = () => current;
 
-export function onSettingsChange(fn: (s: Settings) => void) {
+export function onSettingsChange(fn: (s: Settings) => void): () => void {
   listeners.add(fn);
+  return () => {
+    listeners.delete(fn);
+  };
 }
 
 export async function updateSettings(patch: Partial<Settings>) {

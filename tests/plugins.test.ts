@@ -1075,6 +1075,82 @@ test('Plugin Workspace API onDidClearMemory and onDidResetWorkspace fire on work
   assert.equal(resetListeners.length, 0);
 });
 
+test('Plugin Workspace and UI event APIs (onDidSaveFile, onDidCloseTab, onDidChangeTheme) contract works properly', () => {
+  let savedFile: any = null;
+  let closedTab: any = null;
+  let currentTheme: string | null = null;
+
+  const saveListeners: Array<(e: any) => void> = [];
+  const closeTabListeners: Array<(e: any) => void> = [];
+  const settingsListeners: Array<(s: any) => void> = [];
+
+  let mockSettings = { theme: 'dark' };
+
+  const context: any = {
+    workspace: {
+      onDidSaveFile: (listener: (file: any) => void) => {
+        saveListeners.push(listener);
+        return () => {
+          const idx = saveListeners.indexOf(listener);
+          if (idx !== -1) saveListeners.splice(idx, 1);
+        };
+      },
+      onDidCloseTab: (listener: (tab: any) => void) => {
+        closeTabListeners.push(listener);
+        return () => {
+          const idx = closeTabListeners.indexOf(listener);
+          if (idx !== -1) closeTabListeners.splice(idx, 1);
+        };
+      },
+    },
+    ui: {
+      getTheme: () => mockSettings.theme,
+      onDidChangeTheme: (listener: (event: { theme: string }) => void) => {
+        let lastTheme = mockSettings.theme;
+        const handler = (s: any) => {
+          if (s.theme !== lastTheme) {
+            lastTheme = s.theme;
+            listener({ theme: s.theme });
+          }
+        };
+        settingsListeners.push(handler);
+        return () => {
+          const idx = settingsListeners.indexOf(handler);
+          if (idx !== -1) settingsListeners.splice(idx, 1);
+        };
+      },
+    },
+  };
+
+  const unlistenSave = context.workspace.onDidSaveFile((f: any) => { savedFile = f; });
+  const unlistenClose = context.workspace.onDidCloseTab((t: any) => { closedTab = t; });
+  const unlistenTheme = context.ui.onDidChangeTheme((e: any) => { currentTheme = e.theme; });
+
+  assert.equal(context.ui.getTheme(), 'dark');
+
+  // Trigger save
+  saveListeners.forEach((l) => l({ path: 'd:/mods/test.ini', name: 'test.ini' }));
+  assert.deepEqual(savedFile, { path: 'd:/mods/test.ini', name: 'test.ini' });
+
+  // Trigger close tab
+  closeTabListeners.forEach((l) => l({ tabId: 'tab_1', filePath: 'd:/mods/test.ini', title: 'test.ini' }));
+  assert.deepEqual(closedTab, { tabId: 'tab_1', filePath: 'd:/mods/test.ini', title: 'test.ini' });
+
+  // Trigger theme change
+  mockSettings = { theme: 'light' };
+  settingsListeners.forEach((l) => l(mockSettings));
+  assert.equal(currentTheme, 'light');
+  assert.equal(context.ui.getTheme(), 'light');
+
+  // Unlisten
+  unlistenSave();
+  unlistenClose();
+  unlistenTheme();
+  assert.equal(saveListeners.length, 0);
+  assert.equal(closeTabListeners.length, 0);
+  assert.equal(settingsListeners.length, 0);
+});
+
 test('Plugin INI API extractSymbols parses symbols cleanly', () => {
   const sampleIni = `
 [Constants]
