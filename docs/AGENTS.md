@@ -40,8 +40,8 @@
    - 워크스페이스 전역 검색은 `context.workspace.search`, 고속 glob 파일 탐색은 `context.workspace.findFiles('**/*.ini')`, 작업 폴더 실시간 감지는 `context.workspace.onDidChangeActiveFolder`, 탭 제어는 `context.workspace.getOpenTabs / focusTab / closeTab`, 안전 백업은 `context.workspace.createBackup`을 활용하세요.
 6. 로깅 및 디버깅:
    - 플러그인 동작 상태나 오류, 디버그 정보는 브라우저 console 대신 `context.logger`(`info`, `warn`, `error`, `debug`)를 사용하면 에디터 하단 [출력 콘솔](Ctrl+`)에 플러그인 태그와 함께 실시간 출력됩니다.
-7. API 상세 레퍼런스:
-   - 플러그인 개발 시 사용할 수 있는 모든 `context.*` API의 상세 시그니처, 매개변수 및 예제는 [`docs/PLUGIN_API.md`](./PLUGIN_API.md)를 반드시 참조하세요.
+7. API 상세 레퍼런스 및 토큰 절약:
+   - 플러그인 개발 시 토큰 절약을 위해 전체 문서를 넘길 필요 없이, 본 `AGENTS.md` 지침서와 플러그인이 실제로 사용하는 [`docs/plugin-api/`](./plugin-api/README.md)의 해당 도메인 모듈 문서만 첨부하세요. 전체 마스터 허브는 [`docs/PLUGIN_API.md`](./PLUGIN_API.md)에서 확인할 수 있습니다.
 
 자세한 아키텍처 규칙, 권장 개발 지침 및 템플릿은 아래 내용을 엄격히 준수하세요.
 ```
@@ -112,21 +112,21 @@ export default {
 Migoto Studio 플러그인은 `activate(context)` 함수로 전달되는 `PluginContext` 객체를 통해 에디터의 모든 기능과 상호작용합니다.
 
 > [!IMPORTANT]
-> **공식 API 상세 레퍼런스 문서 안내 (`PLUGIN_API.md`)**
-> 각 네임스페이스별 모든 메서드의 상세 시그니처, 파라미터 타입, 반환값 및 실행 예제는 공식 레퍼런스 문서인 **[`docs/PLUGIN_API.md`](./PLUGIN_API.md)**에 완전하게 수록되어 있습니다.
-> 코드를 작성할 때는 `AGENTS.md`의 아키텍처 규칙과 템플릿을 따르되, 구체적인 API 명세는 반드시 `PLUGIN_API.md`를 참조하세요.
+> **모듈형 API 상세 레퍼런스 문서 안내 (`docs/plugin-api/`)**
+> 각 네임스페이스별 모든 메서드의 상세 시그니처, 파라미터 타입, 반환값 및 실행 예제는 모듈화된 [**`docs/plugin-api/`**](./plugin-api/README.md) 디렉터리에 분할 수록되어 있습니다.  
+> 코드를 작성하거나 외부 AI에게 프롬프트를 전달할 때는 `AGENTS.md`의 아키텍처 규칙을 따르되, **필요한 도메인의 모듈 문서만 선별 첨부하여 토큰을 절약**하세요.
 
 ### 주요 API 네임스페이스 개요
 
-| 네임스페이스 | 주요 역할 및 핵심 기능 | 상세 레퍼런스 문서 |
-| :--- | :--- | :--- |
-| **`context.ui`** | • 선언형 폼 탭(`openFormTab`), 커스텀 에디터 탭(`openTab`), 독립 서브 윈도우(`openSubWindow` - 크기/리사이즈/3대 포커스 모드 지원)<br>• 에디터 테마 조회 및 변경 감지(`getTheme`, `onDidChangeTheme`)<br>• 상단 툴바 메뉴 등록(`registerMenuItem`), 사이드바 패널 등록(`registerSidebarView`)<br>• 확인/입력 모달(`confirm`, `prompt`), Diff 비교 탭(`openDiffTab`), 백업 복원 모달(`openRestoreModal`)<br>• 3DMigoto 키 바인딩 대화상자(`openKeyBindingModal`), 키 입력 위젯(`createKeyInput` - 실시간 감지/표시용 정제/인라인 검증)<br>• UI 빌더: 모든 위젯 표준 `.element` 및 `.getElement()`, 자동 언래핑(`toElement`)<br>• 상단 툴바(`createToolbar`), 상태 토글 버튼(`createToggleButton`), 컴팩트 셀렉트(`createSelect { variant: 'compact', prefix }`), 하단 상태표시줄(`createStatusBar`)<br>• 인라인 검증 상태(`setError`, `clearError`, `hasError`)<br>• 고수준 컴포넌트: 상태 배지(`createBadge`), 원클릭 복사 코드 블록(`createCodeBlock`), 리스트 아이템(`createListItem`)<br>• 레이아웃: 분할뷰(`createSplitView` - Flex/Split 100% 방어 내장), 탭(`createTabs`), 아코디언(`createCollapsible`), 세그먼트(`createSegmentedControl`), 검색창(`createSearchInput`), 숫자 스텝퍼(`createNumberInput`), 파일선택기(`createFilePicker`), 드롭존(`createDropZone`), 툴팁(`attachTooltip`), 카드, 테이블, 콘솔 등 | [`PLUGIN_API.md#3-ui-api-contextui`](./PLUGIN_API.md#3-ui-api-contextui) |
-| **`context.ini`** | • 3DMigoto/XXMI 문법 파싱 및 섹션 자동 분류(`parse`, `classifySection`)<br>• 기존 주석 및 배치 보존 스마트 섹션 갱신(`upsertSection`) 및 삭제(`deleteSection`)<br>• 토글 키 섹션 텍스트 생성(`formatKeyToggle`), 단축키 파싱 및 조합(`parseKeyBinding`, `formatKeyBinding`)<br>• 화면 표시용 단축키 텍스트 정제(`formatDisplayKey` - 부정키 제거 및 배지 표기)<br>• 다중 동일 키(`drawindexed = auto`), `if-endif` 블록, 주석 보존 Raw 조작(`getSectionRaw`, `setSectionRaw`, `parseSectionLines`)<br>• 변수, 리소스, CommandList 고속 심볼 추출(`extractSymbols`), 스마트 병합(`merge`) | [`PLUGIN_API.md#4-ini-문서-파싱-및-조작-api-contextini`](./PLUGIN_API.md#4-ini-문서-파싱-및-조작-api-contextini) |
-| **`context.editor`** | • 현재 열린 활성 파일의 텍스트 읽기/쓰기(`getText`, `setText`) — Monaco 실행 취소(`Ctrl+Z`) 이력 완벽 보존<br>• 커서 위치 조회/이동(`getCursor`, `setCursor`), 선택 영역 교체(`replaceSelection`), 텍스트 삽입(`insertText`)<br>• 에디터 우클릭 컨텍스트 메뉴 등록(`registerContextMenuAction`), 텍스트 변경 이벤트 감지<br>• **인라인 변경 제안(`proposeChanges`)**: 에디터 내에서 변경 사항을 인라인으로 대조하고 수락/되돌리기를 검토할 수 있는 API | [`PLUGIN_API.md#6-에디터-제어-contexteditor`](./PLUGIN_API.md#6-에디터-제어-contexteditor) |
-| **`context.workspace`** | • 활성 파일/작업 폴더 정보(`getCurrentFile`, `getCurrentFolder`), 파일 열기 및 저장(`openFile`, `saveCurrentFile`)<br>• 활성 파일, 폴더 변경, 파일 저장, 탭 닫힘 및 메모리 해제 감지(`onDidChangeActiveFile`, `onDidChangeActiveFolder`, `onDidSaveFile`, `onDidCloseTab`, `onDidClearMemory`)<br>• 텍스트/바이너리 파일 I/O(`readTextFile`, `writeTextFile`, `readBinaryFile`, `writeBinaryFile`)<br>• 디렉터리 트리 순회(`readDirectory`), 워크스페이스 전역 텍스트 검색(`search`)<br>• 수정 전 안전 백업 생성(`createBackup`), 열린 탭 목록 조회/전환/닫기 제어(`getOpenTabs`, `focusTab`, `closeTab`) | [`PLUGIN_API.md#5-워크스페이스--파일-io-contextworkspace`](./PLUGIN_API.md#5-워크스페이스--파일-io-contextworkspace) |
-| **`context.linter`** | • 커스텀 INI 린트 규칙 등록(`registerRule`)<br>• 사후 진단 필터 등록(`registerDiagnosticFilter`)으로 프레임워크 전용 문법 보정<br>• 외부 플러그인 전용 허용 리소스 및 변수 화이트리스트 등록(`registerAllowedResource`, `registerAllowedVariable`) | [`PLUGIN_API.md`](./PLUGIN_API.md) |
-| **`context.storage`** | • 플러그인 ID별로 격리된 영구 설정 저장/조회/삭제(`get`, `set`, `remove`) | [`PLUGIN_API.md#7-영구-저장소-contextstorage`](./PLUGIN_API.md#7-영구-저장소-contextstorage) |
-| **`context.system`** | • 데스크톱 환경에서 외부 유틸리티 CLI 프로세스 비동기 실행(`exec`) | [`PLUGIN_API.md#8-시스템-프로세스-실행-contextsystem---데스크톱-전용`](./PLUGIN_API.md#8-시스템-프로세스-실행-contextsystem---데스크톱-전용) |
+| 네임스페이스 | 주요 역할 및 핵심 기능 | 모듈별 상세 레퍼런스 |
+| :--- | :--- | :---: |
+| **`context.ui`** | • 선언형 폼 탭(`openFormTab`), 커스텀 에디터 탭(`openTab`), 독립 서브 윈도우(`openSubWindow` - 크기/리사이즈/3대 포커스 모드 지원)<br>• 에디터 테마 조회 및 변경 감지(`getTheme`, `onDidChangeTheme`)<br>• 상단 툴바 메뉴 등록(`registerMenuItem`), 사이드바 패널 등록(`registerSidebarView`)<br>• 확인/입력 모달(`confirm`, `prompt`), Diff 비교 탭(`openDiffTab`), 백업 복원 모달(`openRestoreModal`)<br>• 3DMigoto 키 바인딩 대화상자(`openKeyBindingModal`), 키 입력 위젯(`createKeyInput` - 실시간 감지/표시용 정제/인라인 검증)<br>• UI 빌더: 모든 위젯 표준 `.element` 및 `.getElement()`, 자동 언래핑(`toElement`)<br>• 상단 툴바(`createToolbar`), 상태 토글 버튼(`createToggleButton`), 컴팩트 셀렉트(`createSelect { variant: 'compact', prefix }`), 하단 상태표시줄(`createStatusBar`)<br>• 인라인 검증 상태(`setError`, `clearError`, `hasError`)<br>• 고수준 컴포넌트: 상태 배지(`createBadge`), 원클릭 복사 코드 블록(`createCodeBlock`), 리스트 아이템(`createListItem`)<br>• 레이아웃: 분할뷰(`createSplitView` - Flex/Split 100% 방어 내장), 탭(`createTabs`), 아코디언(`createCollapsible`), 세그먼트(`createSegmentedControl`), 검색창(`createSearchInput`), 숫자 스텝퍼(`createNumberInput`), 파일선택기(`createFilePicker`), 드롭존(`createDropZone`), 툴팁(`attachTooltip`), 카드, 테이블, 콘솔 등 | [**02-ui.md**](./plugin-api/02-ui.md) |
+| **`context.ini`** | • 3DMigoto/XXMI 문법 파싱 및 섹션 자동 분류(`parse`, `classifySection`)<br>• 기존 주석 및 배치 보존 스마트 섹션 갱신(`upsertSection`) 및 삭제(`deleteSection`)<br>• 토글 키 섹션 텍스트 생성(`formatKeyToggle`), 단축키 파싱 및 조합(`parseKeyBinding`, `formatKeyBinding`)<br>• 화면 표시용 단축키 텍스트 정제(`formatDisplayKey` - 부정키 제거 및 배지 표기)<br>• 다중 동일 키(`drawindexed = auto`), `if-endif` 블록, 주석 보존 Raw 조작(`getSectionRaw`, `setSectionRaw`, `parseSectionLines`)<br>• 변수, 리소스, CommandList 고속 심볼 추출(`extractSymbols`), 스마트 병합(`merge`) | [**03-ini.md**](./plugin-api/03-ini.md) |
+| **`context.editor`** | • 현재 열린 활성 파일의 텍스트 읽기/쓰기(`getText`, `setText`) — Monaco 실행 취소(`Ctrl+Z`) 이력 완벽 보존<br>• 커서 위치 조회/이동(`getCursor`, `setCursor`), 선택 영역 교체(`replaceSelection`), 텍스트 삽입(`insertText`)<br>• 에디터 우클릭 컨텍스트 메뉴 등록(`registerContextMenuAction`), 텍스트 변경 이벤트 감지<br>• **인라인 변경 제안(`proposeChanges`)**: 에디터 내에서 변경 사항을 인라인으로 대조하고 수락/되돌리기를 검토할 수 있는 API | [**05-editor.md**](./plugin-api/05-editor.md) |
+| **`context.workspace`** | • 활성 파일/작업 폴더 정보(`getCurrentFile`, `getCurrentFolder`), 파일 열기 및 저장(`openFile`, `saveCurrentFile`)<br>• 활성 파일, 폴더 변경, 파일 저장, 탭 닫힘 및 메모리 해제 감지(`onDidChangeActiveFile`, `onDidChangeActiveFolder`, `onDidSaveFile`, `onDidCloseTab`, `onDidClearMemory`)<br>• 텍스트/바이너리 파일 I/O(`readTextFile`, `writeTextFile`, `readBinaryFile`, `writeBinaryFile`)<br>• 디렉터리 트리 순회(`readDirectory`), 워크스페이스 전역 텍스트 검색(`search`)<br>• 수정 전 안전 백업 생성(`createBackup`), 열린 탭 목록 조회/전환/닫기 제어(`getOpenTabs`, `focusTab`, `closeTab`) | [**04-workspace.md**](./plugin-api/04-workspace.md) |
+| **`context.linter`** | • 커스텀 INI 린트 규칙 등록(`registerRule`)<br>• 사후 진단 필터 등록(`registerDiagnosticFilter`)으로 프레임워크 전용 문법 보정<br>• 외부 플러그인 전용 허용 리소스 및 변수 화이트리스트 등록(`registerAllowedResource`, `registerAllowedVariable`) | [**07-linter-and-templates.md**](./plugin-api/07-linter-and-templates.md) |
+| **`context.storage`** | • 플러그인 ID별로 격리된 영구 설정 저장/조회/삭제(`get`, `set`, `remove`) | [**06-storage-and-system.md**](./plugin-api/06-storage-and-system.md) |
+| **`context.system`** | • 데스크톱 환경에서 외부 유틸리티 CLI 프로세스 비동기 실행(`exec`)<br>• 에디터 하단 콘솔 실시간 출력 로거(`context.logger`) | [**06-storage-and-system.md**](./plugin-api/06-storage-and-system.md) |
 
 ### UI 구성 시 권장 개발 가이드라인
 
