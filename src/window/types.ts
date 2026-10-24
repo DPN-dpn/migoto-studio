@@ -164,4 +164,6 @@ export interface NativeSubWindowContext {
     set(key: string, value: any): void;
     delete(key: string): void;
   };
+  /** 메인 창과 동기화된 3D 모델 및 텍스처 슬롯 API */
+  slots?: any;
 }

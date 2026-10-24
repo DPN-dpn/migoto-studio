@@ -69,6 +69,9 @@ export async function bootNativeWindow(params: URLSearchParams): Promise<void> {
   const userMessageListeners = new Set<(data: any) => void>();
 
   let initialData: any = undefined;
+  let cachedSlots: any[] = [];
+  let cachedDetectedFiles: string[] = [];
+  const slotListeners = new Set<(slots: any[]) => void>();
 
   channel.onmessage = (event) => {
     const msg = event.data;
@@ -81,6 +84,14 @@ export async function bootNativeWindow(params: URLSearchParams): Promise<void> {
         } catch (e) {
           console.error('[NativeSubWindow] listener error:', e);
         }
+      });
+    } else if (msg.type === 'SLOTS_UPDATE') {
+      cachedSlots = Array.isArray(msg.slots) ? msg.slots : [];
+      cachedDetectedFiles = Array.isArray(msg.detectedTextureFiles) ? msg.detectedTextureFiles : [];
+      slotListeners.forEach((l) => {
+        try {
+          l([...cachedSlots]);
+        } catch {}
       });
     } else if (msg.type === 'INIT_DATA' || msg.type === 'UPDATE_INITIAL_DATA') {
       initialData = msg.data;
@@ -348,10 +359,54 @@ export async function bootNativeWindow(params: URLSearchParams): Promise<void> {
         } catch {}
       },
     },
+    slots: {
+      getSlots: () => [...cachedSlots],
+      getSlot: (part: string) =>
+        cachedSlots.find((s) => s.part && s.part.toLowerCase() === part.toLowerCase()),
+      getDetectedTextureFiles: () => [...cachedDetectedFiles],
+      onDidChangeSlots: (listener: (slots: any[]) => void) => {
+        slotListeners.add(listener);
+        return () => slotListeners.delete(listener);
+      },
+      refreshSlots: async () => {
+        channel.postMessage({ type: 'REQUEST_REFRESH_SLOTS' });
+        return [...cachedSlots];
+      },
+      setPartMapping: (sectionName: string, part: string) => {
+        channel.postMessage({ type: 'SET_PART_MAPPING', sectionName, part });
+      },
+      setTextureSlot: (sectionName: string, slotId: string, textureFile: string, slotType?: any) => {
+        channel.postMessage({ type: 'SET_TEXTURE_SLOT', sectionName, slotId, textureFile, slotType });
+      },
+      removeTextureSlot: (sectionName: string, slotId: string) => {
+        channel.postMessage({ type: 'REMOVE_TEXTURE_SLOT', sectionName, slotId });
+      },
+      registerTextureSlotResolver: () => () => {},
+    },
   };
 
-  // 5. 메인 창에 준비 완료 알림
+  // 5. 메인 창에 준비 완료 알림 및 슬롯 데이터 수신 대기 (최대 150ms)
+  const waitForInitialSlots = new Promise<void>((resolve) => {
+    let resolved = false;
+    const timer = setTimeout(() => {
+      if (!resolved) {
+        resolved = true;
+        resolve();
+      }
+    }, 150);
+
+    const checkListener = () => {
+      if (!resolved && cachedSlots.length > 0) {
+        resolved = true;
+        clearTimeout(timer);
+        resolve();
+      }
+    };
+    slotListeners.add(checkListener);
+  });
+
   channel.postMessage({ type: 'WINDOW_READY' });
+  await waitForInitialSlots;
 
   // 6. 엔트리 스크립트 실행 (플러그인인 경우)
   if (platform().listDiskPlugins) {

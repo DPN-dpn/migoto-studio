@@ -2,6 +2,7 @@ import type { NativeWindowOptions, NativeWindowHandle, ActiveNativeWindowInfo } 
 import { isTauriEnvironment } from '../platform/index.ts';
 import { appLogger } from '../core/logger.ts';
 import { showToast } from '../ui/common/toast.ts';
+import { slotManager } from '../core/slots/slot-manager.ts';
 
 interface ActiveNativeWindow {
   fullId: string;
@@ -226,13 +227,31 @@ export class NativeWindowManager {
           }
         });
       } else if (msg.type === 'WINDOW_READY') {
-        // 서브 윈도우가 준비되면 초기 데이터 전송
+        // 서브 윈도우가 준비되면 초기 데이터 및 최신 슬롯 데이터 전송
         if (options.initialData !== undefined) {
           channel.postMessage({
             type: 'INIT_DATA',
             data: options.initialData,
           });
         }
+        channel.postMessage({
+          type: 'SLOTS_UPDATE',
+          slots: slotManager.getSlots(),
+          detectedTextureFiles: slotManager.getDetectedTextureFiles(),
+        });
+      } else if (msg.type === 'REQUEST_REFRESH_SLOTS') {
+        slotManager.reanalyzeIfPossible();
+        channel.postMessage({
+          type: 'SLOTS_UPDATE',
+          slots: slotManager.getSlots(),
+          detectedTextureFiles: slotManager.getDetectedTextureFiles(),
+        });
+      } else if (msg.type === 'SET_PART_MAPPING') {
+        slotManager.setPartMapping(msg.sectionName, msg.part);
+      } else if (msg.type === 'SET_TEXTURE_SLOT') {
+        slotManager.setTextureSlot(msg.sectionName, msg.slotId, msg.textureFile, msg.slotType);
+      } else if (msg.type === 'REMOVE_TEXTURE_SLOT') {
+        slotManager.removeTextureSlot(msg.sectionName, msg.slotId);
       } else if (msg.type === 'LOG') {
         const { level, args } = msg;
         const msgStr = Array.isArray(args) ? args.map((a) => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ') : String(args);
@@ -244,6 +263,17 @@ export class NativeWindowManager {
       }
     };
 
+    const unlistenSlots = slotManager.onDidChangeSlots((slots) => {
+      if (isDisposed) return;
+      try {
+        channel.postMessage({
+          type: 'SLOTS_UPDATE',
+          slots,
+          detectedTextureFiles: slotManager.getDetectedTextureFiles(),
+        });
+      } catch {}
+    });
+
     let isDisposed = false;
     let tauriWindow: any = null;
     let browserWindow: Window | null = null;
@@ -251,6 +281,9 @@ export class NativeWindowManager {
     const dispose = () => {
       if (isDisposed) return;
       isDisposed = true;
+      try {
+        unlistenSlots();
+      } catch {}
 
       try {
         channel.postMessage({ type: 'CLOSE_WINDOW' });

@@ -44,6 +44,10 @@ export class SlotManager {
   private listeners = new Set<(slots: ModelSlot[]) => void>();
   private lastAnalysisTime = 0;
   private currentCwd: string | null = null;
+  private docManager: DocumentManager | null = null;
+  private explorer: FileExplorer | null = null;
+  private lastDocs: Map<string, IniDocument> | null = null;
+  private isAnalyzing = false;
 
   constructor() {
     // 기본 표준 3DMigoto 리졸버 등록
@@ -53,8 +57,31 @@ export class SlotManager {
   }
 
   /**
+   * 워크스페이스 컨텍스트를 바인딩하여 UI 패널 개방 여부와 무관하게 백그라운드 자동 분석 보장
+   */
+  attachWorkspace(docManager: DocumentManager, explorer?: FileExplorer) {
+    this.docManager = docManager;
+    this.explorer = explorer || null;
+
+    if (this.explorer) {
+      this.explorer.onDidChangeFolder((folder) => {
+        if (folder) {
+          this.analyzeWorkspace(docManager, this.explorer || undefined);
+        } else {
+          this.clear();
+        }
+      });
+
+      // 이미 열려 있는 폴더가 있는 경우 즉시 분석
+      if (this.explorer.folder) {
+        this.analyzeWorkspace(docManager, this.explorer);
+      }
+    }
+  }
+
+  /**
    * 플러그인 또는 코어 전용 텍스처 슬롯 리졸버를 등록합니다.
-   * (우선순위 priority가 높은 리졸버가 먼저 실행됩니다.)
+   * (새 리졸버 등록 시 기존 문서들을 즉시 재분석하여 슬롯을 자동 갱신합니다.)
    */
   registerTextureSlotResolver(resolver: TextureSlotResolver): () => void {
     const existingIdx = this.resolvers.findIndex((r) => r.id === resolver.id);
@@ -64,12 +91,27 @@ export class SlotManager {
     this.resolvers.push(resolver);
     this.resolvers.sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0));
 
+    // 리졸버가 등록/교체되면 기존 분석 문서들에 즉시 재적용
+    this.reanalyzeIfPossible();
+
     return () => {
       const idx = this.resolvers.findIndex((r) => r.id === resolver.id);
       if (idx !== -1) {
         this.resolvers.splice(idx, 1);
+        this.reanalyzeIfPossible();
       }
     };
+  }
+
+  /**
+   * 기존 문서 캐시 또는 바인딩된 워크스페이스를 통해 슬롯을 즉시 재분석
+   */
+  reanalyzeIfPossible() {
+    if (this.lastDocs && this.lastDocs.size > 0) {
+      this.analyzeDocuments(this.lastDocs);
+    } else if (this.docManager && !this.isAnalyzing) {
+      this.analyzeWorkspace(this.docManager, this.explorer || undefined);
+    }
   }
 
   /**
@@ -232,60 +274,75 @@ export class SlotManager {
    * 열려 있는 작업 폴더 또는 현재 문서를 바탕으로 슬롯을 완전 분석합니다.
    */
   async analyzeWorkspace(docManager: DocumentManager, explorer?: FileExplorer): Promise<SlotAnalysisResult> {
-    const docs = new Map<string, IniDocument>();
-    const activeFile = docManager.file;
-    const currentFolder = explorer?.folderPath ?? null;
-    this.currentCwd = currentFolder;
+    if (this.isAnalyzing) {
+      return {
+        slots: [...this.slots],
+        unmatched: [...this.unmatched],
+        timestamp: this.lastAnalysisTime,
+      };
+    }
+    this.isAnalyzing = true;
+    try {
+      this.docManager = docManager;
+      if (explorer) this.explorer = explorer;
+      const docs = new Map<string, IniDocument>();
+      const activeFile = docManager.file;
+      const currentFolder = explorer?.folderPath ?? null;
+      this.currentCwd = currentFolder;
 
-    // 1. 작업 폴더가 열려 있는 경우 폴더 내 모든 INI 파일 탐색
-    if (currentFolder && platform().readDirectory) {
-      try {
-        const entries = await platform().readDirectory(currentFolder);
-        const iniPaths: string[] = [];
+      // 1. 작업 폴더가 열려 있는 경우 폴더 내 모든 INI 파일 탐색
+      if (currentFolder && platform().readDirectory) {
+        try {
+          const entries = await platform().readDirectory(currentFolder);
+          const iniPaths: string[] = [];
 
-        const traverse = (items: any[]) => {
-          for (const item of items) {
-            if (item.isDir || item.isDirectory) {
-              if (item.children && Array.isArray(item.children)) {
-                traverse(item.children);
+          const traverse = (items: any[]) => {
+            for (const item of items) {
+              if (item.isDir || item.isDirectory) {
+                if (item.children && Array.isArray(item.children)) {
+                  traverse(item.children);
+                }
+              } else if (item.name?.toLowerCase().endsWith('.ini')) {
+                iniPaths.push(item.id || item.path);
               }
-            } else if (item.name?.toLowerCase().endsWith('.ini')) {
-              iniPaths.push(item.id || item.path);
             }
+          };
+          traverse(entries);
+
+          for (const iniPath of iniPaths) {
+            try {
+              const ref = platform().refFromId(iniPath);
+              const loaded = await platform().readFile(ref);
+              if (loaded && loaded.text) {
+                docs.set(iniPath, parseIni(loaded.text));
+              }
+            } catch {}
           }
-        };
-        traverse(entries);
-
-        for (const iniPath of iniPaths) {
-          try {
-            const ref = platform().refFromId(iniPath);
-            const loaded = await platform().readFile(ref);
-            if (loaded && loaded.text) {
-              docs.set(iniPath, parseIni(loaded.text));
-            }
-          } catch {}
+        } catch (err) {
+          appLogger.warn('Slots', '작업 폴더 INI 탐색 중 오류 발생', err);
         }
-      } catch (err) {
-        appLogger.warn('Slots', '작업 폴더 INI 탐색 중 오류 발생', err);
       }
-    }
 
-    // 2. 열려 있는 활성 탭이 있고 위 목록에 없다면(또는 단일 파일 모드라면) 추가
-    if (activeFile && docManager.activeTab?.kind === 'text') {
-      const activeText = docManager.activeTab.model.getValue();
-      docs.set(activeFile.id, parseIni(activeText));
-    } else if (docs.size === 0 && docManager.activeTab?.kind === 'text') {
-      const activeText = docManager.activeTab.model.getValue();
-      docs.set('current.ini', parseIni(activeText));
-    }
+      // 2. 열려 있는 활성 탭이 있고 위 목록에 없다면(또는 단일 파일 모드라면) 추가
+      if (activeFile && docManager.activeTab?.kind === 'text') {
+        const activeText = docManager.activeTab.model.getValue();
+        docs.set(activeFile.id, parseIni(activeText));
+      } else if (docs.size === 0 && docManager.activeTab?.kind === 'text') {
+        const activeText = docManager.activeTab.model.getValue();
+        docs.set('current.ini', parseIni(activeText));
+      }
 
-    return this.analyzeDocuments(docs);
+      return this.analyzeDocuments(docs);
+    } finally {
+      this.isAnalyzing = false;
+    }
   }
 
   /**
    * 전달된 INI 문서 맵을 바탕으로 모델 및 텍스처 슬롯을 추출 및 매칭합니다.
    */
   analyzeDocuments(docs: Map<string, IniDocument>): SlotAnalysisResult {
+    this.lastDocs = docs;
     const newSlots: ModelSlot[] = [];
     const newUnmatched: UnmatchedSection[] = [];
 
