@@ -94,7 +94,17 @@ import type {
 import { createUIBuilder } from './ui-builder';
 import { subWindowManager, nativeWindowManager } from '../window';
 
+import {
+  parseGitHubUrl,
+  fetchGitHubPluginRelease,
+  downloadZipBytes,
+  checkGitHubPluginUpdate,
+  type PluginGitHubSource,
+  type GitHubPluginReleaseInfo,
+} from './github';
+
 export { validatePluginZip, type ExtractedPlugin };
+export { type PluginGitHubSource };
 
 export interface CreatePluginTemplateOptions {
   id: string;
@@ -107,6 +117,7 @@ export interface CreatePluginTemplateOptions {
 
 const STORAGE_ENABLED_PLUGINS = 'migoto_plugins_enabled';
 const STORAGE_PLUGIN_ORDER_VERSION = 'migoto_plugin_order_v';
+const STORAGE_PLUGIN_GITHUB_SOURCES = 'migoto_plugin_github_sources';
 
 export const DEFAULT_PLUGIN_ORDER: readonly string[] = [
   'custom-lint',
@@ -131,6 +142,8 @@ export class PluginManager {
   private customReferenceProviders: CustomReferenceProvider[] = [];
   private pluginMenuItems: Map<string, { manifest: PluginManifest; items: PluginMenuItemDef[] }> = new Map();
   private lintTrigger?: () => void;
+  private githubSources: Map<string, PluginGitHubSource> = new Map();
+  private isCheckingUpdates = false;
 
   private doc: DocumentManager;
   private editor: monaco.editor.IStandaloneCodeEditor;
@@ -149,6 +162,7 @@ export class PluginManager {
     this.activityBar = activityBar;
     this.statusBarEl = document.getElementById('statusbar');
     this.doc.setViewerProvider(this);
+    this.loadGitHubSources();
 
     // Register plugin symbol resolution providers into the core symbol navigation system
     setCustomDefinitionResolver(async (target, model) => {
@@ -369,6 +383,28 @@ export class PluginManager {
       }
     }
     return results;
+  }
+
+  private loadGitHubSources(): void {
+    try {
+      const raw = localStorage.getItem(STORAGE_PLUGIN_GITHUB_SOURCES);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object') {
+        this.githubSources = new Map(Object.entries(parsed));
+      }
+    } catch {}
+  }
+
+  private saveGitHubSources(): void {
+    try {
+      const obj = Object.fromEntries(this.githubSources);
+      localStorage.setItem(STORAGE_PLUGIN_GITHUB_SOURCES, JSON.stringify(obj));
+    } catch {}
+  }
+
+  getGitHubSource(pluginId: string): PluginGitHubSource | undefined {
+    return this.githubSources.get(pluginId);
   }
 
   private getStoredPluginOrder(): string[] {
@@ -671,6 +707,9 @@ export class PluginManager {
 
     this.activityBar?.reorderDynamicTabs(this.getPluginOrder());
     this.notify();
+
+    // 저장된 GitHub 플러그인들의 최신 릴리스 버전 체크 (백그라운드 비동기)
+    this.checkPluginUpdates().catch(() => {});
   }
 
   private async loadDiskPlugins(savedStates: Record<string, boolean>): Promise<void> {
@@ -950,6 +989,10 @@ export class PluginManager {
     }
 
     this.plugins.delete(pluginId);
+    if (this.githubSources.has(pluginId)) {
+      this.githubSources.delete(pluginId);
+      this.saveGitHubSources();
+    }
 
     const storedOrder = this.getStoredPluginOrder().filter((id) => id !== pluginId);
     this.saveStoredPluginOrder(storedOrder);
@@ -968,30 +1011,19 @@ export class PluginManager {
     return true;
   }
 
-  async installPluginFromZip(): Promise<boolean> {
-    if (!platform().pickPluginZip) {
-      this.showToast('플러그인 파일 선택이 지원되지 않는 환경입니다.', 'warn');
-      return false;
-    }
-
-    let bytes: Uint8Array | null = null;
-    try {
-      bytes = await platform().pickPluginZip!();
-    } catch (err) {
-      this.showToast(`파일 선택 실패: ${err}`, 'error');
-      return false;
-    }
-
-    if (!bytes || bytes.length === 0) {
-      return false; // User cancelled
-    }
-
+  /**
+   * 플러그인 ZIP 압축 바이트 배열로부터 플러그인을 검증하고 시스템에 설치합니다.
+   */
+  async installPluginFromBytes(
+    bytes: Uint8Array,
+    sourceMeta?: { owner: string; repo: string; url: string },
+  ): Promise<PluginManifest | null> {
     let extracted: ExtractedPlugin;
     try {
       extracted = validatePluginZip(bytes);
     } catch (err: any) {
       this.showToast(err?.message || '유효하지 않은 플러그인 압축파일입니다.', 'error');
-      return false;
+      return null;
     }
 
     const { manifest, files, manifestJson, scriptContent } = extracted;
@@ -1024,14 +1056,35 @@ export class PluginManager {
         }
       } catch (err) {
         this.showToast(`플러그인 파일 저장 실패: ${err}`, 'error');
-        return false;
+        return null;
       }
     } else if (platform().saveDiskPlugin) {
       try {
         await platform().saveDiskPlugin!(manifest.id, manifestJson, scriptContent, textFiles);
       } catch (err) {
         this.showToast(`플러그인 저장 실패: ${err}`, 'error');
-        return false;
+        return null;
+      }
+    }
+
+    // GitHub 출처 정보 등록 및 갱신
+    if (sourceMeta) {
+      this.githubSources.set(manifest.id, {
+        owner: sourceMeta.owner,
+        repo: sourceMeta.repo,
+        url: sourceMeta.url,
+        installedVersion: manifest.version,
+        lastCheckedVersion: manifest.version,
+        updateAvailable: false,
+        checkedAt: Date.now(),
+      });
+      this.saveGitHubSources();
+    } else {
+      const existingSource = this.githubSources.get(manifest.id);
+      if (existingSource) {
+        existingSource.installedVersion = manifest.version;
+        existingSource.updateAvailable = false;
+        this.saveGitHubSources();
       }
     }
 
@@ -1056,12 +1109,159 @@ export class PluginManager {
     }
 
     this.emitLifecycle('installed', manifest.id, manifest);
+    return manifest;
+  }
+
+  /**
+   * 로컬 .zip 압축파일을 선택받아 플러그인을 설치합니다.
+   */
+  async installPluginFromZip(): Promise<boolean> {
+    if (!platform().pickPluginZip) {
+      this.showToast('플러그인 파일 선택이 지원되지 않는 환경입니다.', 'warn');
+      return false;
+    }
+
+    let bytes: Uint8Array | null = null;
+    try {
+      bytes = await platform().pickPluginZip!();
+    } catch (err) {
+      this.showToast(`파일 선택 실패: ${err}`, 'error');
+      return false;
+    }
+
+    if (!bytes || bytes.length === 0) {
+      return false; // User cancelled
+    }
+
+    const manifest = await this.installPluginFromBytes(bytes);
+    if (!manifest) return false;
 
     const extraNote = platform().kind === 'web'
       ? ' (브라우저 저장소에 설치되었습니다)'
       : '';
     this.showToast(`플러그인 "${manifest.name}" 설치가 완료되었습니다!${extraNote}`, 'info');
     return true;
+  }
+
+  /**
+   * GitHub 저장소 또는 Release 링크로부터 플러그인을 다운로드하여 설치합니다.
+   */
+  async installPluginFromGitHub(urlStr: string): Promise<boolean> {
+    const ref = parseGitHubUrl(urlStr);
+    if (!ref) {
+      this.showToast('올바른 GitHub 저장소 링크를 입력해주세요 (예: https://github.com/owner/repo 또는 owner/repo)', 'warn');
+      return false;
+    }
+
+    this.showToast(`GitHub 릴리스 정보 확인 중... (${ref.owner}/${ref.repo})`, 'info');
+
+    let releaseInfo: GitHubPluginReleaseInfo;
+    try {
+      releaseInfo = await fetchGitHubPluginRelease(ref);
+    } catch (err: any) {
+      this.showToast(`GitHub 릴리스 확인 실패: ${err?.message || err}`, 'error');
+      return false;
+    }
+
+    this.showToast(`플러그인 다운로드 중... (v${releaseInfo.version})`, 'info');
+
+    let bytes: Uint8Array;
+    try {
+      bytes = await downloadZipBytes(releaseInfo.zipUrl);
+    } catch (err: any) {
+      this.showToast(`다운로드 실패: ${err?.message || err}`, 'error');
+      return false;
+    }
+
+    const manifest = await this.installPluginFromBytes(bytes, {
+      owner: ref.owner,
+      repo: ref.repo,
+      url: urlStr.trim(),
+    });
+
+    if (!manifest) return false;
+
+    this.showToast(`GitHub 플러그인 "${manifest.name}" (v${manifest.version}) 설치가 완료되었습니다!`, 'info');
+    return true;
+  }
+
+  /**
+   * GitHub 출처가 등록된 플러그인들의 최신 버전을 비동기로 확인합니다.
+   */
+  async checkPluginUpdates(): Promise<void> {
+    if (this.isCheckingUpdates || this.githubSources.size === 0) return;
+    this.isCheckingUpdates = true;
+
+    let changed = false;
+    try {
+      for (const [pluginId, source] of Array.from(this.githubSources.entries())) {
+        if (!this.plugins.has(pluginId)) {
+          this.githubSources.delete(pluginId);
+          changed = true;
+          continue;
+        }
+
+        const inst = this.plugins.get(pluginId)!;
+        source.installedVersion = inst.manifest.version;
+
+        const update = await checkGitHubPluginUpdate(source);
+        if (update) {
+          if (
+            source.updateAvailable !== update.updateAvailable ||
+            source.lastCheckedVersion !== update.latestVersion
+          ) {
+            source.updateAvailable = update.updateAvailable;
+            source.lastCheckedVersion = update.latestVersion;
+            source.latestZipUrl = update.zipUrl;
+            source.checkedAt = Date.now();
+            changed = true;
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('[PluginManager] Failed to check plugin updates:', err);
+    } finally {
+      this.isCheckingUpdates = false;
+      if (changed) {
+        this.saveGitHubSources();
+        this.notify();
+      }
+    }
+  }
+
+  /**
+   * GitHub 출처 플러그인을 최신 릴리스 버전으로 자동 업데이트합니다.
+   */
+  async updatePluginFromGitHub(pluginId: string): Promise<boolean> {
+    const source = this.githubSources.get(pluginId);
+    if (!source) {
+      this.showToast('GitHub 출처 정보가 없는 플러그인입니다.', 'warn');
+      return false;
+    }
+
+    const inst = this.plugins.get(pluginId);
+    const pluginName = inst?.manifest.name || pluginId;
+
+    this.showToast(`"${pluginName}" 최신 업데이트 다운로드 중...`, 'info');
+
+    try {
+      const release = await fetchGitHubPluginRelease({ owner: source.owner, repo: source.repo });
+      const bytes = await downloadZipBytes(release.zipUrl);
+      const manifest = await this.installPluginFromBytes(bytes, {
+        owner: source.owner,
+        repo: source.repo,
+        url: source.url,
+      });
+
+      if (manifest) {
+        this.showToast(`"${manifest.name}" 플러그인이 v${manifest.version}(으)로 성공적으로 업데이트되었습니다!`, 'info');
+        return true;
+      }
+      return false;
+    } catch (err: any) {
+      this.showToast(`업데이트 실패: ${err?.message || err}`, 'error');
+      return false;
+    }
   }
 
   async createPluginTemplate(
@@ -2034,6 +2234,9 @@ export default {
           callbacks.onRegisterCleanup(unlisten);
           return unlisten;
         },
+        installFromGitHub: (url: string) => this.installPluginFromGitHub(url),
+        checkUpdates: () => this.checkPluginUpdates(),
+        getGitHubSource: (pluginId: string) => this.getGitHubSource(pluginId),
       },
 
       system: {

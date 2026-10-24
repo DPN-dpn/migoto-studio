@@ -69,7 +69,38 @@ const unlisten = context.plugins.onDidChangePlugins((event) => {
 
 ---
 
-## 3. 주요 데이터 타입 정의
+## 3. GitHub 플러그인 설치 및 업데이트 확인
+
+### `context.plugins.installFromGitHub(url)`
+GitHub 저장소 링크(예: `https://github.com/owner/repo` 또는 `owner/repo`)로부터 플러그인을 다운로드하여 설치합니다.
+최신 Release의 ZIP 에셋을 우선 탐색하며, Release가 없는 경우 기본 브랜치의 아카이브 ZIP을 자동으로 추출하여 설치합니다.
+
+```typescript
+// GitHub 저장소로부터 직접 플러그인 설치
+await context.plugins.installFromGitHub('https://github.com/DPN-dpn/migoto-custom-plugin');
+```
+
+### `context.plugins.checkUpdates()`
+GitHub 출처가 등록된 모든 플러그인의 최신 릴리스 버전을 비동기로 확인하고, 새 버전이 발견되면 업데이트 가능 상태를 갱신합니다.
+
+```typescript
+// 업데이트 확인 수동 트리거 (보통 플러그인 패널 새로고침 시 자동 실행)
+await context.plugins.checkUpdates();
+```
+
+### `context.plugins.getGitHubSource(pluginId)`
+특정 플러그인의 GitHub 출처 정보(`owner`, `repo`, `installedVersion`, `updateAvailable` 등)를 조회합니다.
+
+```typescript
+const source = context.plugins.getGitHubSource('my-custom-plugin');
+if (source?.updateAvailable) {
+  context.logger.info(`업데이트 가능: v${source.installedVersion} -> v${source.lastCheckedVersion}`);
+}
+```
+
+---
+
+## 4. 주요 데이터 타입 정의
 
 ```typescript
 export type PluginLifecycleAction = 'activated' | 'deactivated' | 'installed' | 'uninstalled';
@@ -86,5 +117,16 @@ export interface PluginInfo {
   version: string;
   enabled: boolean;
   isBuiltin: boolean;
+}
+
+export interface PluginGitHubSource {
+  owner: string;
+  repo: string;
+  url: string;
+  installedVersion: string;
+  lastCheckedVersion?: string;
+  updateAvailable?: boolean;
+  latestZipUrl?: string;
+  checkedAt?: number;
 }
 ```

@@ -104,6 +104,26 @@ export class PluginPanel {
     };
     actions.append(addZipBtn);
 
+    // [GitHub] 버튼: GitHub 링크로부터 플러그인 추가 설치
+    const addGithubBtn = document.createElement('button');
+    addGithubBtn.className = 'icon-btn';
+    addGithubBtn.title = 'GitHub 링크로부터 플러그인 추가';
+    addGithubBtn.setAttribute('aria-label', 'GitHub 플러그인 추가');
+    addGithubBtn.innerHTML = `
+      <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+        <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/>
+      </svg>
+    `;
+    addGithubBtn.onclick = async () => {
+      const url = prompt(
+        '설치할 플러그인의 GitHub 링크를 입력하세요:\n(예: https://github.com/owner/repo 또는 owner/repo)',
+      );
+      if (url && url.trim()) {
+        await this.manager.installPluginFromGitHub(url.trim());
+      }
+    };
+    actions.append(addGithubBtn);
+
     // 새 플러그인 템플릿 직접 만들기 버튼 (데스크톱 전용)
     if (isDesktop) {
       const createBtn = document.createElement('button');
@@ -360,8 +380,11 @@ export class PluginPanel {
 
   private createPluginCard(p: PluginInstance, index: number, total: number): HTMLElement {
     const isCollapsed = !this.expandedPlugins.has(p.manifest.id);
+    const githubSource = this.manager.getGitHubSource(p.manifest.id);
+    const hasUpdate = Boolean(githubSource?.updateAvailable);
+
     const card = document.createElement('div');
-    card.className = `plugin-card${p.enabled ? ' is-enabled' : ''}${isCollapsed ? ' is-collapsed' : ''}`;
+    card.className = `plugin-card${p.enabled ? ' is-enabled' : ''}${isCollapsed ? ' is-collapsed' : ''}${hasUpdate ? ' has-update' : ''}`;
 
     const topRow = document.createElement('div');
     topRow.className = 'plugin-card-top';
@@ -377,6 +400,7 @@ export class PluginPanel {
       <span class="plugin-chevron">${CHEVRON_SVG}</span>
       <span class="plugin-icon">${renderPluginIcon(p.manifest.icon)}</span>
       <strong class="plugin-name">${p.manifest.name}</strong>
+      ${hasUpdate ? `<span class="plugin-update-chip" title="새 버전(v${githubSource?.lastCheckedVersion}) 업데이트 가능">NEW v${githubSource?.lastCheckedVersion}</span>` : ''}
     `;
     titleClickArea.onclick = () => this.toggleCollapse(p.manifest.id);
     iconName.append(titleClickArea);
@@ -466,6 +490,24 @@ export class PluginPanel {
     const cardBody = document.createElement('div');
     cardBody.className = 'plugin-card-body';
 
+    // GitHub 업데이트 배너
+    if (hasUpdate) {
+      const banner = document.createElement('div');
+      banner.className = 'plugin-update-banner';
+      banner.innerHTML = `
+        <div class="plugin-update-info">
+          <span class="plugin-update-icon">🚀</span>
+          <span>새 버전 <b>v${githubSource?.lastCheckedVersion}</b> 사용 가능</span>
+        </div>
+        <button class="plugin-btn-update" title="최신 릴리스로 즉시 업데이트">업데이트</button>
+      `;
+      banner.querySelector('.plugin-btn-update')?.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        await this.manager.updatePluginFromGitHub(p.manifest.id);
+      });
+      cardBody.append(banner);
+    }
+
     const desc = document.createElement('p');
     desc.className = 'plugin-desc';
     desc.textContent = p.manifest.description || '설명이 없습니다.';
@@ -482,6 +524,7 @@ export class PluginPanel {
     metaRow.innerHTML = `
       <span class="plugin-author">제작: ${p.manifest.author || '알 수 없음'}</span>
       <span class="plugin-badge user">v${p.manifest.version || '1.0.0'}</span>
+      ${githubSource ? `<span class="plugin-badge github-src" title="${githubSource.url}">GitHub: ${githubSource.owner}/${githubSource.repo}</span>` : ''}
       ${p.enabled ? '<span class="plugin-status-badge enabled">활성</span>' : '<span class="plugin-status-badge disabled">비활성</span>'}
     `;
 

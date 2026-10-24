@@ -2106,8 +2106,48 @@ test('PluginLifecycleEvent and subscription contracts work properly', () => {
   assert.equal(events[1].action, 'deactivated');
   assert.equal(events[2].action, 'installed');
   assert.equal(events[3].action, 'uninstalled');
-
   unlisten();
   emit('activated', 'test', 'Test');
   assert.equal(events.length, 4);
+});
+
+test('parseGitHubUrl correctly parses various GitHub repository and release URLs', async () => {
+  const { parseGitHubUrl } = await import('../src/plugins/github.ts');
+
+  // Standard repo URL
+  const ref1 = parseGitHubUrl('https://github.com/DPN-dpn/migoto-custom-plugin');
+  assert.ok(ref1);
+  assert.equal(ref1.owner, 'DPN-dpn');
+  assert.equal(ref1.repo, 'migoto-custom-plugin');
+
+  // With .git suffix
+  const refGit = parseGitHubUrl('https://github.com/DPN-dpn/migoto-custom-plugin.git');
+  assert.ok(refGit);
+  assert.equal(refGit.owner, 'DPN-dpn');
+  assert.equal(refGit.repo, 'migoto-custom-plugin');
+
+  // Short owner/repo format
+  const refShort = parseGitHubUrl('alice/cool-plugin');
+  assert.ok(refShort);
+  assert.equal(refShort.owner, 'alice');
+  assert.equal(refShort.repo, 'cool-plugin');
+
+  // Release tag URL
+  const refTag = parseGitHubUrl('https://github.com/alice/cool-plugin/releases/tag/v2.1.0');
+  assert.ok(refTag);
+  assert.equal(refTag.owner, 'alice');
+  assert.equal(refTag.repo, 'cool-plugin');
+  assert.equal(refTag.tag, 'v2.1.0');
+
+  // Direct download ZIP URL
+  const refDownload = parseGitHubUrl('https://github.com/alice/cool-plugin/releases/download/v2.1.0/plugin.zip');
+  assert.ok(refDownload);
+  assert.equal(refDownload.owner, 'alice');
+  assert.equal(refDownload.repo, 'cool-plugin');
+  assert.equal(refDownload.tag, 'v2.1.0');
+  assert.ok(refDownload.directZipUrl?.endsWith('plugin.zip'));
+
+  // Invalid strings
+  assert.equal(parseGitHubUrl(''), null);
+  assert.equal(parseGitHubUrl('https://google.com/test'), null);
 });

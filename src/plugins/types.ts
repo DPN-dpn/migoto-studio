@@ -4,6 +4,8 @@ import type { PluginLogger } from '../core/logger.ts';
 export type { PluginLogger };
 import type { ModelSlot, ModPartType, TextureSlot, TextureSlotType, TextureSlotResolver } from '../core/slots/types.ts';
 export type { ModelSlot, ModPartType, TextureSlot, TextureSlotType, TextureSlotResolver };
+import type { PluginGitHubSource } from './github.ts';
+export type { PluginGitHubSource };
 
 export interface PluginManifest {
   id: string;
@@ -586,6 +588,12 @@ export interface PluginContext {
     isEnabled(pluginId: string): boolean;
     /** 플러그인 활성화/비활성화/설치/삭제 이벤트 리스너 등록 */
     onDidChangePlugins(listener: (event: PluginLifecycleEvent) => void): () => void;
+    /** GitHub 링크로부터 플러그인을 다운로드하여 설치 */
+    installFromGitHub(url: string): Promise<boolean>;
+    /** GitHub 출처 플러그인들의 최신 릴리스 버전 체크 트리거 */
+    checkUpdates(): Promise<void>;
+    /** 특정 플러그인의 GitHub 출처 정보 조회 */
+    getGitHubSource(pluginId: string): PluginGitHubSource | undefined;
   };
 
   // ---- System execution (desktop) ----
