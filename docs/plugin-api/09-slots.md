@@ -24,13 +24,16 @@ for (const slot of slots) {
 ```
 
 ### `context.slots.getSlot(part)`
-특정 부위(`'head'`, `'body'`, `'dress'`, `'hair'`, `'face'`, `'weapon'`, `'extra'`, `'custom'`)에 매칭된 모델 슬롯을 조회합니다.
+특정 부위(`'head'`, `'body'`, `'dress'`, `'hair'`, `'weapon'`, `'tail'`, `'coat'` 등 모더가 명명한 임의의 부위명)에 매칭된 모델 슬롯을 대소문자 구분 없이 조회합니다.
 
 ```typescript
 const bodySlot = context.slots.getSlot('body');
 if (bodySlot) {
   context.logger.info(`몸체 IB: ${bodySlot.ib}, 해시: ${bodySlot.hash}`);
 }
+
+// 모더가 임의로 명명한 부위도 직접 조회 가능
+const tailSlot = context.slots.getSlot('tail');
 ```
 
 ### `context.slots.onDidChangeSlots(listener)`
@@ -100,6 +103,7 @@ context.slots.registerTextureSlotResolver({
 ## 3. 주요 데이터 타입 정의
 
 ```typescript
+// 부위 타입은 고정된 카테고리에 한정되지 않고, 모더가 자유롭게 명명한 모든 부위명(string)을 지원합니다.
 export type ModPartType =
   | 'head'
   | 'body'
@@ -107,9 +111,11 @@ export type ModPartType =
   | 'hair'
   | 'face'
   | 'weapon'
+  | 'tail'
   | 'extra'
   | 'custom'
-  | 'unknown';
+  | 'unknown'
+  | string;
 
 export type TextureSlotType = 'diffuse' | 'normal' | 'light' | 'material' | 'fx' | 'custom';
 

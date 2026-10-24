@@ -5,16 +5,16 @@ import { detectPartFromSectionName, discoverModParts, standard3DMigotoResolver, 
 import { SlotManager } from '../src/core/slots/slot-manager.ts';
 import { createZzmiSlotResolver } from '../default-plugins/zzmi-support/rules.ts';
 
-test('detectPartFromSectionName correctly categorizes 3DMigoto section names', () => {
-  assert.equal(detectPartFromSectionName('TextureOverrideRoxyHead'), 'head');
-  assert.equal(detectPartFromSectionName('TextureOverrideBodyDiffuse'), 'body');
-  assert.equal(detectPartFromSectionName('TextureOverrideCharacterHair'), 'hair');
-  assert.equal(detectPartFromSectionName('TextureOverrideFaceTex'), 'face');
-  assert.equal(detectPartFromSectionName('TextureOverrideDressA'), 'dress');
-  assert.equal(detectPartFromSectionName('TextureOverrideSwordWeapon'), 'weapon');
-  assert.equal(detectPartFromSectionName('TextureOverrideWingAccessory'), 'extra');
-  assert.equal(detectPartFromSectionName('TextureOverrideCustomPartX'), 'custom');
+test('detectPartFromSectionName correctly extracts modder part names without forcing fixed categories', () => {
+  assert.equal(detectPartFromSectionName('TextureOverrideRoxyHead'), 'Head');
+  assert.equal(detectPartFromSectionName('TextureOverrideBodyDiffuse'), 'Body');
+  assert.equal(detectPartFromSectionName('TextureOverrideCharacterHair'), 'Hair');
+  assert.equal(detectPartFromSectionName('TextureOverrideFaceTex'), 'Face');
+  assert.equal(detectPartFromSectionName('TextureOverrideJane_Coat'), 'Coat');
+  assert.equal(detectPartFromSectionName('TextureOverrideCorin_Saw'), 'Saw');
+  assert.equal(detectPartFromSectionName('TextureOverrideAnby_Upper'), 'Upper');
   assert.equal(detectPartFromSectionName('TextureOverrideRandom1234'), 'unknown');
+  assert.equal(detectPartFromSectionName('TextureOverrideDummy'), 'unknown');
 });
 
 test('standard3DMigotoResolver parses ps-t slots and explicit texture properties', () => {
@@ -179,7 +179,7 @@ diffuse = ResourceBlade
   const parts = result.slots.map((s) => s.part);
   assert.ok(parts.includes('Hair'));
   assert.ok(parts.includes('Tail'));
-  assert.ok(parts.includes('Blade'));
+  assert.ok(parts.includes('SharkBlade'));
 
   // Custom manual mapping with an arbitrary part name
   sm.setPartMapping('TextureOverrideEllenTail', 'CyberTail');

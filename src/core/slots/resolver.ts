@@ -2,27 +2,63 @@ import type { IniDocument, IniSection } from '../ini/ini.ts';
 import type { ModPartType, TextureSlot, TextureSlotResolver } from './types.ts';
 
 export const PART_LABELS: Record<string, string> = {
-  body: '몸체 (Body)',
   head: '머리 (Head)',
   hair: '헤어 (Hair)',
   face: '얼굴 (Face)',
+  body: '몸체 (Body)',
   dress: '의상 (Dress)',
   weapon: '무기 (Weapon)',
-  extra: '장신구 (Accessory)',
+  tail: '꼬리 (Tail)',
+  coat: '코트 (Coat)',
+  jacket: '재킷 (Jacket)',
+  upper: '상의 (Upper)',
+  lower: '하의 (Lower)',
+  top: '상의 (Top)',
+  bottom: '하의 (Bottom)',
+  skirt: '스커트 (Skirt)',
+  pants: '바지 (Pants)',
+  shoes: '신발 (Shoes)',
+  boots: '부츠 (Boots)',
+  socks: '양말 (Socks)',
+  stockings: '스타킹 (Stockings)',
+  wings: '날개 (Wings)',
+  wing: '날개 (Wing)',
+  horn: '뿔 (Horn)',
+  ears: '귀 (Ears)',
+  ribbon: '리본 (Ribbon)',
+  sword: '검 (Sword)',
+  blade: '칼날 (Blade)',
+  dagger: '단검 (Dagger)',
+  gun: '총기 (Gun)',
+  bow: '활 (Bow)',
+  saw: '톱 (Saw)',
+  shield: '방패 (Shield)',
+  glasses: '안경 (Glasses)',
+  mask: '가면 (Mask)',
+  hat: '모자 (Hat)',
+  cap: '모자 (Cap)',
+  bag: '가방 (Bag)',
+  earrings: '귀걸이 (Earrings)',
+  necklace: '목걸이 (Necklace)',
+  cape: '망토 (Cape)',
+  gloves: '장갑 (Gloves)',
+  accessory: '장신구 (Accessory)',
+  extra: '장신구 (Extra)',
   custom: '커스텀 (Custom)',
   unknown: '미분류 (Unknown)',
 };
 
 /**
  * 부위 식별자를 사람이 읽기 좋은 레이블로 변환합니다.
- * 표준 부위는 한/영 병기 레이블을 제공하고, 모더가 자유롭게 명명한 부위는 깔끔한 타이틀 형태로 포맷팅합니다.
+ * 사전에 등록된 부위는 한/영 병기 레이블을 제공하고,
+ * 모더가 자유롭게 명명한 부위(예: SharkBlade, MechaArm 등)는 깔끔한 타이틀 형태로 띄어쓰기 및 대문자 포맷팅합니다.
  */
 export function formatPartLabel(part: string): string {
   const lower = part.toLowerCase();
   if (PART_LABELS[lower]) {
     return PART_LABELS[lower];
   }
-  // camelCase 또는 snake_case를 공백으로 분리
+  // camelCase 또는 snake_case / kebab-case를 공백으로 분리
   const spaced = part
     .replace(/([a-z])([A-Z])/g, '$1 $2')
     .replace(/[_-]+/g, ' ')
@@ -58,22 +94,77 @@ export function getPartColorStyle(part: string): { bg: string; color: string; bo
 }
 
 /**
+ * 섹션 이름에서 3DMigoto 오버라이드 접두사 및 기술/텍스처 접미사를 정리합니다.
+ */
+export function cleanSectionName(sectionName: string): string {
+  let clean = sectionName.replace(/^(textureoverride|shaderoverride|override|commandlist)[_-\s]*/i, '');
+
+  // 끝에 붙은 기술 접미사(IB, VB, Remap 등) 제거 (단, 이름 전체가 IB/VB인 경우는 유지)
+  if (clean.length > 3 && /(ib|vb|remap|blend|position|texcoord|normal|tangent)$/i.test(clean)) {
+    clean = clean.replace(/(ib|vb|remap|blend|position|texcoord|normal|tangent)$/i, '');
+  }
+
+  // 끝에 붙은 텍스처 타입 접미사 제거 (예: BodyDiffuse -> Body, TailTex -> Tail)
+  if (clean.length > 5 && /(diffuse|lightmap|normalmap|materialmap|tex)$/i.test(clean)) {
+    clean = clean.replace(/(diffuse|lightmap|normalmap|materialmap|tex)$/i, '');
+  }
+
+  return clean.replace(/^[_-\s]+|[_-\s]+$/g, '');
+}
+
+/**
+ * 단일 섹션명에서 캐릭터/모드 접두사를 분리하고 모더가 명명한 부위 이름을 추출합니다.
+ */
+export function extractPartName(name: string): string {
+  const cleaned = cleanSectionName(name);
+  if (!cleaned) return 'unknown';
+
+  // 언더스코어 또는 하이픈 구분자가 있는 경우 마지막 세그먼트를 부위명으로 사용
+  // 예: JaneDoe_Tail -> Tail, Mod_Char_Coat -> Coat
+  if (cleaned.includes('_') || cleaned.includes('-')) {
+    const parts = cleaned.split(/[-_]+/).filter(Boolean);
+    if (parts.length >= 2) {
+      const last = parts[parts.length - 1];
+      if (last && !/^\d+$/.test(last)) {
+        return refinePartName(last);
+      }
+    }
+  }
+
+  // CamelCase 분절 탐색 (예: HeroHead -> Head, AnbyBody -> Body, RoxyHair -> Hair)
+  const tokens = cleaned.match(/[A-Z][a-z0-9]*/g);
+  if (tokens && tokens.length >= 2) {
+    const last = tokens[tokens.length - 1];
+    // 3개 이상 토큰일 때 (예: JaneDoeTail): 마지막 토큰이 부위인 경우 우선
+    if (tokens.length >= 3) {
+      const rest = tokens.slice(tokens.length - 2).join('');
+      // 마지막 1단어가 흔히 쓰이는 부위명이거나 구체적 이름인 경우
+      return refinePartName(last);
+    }
+    // 2개 토큰일 때 (예: HeroHead, AnbyBody, CorinSaw, BillyJacket): 두 번째 토큰이 부위
+    return refinePartName(last);
+  }
+
+  return refinePartName(cleaned);
+}
+
+/**
  * 모드 INI 전체의 오버라이드 섹션 목록을 분석하여,
- * 모더가 부여한 고유한 부위 이름들을 동적으로 파악합니다.
+ * 미리 정해둔 부위에 끼워맞추지 않고 모더가 명명한 실제 부위 이름들을 모드 단위로 동적 파악합니다.
  */
 export function discoverModParts(sectionNames: string[]): Map<string, string> {
   const result = new Map<string, string>();
   if (sectionNames.length === 0) return result;
 
-  // 1. 3DMigoto 표준 접두사 제거
-  const entries: Array<{ original: string; stripped: string }> = [];
+  // 1. 섹션명에서 기술적 접두사/접미사 1차 정리
+  const entries: Array<{ original: string; cleaned: string }> = [];
   for (const name of sectionNames) {
-    const clean = name.replace(/^(textureoverride|shaderoverride|override)[_-\s]*/i, '');
-    entries.push({ original: name, stripped: clean });
+    const cleaned = cleanSectionName(name);
+    entries.push({ original: name, cleaned });
   }
 
-  // 2. 모드 내 섹션들이 공유하는 공통 캐릭터/모드 접두사 탐색 (예: 'Roxy', 'JaneDoe', 'Keqing_')
-  const valid = entries.map((e) => e.stripped).filter((s) => s.length > 0);
+  // 2. 모드 내 섹션들이 공유하는 공통 캐릭터/모드 접두사 탐색 (예: 'Roxy', 'JaneDoe_', 'Ellen')
+  const valid = entries.map((e) => e.cleaned).filter((s) => s.length > 0 && refinePartName(s) !== 'unknown');
   let commonPrefix = '';
 
   if (valid.length >= 2) {
@@ -90,29 +181,33 @@ export function discoverModParts(sectionNames: string[]): Map<string, string> {
 
     if (maxLen >= 2) {
       commonPrefix = first.slice(0, maxLen);
-      // 언더스코어가 있다면 언더스코어까지를 깔끔한 접두사로 분리
-      const lastUnderscore = commonPrefix.lastIndexOf('_');
-      if (lastUnderscore >= 2) {
-        commonPrefix = commonPrefix.slice(0, lastUnderscore + 1);
+      // 언더스코어나 하이픈이 있다면 구분자까지를 접두사 경계로 깔끔하게 정리
+      const lastDelim = Math.max(commonPrefix.lastIndexOf('_'), commonPrefix.lastIndexOf('-'));
+      if (lastDelim >= 2) {
+        commonPrefix = commonPrefix.slice(0, lastDelim + 1);
       }
     }
   }
 
   // 3. 각 섹션별 최종 부위 식별자 결정
   for (const entry of entries) {
-    let part = entry.stripped;
+    let part = entry.cleaned;
 
+    // 공통 접두사가 존재하면 제거하여 모더가 부여한 실제 부위명만 추출
     if (commonPrefix && part.toLowerCase().startsWith(commonPrefix.toLowerCase())) {
       const rest = part.slice(commonPrefix.length).replace(/^[_-\s]+/, '');
       if (rest.length > 0 && !/^\d+$/.test(rest)) {
         part = rest;
       }
+    } else {
+      // 공통 접두사가 적용되지 않는 개별 섹션은 CamelCase / 구분자 분절 적용
+      part = extractPartName(entry.cleaned);
     }
 
-    if (!part) {
-      part = detectPartFromSectionName(entry.original);
+    if (!part || part === 'unknown') {
+      part = extractPartName(entry.original);
     } else {
-      part = refinePartName(part, entry.original);
+      part = refinePartName(part);
     }
 
     result.set(entry.original, part);
@@ -121,10 +216,14 @@ export function discoverModParts(sectionNames: string[]): Map<string, string> {
   return result;
 }
 
-function refinePartName(part: string, originalSection: string): string {
+/**
+ * 모더가 지은 부위 이름을 정제합니다.
+ * 미리 정해둔 카테고리로 축소하지 않고 모더가 지은 부위명(Tail, Blade, Jacket 등)을 온전히 보존합니다.
+ */
+function refinePartName(part: string): string {
   const lower = part.toLowerCase();
 
-  // 명확한 부위가 아니거나 모호한 명칭은 unknown으로 분류하여 수동 매칭 패널로 유도
+  // 부위명이 아니거나 의미를 알 수 없는 모호한 명칭은 unknown으로 처리하여 수동 매칭 패널로 유도
   if (
     !part ||
     lower === 'mesh' ||
@@ -139,46 +238,19 @@ function refinePartName(part: string, originalSection: string): string {
     return 'unknown';
   }
 
-  // 꼬리, 재킷, 머리, 몸체, 리본, 칼날 등 흔히 쓰이는 부위 키워드가 끝에 붙어 있는 경우 추출
-  const match = part.match(/(hair|ahoge|bangs|face|eye|head|dress|outfit|skirt|pants|jacket|suit|body|skin|arm|leg|weapon|sword|gun|bow|blade|tail|ribbon|horn|wing|cape|glasses|mask|hat|bell|prop)/i);
-  if (match) {
-    const matched = match[0];
-    const cap = matched.charAt(0).toUpperCase() + matched.slice(1).toLowerCase();
-    if (lower.endsWith(matched.toLowerCase())) {
-      return cap;
-    }
-  }
-
   const clean = part.replace(/^[_-\s]+|[_-\s]+$/g, '');
   if (!clean || clean.toLowerCase() === 'unknown') return 'unknown';
+
+  // 첫 글자 대문자화하여 모더의 부위명 그대로 반환
   return clean.charAt(0).toUpperCase() + clean.slice(1);
 }
 
 /**
  * 단일 섹션 이름을 바탕으로 부위를 추정합니다 (모드 전체 파싱이 없을 때의 fallback).
+ * 특정 몇 개 카테고리에 고정하지 않고, 섹션명에 적힌 모더의 부위 명칭을 추출합니다.
  */
 export function detectPartFromSectionName(sectionName: string): ModPartType {
-  const norm = sectionName.toLowerCase().replace(/^(textureoverride|shaderoverride|override)[_-\s]*/i, '');
-  if (!norm) return 'unknown';
-
-  if (/(hair|ahoge|bangs|ponytail|twintail|pigtail)/i.test(norm)) return 'hair';
-  if (/(face|facemesh|eye|eyebrow|mouth|teeth|tongue|lip)/i.test(norm)) return 'face';
-  if (/(head|headmesh|skull)/i.test(norm)) return 'head';
-  if (/(dress|costume|outfit|cloth|shirt|skirt|pants|jacket|suit|coat|underwear|bra|panties|top|bottom|shoes|boots|sock)/i.test(norm)) return 'dress';
-  if (/(body|bodymesh|skin|arm|leg|torso|hand|foot|feet|handmesh)/i.test(norm)) return 'body';
-  if (/(weapon|sword|gun|bow|blade|shield|spear|catalyst|wengine|claymore|polearm|dagger)/i.test(norm)) return 'weapon';
-  if (/(acc|accessory|hat|glasses|mask|wing|tail|ribbon|badge|prop|item|ring|earring|necklace|cape|bell)/i.test(norm)) return 'extra';
-  if (/(custom|part|misc)/i.test(norm)) return 'custom';
-
-  // 특정 키워드에 걸리지 않았더라도 의미 있는 모더 고유 부위명인 경우 추출
-  if (/^[a-zA-Z][a-zA-Z0-9_-]{1,}$/.test(norm)) {
-    if (/^(random|temp|dummy|test|mesh)\d+$/i.test(norm) || /^[a-f0-9]{8,}$/i.test(norm)) {
-      return 'unknown';
-    }
-    return norm.charAt(0).toUpperCase() + norm.slice(1);
-  }
-
-  return 'unknown';
+  return extractPartName(sectionName);
 }
 
 /**
