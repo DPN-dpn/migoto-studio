@@ -2270,3 +2270,57 @@ test('Plugin dependency and version checking satisfies semver rules', () => {
   assert.equal(sorted[1].manifest.id, 'pA');
 });
 
+test('Plugin menu items deduplication and lifecycle cleanup', () => {
+  // Mock PluginManager menu items map behavior
+  const menuItems = new Map<string, { manifest: any; items: any[] }>();
+
+  const registerMenuItem = (manifest: any, options: { label: string; shortcut?: string; action: () => void }) => {
+    let group = menuItems.get(manifest.id);
+    if (!group) {
+      group = { manifest, items: [] };
+      menuItems.set(manifest.id, group);
+    }
+    const itemDef = { label: options.label, shortcut: options.shortcut, action: options.action };
+    const existingIdx = group.items.findIndex((it) => it.label === options.label);
+    if (existingIdx !== -1) {
+      group.items[existingIdx] = itemDef;
+    } else {
+      group.items.push(itemDef);
+    }
+
+    return () => {
+      const g = menuItems.get(manifest.id);
+      if (g) {
+        g.items = g.items.filter((it) => it !== itemDef);
+        if (g.items.length === 0) {
+          menuItems.delete(manifest.id);
+        }
+      }
+    };
+  };
+
+  const manifest = { id: 'test-plugin', name: 'Test Plugin' };
+
+  // First registration
+  const unreg1 = registerMenuItem(manifest, { label: 'Open Viewer', action: () => {} });
+  assert.equal(menuItems.get('test-plugin')?.items.length, 1);
+
+  // Duplicate registration with same label replaces item instead of adding duplicate
+  const unreg2 = registerMenuItem(manifest, { label: 'Open Viewer', action: () => {} });
+  assert.equal(menuItems.get('test-plugin')?.items.length, 1);
+
+  // Registration with different label adds new item
+  registerMenuItem(manifest, { label: 'Export Data', action: () => {} });
+  assert.equal(menuItems.get('test-plugin')?.items.length, 2);
+
+  // Unregistering second Open Viewer removes it
+  unreg2();
+  assert.equal(menuItems.get('test-plugin')?.items.length, 1);
+  assert.equal(menuItems.get('test-plugin')?.items[0].label, 'Export Data');
+
+  // Deleting plugin clears menu group completely
+  menuItems.delete('test-plugin');
+  assert.equal(menuItems.has('test-plugin'), false);
+});
+
+

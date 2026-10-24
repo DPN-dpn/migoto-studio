@@ -685,6 +685,8 @@ export class PluginManager {
       p.instance = undefined;
     }
     this.plugins.clear();
+    this.pluginMenuItems.clear();
+    this.pluginApis.clear();
 
     await this.loadDiskPlugins(savedStates);
 
@@ -804,7 +806,7 @@ export class PluginManager {
       );
       const { sorted } = topologicalSortPlugins(enabledWithScript);
       for (const instance of sorted) {
-        if (instance.scriptContent) {
+        if (instance.scriptContent && !instance.instance) {
           await this.loadAndActivateScriptPlugin(instance, instance.scriptContent);
         }
       }
@@ -817,6 +819,9 @@ export class PluginManager {
     instance: PluginInstance,
     scriptContent: string,
   ): Promise<void> {
+    if (instance.instance) {
+      return;
+    }
     let linkedDisposer: (() => void) | undefined;
     try {
       // Dynamic ES module evaluation via Virtual Module Linker
@@ -841,6 +846,15 @@ export class PluginManager {
     plugin: MigotoPlugin,
     moduleDisposer?: () => void,
   ): Promise<void> {
+    if (instance.instance) {
+      return;
+    }
+    if (instance.cleanup) {
+      try {
+        instance.cleanup();
+      } catch {}
+      instance.cleanup = undefined;
+    }
     // Verify dependencies before activation
     const depResults = checkAllDependencies(instance.manifest, (id) => this.plugins.get(id));
     const unsatisfied = depResults.filter((r) => !r.satisfied);
@@ -986,6 +1000,7 @@ export class PluginManager {
       p.cleanup = undefined;
       p.instance = undefined;
       this.pluginApis.delete(pluginId);
+      this.pluginMenuItems.delete(pluginId);
       if (this.customLintRules.size === 0) {
         clearAllowedVariables();
         clearAllowedResources();
@@ -998,12 +1013,13 @@ export class PluginManager {
         dep.cleanup?.();
         dep.cleanup = undefined;
         dep.instance = undefined;
+        this.pluginMenuItems.delete(dep.manifest.id);
         dep.dependencyErrors = this.checkPluginDependencies(dep.manifest.id);
         dep.error = `종속성 미충족: ${dep.dependencyErrors.filter((r) => !r.satisfied).map((r) => r.id).join(', ')}`;
         appLogger.warn('Plugin', `종속 플러그인 "${dep.manifest.name}"의 필수 종속성(${p.manifest.name}) 비활성화로 작동이 중단되었습니다.`);
         this.emitLifecycle('deactivated', dep.manifest.id, dep.manifest);
       }
-    } else if (p.scriptContent) {
+    } else if (p.scriptContent && !p.instance) {
       await this.loadAndActivateScriptPlugin(p, p.scriptContent);
       this.emitLifecycle('activated', pluginId, p.manifest);
       await this.retryActivatingDependents(pluginId);
@@ -1062,6 +1078,7 @@ export class PluginManager {
 
     this.plugins.delete(pluginId);
     this.pluginApis.delete(pluginId);
+    this.pluginMenuItems.delete(pluginId);
     if (this.githubSources.has(pluginId)) {
       this.githubSources.delete(pluginId);
       this.saveGitHubSources();
@@ -2333,7 +2350,12 @@ export default {
             group = { manifest, items: [] };
             this.pluginMenuItems.set(manifest.id, group);
           }
-          group.items.push(itemDef);
+          const existingIdx = group.items.findIndex((it) => it.label === options.label);
+          if (existingIdx !== -1) {
+            group.items[existingIdx] = itemDef;
+          } else {
+            group.items.push(itemDef);
+          }
           this.notify();
 
           const unregister = () => {
