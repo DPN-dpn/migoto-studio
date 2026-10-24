@@ -38,6 +38,7 @@ export class SlotManager {
   private resolvers: TextureSlotResolver[] = [];
   private manualMappings: Map<string, ModPartType> = new Map();
   private manualTextureMappings: Map<string, TextureSlot[]> = new Map();
+  private detectedTextureFiles: string[] = [];
   private slots: ModelSlot[] = [];
   private unmatched: UnmatchedSection[] = [];
   private listeners = new Set<(slots: ModelSlot[]) => void>();
@@ -91,6 +92,13 @@ export class SlotManager {
    */
   getSlot(part: ModPartType | string): ModelSlot | undefined {
     return this.slots.find((s) => s.part.toLowerCase() === part.toLowerCase());
+  }
+
+  /**
+   * INI 문서들에서 감지된 텍스처/이미지 파일명 목록을 반환합니다.
+   */
+  getDetectedTextureFiles(): string[] {
+    return [...this.detectedTextureFiles];
   }
 
   /**
@@ -280,6 +288,26 @@ export class SlotManager {
   analyzeDocuments(docs: Map<string, IniDocument>): SlotAnalysisResult {
     const newSlots: ModelSlot[] = [];
     const newUnmatched: UnmatchedSection[] = [];
+
+    // 0. INI 문서들 전체에서 정의/참조된 텍스처 및 이미지 파일명 수집
+    const texFilesSet = new Set<string>();
+    for (const iniDoc of docs.values()) {
+      for (const section of iniDoc.sections) {
+        // [Resource...] 섹션의 filename 프로퍼티 우선 수집
+        if (section.properties['filename']) {
+          const fn = section.properties['filename'].replace(/['"]/g, '').trim();
+          if (fn) texFilesSet.add(fn);
+        }
+        // 섹션 내 모든 프로퍼티에서 이미지 확장자 파일명 수집
+        for (const val of Object.values(section.properties)) {
+          const cleanVal = val.replace(/['"]/g, '').trim();
+          if (/\.(dds|png|tga|jpg|jpeg|webp)$/i.test(cleanVal)) {
+            texFilesSet.add(cleanVal);
+          }
+        }
+      }
+    }
+    this.detectedTextureFiles = Array.from(texFilesSet).sort((a, b) => a.localeCompare(b));
 
     // 1. 모드 내 모델 섹션 수집 (ib = 구문이 있는 섹션만 모델로 파악)
     const candidates: Array<{ section: IniSection; filePath: string; doc: IniDocument }> = [];

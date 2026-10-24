@@ -7253,7 +7253,32 @@ button.has-icon {
 .slot-tex-type.normal { color: #f472b6; }
 .slot-tex-type.lightmap { color: #fbbf24; }
 .slot-tex-type.specular { color: #34d399; }
-.slot-tex-type.fx { color: #c084fc; }
+.slot-tex-file-select {
+  flex: 1;
+  min-width: 0;
+  font-family: 'Cascadia Code', Consolas, monospace;
+  font-size: 11px;
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 2px 6px;
+  outline: none;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: border-color 0.15s;
+}
+
+.slot-tex-file-select:focus {
+  border-color: var(--accent);
+}
+
+.slot-tex-file-select option {
+  background: var(--bg-elev);
+  color: var(--fg);
+}
 
 .slot-tex-ref {
   font-family: 'Cascadia Code', Consolas, monospace;

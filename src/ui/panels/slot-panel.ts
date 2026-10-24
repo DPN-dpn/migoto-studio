@@ -215,7 +215,7 @@ export class SlotMatchingPanel {
     });
     card.appendChild(cardHeader);
 
-    // 텍스처 슬롯 목록 (파일 단위로 표시 및 사용자가 수동 수정 가능)
+    // 텍스처 슬롯 목록 (파일 드롭다운 선택 및 슬롯 추가/삭제 지원)
     const texContainer = document.createElement('div');
     texContainer.className = 'slot-texture-section';
 
@@ -238,27 +238,45 @@ export class SlotMatchingPanel {
         const item = document.createElement('div');
         item.className = 'slot-texture-item';
 
-        const fileDisplay = tex.textureFile || tex.resourceRef || '(파일 없음)';
-        const isFileMissing = !tex.textureFile;
+        // 1. 슬롯 종류 배지
+        const typeBadge = document.createElement('span');
+        typeBadge.className = `slot-tex-type ${tex.slotType}`;
+        typeBadge.textContent = tex.slotId;
+        item.appendChild(typeBadge);
 
-        item.innerHTML = `
-          <span class="slot-tex-type ${tex.slotType}">${tex.slotId}</span>
-          <span class="slot-tex-ref ${isFileMissing ? 'missing' : ''}" title="${tex.resourceRef ? `리소스: ${tex.resourceRef}\n` : ''}클릭하여 파일명 수정">${fileDisplay}</span>
-          <div class="slot-tex-item-actions">
-            <button class="slot-tex-btn edit-btn" title="텍스처 파일명 변경">✏️</button>
-            <button class="slot-tex-btn delete-btn" title="이 슬롯 삭제">🗑️</button>
-          </div>
-        `;
+        // 2. INI 감지 파일 드롭다운 선택기
+        const fileSelect = document.createElement('select');
+        fileSelect.className = 'slot-tex-file-select';
+        fileSelect.title = `"${tex.slotId}" 슬롯에 연결할 텍스처 파일 선택`;
+        this.populateTextureFileSelect(fileSelect, tex.textureFile);
 
-        // 파일명 클릭 또는 ✏️ 버튼 시 파일명 수정
-        const onEdit = () => this.promptEditTextureSlot(slot.sectionName, tex.slotId, tex.textureFile || '');
-        item.querySelector('.slot-tex-ref')?.addEventListener('click', onEdit);
-        item.querySelector('.edit-btn')?.addEventListener('click', onEdit);
+        fileSelect.addEventListener('change', (e) => {
+          const val = (e.target as HTMLSelectElement).value;
+          if (val === '__custom__') {
+            const entered = prompt(
+              `[${slot.sectionName}]의 "${tex.slotId}" 슬롯에 연결할 텍스처 파일명을 입력하세요:`,
+              tex.textureFile || '',
+            );
+            if (entered !== null) {
+              slotManager.setTextureSlot(slot.sectionName, tex.slotId, entered.trim(), tex.slotType);
+            } else {
+              this.render();
+            }
+          } else {
+            slotManager.setTextureSlot(slot.sectionName, tex.slotId, val, tex.slotType);
+          }
+        });
+        item.appendChild(fileSelect);
 
-        // 🗑️ 버튼 시 슬롯 삭제
-        item.querySelector('.delete-btn')?.addEventListener('click', () => {
+        // 3. 슬롯 삭제 버튼
+        const deleteBtn = document.createElement('button');
+        deleteBtn.className = 'slot-tex-btn delete-btn';
+        deleteBtn.title = `"${tex.slotId}" 슬롯 삭제`;
+        deleteBtn.textContent = '🗑️';
+        deleteBtn.addEventListener('click', () => {
           slotManager.removeTextureSlot(slot.sectionName, tex.slotId);
         });
+        item.appendChild(deleteBtn);
 
         texList.appendChild(item);
       }
@@ -266,10 +284,7 @@ export class SlotMatchingPanel {
     } else {
       const noTex = document.createElement('div');
       noTex.className = 'slot-no-textures';
-      noTex.innerHTML = `<span>연결된 텍스처 파일 없음</span> <button class="slot-btn-link add-tex-link">추가하기</button>`;
-      noTex.querySelector('.add-tex-link')?.addEventListener('click', () => {
-        this.promptAddTextureSlot(slot.sectionName);
-      });
+      noTex.innerHTML = `<span>연결된 텍스처 슬롯 없음</span>`;
       texContainer.appendChild(noTex);
     }
     card.appendChild(texContainer);
@@ -362,36 +377,63 @@ export class SlotMatchingPanel {
   }
 
   /**
-   * 텍스처 파일명 수동 수정 프롬프트
+   * INI에서 감지된 텍스처 파일 선택 드롭다운 채우기
    */
-  private promptEditTextureSlot(sectionName: string, slotId: string, currentFile: string) {
-    const entered = prompt(
-      `[${sectionName}]의 "${slotId}" 슬롯에 매칭할 텍스처 파일명을 입력하세요 (예: Diffuse.dds):`,
-      currentFile,
-    );
-    if (entered !== null) {
-      const trimmed = entered.trim();
-      slotManager.setTextureSlot(sectionName, slotId, trimmed);
+  private populateTextureFileSelect(select: HTMLSelectElement, currentFile?: string) {
+    select.innerHTML = '';
+
+    const defaultOpt = document.createElement('option');
+    defaultOpt.value = '';
+    defaultOpt.textContent = '(연결할 텍스처 파일 선택...)';
+    if (!currentFile) {
+      defaultOpt.selected = true;
     }
+    select.appendChild(defaultOpt);
+
+    const detectedFiles = slotManager.getDetectedTextureFiles();
+    if (detectedFiles.length > 0) {
+      const optGroup = document.createElement('optgroup');
+      optGroup.label = '📄 INI에서 감지된 텍스처 파일';
+      for (const f of detectedFiles) {
+        const opt = document.createElement('option');
+        opt.value = f;
+        opt.textContent = f;
+        if (currentFile && f.toLowerCase() === currentFile.toLowerCase()) {
+          opt.selected = true;
+        }
+        optGroup.appendChild(opt);
+      }
+      select.appendChild(optGroup);
+    }
+
+    // 만약 현재 연결된 파일이 있는데 감지 목록에 없다면 추가 표시
+    if (currentFile && !detectedFiles.some((f) => f.toLowerCase() === currentFile.toLowerCase())) {
+      const customFileOpt = document.createElement('option');
+      customFileOpt.value = currentFile;
+      customFileOpt.textContent = `${currentFile} (지정됨)`;
+      customFileOpt.selected = true;
+      select.appendChild(customFileOpt);
+    }
+
+    // 직접 입력 옵션
+    const directOpt = document.createElement('option');
+    directOpt.value = '__custom__';
+    directOpt.textContent = '✏️ 직접 파일명 입력...';
+    select.appendChild(directOpt);
   }
 
   /**
-   * 텍스처 슬롯 신규 추가 프롬프트
+   * 텍스처 슬롯만 추가 (파일은 드롭다운에서 선택하도록 파일명은 빈 값으로 생성)
    */
   private promptAddTextureSlot(sectionName: string) {
     const slotId = prompt(
-      `추가할 텍스처 슬롯 ID를 입력하세요:\n(예: Diffuse, NormalMap, LightMap, MaterialMap, WEngineFX 등)`,
+      `추가할 텍스처 슬롯 ID를 입력하세요:\n(예: Diffuse, NormalMap, LightMap, MaterialMap, WEngineFX, Specular 등)`,
       'Diffuse',
     );
     if (!slotId || !slotId.trim()) return;
 
-    const textureFile = prompt(
-      `"${slotId.trim()}" 슬롯에 연결할 텍스처 파일명을 입력하세요 (예: Texture_D.dds):`,
-      '',
-    );
-    if (textureFile !== null) {
-      slotManager.setTextureSlot(sectionName, slotId.trim(), textureFile.trim());
-    }
+    // 슬롯만 추가하고 파일은 드롭다운에서 선택할 수 있도록 빈 문자열로 슬롯 생성
+    slotManager.setTextureSlot(sectionName, slotId.trim(), '');
   }
 
   /**

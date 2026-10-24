@@ -175,9 +175,11 @@ hash = 1003
 ib = ResourceBladeIB
 diffuse = ResourceBlade
 
-[TextureOverrideNonModelSection]
-hash = 9999
-diffuse = ResourceSomething
+[ResourceHair]
+filename = EllenHair.dds
+
+[ResourceTail]
+filename = EllenTail.dds
 `;
   const doc = parseIni(iniText);
   const result = sm.analyzeDocuments(new Map([['ellen.ini', doc]]));
@@ -188,6 +190,11 @@ diffuse = ResourceSomething
   assert.ok(parts.includes('Hair'));
   assert.ok(parts.includes('Tail'));
   assert.ok(parts.includes('SharkBlade'));
+
+  // Detected texture files from INI
+  const detectedFiles = sm.getDetectedTextureFiles();
+  assert.ok(detectedFiles.includes('EllenHair.dds'));
+  assert.ok(detectedFiles.includes('EllenTail.dds'));
 
   // Custom manual mapping with an arbitrary part name
   sm.setPartMapping('TextureOverrideEllenTail', 'CyberTail');

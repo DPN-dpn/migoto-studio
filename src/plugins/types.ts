@@ -572,6 +572,8 @@ export interface PluginContext {
     setTextureSlot(sectionName: string, slotId: string, textureFile: string, slotType?: TextureSlotType): void;
     /** 특정 섹션의 텍스처 슬롯을 수동 삭제 */
     removeTextureSlot(sectionName: string, slotId: string): void;
+    /** INI 파일들에서 감지된 텍스처/이미지 파일명 목록 조회 */
+    getDetectedTextureFiles(): string[];
     /** 게임/엔진별 특수 텍스처 구문(예: ZZMI SlotFix 등)을 해석하기 위한 커스텀 리졸버 등록 */
     registerTextureSlotResolver(resolver: TextureSlotResolver): () => void;
   };

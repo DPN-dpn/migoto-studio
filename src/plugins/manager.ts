@@ -2010,6 +2010,7 @@ export default {
         removeTextureSlot: (sectionName: string, slotId: string) => {
           slotManager.removeTextureSlot(sectionName, slotId);
         },
+        getDetectedTextureFiles: () => slotManager.getDetectedTextureFiles(),
         registerTextureSlotResolver: (resolver: TextureSlotResolver) => {
           const unregister = slotManager.registerTextureSlotResolver(resolver);
           callbacks.onRegisterCleanup(unregister);

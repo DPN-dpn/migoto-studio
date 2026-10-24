@@ -75,6 +75,14 @@ context.slots.setTextureSlot('TextureOverrideJaneTail', 'Diffuse', 'Jane_Tail_D.
 context.slots.removeTextureSlot('TextureOverrideJaneTail', 'Diffuse');
 ```
 
+### `context.slots.getDetectedTextureFiles()`
+모드 INI 파일들 전역에서 감지/참조된 텍스처 및 이미지 파일명(`filename = ...`, `.dds`, `.png` 등) 목록을 정렬된 문자열 배열로 반환합니다.
+
+```typescript
+const texFiles = context.slots.getDetectedTextureFiles();
+context.logger.info(`감지된 텍스처 파일: ${texFiles.join(', ')}`);
+```
+
 ---
 
 ## 2. 커스텀 텍스처 슬롯 리졸버 등록
