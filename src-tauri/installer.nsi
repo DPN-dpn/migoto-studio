@@ -478,8 +478,8 @@ LangString secPluginAI ${LANG_ENGLISH} "AI Modding Agent"
 LangString secPluginAIDesc ${LANG_KOREAN} "LLM API(OpenAI, Gemini, Ollama)를 연동하여 INI 분석 및 코드 작성을 돕습니다."
 LangString secPluginAIDesc ${LANG_ENGLISH} "AI assistant supporting OpenAI, Gemini, and Ollama APIs for INI analysis and generation."
 
-LangString secPluginViewer ${LANG_KOREAN} "DDS / 텍스처 뷰어"
-LangString secPluginViewer ${LANG_ENGLISH} "DDS / Texture Viewer"
+LangString secPluginViewer ${LANG_KOREAN} "텍스처 라이브러리"
+LangString secPluginViewer ${LANG_ENGLISH} "Texture Library"
 
 LangString secPluginViewerDesc ${LANG_KOREAN} "DDS 및 이미지 파일을 에디터 탭 내에서 인터랙티브하게 검사하고 미리봅니다."
 LangString secPluginViewerDesc ${LANG_ENGLISH} "Interactive in-editor viewer for DDS and image texture assets."
@@ -787,9 +787,10 @@ SectionGroup "$(secDefaultPlugins)" SecGroupPlugins
   Section "$(secPluginViewer)" SecPluginViewer
     SetShellVarContext current
     RMDir /r "$APPDATA\MigotoStudio\plugins\asset-viewer"
-    CreateDirectory "$APPDATA\MigotoStudio\plugins\asset-viewer"
-    SetOutPath "$APPDATA\MigotoStudio\plugins\asset-viewer"
-    File /r "${DEFAULT_PLUGINS_DIR}\asset-viewer\*.*"
+    RMDir /r "$APPDATA\MigotoStudio\plugins\texture-library"
+    CreateDirectory "$APPDATA\MigotoStudio\plugins\texture-library"
+    SetOutPath "$APPDATA\MigotoStudio\plugins\texture-library"
+    File /r "${DEFAULT_PLUGINS_DIR}\texture-library\*.*"
   SectionEnd
 
   Section "$(secPluginPython)" SecPluginPython
