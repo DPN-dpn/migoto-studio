@@ -24,6 +24,8 @@ export interface PluginManifest {
   category?: 'tools' | 'assets' | 'ai' | 'general';
   location?: string;
   dependencies?: Record<string, string>;
+  repository?: string;
+  homepage?: string;
 }
 
 /**

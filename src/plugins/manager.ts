@@ -799,7 +799,36 @@ export class PluginManager {
           files: disk.files,
         };
         this.plugins.set(manifest.id, instance);
+
+        // .github-source.json 파일이 있으면 GitHub 출처 정보 복원
+        if (disk.files && disk.files['.github-source.json']) {
+          try {
+            const parsedSource = JSON.parse(disk.files['.github-source.json']);
+            if (parsedSource && parsedSource.owner && parsedSource.repo) {
+              this.githubSources.set(manifest.id, {
+                ...parsedSource,
+                installedVersion: manifest.version,
+              });
+            }
+          } catch {}
+        } else if (manifest.repository || manifest.homepage) {
+          // plugin.json의 repository 또는 homepage 필드에서 GitHub 출처 자동 감지
+          const repoUrl = manifest.repository || manifest.homepage || '';
+          const ref = parseGitHubUrl(repoUrl);
+          if (ref && !this.githubSources.has(manifest.id)) {
+            this.githubSources.set(manifest.id, {
+              owner: ref.owner,
+              repo: ref.repo,
+              url: repoUrl,
+              installedVersion: manifest.version,
+              lastCheckedVersion: manifest.version,
+              updateAvailable: false,
+              checkedAt: Date.now(),
+            });
+          }
+        }
       }
+      this.saveGitHubSources();
 
       // Topologically sort enabled plugins so dependencies activate before dependents
       const enabledWithScript = Array.from(this.plugins.values()).filter(
@@ -1149,6 +1178,22 @@ export class PluginManager {
           const fullPath = `${baseFolder}/${relPath}`;
           await platform().writeBinaryFile!(fullPath, fileData);
         }
+
+        if (sourceMeta) {
+          const sourceObj = {
+            owner: sourceMeta.owner,
+            repo: sourceMeta.repo,
+            url: sourceMeta.url,
+            installedVersion: manifest.version,
+            lastCheckedVersion: manifest.version,
+            updateAvailable: false,
+            checkedAt: Date.now(),
+          };
+          const metaPath = `${baseFolder}/.github-source.json`;
+          const encoder = new TextEncoder();
+          await platform().writeBinaryFile!(metaPath, encoder.encode(JSON.stringify(sourceObj, null, 2)));
+        }
+
         appLogger.info('Plugin', `플러그인 파일 설치 완료: ${baseFolder} (${Object.keys(files).length}개 파일 저장됨)`);
       } catch (err) {
         appLogger.error('Plugin', `플러그인 파일 저장 실패: ${err}`);
@@ -1157,6 +1202,17 @@ export class PluginManager {
       }
     } else if (platform().saveDiskPlugin) {
       try {
+        if (sourceMeta) {
+          textFiles['.github-source.json'] = JSON.stringify({
+            owner: sourceMeta.owner,
+            repo: sourceMeta.repo,
+            url: sourceMeta.url,
+            installedVersion: manifest.version,
+            lastCheckedVersion: manifest.version,
+            updateAvailable: false,
+            checkedAt: Date.now(),
+          }, null, 2);
+        }
         await platform().saveDiskPlugin!(manifest.id, manifestJson, scriptContent, textFiles);
         appLogger.info('Plugin', `플러그인 저장 완료 (웹 스토리지): ${manifest.id}`);
       } catch (err) {
@@ -1438,6 +1494,48 @@ export class PluginManager {
       this.showToast(`업데이트 실패: ${msg}`, 'error');
       return false;
     }
+  }
+
+  /**
+   * 플러그인에 GitHub 저장소 출처를 수동으로 연결하고 업데이트를 확인합니다.
+   */
+  async linkPluginToGitHub(pluginId: string, urlStr: string): Promise<boolean> {
+    const p = this.plugins.get(pluginId);
+    if (!p) return false;
+
+    const ref = parseGitHubUrl(urlStr);
+    if (!ref) {
+      this.showToast('올바른 GitHub 저장소 링크를 입력해주세요 (예: https://github.com/owner/repo 또는 owner/repo)', 'warn');
+      return false;
+    }
+
+    const source: PluginGitHubSource = {
+      owner: ref.owner,
+      repo: ref.repo,
+      url: urlStr.trim(),
+      installedVersion: p.manifest.version,
+      lastCheckedVersion: p.manifest.version,
+      updateAvailable: false,
+      checkedAt: Date.now(),
+    };
+
+    this.githubSources.set(pluginId, source);
+    this.saveGitHubSources();
+
+    // 데스크톱 환경에서는 플러그인 폴더 내 .github-source.json 파일로도 저장
+    if (platform().kind === 'desktop' && platform().getPluginsDir && platform().writeBinaryFile) {
+      try {
+        const pluginsDir = await platform().getPluginsDir!();
+        const metaPath = `${pluginsDir.replace(/\\/g, '/')}/${pluginId}/.github-source.json`;
+        const encoder = new TextEncoder();
+        await platform().writeBinaryFile!(metaPath, encoder.encode(JSON.stringify(source, null, 2)));
+      } catch {}
+    }
+
+    this.notify();
+    this.showToast(`GitHub 출처(${ref.owner}/${ref.repo})가 연결되었습니다. 업데이트를 확인합니다.`, 'info');
+    await this.checkPluginUpdates({ showToast: true });
+    return true;
   }
 
   /**

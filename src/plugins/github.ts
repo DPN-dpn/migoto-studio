@@ -79,21 +79,21 @@ export function parseGitHubUrl(input: string): GitHubRepoRef | null {
     };
   }
 
-  // 4. 특정 브랜치/트리 링크: https://github.com/owner/repo/tree/branch-name
-  const treeMatch = trimmed.match(
-    /^https?:\/\/github\.com\/([^/]+)\/([^/]+)\/tree\/([^/?#]+)/i,
+  // 4. 특정 브랜치/트리/파일 링크: https://github.com/owner/repo/(tree|blob)/branch-name(/path...)?
+  const branchPathMatch = trimmed.match(
+    /^https?:\/\/github\.com\/([^/]+)\/([^/]+)\/(?:tree|blob)\/([^/?#]+)(?:\/.*)?$/i,
   );
-  if (treeMatch) {
+  if (branchPathMatch) {
     return {
-      owner: treeMatch[1],
-      repo: treeMatch[2].replace(/\.git$/i, ''),
-      tag: treeMatch[3],
+      owner: branchPathMatch[1],
+      repo: branchPathMatch[2].replace(/\.git$/i, ''),
+      tag: branchPathMatch[3],
     };
   }
 
-  // 5. 일반 저장소 링크 또는 owner/repo 단축 형식
+  // 5. 일반 저장소 링크 또는 owner/repo 단축 형식 (뒤에 서브패스가 붙어있는 경우도 포함)
   const repoMatch = trimmed.match(
-    /^(?:https?:\/\/github\.com\/)?([a-zA-Z0-9_.-]+)\/([a-zA-Z0-9_.-]+)$/i,
+    /^(?:https?:\/\/github\.com\/)?([a-zA-Z0-9_.-]+)\/([a-zA-Z0-9_.-]+)(?:\/.*)?$/i,
   );
   if (repoMatch) {
     return {
@@ -184,7 +184,6 @@ export async function fetchGitHubPluginRelease(ref: GitHubRepoRef): Promise<GitH
   if (!candidateBranches.includes('main')) candidateBranches.push('main');
   if (!candidateBranches.includes('master')) candidateBranches.push('master');
 
-  let version = '1.0.0';
   for (const branch of candidateBranches) {
     for (const manifestName of ['plugin.json', 'manifest.json']) {
       try {
@@ -199,11 +198,10 @@ export async function fetchGitHubPluginRelease(ref: GitHubRepoRef): Promise<GitH
         if (manifestRes.ok) {
           const manifest = await manifestRes.json();
           if (manifest.version) {
-            version = manifest.version;
             return {
               owner,
               repo,
-              version,
+              version: manifest.version,
               zipUrl: `https://github.com/${owner}/${repo}/archive/refs/heads/${branch}.zip`,
               isArchiveFallback: true,
             };
@@ -213,15 +211,19 @@ export async function fetchGitHubPluginRelease(ref: GitHubRepoRef): Promise<GitH
     }
   }
 
-  // 최종 fallback: main.zip
-  const defaultBranch = candidateBranches[0] || 'main';
-  return {
-    owner,
-    repo,
-    version,
-    zipUrl: `https://github.com/${owner}/${repo}/archive/refs/heads/${defaultBranch}.zip`,
-    isArchiveFallback: true,
-  };
+  // 태그가 버전 형태라면 태그명을 최후 fallback으로 사용
+  if (tag && tag !== 'latest' && /^\d/.test(tag.replace(/^v/i, ''))) {
+    const defaultBranch = candidateBranches[0] || 'main';
+    return {
+      owner,
+      repo,
+      version: tag.replace(/^v/i, ''),
+      zipUrl: `https://github.com/${owner}/${repo}/archive/refs/heads/${defaultBranch}.zip`,
+      isArchiveFallback: true,
+    };
+  }
+
+  throw new Error(`GitHub 저장소(${owner}/${repo})에서 릴리스 또는 plugin.json 버전을 확인할 수 없습니다.`);
 }
 
 /**

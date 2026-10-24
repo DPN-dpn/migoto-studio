@@ -2171,6 +2171,13 @@ test('parseGitHubUrl correctly parses various GitHub repository and release URLs
   assert.equal(refTree.repo, 'cool-plugin');
   assert.equal(refTree.tag, 'main');
 
+  // Blob / file URL with subpath
+  const refBlob = parseGitHubUrl('https://github.com/DPN-dpn/mod-viewer-for-migoto-studio/blob/main/plugin.json');
+  assert.ok(refBlob);
+  assert.equal(refBlob.owner, 'DPN-dpn');
+  assert.equal(refBlob.repo, 'mod-viewer-for-migoto-studio');
+  assert.equal(refBlob.tag, 'main');
+
   // Trailing slash
   const refSlash = parseGitHubUrl('https://github.com/alice/cool-plugin/');
   assert.ok(refSlash);
