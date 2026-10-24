@@ -180,6 +180,9 @@ export async function bootNativeWindow(params: URLSearchParams): Promise<void> {
     window.addEventListener('beforeunload', () => clearInterval(checkOpener));
   }
 
+  // 타 플러그인 공개 API 저장소 (예: texture-library의 decodeDDS 등)
+  const pluginApis = new Map<string, any>();
+
   // 4. 서브윈도우 전용 컨텍스트(NativeSubWindowContext) 구축
   const context: NativeSubWindowContext = {
     container: rootContainer,
@@ -313,6 +316,38 @@ export async function bootNativeWindow(params: URLSearchParams): Promise<void> {
         console.debug(`[OS창:${title}]`, ...args);
       },
     },
+    plugins: {
+      getPluginApi: <T = any>(targetId: string): T | undefined => {
+        return pluginApis.get(targetId);
+      },
+      registerApi: (api: any) => {
+        pluginApis.set(pluginId, api);
+      },
+      hasPluginApi: (targetId: string) => {
+        return pluginApis.has(targetId);
+      },
+    },
+    storage: {
+      get: <T = any>(key: string, defaultValue?: T): T => {
+        try {
+          const raw = localStorage.getItem(`migoto_plugin_${pluginId}_${key}`);
+          if (raw === null) return defaultValue as T;
+          return JSON.parse(raw);
+        } catch {
+          return defaultValue as T;
+        }
+      },
+      set: (key: string, val: any) => {
+        try {
+          localStorage.setItem(`migoto_plugin_${pluginId}_${key}`, JSON.stringify(val));
+        } catch {}
+      },
+      delete: (key: string) => {
+        try {
+          localStorage.removeItem(`migoto_plugin_${pluginId}_${key}`);
+        } catch {}
+      },
+    },
   };
 
   // 5. 메인 창에 준비 완료 알림
@@ -324,23 +359,194 @@ export async function bootNativeWindow(params: URLSearchParams): Promise<void> {
       const diskList = await platform().listDiskPlugins!();
       const disk = diskList.find((p) => p.id === pluginId);
 
+      // 종속/연동 플러그인 활성화를 위한 안전한 격리 컨텍스트 팩토리
+      const createSafePluginContext = (targetPluginId: string) => ({
+        ...context,
+        editor: {
+          registerCustomViewer: () => {},
+          registerCustomEditor: () => {},
+          openFile: async () => {},
+          getActiveFile: () => null,
+          onDidChangeActiveFile: () => () => {},
+          setText: () => {},
+          getText: () => '',
+        },
+        commands: {
+          registerCommand: () => {},
+          executeCommand: async () => {},
+        },
+        views: {
+          registerView: () => {},
+        },
+        ui: context.ui || createUIBuilder(),
+        workspace: context.workspace,
+        logger: {
+          info: (...args: any[]) => context.logger?.info?.(...args),
+          warn: (...args: any[]) => context.logger?.warn?.(...args),
+          error: (...args: any[]) => context.logger?.error?.(...args),
+          debug: (...args: any[]) => context.logger?.debug?.(...args),
+        },
+        storage: {
+          get: <T = any>(k: string, d?: T): T => {
+            try {
+              const val = localStorage.getItem(`migoto_plugin_${targetPluginId}_${k}`);
+              return val === null ? (d as T) : JSON.parse(val);
+            } catch {
+              return d as T;
+            }
+          },
+          set: (k: string, v: any) => {
+            try {
+              localStorage.setItem(`migoto_plugin_${targetPluginId}_${k}`, JSON.stringify(v));
+            } catch {}
+          },
+          delete: (k: string) => {
+            try {
+              localStorage.removeItem(`migoto_plugin_${targetPluginId}_${k}`);
+            } catch {}
+          },
+        },
+        plugins: {
+          registerApi: (api: any) => {
+            pluginApis.set(targetPluginId, api);
+          },
+          getPluginApi: <T = any>(id: string): T | undefined => {
+            return pluginApis.get(id);
+          },
+          hasPluginApi: (id: string) => pluginApis.has(id),
+        },
+      });
+
+      // 플러그인 모듈 로드 및 공개 API 등록 헬퍼
+      const loadPluginModule = async (targetDisk: any) => {
+        if (!targetDisk || pluginApis.has(targetDisk.id)) return;
+        const targetId = targetDisk.id;
+        try {
+          let targetManifest: any = null;
+          try {
+            if (targetDisk.manifestJson) {
+              targetManifest = JSON.parse(targetDisk.manifestJson);
+            }
+          } catch {}
+
+          const candidateFiles = [
+            targetManifest?.main,
+            targetDisk.entryPath,
+            'plugin.js',
+            'index.js',
+            'index.ts',
+            'main.js',
+          ].filter(Boolean);
+
+          const filesMap: Record<string, string> = targetDisk.files || {};
+          let resolvedFileName = '';
+          let scriptSource = '';
+
+          for (const cand of candidateFiles) {
+            if (!cand) continue;
+            const candNorm = cand.replace(/^[./\\]+/, '').replace(/\\/g, '/').toLowerCase();
+            for (const [k, content] of Object.entries(filesMap)) {
+              const kNorm = k.replace(/^[./\\]+/, '').replace(/\\/g, '/').toLowerCase();
+              if (kNorm === candNorm && content) {
+                resolvedFileName = k;
+                scriptSource = content;
+                break;
+              }
+            }
+            if (scriptSource) break;
+          }
+
+          if (!scriptSource && targetDisk.scriptContent) {
+            resolvedFileName = targetDisk.entryPath || targetManifest?.main || 'plugin.js';
+            scriptSource = targetDisk.scriptContent;
+          }
+
+          if (!scriptSource) {
+            console.warn(`[NativeSubWindow] 플러그인 "${targetId}"의 진입 스크립트를 찾을 수 없습니다.`);
+            return;
+          }
+
+          const linked = linkPluginModules(scriptSource, resolvedFileName, filesMap);
+          const mod = await import(/* @vite-ignore */ linked.entryUrl);
+          const targetPlugin = mod.default || mod;
+          const targetContext = createSafePluginContext(targetId);
+
+          let exportedApi: any = null;
+          if (typeof targetPlugin?.activate === 'function') {
+            exportedApi = await targetPlugin.activate(targetContext);
+          } else if (typeof targetPlugin === 'function') {
+            exportedApi = await targetPlugin(targetContext);
+          } else {
+            exportedApi = targetPlugin;
+          }
+
+          if (exportedApi && typeof exportedApi === 'object' && !pluginApis.has(targetId)) {
+            pluginApis.set(targetId, exportedApi);
+          } else if (!pluginApis.has(targetId) && targetPlugin && typeof targetPlugin === 'object') {
+            pluginApis.set(targetId, targetPlugin);
+          }
+        } catch (err) {
+          console.warn(`[NativeSubWindow] 플러그인 "${targetId}" 로드 실패:`, err);
+        }
+      };
+
       if (disk && disk.files) {
-        // 엔트리 파일 자동 탐색 폴백
-        let targetFile = entryFile;
-        if (!targetFile) {
-          const candidates = ['subwindow.js', 'sub-window.js', 'window.js', disk.entryPath || 'index.js'];
-          for (const cand of candidates) {
-            if (disk.files[cand] || disk.files[`./${cand}`]) {
-              targetFile = cand;
+        // 1. 디스크에 texture-library가 존재하면 최우선으로 사전 로드 (3D 뷰어 / 에셋 핵심 라이브러리)
+        const texLibDisk = diskList.find((p) => p.id === 'texture-library');
+        if (texLibDisk) {
+          await loadPluginModule(texLibDisk);
+        }
+
+        // 2. manifest.dependencies에 정의된 모든 필수 종속 플러그인 사전 로드
+        try {
+          const manifest = disk.manifestJson ? JSON.parse(disk.manifestJson) : null;
+          if (manifest?.dependencies && typeof manifest.dependencies === 'object') {
+            for (const depId of Object.keys(manifest.dependencies)) {
+              if (pluginApis.has(depId)) continue;
+              const depDisk = diskList.find((p) => p.id === depId);
+              if (depDisk) {
+                await loadPluginModule(depDisk);
+              }
+            }
+          }
+        } catch (mErr) {
+          console.warn('[NativeSubWindow] 매니페스트 종속성 파싱 경고:', mErr);
+        }
+
+        // 3. 엔트리 파일 자동 탐색 및 로드 (정규화된 경로 매칭)
+        const candidateEntryFiles = [
+          entryFile,
+          'subwindow.js',
+          'sub-window.js',
+          'window.js',
+          disk.entryPath,
+          'index.js',
+        ].filter(Boolean);
+
+        let resolvedEntryName = '';
+        let resolvedEntryContent = '';
+
+        for (const cand of candidateEntryFiles) {
+          if (!cand) continue;
+          const candNorm = cand.replace(/^[./\\]+/, '').replace(/\\/g, '/').toLowerCase();
+          for (const [k, content] of Object.entries(disk.files as Record<string, string>)) {
+            const kNorm = k.replace(/^[./\\]+/, '').replace(/\\/g, '/').toLowerCase();
+            if (kNorm === candNorm && content) {
+              resolvedEntryName = k;
+              resolvedEntryContent = content;
               break;
             }
           }
+          if (resolvedEntryContent) break;
         }
 
-        const fileEntry = targetFile ? (disk.files[targetFile] || disk.files[`./${targetFile}`]) : null;
+        if (!resolvedEntryContent && disk.scriptContent) {
+          resolvedEntryName = entryFile || disk.entryPath || 'subwindow.js';
+          resolvedEntryContent = disk.scriptContent;
+        }
 
-        if (fileEntry && targetFile) {
-          const linked = linkPluginModules(fileEntry, targetFile, disk.files);
+        if (resolvedEntryContent && resolvedEntryName) {
+          const linked = linkPluginModules(resolvedEntryContent, resolvedEntryName, disk.files);
           const mod = await import(/* @vite-ignore */ linked.entryUrl);
           const entryFn =
             typeof mod.default === 'function'

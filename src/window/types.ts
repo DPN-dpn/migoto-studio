@@ -152,4 +152,16 @@ export interface NativeSubWindowContext {
   workspace?: any;
   /** 로거 지원 */
   logger?: any;
+  /** 타 플러그인 연동 및 API 접근 지원 */
+  plugins?: {
+    getPluginApi<T = any>(pluginId: string): T | undefined;
+    registerApi?(api: any): void;
+    hasPluginApi?(pluginId: string): boolean;
+  };
+  /** 플러그인 전용 로컬 저장소 */
+  storage?: {
+    get<T = any>(key: string, defaultValue?: T): T;
+    set(key: string, value: any): void;
+    delete(key: string): void;
+  };
 }
