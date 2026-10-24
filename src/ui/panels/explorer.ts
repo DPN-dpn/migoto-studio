@@ -106,6 +106,14 @@ export class FileExplorer {
     return this.currentFolder !== null;
   }
 
+  get folder(): FolderRef | null {
+    return this.currentFolder;
+  }
+
+  get folderPath(): string | null {
+    return this.currentFolder?.id ?? null;
+  }
+
   get folderName(): string {
     return this.currentFolder?.name ?? '';
   }

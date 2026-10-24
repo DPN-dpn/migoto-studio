@@ -216,3 +216,16 @@
 
 - 설정과 최근 파일 목록은 **같은 파일 `settings.json`** 에 저장된다. 이 파일은 앱 데이터 폴더(`MigotoStudio`) 안에 있어 백업과 함께 한 곳에서 관리된다.
 - 개발 실행 중에는 프로젝트의 `data/settings.json`이다.
+
+## 3D 모델 및 텍스처 슬롯 매칭 엔진 (코어 내장 및 플러그인 확장)
+
+- **배경 및 목적**: 모드 제작 시 각 3D 부위(Head, Body, Dress, Hair, Face, Weapon 등)와 연결된 텍스처(Diffuse, Normal, LightMap 등)를 파악하고 추적하는 작업이 필수적입니다. 이를 플러그인마다 중복 파싱하지 않고 코어 수준에서 통합 관리하도록 엔진을 구축했습니다.
+- **코어 탈종속화 원칙 준수**:
+  - 코어 에디터(`src/core/slots/`)는 범용 표준 3DMigoto 구문(`ps-t0`, `diffuse = ...`, 섹션 이름 휴리스틱)만 처리합니다.
+  - 특정 게임이나 런처에 종속된 텍스처 문법(예: ZZMI SlotFix `Resource\ZZMI\Diffuse = ref ...`, TTL `Resource\TTL\TransparencyTex`)은 코어에 하드코딩하지 않고, 전용 플러그인(`zzmi-support`)이 `context.slots.registerTextureSlotResolver`를 통해 동적으로 리졸버를 등록합니다.
+- **수동 매칭 및 인터페이스**:
+  - 섹션 이름만으로 부위 판별이 어려운 경우, 액티비티 바의 **슬롯 매칭(Slot Matching)** 사이드바 패널에서 사용자가 직접 드롭다운으로 부위를 매칭할 수 있습니다.
+  - 사용자의 수동 매칭 결과는 `localStorage`(`migoto_slot_manual_mappings`)에 안전하게 저장되어 재실행 시에도 유지됩니다.
+- **플러그인 API (`context.slots`) 제공**:
+  - 다른 플러그인(에셋 뷰어, 자동 컨버터 등)은 복잡한 INI 파싱 없이 `context.slots.getSlots()` 또는 `context.slots.getSlot('body')` 한 줄로 매칭된 3D 모델 및 텍스처 슬롯 정보를 즉시 가져다 활용할 수 있습니다.
+

@@ -14,6 +14,7 @@ import { ConsolePanel } from './ui/panels/console-panel';
 import { appLogger } from './core/logger';
 import { PluginManager } from './plugins';
 import { PluginPanel } from './ui/panels/plugin-panel';
+import { SlotMatchingPanel } from './ui/panels/slot-panel';
 import { ActivityBar } from './ui/layout/activitybar';
 import { MenuBar } from './ui/layout/menubar';
 import { getSettings, loadSettings, onSettingsChange } from './core/workspace/settings';
@@ -197,6 +198,7 @@ async function boot() {
   });
   const pluginManager = new PluginManager(doc, editor, explorer);
   new PluginPanel($('sidebar-panel-plugins'), pluginManager);
+  const slotPanel = new SlotMatchingPanel($('sidebar-panel-slots'), doc, editor, explorer);
   new TabBar(doc, $('tabbar'), $('btn-new-tab'), $('tab-menu'));
 
   // ---- Activity Bar (세로 툴바) ----
@@ -214,6 +216,8 @@ async function boot() {
     $('sidebar-panel-plugins'),
     outline,
     () => openSettings(),
+    $('act-slots'),
+    $('sidebar-panel-slots'),
   );
 
   pluginManager.setActivityBar(activityBar);

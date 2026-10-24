@@ -1,4 +1,4 @@
-import type { PluginContext } from '../../src/plugins/types.ts';
+import type { PluginContext, TextureSlotResolver, TextureSlot, IniSection, IniDocument } from '../../src/plugins/types.ts';
 
 export function registerZzmiRules(context: PluginContext): (() => void)[] {
   const cleanups: (() => void)[] = [];
@@ -73,6 +73,119 @@ export function registerZzmiRules(context: PluginContext): (() => void)[] {
     );
   }
 
+  // 5. ZZMI 전용 텍스처 슬롯픽스(SlotFix) 리졸버 등록
+  if (context.slots?.registerTextureSlotResolver) {
+    cleanups.push(context.slots.registerTextureSlotResolver(createZzmiSlotResolver()));
+  }
+
   return cleanups;
+}
+
+/**
+ * ZZMI 슬롯픽스(SlotFix) 및 TTL 구문을 해석하는 텍스처 슬롯 리졸버 생성
+ */
+export function createZzmiSlotResolver(): TextureSlotResolver {
+  return {
+    id: 'zzmi-slotfix',
+    name: 'ZZMI 슬롯픽스 리졸버 (SlotFix & TTL)',
+    priority: 10,
+    resolveSlots: (section: IniSection, doc: IniDocument, allDocs?: Map<string, IniDocument>): TextureSlot[] | null => {
+      const slots: TextureSlot[] = [];
+      const props = section.properties;
+
+      const resolveFilename = (resName: string): string | undefined => {
+        const clean = resName.replace(/^[\\$]+/, '').replace(/^ref\s+/i, '').trim();
+        const candidates = [clean, `Resource${clean}`, `Resource\\${clean}`];
+        for (const name of candidates) {
+          const sec = doc.getSection(name);
+          if (sec && sec.properties['filename']) {
+            return sec.properties['filename'].replace(/['"]/g, '').trim();
+          }
+        }
+        if (allDocs) {
+          for (const otherDoc of allDocs.values()) {
+            for (const name of candidates) {
+              const sec = otherDoc.getSection(name);
+              if (sec && sec.properties['filename']) {
+                return sec.properties['filename'].replace(/['"]/g, '').trim();
+              }
+            }
+          }
+        }
+        return undefined;
+      };
+
+      const checkProperties = (pRecord: Record<string, string>, srcSec: string) => {
+        for (const [key, rawVal] of Object.entries(pRecord)) {
+          const cleanKey = key.trim();
+          const cleanVal = rawVal.replace(/^ref\s+/i, '').trim();
+
+          // Resource\ZZMI\... 패턴
+          const zzmiMatch = cleanKey.match(/^Resource\\ZZMI\\(.+)$/i);
+          if (zzmiMatch) {
+            const slotName = zzmiMatch[1].trim();
+            const lowerSlot = slotName.toLowerCase();
+            let slotType: TextureSlot['slotType'] = 'custom';
+            let displaySlotName = slotName;
+            if (lowerSlot.includes('diffuse')) { slotType = 'diffuse'; displaySlotName = 'Diffuse'; }
+            else if (lowerSlot.includes('normal')) { slotType = 'normal'; displaySlotName = 'NormalMap'; }
+            else if (lowerSlot.includes('light')) { slotType = 'light'; displaySlotName = 'LightMap'; }
+            else if (lowerSlot.includes('material')) { slotType = 'material'; displaySlotName = 'MaterialMap'; }
+            else if (lowerSlot.includes('fx') || lowerSlot.includes('wengine')) { slotType = 'fx'; displaySlotName = 'WEngineFX'; }
+
+            slots.push({
+              slotId: `ZZMI\\${displaySlotName}`,
+              slotType,
+              resourceRef: cleanVal,
+              textureFile: resolveFilename(cleanVal),
+              sourceSection: srcSec,
+              rawLine: `${key} = ${rawVal}`,
+            });
+            continue;
+          }
+
+          // Resource\TTL\... 패턴
+          const ttlMatch = cleanKey.match(/^Resource\\TTL\\(.+)$/i);
+          if (ttlMatch) {
+            const slotName = ttlMatch[1].trim();
+            const lowerTtl = slotName.toLowerCase();
+            let displayTtl = slotName;
+            if (lowerTtl.includes('transparency')) displayTtl = 'TransparencyTex';
+
+            slots.push({
+              slotId: `TTL\\${displayTtl}`,
+              slotType: 'custom',
+              resourceRef: cleanVal,
+              textureFile: resolveFilename(cleanVal),
+              sourceSection: srcSec,
+              rawLine: `${key} = ${rawVal}`,
+            });
+            continue;
+          }
+        }
+      };
+
+      // 1. 현재 섹션의 프로퍼티 직접 확인
+      checkProperties(props, section.name);
+
+      // 2. 만약 run = CommandList\ZZMI\... 또는 커맨드리스트 참조가 있는 경우 해당 커맨드리스트 내부도 확인
+      if (props['run']) {
+        const cmdName = props['run'].trim();
+        const cmdSec = doc.getSection(cmdName) || (allDocs ? (() => {
+          for (const otherDoc of allDocs.values()) {
+            const s = otherDoc.getSection(cmdName);
+            if (s) return s;
+          }
+          return undefined;
+        })() : undefined);
+
+        if (cmdSec) {
+          checkProperties(cmdSec.properties, cmdSec.name);
+        }
+      }
+
+      return slots.length > 0 ? slots : null;
+    },
+  };
 }
 

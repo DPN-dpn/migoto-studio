@@ -56,6 +56,8 @@ import {
   BINARY_EXTENSIONS as SEARCH_BINARY_EXTENSIONS,
 } from '../core/workspace/search';
 import { extractSymbols } from '../core/ini/symbols';
+import { slotManager } from '../core/slots/slot-manager';
+import type { ModelSlot, TextureSlotResolver } from '../core/slots/types';
 import type {
   CustomDefinitionProvider,
   CustomLintRule,
@@ -1950,6 +1952,28 @@ export default {
           });
           callbacks.onRegisterCleanup(unlisten);
           return unlisten;
+        },
+      },
+
+      slots: {
+        getSlots: () => slotManager.getSlots(),
+        getSlot: (part: string) => slotManager.getSlot(part),
+        onDidChangeSlots: (listener: (slots: ModelSlot[]) => void) => {
+          const unlisten = slotManager.onDidChangeSlots(listener);
+          callbacks.onRegisterCleanup(unlisten);
+          return unlisten;
+        },
+        refreshSlots: async () => {
+          const res = await slotManager.analyzeWorkspace(this.doc, this.explorer);
+          return res.slots;
+        },
+        setPartMapping: (sectionName: string, part: string) => {
+          slotManager.setPartMapping(sectionName, part);
+        },
+        registerTextureSlotResolver: (resolver: TextureSlotResolver) => {
+          const unregister = slotManager.registerTextureSlotResolver(resolver);
+          callbacks.onRegisterCleanup(unregister);
+          return unregister;
         },
       },
 

@@ -2,7 +2,7 @@ import { getSettings, updateSettings, onSettingsChange } from '../../core/worksp
 import type { OutlinePanel } from '../panels/outline';
 import { renderPluginIcon } from '../../plugins/types';
 
-export type ActivityPanel = 'explorer' | 'search' | 'outline' | 'templates' | 'plugins' | string;
+export type ActivityPanel = 'explorer' | 'search' | 'outline' | 'templates' | 'plugins' | 'slots' | string;
 
 export interface DynamicTab {
   id: string;
@@ -14,7 +14,7 @@ export interface DynamicTab {
 
 /**
  * VS Code-style vertical Activity Bar on the far left.
- * Lets users switch between Explorer, Outline, Templates, Plugins, and dynamic plugin tabs,
+ * Lets users switch between Explorer, Outline, Templates, Plugins, Slots, and dynamic plugin tabs,
  * or toggle the entire sidebar by clicking the active icon.
  * Bottom icons provide quick access to Settings and Help.
  */
@@ -36,6 +36,8 @@ export class ActivityBar {
     private panelPlugins: HTMLElement,
     private outline: OutlinePanel,
     private onOpenSettings: () => void,
+    private slotsBtn?: HTMLElement,
+    private panelSlots?: HTMLElement,
   ) {
     this.bindEvents();
     this.updateActiveUi();
@@ -153,6 +155,7 @@ export class ActivityBar {
     this.outlineBtn.addEventListener('click', () => this.handlePanelClick('outline'));
     this.templatesBtn.addEventListener('click', () => this.handlePanelClick('templates'));
     this.pluginsBtn.addEventListener('click', () => this.handlePanelClick('plugins'));
+    this.slotsBtn?.addEventListener('click', () => this.handlePanelClick('slots'));
 
     const settingsBtn = this.barEl.querySelector('#act-settings');
     settingsBtn?.addEventListener('click', () => this.onOpenSettings());
@@ -200,6 +203,7 @@ export class ActivityBar {
     const isOut = isShowing && this.activePanel === 'outline';
     const isTpl = isShowing && this.activePanel === 'templates';
     const isPlg = isShowing && this.activePanel === 'plugins';
+    const isSlt = isShowing && this.activePanel === 'slots';
 
     this.explorerBtn.classList.toggle('active', isExp);
     this.explorerBtn.setAttribute('aria-pressed', String(isExp));
@@ -216,12 +220,20 @@ export class ActivityBar {
     this.pluginsBtn.classList.toggle('active', isPlg);
     this.pluginsBtn.setAttribute('aria-pressed', String(isPlg));
 
+    if (this.slotsBtn) {
+      this.slotsBtn.classList.toggle('active', isSlt);
+      this.slotsBtn.setAttribute('aria-pressed', String(isSlt));
+    }
+
     // Show/hide sub-panels inside the sidebar
     this.panelExplorer.hidden = this.activePanel !== 'explorer';
     this.panelSearch.hidden = this.activePanel !== 'search';
     this.panelOutline.hidden = this.activePanel !== 'outline';
     this.panelTemplates.hidden = this.activePanel !== 'templates';
     this.panelPlugins.hidden = this.activePanel !== 'plugins';
+    if (this.panelSlots) {
+      this.panelSlots.hidden = this.activePanel !== 'slots';
+    }
 
     // Show/hide dynamic tabs
     for (const [id, tab] of this.dynamicTabs) {

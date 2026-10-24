@@ -21,6 +21,7 @@ Migoto Studio는 개발자가 에디터의 기능을 자유롭게 확장하고 �
 | **06. 스토리지, 시스템 & 로거** | 격리 영구 스토리지(`context.storage`), 외부 CLI 프로세스 실행(`context.system.exec`), 전용 콘솔 로거(`context.logger`), `fetch` | [**06-storage-and-system.md**](./plugin-api/06-storage-and-system.md) |
 | **07. 린터 & 코드 템플릿** | 허용 리소스/변수 화이트리스트, 커스텀 린트 규칙(`registerRule`), 사후 진단 필터(`registerDiagnosticFilter`), 코드 템플릿 | [**07-linter-and-templates.md**](./plugin-api/07-linter-and-templates.md) |
 | **08. 종합 실전 예제 & 배포** | 단일 파일 실전 예제, 다중 파일 분할 실전 예제, `.zip` 패키징 및 설치 방법 | [**08-examples-and-guides.md**](./plugin-api/08-examples-and-guides.md) |
+| **09. 3D 모델 및 텍스처 슬롯 매칭** | 모드 부위별 슬롯 조회(`context.slots.getSlots`), 커스텀 텍스처 슬롯 리졸버(`registerTextureSlotResolver`), ZZMI SlotFix 연동 | [**09-slots.md**](./plugin-api/09-slots.md) |
 
 ---
 

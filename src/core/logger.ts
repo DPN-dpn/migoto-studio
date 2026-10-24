@@ -106,17 +106,19 @@ class AppLogger {
     };
 
     // 전역 런타임 오류 캡처
-    window.addEventListener('error', (event) => {
-      const msg = event.message || '알 수 없는 스크립트 오류';
-      const fileInfo = event.filename ? ` (${event.filename}:${event.lineno}:${event.colno})` : '';
-      self.error('Runtime', `${msg}${fileInfo}`, event.error);
-    });
+    if (typeof window !== 'undefined') {
+      window.addEventListener('error', (event) => {
+        const msg = event.message || '알 수 없는 스크립트 오류';
+        const fileInfo = event.filename ? ` (${event.filename}:${event.lineno}:${event.colno})` : '';
+        self.error('Runtime', `${msg}${fileInfo}`, event.error);
+      });
 
-    // 처리되지 않은 Promise rejection 캡처
-    window.addEventListener('unhandledrejection', (event) => {
-      const reason = event.reason?.message || event.reason || 'Unhandled Promise Rejection';
-      self.error('Runtime', `[비동기 예외] ${reason}`, event.reason);
-    });
+      // 처리되지 않은 Promise rejection 캡처
+      window.addEventListener('unhandledrejection', (event) => {
+        const reason = event.reason?.message || event.reason || 'Unhandled Promise Rejection';
+        self.error('Runtime', `[비동기 예외] ${reason}`, event.reason);
+      });
+    }
   }
 
   private logInternal(level: LogLevel, source: string, message: string, details?: any[]) {

@@ -2,6 +2,8 @@ import type { IniSection, IniDocument, IniMergeResult, IniSectionLine } from '..
 export type { IniSection, IniDocument, IniMergeResult, IniSectionLine } from '../core/ini/ini.ts';
 import type { PluginLogger } from '../core/logger.ts';
 export type { PluginLogger };
+import type { ModelSlot, ModPartType, TextureSlot, TextureSlotResolver } from '../core/slots/types.ts';
+export type { ModelSlot, ModPartType, TextureSlot, TextureSlotResolver };
 
 export interface PluginManifest {
   id: string;
@@ -553,6 +555,22 @@ export interface PluginContext {
     /** 에디터 테마 변경 시 발생하는 이벤트 ('dark' | 'light') */
     onDidChangeTheme(listener: (event: { theme: 'dark' | 'light' }) => void): () => void;
   } & PluginUIBuilder;
+
+  // ---- 3D Model & Texture Slots ----
+  slots: {
+    /** 현재 분석/매칭된 모든 부위의 모델 및 텍스처 슬롯 목록 반환 */
+    getSlots(): ModelSlot[];
+    /** 특정 부위(head, body, dress, hair 등)에 매칭된 모델 슬롯 반환 */
+    getSlot(part: ModPartType | string): ModelSlot | undefined;
+    /** 슬롯 매칭 또는 분석 결과가 변경되었을 때 호출되는 리스너 등록 */
+    onDidChangeSlots(listener: (slots: ModelSlot[]) => void): () => void;
+    /** 모드 폴더 및 INI 파일들을 다시 스캔하여 슬롯 분석 갱신 */
+    refreshSlots(): Promise<ModelSlot[]>;
+    /** 특정 섹션의 부위를 수동으로 지정/매칭 */
+    setPartMapping(sectionName: string, part: ModPartType | string): void;
+    /** 게임/엔진별 특수 텍스처 구문(예: ZZMI SlotFix 등)을 해석하기 위한 커스텀 리졸버 등록 */
+    registerTextureSlotResolver(resolver: TextureSlotResolver): () => void;
+  };
 
   // ---- System execution (desktop) ----
   system: {
