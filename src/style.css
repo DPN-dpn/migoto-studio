@@ -3893,27 +3893,6 @@ body.ai-dock-resizing * {
   border: 1px solid rgba(255, 255, 255, 0.15);
 }
 
-.plugin-link-github-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  background: transparent;
-  border: 1px dashed rgba(255, 255, 255, 0.2);
-  color: var(--fg-dim);
-  font-size: 10px;
-  padding: 2px 6px;
-  border-radius: 4px;
-  cursor: pointer;
-  transition: all 0.15s ease;
-  margin-left: auto;
-}
-
-.plugin-link-github-btn:hover {
-  border-color: var(--accent);
-  color: var(--fg);
-  background: rgba(255, 255, 255, 0.05);
-}
-
 .plugin-dependencies-section {
   background: rgba(255, 255, 255, 0.02);
   border: 1px solid var(--border);

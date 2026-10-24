@@ -568,30 +568,6 @@ export class PluginPanel {
 
     metaRow.append(authorSpan, versionSpan, statusSpan);
 
-    // GitHub 출처 연결/수정 액션 버튼
-    if (!p.isBuiltin) {
-      const linkGitHubBtn = document.createElement('button');
-      linkGitHubBtn.className = 'plugin-link-github-btn';
-      linkGitHubBtn.title = githubSource
-        ? `현재 GitHub 출처: ${githubSource.url}\n클릭하여 출처 저장소 링크 변경`
-        : 'GitHub 저장소 링크를 연결하여 최신 릴리스 자동 업데이트를 활성화합니다.';
-      linkGitHubBtn.innerHTML = githubSource
-        ? `<svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg> <span>출처 변경</span>`
-        : `<svg viewBox="0 0 24 24" width="11" height="11" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg> <span>GitHub 출처 연결</span>`;
-      linkGitHubBtn.onclick = async (e) => {
-        e.stopPropagation();
-        const currentUrl = githubSource?.url || '';
-        const inputUrl = window.prompt(
-          `"${p.manifest.name}" 플러그인의 GitHub 저장소 링크를 입력해주세요:\n(예: https://github.com/owner/repo 또는 owner/repo)`,
-          currentUrl,
-        );
-        if (inputUrl && inputUrl.trim()) {
-          await this.manager.linkPluginToGitHub(p.manifest.id, inputUrl.trim());
-        }
-      };
-      metaRow.append(linkGitHubBtn);
-    }
-
     cardBody.append(desc, locRow, metaRow);
 
     // 종속 플러그인(Dependencies) 상세 정보 섹션
