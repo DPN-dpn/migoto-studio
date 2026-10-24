@@ -220,12 +220,19 @@
 ## 3D 모델 및 텍스처 슬롯 매칭 엔진 (코어 내장 및 플러그인 확장)
 
 - **배경 및 목적**: 모드 제작 시 각 3D 부위(Head, Body, Dress, Hair, Face, Weapon 등)와 연결된 텍스처(Diffuse, Normal, LightMap 등)를 파악하고 추적하는 작업이 필수적입니다. 이를 플러그인마다 중복 파싱하지 않고 코어 수준에서 통합 관리하도록 엔진을 구축했습니다.
+- **모델 슬롯 판별 기준 (`ib = ...`)**:
+  - 3DMigoto/XXMI에서 인덱스 버퍼(`ib` 또는 `IB`) 구문이 명시된 섹션만 실제 3D 모델 서브메시 섹션으로 정확히 인식합니다.
+  - `ib`가 없는 단순 커맨드리스트나 텍스처 오버라이드 전용 섹션은 모델 슬롯 목록에서 제외되어 분석 노이즈를 방지합니다.
+- **모드별 동적 부위명 인식 및 서브메시 인덱스 보존 (`discoverModParts`)**:
+  - 부위 분류를 고정된 소수 카테고리(`head`, `body` 등)로 강제 축소하지 않고, 각 모드 INI의 섹션명 패턴을 스스로 파악하여 모더가 명명한 부위명 원형(예: `SharkBlade`, `CyberTail`, `Jacket` 등)을 그대로 보존합니다.
+  - `TextureOverridePearlbodyA` / `TextureOverridePearlbodyB`처럼 서브메시 인덱스(`A`, `B`, `1`, `2` 등)가 붙은 경우, 공통 접두사가 부위 어간을 침범하지 않도록 안전 후퇴(`backOffPrefix`) 알고리즘을 적용하여 `BodyA`, `BodyB` 형태로 온전히 부위를 식별합니다.
 - **코어 탈종속화 원칙 준수**:
   - 코어 에디터(`src/core/slots/`)는 범용 표준 3DMigoto 구문(`ps-t0`, `diffuse = ...`, 섹션 이름 휴리스틱)만 처리합니다.
   - 특정 게임이나 런처에 종속된 텍스처 문법(예: ZZMI SlotFix `Resource\ZZMI\Diffuse = ref ...`, TTL `Resource\TTL\TransparencyTex`)은 코어에 하드코딩하지 않고, 전용 플러그인(`zzmi-support`)이 `context.slots.registerTextureSlotResolver`를 통해 동적으로 리졸버를 등록합니다.
 - **수동 매칭 및 인터페이스**:
-  - 섹션 이름만으로 부위 판별이 어려운 경우, 액티비티 바의 **슬롯 매칭(Slot Matching)** 사이드바 패널에서 사용자가 직접 드롭다운으로 부위를 매칭할 수 있습니다.
-  - 사용자의 수동 매칭 결과는 `localStorage`(`migoto_slot_manual_mappings`)에 안전하게 저장되어 재실행 시에도 유지됩니다.
+  - 추천 프리셋 드롭다운 대신, 액티비티 바의 **슬롯 매칭(Slot Matching)** 사이드바 패널에서 사용자가 직접 **자유로운 텍스트 문자열 입력**으로 부위명을 즉시 수정하거나 지정할 수 있습니다.
+  - 연결할 텍스처 파일은 INI 내에서 감지된 이미지 파일 목록 드롭다운에서 선택하거나 직접 입력하여 지정할 수 있습니다.
+  - 사용자의 수동 매칭 결과는 `localStorage`(`migoto_slot_manual_mappings`, `migoto_slot_manual_textures`)에 안전하게 저장되어 재실행 시에도 유지됩니다.
 - **플러그인 API (`context.slots`) 제공**:
-  - 다른 플러그인(에셋 뷰어, 자동 컨버터 등)은 복잡한 INI 파싱 없이 `context.slots.getSlots()` 또는 `context.slots.getSlot('body')` 한 줄로 매칭된 3D 모델 및 텍스처 슬롯 정보를 즉시 가져다 활용할 수 있습니다.
+  - 다른 플러그인(에셋 뷰어, 자동 컨버터 등)은 복잡한 INI 파싱 없이 `context.slots.getSlots()`, `context.slots.getSlot('BodyA')`, `context.slots.getDetectedTextureFiles()` 등으로 매칭된 3D 모델 및 텍스처 슬롯 정보를 즉시 가져다 활용할 수 있습니다.
 
