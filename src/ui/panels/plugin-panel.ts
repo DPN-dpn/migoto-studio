@@ -28,7 +28,7 @@ export class PluginPanel {
           );
         }
       }
-    } catch {}
+    } catch { }
 
     this.manager.onChange(() => this.render());
     this.render();
@@ -59,7 +59,7 @@ export class PluginPanel {
     try {
       localStorage.setItem('migoto_plugins_expanded', JSON.stringify(Array.from(this.expandedPlugins)));
       localStorage.removeItem('migoto_plugins_collapsed');
-    } catch {}
+    } catch { }
   }
 
   private render() {
@@ -500,7 +500,6 @@ export class PluginPanel {
       banner.className = 'plugin-update-banner';
       banner.innerHTML = `
         <div class="plugin-update-info">
-          <span class="plugin-update-icon">🚀</span>
           <span>새 버전 <b>v${githubSource?.lastCheckedVersion}</b> 사용 가능</span>
         </div>
         <button class="plugin-btn-update" title="최신 릴리스로 즉시 업데이트">업데이트</button>
