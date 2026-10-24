@@ -106,6 +106,27 @@ export function parseGitHubUrl(input: string): GitHubRepoRef | null {
 }
 
 /**
+ * 텍스트나 JSON을 안전하게 가져옵니다.
+ * 데스크톱 환경에서는 Rust 백엔드(curl)를 통해 브라우저 CORS 및 프리플라이트 제약을 완전히 우회합니다.
+ */
+async function fetchTextSafe(url: string, headers?: Record<string, string>): Promise<string> {
+  if (platform().downloadBinary) {
+    try {
+      const bytes = await platform().downloadBinary!(url);
+      const decoder = new TextDecoder('utf-8');
+      return decoder.decode(bytes);
+    } catch {}
+  }
+
+  // 웹 브라우저 환경에서는 CORS OPTIONS 프리플라이트 403을 피하기 위해 헤더를 최소화하여 요청
+  const res = await fetch(url, headers ? { headers } : undefined);
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+  }
+  return await res.text();
+}
+
+/**
  * GitHub API 또는 raw 저장소를 통해 최신 릴리스 및 플러그인 ZIP 다운로드 URL을 확인합니다.
  */
 export async function fetchGitHubPluginRelease(ref: GitHubRepoRef): Promise<GitHubPluginReleaseInfo> {
@@ -127,49 +148,41 @@ export async function fetchGitHubPluginRelease(ref: GitHubRepoRef): Promise<GitH
     : `https://api.github.com/repos/${owner}/${repo}/releases/latest`;
 
   try {
-    const res = await fetch(releaseApiUrl, {
-      headers: {
-        Accept: 'application/vnd.github.v3+json',
-        'Cache-Control': 'no-cache',
-        Pragma: 'no-cache',
-      },
-      cache: 'no-store',
+    const text = await fetchTextSafe(releaseApiUrl, {
+      Accept: 'application/vnd.github.v3+json',
     });
+    const releaseData = JSON.parse(text);
+    const tagName = releaseData.tag_name || releaseData.name || '';
+    const version = tagName.replace(/^v/i, '').trim() || '1.0.0';
 
-    if (res.ok) {
-      const releaseData = await res.json();
-      const tagName = releaseData.tag_name || releaseData.name || '';
-      const version = tagName.replace(/^v/i, '').trim() || '1.0.0';
+    // Releases asset 중 .zip 파일 탐색 (plugin.zip 또는 첫 번째 zip 파일 우선)
+    if (Array.isArray(releaseData.assets) && releaseData.assets.length > 0) {
+      const zipAsset = releaseData.assets.find(
+        (a: any) => /\.zip$/i.test(a.name) && /plugin/i.test(a.name),
+      ) || releaseData.assets.find((a: any) => /\.zip$/i.test(a.name));
 
-      // Releases asset 중 .zip 파일 탐색 (plugin.zip 또는 첫 번째 zip 파일 우선)
-      if (Array.isArray(releaseData.assets) && releaseData.assets.length > 0) {
-        const zipAsset = releaseData.assets.find(
-          (a: any) => /\.zip$/i.test(a.name) && /plugin/i.test(a.name),
-        ) || releaseData.assets.find((a: any) => /\.zip$/i.test(a.name));
-
-        if (zipAsset && zipAsset.browser_download_url) {
-          return {
-            owner,
-            repo,
-            version,
-            zipUrl: zipAsset.browser_download_url,
-            tagName,
-            releaseNotes: releaseData.body,
-          };
-        }
-      }
-
-      // asset에 zip이 없는 경우 GitHub 자동 생성 zipball_url 활용
-      if (releaseData.zipball_url) {
+      if (zipAsset && zipAsset.browser_download_url) {
         return {
           owner,
           repo,
           version,
-          zipUrl: releaseData.zipball_url,
+          zipUrl: zipAsset.browser_download_url,
           tagName,
           releaseNotes: releaseData.body,
         };
       }
+    }
+
+    // asset에 zip이 없는 경우 GitHub 자동 생성 zipball_url 활용
+    if (releaseData.zipball_url) {
+      return {
+        owner,
+        repo,
+        version,
+        zipUrl: releaseData.zipball_url,
+        tagName,
+        releaseNotes: releaseData.body,
+      };
     }
   } catch {
     // API 제한 또는 네트워크 오류 시 아래 2단계 fallback으로 진행
@@ -188,24 +201,16 @@ export async function fetchGitHubPluginRelease(ref: GitHubRepoRef): Promise<GitH
     for (const manifestName of ['plugin.json', 'manifest.json']) {
       try {
         const rawUrl = `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${manifestName}?t=${Date.now()}`;
-        const manifestRes = await fetch(rawUrl, {
-          headers: {
-            'Cache-Control': 'no-cache',
-            Pragma: 'no-cache',
-          },
-          cache: 'no-store',
-        });
-        if (manifestRes.ok) {
-          const manifest = await manifestRes.json();
-          if (manifest.version) {
-            return {
-              owner,
-              repo,
-              version: manifest.version,
-              zipUrl: `https://github.com/${owner}/${repo}/archive/refs/heads/${branch}.zip`,
-              isArchiveFallback: true,
-            };
-          }
+        const text = await fetchTextSafe(rawUrl);
+        const manifest = JSON.parse(text);
+        if (manifest && manifest.version) {
+          return {
+            owner,
+            repo,
+            version: manifest.version,
+            zipUrl: `https://github.com/${owner}/${repo}/archive/refs/heads/${branch}.zip`,
+            isArchiveFallback: true,
+          };
         }
       } catch {}
     }
