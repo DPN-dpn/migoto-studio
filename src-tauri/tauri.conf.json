@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Migoto Studio",
-  "version": "0.12.10",
+  "version": "0.12.11",
   "identifier": "dev.migotostudio",
   "build": {
     "frontendDist": "../dist",

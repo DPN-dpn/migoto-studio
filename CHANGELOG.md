@@ -1,12 +1,40 @@
 # 릴리스 노트 (Release Notes)
 
-## [다음 버전]
+## [0.12.11] - 2026-10-25
 
 ### 신규 기능
+- GitHub 플러그인 온라인 추가 및 자동 업데이트 검사:
+  - 플러그인 관리 패널 상단에 **[GitHub 플러그인 추가]** 버튼 신설 (`openPromptModal` 모달 대화상자)
+  - GitHub 저장소 링크(예: `https://github.com/owner/repo` 또는 `owner/repo`) 입력만으로 플러그인 자동 다운로드 및 설치
+  - Tauri Rust 백엔드 네이티브 다운로드 커맨드(`download_file_bytes`)를 구현하여 브라우저 CORS 제약 및 302 리다이렉트(`codeload.github.com`)를 원천 우회
+  - 플러그인 새로고침 시 저장된 GitHub 출처를 기반으로 백그라운드에서 최신 릴리스/버전을 비교하여 `NEW vX.Y.Z` 칩 및 업데이트 배너 표시
+  - 원클릭 **[업데이트]** 버튼으로 최신 버전 즉시 교체 설치
+  - 플러그인 카드에서 버전 배지(`vX.Y.Z`)에 마우스를 올리면 툴팁으로 저장소 링크를 표시하고, 클릭 시 기본 웹 브라우저로 저장소 페이지 자동 연결
+  - 플러그인 API 확장: `context.plugins.installFromGitHub`, `context.plugins.checkUpdates`, `context.plugins.getGitHubSource`
+- 3D 모델 및 텍스처 슬롯 매칭 엔진 & 전용 UI (`SlotMatchingPanel`):
+  - 액티비티 바에 전용 **[3D 모델 및 텍스처 슬롯 매칭]** 패널 신설
+  - 작업 폴더 내 INI 파일을 파싱하여 3D 모델 드로우콜(IB/VB) 및 텍스처 슬롯(`ps-t0`~`ps-t9`, `Resource...`) 자동 분석 및 매칭
+  - 표준 3DMigoto 문법 및 ZZMI SlotFix 문법(`Resource\ZZMI\...`, `CommandList\SlotFix\...`) 자동 식별 지원
+  - 하드코딩 없는 동적 파트 추론 알고리즘(`discoverModParts`): `PearlbodyA`, `PearlbodyB` 등 다양한 모더 정의 파트명을 정밀하게 식별
+  - 부위(파트)명 수정 시 고정 드롭다운 대신 자유로운 직접 문자열 입력 UI 제공
+  - 슬롯 분석 결과를 플러그인에서 활용할 수 있는 `context.slots` API (`getMatches`, `getUnmatchedSections`, `getDetectedTextureFiles`, `onDidChange`) 제공
+- 워크스페이스 및 UI 이벤트 API 확장:
+  - 파일 저장 이벤트 (`context.workspace.onDidSaveFile`)
+  - 탭 닫힘 이벤트 (`context.workspace.onDidCloseTab`)
+  - 작업 메모리 초기화 이벤트 (`context.workspace.onDidClearMemory`)
+  - 테마 조회 및 변경 감지 (`context.ui.getTheme`, `context.ui.onDidChangeTheme`)
+  - 플러그인 생명주기 이벤트 (`PluginLifecycleEvent`: `installed`, `activated`, `deactivated`, `uninstalled`) 구독 지원
 
 ### 기능 개선
+- 플러그인 관리 패널 레이아웃 개선:
+  - 플러그인 카드 펼침 시 긴 GitHub URL로 인해 패널 너비를 넘쳐 화면이 깨지던 문제 해결 (버전 배지 툴팁 및 클릭 연결로 일원화)
+  - 메타 정보 행(`.plugin-meta-row`)에 자동 줄바꿈(`flex-wrap`) 및 간격 스타일 적용
+- 플러그인 매니페스트(`plugin.json`) 규격에 `"location"`(주요 UI 배치 위치 설명) 필드 공식 문서화 및 반영
 
 ### 버그 수정
+- 작업 폴더 닫힘 시 메모리 초기화 및 디스크 외부 변경 감지 시 편집 중이지 않은 탭의 자동 동기화 개선
+- Windows UNC 경로 접두사(`\\?\`) 정규화로 `curl` 및 파일 I/O 실패 오류 원천 방지
+- 데스크톱(Tauri) 환경에서 `window.prompt()` 차단 문제 해결 (`openPromptModal` 교체)
 
 ---
 
