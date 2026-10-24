@@ -880,4 +880,30 @@ export const web: Platform = {
       input.click();
     });
   },
+  downloadBinary: async (url: string): Promise<Uint8Array> => {
+    // 1. Direct fetch
+    try {
+      const res = await fetch(url);
+      if (res.ok) {
+        const buf = await res.arrayBuffer();
+        return new Uint8Array(buf);
+      }
+    } catch {}
+
+    // 2. CORS proxy fallbacks
+    for (const proxyGen of [
+      (u: string) => `https://corsproxy.io/?url=${encodeURIComponent(u)}`,
+      (u: string) => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
+    ]) {
+      try {
+        const proxyRes = await fetch(proxyGen(url));
+        if (proxyRes.ok) {
+          const buf = await proxyRes.arrayBuffer();
+          return new Uint8Array(buf);
+        }
+      } catch {}
+    }
+
+    throw new Error('웹 브라우저의 CORS 제한으로 인해 링크를 다운로드할 수 없습니다. .zip 파일을 직접 다운받아 [+] 버튼으로 추가해 주세요.');
+  },
 };

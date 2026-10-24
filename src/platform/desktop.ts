@@ -202,4 +202,44 @@ export const desktop: Platform = {
     const bytes = await invoke<number[]>('read_binary_file', { path: picked });
     return new Uint8Array(bytes);
   },
+  downloadBinary: async (url: string): Promise<Uint8Array> => {
+    const dataDir = await invoke<string>('get_data_dir');
+    const tempName = `temp_dl_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.zip`;
+    const tempPath = `${dataDir.replace(/\\/g, '/')}/${tempName}`;
+
+    try {
+      // 1. Try curl.exe with -fL (follow redirects, fail on HTTP error, silent)
+      const curlRes = await invoke<ProcessOutput>('exec_process', {
+        command: 'curl.exe',
+        args: ['-fL', '-sS', '-o', tempPath, url],
+      });
+
+      if (curlRes.exitCode === 0) {
+        const bytes = await invoke<number[]>('read_binary_file', { path: tempPath });
+        if (bytes && bytes.length > 0) {
+          return new Uint8Array(bytes);
+        }
+      }
+
+      // 2. Fallback to PowerShell WebClient with TLS 1.2
+      const psScript = `[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; $wc = New-Object System.Net.WebClient; $wc.Headers.Add('User-Agent', 'MigotoStudio'); $wc.DownloadFile('${url.replace(/'/g, "''")}', '${tempPath.replace(/'/g, "''")}')`;
+      const psRes = await invoke<ProcessOutput>('exec_process', {
+        command: 'powershell',
+        args: ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', psScript],
+      });
+
+      if (psRes.exitCode === 0) {
+        const bytes = await invoke<number[]>('read_binary_file', { path: tempPath });
+        if (bytes && bytes.length > 0) {
+          return new Uint8Array(bytes);
+        }
+      }
+
+      throw new Error(curlRes.stderr || psRes.stderr || '파일 다운로드에 실패했습니다.');
+    } finally {
+      try {
+        await invoke('delete_entry', { path: tempPath });
+      } catch {}
+    }
+  },
 };

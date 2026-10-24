@@ -105,6 +105,7 @@ export interface Platform {
   listDiskPlugins?(): Promise<DiskPlugin[]>;
   saveDiskPlugin?(id: string, manifestJson: string, scriptContent: string, files?: Record<string, string>): Promise<void>;
   pickPluginZip?(): Promise<Uint8Array | null>;
+  downloadBinary?(url: string): Promise<Uint8Array>;
 }
 
 export interface ProcessOutput {

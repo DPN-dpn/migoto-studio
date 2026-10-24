@@ -1,4 +1,5 @@
 import { isNewerVersion } from '../updater/version.ts';
+import { platform } from '../platform/index.ts';
 
 export interface GitHubRepoRef {
   owner: string;
@@ -215,8 +216,13 @@ export async function fetchGitHubPluginRelease(ref: GitHubRepoRef): Promise<GitH
 
 /**
  * 지정된 URL로부터 ZIP 파일 바이트를 비동기 다운로드합니다.
+ * 데스크톱에서는 curl/powershell을 활용하여 브라우저 CORS 제약을 우회합니다.
  */
 export async function downloadZipBytes(url: string): Promise<Uint8Array> {
+  if (platform().downloadBinary) {
+    return await platform().downloadBinary!(url);
+  }
+
   const res = await fetch(url);
   if (!res.ok) {
     throw new Error(`플러그인 다운로드 실패 (${res.status} ${res.statusText}): ${url}`);
