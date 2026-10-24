@@ -6,6 +6,12 @@ import type { ModelSlot, ModPartType, TextureSlot, TextureSlotType, TextureSlotR
 export type { ModelSlot, ModPartType, TextureSlot, TextureSlotType, TextureSlotResolver };
 import type { PluginGitHubSource } from './github.ts';
 export type { PluginGitHubSource };
+import type {
+  ParsedDependency,
+  DependencyCheckResult,
+  DependencyStatusReason,
+} from './dependency.ts';
+export type { ParsedDependency, DependencyCheckResult, DependencyStatusReason };
 
 export interface PluginManifest {
   id: string;
@@ -17,6 +23,7 @@ export interface PluginManifest {
   main?: string;
   category?: 'tools' | 'assets' | 'ai' | 'general';
   location?: string;
+  dependencies?: Record<string, string>;
 }
 
 /**
@@ -594,6 +601,16 @@ export interface PluginContext {
     checkUpdates(): Promise<void>;
     /** 특정 플러그인의 GitHub 출처 정보 조회 */
     getGitHubSource(pluginId: string): PluginGitHubSource | undefined;
+    /** 이 플러그인의 공개 API를 등록하여 다른 플러그인이 사용할 수 있도록 공유 */
+    registerApi<T = any>(api: T): void;
+    /** 특정 플러그인이 공개한 API 객체 조회 */
+    getPluginApi<T = any>(pluginId: string): T | undefined;
+    /** 특정 플러그인의 공개 API 등록 여부 확인 */
+    hasPluginApi(pluginId: string): boolean;
+    /** 특정 플러그인의 종속성 상태 확인 */
+    checkDependencies(pluginId: string): DependencyCheckResult[];
+    /** GitHub 또는 저장소로부터 종속성 플러그인 설치 */
+    installDependency(dependencyId: string, spec?: string): Promise<boolean>;
   };
 
   // ---- System execution (desktop) ----
@@ -620,7 +637,7 @@ export interface PluginContext {
 }
 
 export interface MigotoPlugin {
-  activate(context: PluginContext): void | Promise<void>;
+  activate(context: PluginContext): any | Promise<any>;
   deactivate?(): void | Promise<void>;
 }
 
@@ -654,6 +671,7 @@ export interface PluginInstance {
   instance?: MigotoPlugin;
   cleanup?: () => void;
   error?: string;
+  dependencyErrors?: DependencyCheckResult[];
 }
 
 export interface PluginMenuItemDef {

@@ -27,6 +27,15 @@ import {
   resolveRelativeSpecifier,
   linkPluginModules,
 } from '../src/plugins/module-linker.ts';
+import {
+  parseSemver,
+  compareSemver,
+  satisfiesVersionConstraint,
+  parseDependencySpec,
+  checkDependency,
+  checkAllDependencies,
+  topologicalSortPlugins,
+} from '../src/plugins/dependency.ts';
 import { zipSync, strToU8 } from 'fflate';
 import {
   isAllowedResource,
@@ -2164,3 +2173,93 @@ test('parseGitHubUrl correctly parses various GitHub repository and release URLs
   assert.equal(parseGitHubUrl(''), null);
   assert.equal(parseGitHubUrl('https://google.com/test'), null);
 });
+
+test('Plugin dependency and version checking satisfies semver rules', () => {
+  // 1. Semver parsing: returns [major, minor, patch, prerelease]
+  assert.deepEqual(parseSemver('1.2.3'), [1, 2, 3, null]);
+  assert.deepEqual(parseSemver('v2.0.4'), [2, 0, 4, null]);
+  assert.deepEqual(parseSemver('0.12.11-beta.1'), [0, 12, 11, 'beta.1']);
+
+  // 2. Semver comparing
+  assert.equal(compareSemver('1.2.3', '1.2.0') > 0, true);
+  assert.equal(compareSemver('1.2.0', '1.2.3') < 0, true);
+  assert.equal(compareSemver('1.2.3', '1.2.3'), 0);
+
+  // 3. satisfiesVersionConstraint
+  assert.equal(satisfiesVersionConstraint('1.2.3', '^1.2.0'), true);
+  assert.equal(satisfiesVersionConstraint('1.2.3', '^1.3.0'), false);
+  assert.equal(satisfiesVersionConstraint('2.0.0', '^1.2.0'), false);
+  assert.equal(satisfiesVersionConstraint('1.2.3', '~1.2.0'), true);
+  assert.equal(satisfiesVersionConstraint('1.3.0', '~1.2.0'), false);
+  assert.equal(satisfiesVersionConstraint('1.2.3', '>=1.2.0'), true);
+  assert.equal(satisfiesVersionConstraint('1.1.9', '>=1.2.0'), false);
+  assert.equal(satisfiesVersionConstraint('1.2.3', '*'), true);
+  assert.equal(satisfiesVersionConstraint('1.2.3', '1.2.3'), true);
+  assert.equal(satisfiesVersionConstraint('1.2.4', '1.2.3'), false);
+
+  // 4. parseDependencySpec
+  const p1 = parseDependencySpec('dep-a', '^1.0.0');
+  assert.equal(p1.id, 'dep-a');
+  assert.equal(p1.versionConstraint, '^1.0.0');
+  assert.equal(p1.gitHubUrl, undefined);
+
+  const p2 = parseDependencySpec('dep-missing', 'https://github.com/alice/dep-missing#>=2.0.0');
+  assert.equal(p2.id, 'dep-missing');
+  assert.equal(p2.versionConstraint, '>=2.0.0');
+  assert.equal(p2.gitHubUrl, 'https://github.com/alice/dep-missing');
+
+  // 5. checkDependency with resolver
+  const mockPlugins: Record<string, any> = {
+    'dep-a': { manifest: { id: 'dep-a', version: '1.5.0' }, enabled: true },
+    'dep-b': { manifest: { id: 'dep-b', version: '2.0.0' }, enabled: false },
+  };
+  const resolver = (id: string) => mockPlugins[id];
+
+  // Satisfied required dependency
+  const r1 = checkDependency(p1, resolver);
+  assert.equal(r1.satisfied, true);
+  assert.equal(r1.status, 'ok');
+  assert.equal(r1.installedVersion, '1.5.0');
+
+  // Missing dependency
+  const r2 = checkDependency(p2, resolver);
+  assert.equal(r2.satisfied, false);
+  assert.equal(r2.status, 'missing');
+
+  // Disabled dependency
+  const pDisabled = parseDependencySpec('dep-b', '>=1.0.0');
+  const r3 = checkDependency(pDisabled, resolver);
+  assert.equal(r3.satisfied, false);
+  assert.equal(r3.status, 'disabled');
+
+  // Version mismatch
+  const pMismatch = parseDependencySpec('dep-a', '>=2.0.0');
+  const r4 = checkDependency(pMismatch, resolver);
+  assert.equal(r4.satisfied, false);
+  assert.equal(r4.status, 'version_mismatch');
+
+  // 6. checkAllDependencies
+  const targetManifest: any = {
+    id: 'my-plugin',
+    name: 'My Plugin',
+    version: '1.0.0',
+    dependencies: {
+      'dep-a': '^1.0.0',
+      'dep-missing': '>=1.0.0',
+    },
+  };
+  const allResults = checkAllDependencies(targetManifest, resolver);
+  assert.equal(allResults.length, 2);
+  assert.equal(allResults[0].satisfied, true);
+  assert.equal(allResults[1].satisfied, false);
+  assert.equal(allResults[1].status, 'missing');
+
+  // 7. topologicalSortPlugins
+  const pA: any = { manifest: { id: 'pA', dependencies: { pB: '*' } } };
+  const pB: any = { manifest: { id: 'pB' } };
+  const { sorted, cycles } = topologicalSortPlugins([pA, pB]);
+  assert.equal(cycles.length, 0);
+  assert.equal(sorted[0].manifest.id, 'pB');
+  assert.equal(sorted[1].manifest.id, 'pA');
+});
+

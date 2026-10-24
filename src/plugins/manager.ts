@@ -103,6 +103,13 @@ import {
   type GitHubPluginReleaseInfo,
 } from './github';
 
+import {
+  checkAllDependencies,
+  topologicalSortPlugins,
+  parseDependencySpec,
+  type DependencyCheckResult,
+} from './dependency';
+
 export { validatePluginZip, type ExtractedPlugin };
 export { type PluginGitHubSource };
 
@@ -141,9 +148,9 @@ export class PluginManager {
   private customDefinitionProviders: CustomDefinitionProvider[] = [];
   private customReferenceProviders: CustomReferenceProvider[] = [];
   private pluginMenuItems: Map<string, { manifest: PluginManifest; items: PluginMenuItemDef[] }> = new Map();
-  private lintTrigger?: () => void;
   private githubSources: Map<string, PluginGitHubSource> = new Map();
   private isCheckingUpdates = false;
+  private pluginApis: Map<string, any> = new Map();
 
   private doc: DocumentManager;
   private editor: monaco.editor.IStandaloneCodeEditor;
@@ -765,9 +772,16 @@ export class PluginManager {
           files: disk.files,
         };
         this.plugins.set(manifest.id, instance);
+      }
 
-        if (isEnabled && disk.scriptContent) {
-          await this.loadAndActivateScriptPlugin(instance, disk.scriptContent);
+      // Topologically sort enabled plugins so dependencies activate before dependents
+      const enabledWithScript = Array.from(this.plugins.values()).filter(
+        (p) => p.enabled && p.scriptContent,
+      );
+      const { sorted } = topologicalSortPlugins(enabledWithScript);
+      for (const instance of sorted) {
+        if (instance.scriptContent) {
+          await this.loadAndActivateScriptPlugin(instance, instance.scriptContent);
         }
       }
     } catch (err) {
@@ -803,6 +817,21 @@ export class PluginManager {
     plugin: MigotoPlugin,
     moduleDisposer?: () => void,
   ): Promise<void> {
+    // Verify dependencies before activation
+    const depResults = checkAllDependencies(instance.manifest, (id) => this.plugins.get(id));
+    const unsatisfied = depResults.filter((r) => !r.satisfied);
+    if (unsatisfied.length > 0) {
+      instance.dependencyErrors = unsatisfied;
+      instance.error = `종속성 미충족: ${unsatisfied.map((r) => `${r.id} (${r.message})`).join(', ')}`;
+      console.warn(`[plugins] Cannot activate plugin "${instance.manifest.name}" due to unsatisfied dependencies:`, unsatisfied);
+      if (moduleDisposer) {
+        try { moduleDisposer(); } catch {}
+      }
+      return;
+    }
+    instance.dependencyErrors = undefined;
+    instance.error = undefined;
+
     const unregisterViews: string[] = [];
     const unregisterStatusItems: string[] = [];
     const unregisterCustomViewers: string[] = [];
@@ -867,13 +896,18 @@ export class PluginManager {
     });
 
     try {
-      await plugin.activate(context);
+      const exportedApi = await plugin.activate(context);
+      if (exportedApi && typeof exportedApi === 'object' && !this.pluginApis.has(instance.manifest.id)) {
+        this.pluginApis.set(instance.manifest.id, exportedApi);
+      }
       instance.instance = plugin;
       instance.error = undefined;
+      instance.dependencyErrors = undefined;
       instance.cleanup = () => {
         try {
           plugin.deactivate?.();
         } catch { }
+        this.pluginApis.delete(instance.manifest.id);
         unregisterCleanups.forEach((fn) => {
           try { fn(); } catch { }
         });
@@ -900,6 +934,7 @@ export class PluginManager {
         }
       };
       appLogger.info('Plugin', `플러그인 활성화: "${instance.manifest.name}" (v${instance.manifest.version})`);
+      await this.retryActivatingDependents(instance.manifest.id);
     } catch (err: any) {
       instance.error = err.message || String(err);
       appLogger.error('Plugin', `플러그인 활성화 실패: "${instance.manifest.name}"`, err);
@@ -926,15 +961,28 @@ export class PluginManager {
       p.cleanup?.();
       p.cleanup = undefined;
       p.instance = undefined;
+      this.pluginApis.delete(pluginId);
       if (this.customLintRules.size === 0) {
         clearAllowedVariables();
         clearAllowedResources();
       }
       appLogger.info('Plugin', `플러그인 비활성화: "${p.manifest.name}"`);
       this.emitLifecycle('deactivated', pluginId, p.manifest);
+
+      // 종속하고 있던 활성화 플러그인들의 작동 중단 처리
+      for (const dep of this.getActiveDependents(pluginId)) {
+        dep.cleanup?.();
+        dep.cleanup = undefined;
+        dep.instance = undefined;
+        dep.dependencyErrors = this.checkPluginDependencies(dep.manifest.id);
+        dep.error = `종속성 미충족: ${dep.dependencyErrors.filter((r) => !r.satisfied).map((r) => r.id).join(', ')}`;
+        appLogger.warn('Plugin', `종속 플러그인 "${dep.manifest.name}"의 필수 종속성(${p.manifest.name}) 비활성화로 작동이 중단되었습니다.`);
+        this.emitLifecycle('deactivated', dep.manifest.id, dep.manifest);
+      }
     } else if (p.scriptContent) {
       await this.loadAndActivateScriptPlugin(p, p.scriptContent);
       this.emitLifecycle('activated', pluginId, p.manifest);
+      await this.retryActivatingDependents(pluginId);
     }
 
     this.notify();
@@ -989,6 +1037,7 @@ export class PluginManager {
     }
 
     this.plugins.delete(pluginId);
+    this.pluginApis.delete(pluginId);
     if (this.githubSources.has(pluginId)) {
       this.githubSources.delete(pluginId);
       this.saveGitHubSources();
@@ -1296,6 +1345,113 @@ export class PluginManager {
       appLogger.error('Plugin', `업데이트 실패: ${msg}`);
       this.showToast(`업데이트 실패: ${msg}`, 'error');
       return false;
+    }
+  }
+
+  /**
+   * 플러그인 인스턴스를 반환합니다.
+   */
+  getPlugin(pluginId: string): PluginInstance | undefined {
+    return this.plugins.get(pluginId);
+  }
+
+  /**
+   * 플러그인이 외부에 노출한 API 객체를 반환합니다.
+   */
+  getPluginApi<T = any>(pluginId: string): T | undefined {
+    return this.pluginApis.get(pluginId);
+  }
+
+  /**
+   * 플러그인의 공개 API 등록 여부를 확인합니다.
+   */
+  hasPluginApi(pluginId: string): boolean {
+    return this.pluginApis.has(pluginId);
+  }
+
+  /**
+   * 플러그인의 종속성 상태(충족 여부, 누락 항목, 버전 불일치)를 검사합니다.
+   */
+  checkPluginDependencies(pluginId: string): DependencyCheckResult[] {
+    const p = this.plugins.get(pluginId);
+    return p ? checkAllDependencies(p.manifest, (id) => this.plugins.get(id)) : [];
+  }
+
+  /**
+   * 특정 플러그인을 종속성으로 선언하고 있는 활성화된 플러그인 목록을 반환합니다.
+   */
+  getActiveDependents(pluginId: string): PluginInstance[] {
+    const list: PluginInstance[] = [];
+    for (const p of this.plugins.values()) {
+      if (p.enabled && p.manifest.dependencies && pluginId in p.manifest.dependencies) {
+        list.push(p);
+      }
+    }
+    return list;
+  }
+
+  /**
+   * 플러그인 종속성을 설치하거나 활성화합니다.
+   * 로컬에 이미 있으나 비활성화된 경우 활성화하고, GitHub URL이 지정된 경우 다운로드하여 설치합니다.
+   */
+  async installDependency(dependencyId: string, spec?: string): Promise<boolean> {
+    const existing = this.plugins.get(dependencyId);
+    if (existing) {
+      if (!existing.enabled) {
+        await this.togglePlugin(dependencyId, true);
+        return true;
+      }
+      return true;
+    }
+
+    let targetSpec = spec;
+    if (!targetSpec) {
+      for (const p of this.plugins.values()) {
+        if (p.manifest.dependencies && p.manifest.dependencies[dependencyId]) {
+          targetSpec = p.manifest.dependencies[dependencyId];
+          break;
+        }
+      }
+    }
+
+    if (!targetSpec) {
+      appLogger.warn('Plugin', `종속성 "${dependencyId}"의 설치 출처(GitHub URL)를 찾을 수 없습니다.`);
+      return false;
+    }
+
+    const parsed = parseDependencySpec(dependencyId, targetSpec);
+    if (parsed.gitHubUrl) {
+      appLogger.info('Plugin', `종속성 "${dependencyId}" 다운로드 및 설치 시작: ${parsed.gitHubUrl}`);
+      const ok = await this.installPluginFromGitHub(parsed.gitHubUrl);
+      if (ok) {
+        await this.retryActivatingDependents(dependencyId);
+      }
+      return ok;
+    }
+
+    appLogger.warn('Plugin', `종속성 "${dependencyId}"에 유효한 GitHub URL이 지정되지 않았습니다: ${targetSpec}`);
+    return false;
+  }
+
+  /**
+   * 종속성 미충족으로 대기 중이던 플러그인들의 재활성화를 시도합니다.
+   */
+  private async retryActivatingDependents(activatedPluginId: string): Promise<void> {
+    for (const p of this.plugins.values()) {
+      if (
+        p.enabled &&
+        !p.instance &&
+        p.scriptContent &&
+        p.manifest.dependencies &&
+        activatedPluginId in p.manifest.dependencies
+      ) {
+        const checkResults = checkAllDependencies(p.manifest, (id) => this.plugins.get(id));
+        if (checkResults.every((r) => r.satisfied)) {
+          p.dependencyErrors = undefined;
+          p.error = undefined;
+          await this.loadAndActivateScriptPlugin(p, p.scriptContent);
+        }
+      }
     }
   }
 
@@ -2272,6 +2428,16 @@ export default {
         installFromGitHub: (url: string) => this.installPluginFromGitHub(url),
         checkUpdates: () => this.checkPluginUpdates(),
         getGitHubSource: (pluginId: string) => this.getGitHubSource(pluginId),
+        registerApi: (api: any) => {
+          this.pluginApis.set(manifest.id, api);
+        },
+        getPluginApi: <T = any>(targetId: string): T | undefined => {
+          return this.getPluginApi<T>(targetId);
+        },
+        hasPluginApi: (targetId: string) => this.hasPluginApi(targetId),
+        checkDependencies: (targetId: string) => this.checkPluginDependencies(targetId),
+        installDependency: (dependencyId: string, spec?: string) =>
+          this.installDependency(dependencyId, spec),
       },
 
       system: {
