@@ -1027,6 +1027,54 @@ test('Plugin Workspace and Tab APIs contract supports search, tabs control and b
   assert.ok(searchCalled);
 });
 
+test('Plugin Workspace API onDidClearMemory and onDidResetWorkspace fire on workspace reset', async () => {
+  let clearMemoryReason: string | null = null;
+  let resetWorkspaceReason: string | null = null;
+
+  const resetListeners: Array<(event: any) => void> = [];
+  const mockDoc = {
+    onDidResetWorkspace: (listener: (event: any) => void) => {
+      resetListeners.push(listener);
+      return () => {
+        const idx = resetListeners.indexOf(listener);
+        if (idx !== -1) resetListeners.splice(idx, 1);
+      };
+    },
+  };
+
+  const context: any = {
+    workspace: {
+      onDidClearMemory: (listener: (event: any) => void) => {
+        return mockDoc.onDidResetWorkspace(listener);
+      },
+      onDidResetWorkspace: (listener: (event: any) => void) => {
+        return mockDoc.onDidResetWorkspace(listener);
+      },
+    },
+  };
+
+  const unlisten1 = context.workspace.onDidClearMemory((e: any) => {
+    clearMemoryReason = e.reason;
+  });
+  const unlisten2 = context.workspace.onDidResetWorkspace((e: any) => {
+    resetWorkspaceReason = e.reason;
+  });
+
+  // Trigger simulated folder_closed event
+  resetListeners.forEach((l) => l({ reason: 'folder_closed' }));
+  assert.equal(clearMemoryReason, 'folder_closed');
+  assert.equal(resetWorkspaceReason, 'folder_closed');
+
+  // Trigger simulated folder_changed event
+  resetListeners.forEach((l) => l({ reason: 'folder_changed' }));
+  assert.equal(clearMemoryReason, 'folder_changed');
+  assert.equal(resetWorkspaceReason, 'folder_changed');
+
+  unlisten1();
+  unlisten2();
+  assert.equal(resetListeners.length, 0);
+});
+
 test('Plugin INI API extractSymbols parses symbols cleanly', () => {
   const sampleIni = `
 [Constants]

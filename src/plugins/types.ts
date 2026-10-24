@@ -424,6 +424,10 @@ export interface PluginContext {
     onDidChangeActiveFile(listener: (file: { name: string; path: string; location: string } | null) => void): () => void;
     /** 작업 폴더가 열리거나 닫힐 때 발생하는 이벤트 (열렸을 때 절대 경로 string, 닫혔을 때 null) */
     onDidChangeActiveFolder(listener: (folder: string | null) => void): () => void;
+    /** 모드 폴더 닫기/변경 또는 작업 영역 초기화로 메모리가 제거될 때 발생하는 이벤트 (플러그인 자체 캐시/메모리 정리용) */
+    onDidClearMemory(listener: (event: { reason: 'folder_closed' | 'folder_changed' | 'reset' }) => void): () => void;
+    /** onDidClearMemory의 별칭 (작업 영역 탭 및 메모리 초기화 감지) */
+    onDidResetWorkspace(listener: (event: { reason: 'folder_closed' | 'folder_changed' | 'reset' }) => void): () => void;
     /** glob 패턴(예: '**\/*.ini')을 기준으로 워크스페이스 내 파일 목록을 고속 검색하여 반환 */
     findFiles(globPattern: string, options?: { cwd?: string; maxResults?: number }): Promise<string[]>;
     search(query: string, options?: WorkspaceSearchOptions): Promise<WorkspaceSearchResult[]>;

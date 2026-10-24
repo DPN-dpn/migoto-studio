@@ -1380,6 +1380,16 @@ export default {
           callbacks.onRegisterCleanup(unlisten);
           return unlisten;
         },
+        onDidClearMemory: (listener: (event: { reason: 'folder_closed' | 'folder_changed' | 'reset' }) => void) => {
+          const unlisten = this.doc.onDidResetWorkspace(listener);
+          callbacks.onRegisterCleanup(unlisten);
+          return unlisten;
+        },
+        onDidResetWorkspace: (listener: (event: { reason: 'folder_closed' | 'folder_changed' | 'reset' }) => void) => {
+          const unlisten = this.doc.onDidResetWorkspace(listener);
+          callbacks.onRegisterCleanup(unlisten);
+          return unlisten;
+        },
         findFiles: async (globPattern: string, options?: { cwd?: string; maxResults?: number }): Promise<string[]> => {
           const targetCwd = options?.cwd || (this.explorer && this.explorer.hasFolder ? (this.explorer as any).currentFolder?.id : null);
           if (!targetCwd) return [];

@@ -1335,6 +1335,13 @@ const unlistenFolder = context.workspace.onDidChangeActiveFolder((folderPath) =>
   }
 });
 // unlistenFolder(); // 필요 시 리스너 해제
+
+// 작업 영역 초기화 및 메모리 제거 감지 (모드 폴더 닫기/변경 시 플러그인 자체 캐시 정리)
+const unlistenClear = context.workspace.onDidClearMemory(({ reason }) => {
+  // reason: 'folder_closed' | 'folder_changed' | 'reset'
+  myPluginCache.clear();
+});
+// unlistenClear();
 ```
 
 ---

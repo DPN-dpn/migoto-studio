@@ -261,7 +261,7 @@ export class FileExplorer {
     }
 
     if (this.currentFolder && this.currentFolder.id !== folder.id) {
-      await this.doc.resetWorkspace(true);
+      await this.doc.resetWorkspace(true, 'folder_changed');
     }
 
     this.currentFolder = folder;
@@ -316,7 +316,7 @@ export class FileExplorer {
     this.notifyFolderChange(null);
     this.render();
     if (discardTabs) {
-      await this.doc.resetWorkspace(true);
+      await this.doc.resetWorkspace(true, 'folder_closed');
     }
     if (prevName) {
       appLogger.info('Workspace', `작업 폴더 닫힘: "${prevName}" (작업 메모리 및 탭 초기화됨)`);

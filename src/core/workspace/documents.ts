@@ -90,6 +90,7 @@ export class DocumentManager {
   private tabSeq = 0;
   private untitledSeq = 0;
   private listeners = new Set<() => void>();
+  private resetListeners = new Set<(event: { reason: 'folder_closed' | 'folder_changed' | 'reset' }) => void>();
   private beforeSwitchHandlers = new Set<(fromTabId: string, toTabId: string) => void>();
   private viewerProvider?: CustomViewerProvider;
   private diffViewer?: DiffViewerHandler;
@@ -158,6 +159,11 @@ export class DocumentManager {
   onChange(listener: () => void): () => void {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
+  }
+
+  onDidResetWorkspace(listener: (event: { reason: 'folder_closed' | 'folder_changed' | 'reset' }) => void): () => void {
+    this.resetListeners.add(listener);
+    return () => this.resetListeners.delete(listener);
   }
 
   onBeforeSwitchTab(handler: (fromTabId: string, toTabId: string) => void): () => void {
@@ -531,7 +537,10 @@ export class DocumentManager {
   /**
    * 작업 폴더 변경 또는 닫기 시 작업 영역 탭 및 메모리를 완전히 초기화합니다.
    */
-  async resetWorkspace(discardUnsaved = true): Promise<void> {
+  async resetWorkspace(
+    discardUnsaved = true,
+    reason: 'folder_closed' | 'folder_changed' | 'reset' = 'reset',
+  ): Promise<void> {
     if (!discardUnsaved) {
       const ok = await this.promptSaveDirty();
       if (!ok) return;
@@ -560,7 +569,14 @@ export class DocumentManager {
     this.activeTabId = '';
     this.newFile();
     this.emit();
-    appLogger.info('Workspace', '작업 영역 닫힘: 모든 작업 탭 및 메모리가 초기화되었습니다.');
+    this.resetListeners.forEach((l) => {
+      try {
+        l({ reason });
+      } catch (err) {
+        console.warn('[DocumentManager] resetListener error:', err);
+      }
+    });
+    appLogger.info('Workspace', `작업 영역 닫힘: 모든 작업 탭 및 메모리가 초기화되었습니다. (이유: ${reason})`);
   }
 
   /**
