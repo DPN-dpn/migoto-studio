@@ -115,12 +115,34 @@ function getBC7Mode(firstByte: number): number {
   return 8;
 }
 
-function insertWeightZero(indexBits: bigint, bitsPerIndex: number, offset: number): bigint {
-  const shift = BigInt(bitsPerIndex * (offset + 1) - 1);
-  const lowBitMask = (1n << shift) - 1n;
-  const highBitMask = ~lowBitMask;
-  return ((indexBits & highBitMask) << 1n) | (indexBits & lowBitMask);
+class BitReader {
+  private buf!: Uint8Array;
+  private baseOffset: number = 0;
+  bitPos: number = 0;
+
+  init(buf: Uint8Array, baseOffset: number) {
+    this.buf = buf;
+    this.baseOffset = baseOffset;
+    this.bitPos = 0;
+  }
+
+  read(count: number): number {
+    let bits = 0;
+    let totalBits = 0;
+    while (totalBits < count) {
+      const bitInByte = this.bitPos & 7;
+      const bitsToRead = Math.min(count - totalBits, 8 - bitInByte);
+      const byteVal = this.buf[this.baseOffset + (this.bitPos >> 3)] >> bitInByte;
+      const mask = (1 << bitsToRead) - 1;
+      bits |= (byteVal & mask) << totalBits;
+      totalBits += bitsToRead;
+      this.bitPos += bitsToRead;
+    }
+    return bits >>> 0;
+  }
 }
+
+const blockReader = new BitReader();
 
 function bc7DequantWithPBit(val: number, pbit: number, valBits: number): number {
   const totalBits = valBits + 1;
@@ -142,11 +164,6 @@ function bc7Interp(l: number, h: number, w: number, weights: number[]): number {
   return (l * (64 - weight) + h * weight + 32) >> 6;
 }
 
-function readUint64LE(bytes: Uint8Array, offset: number): bigint {
-  const b0 = BigInt(bytes[offset] | (bytes[offset + 1] << 8) | (bytes[offset + 2] << 16) | ((bytes[offset + 3] << 24) >>> 0));
-  const b1 = BigInt(bytes[offset + 4] | (bytes[offset + 5] << 8) | (bytes[offset + 6] << 16) | ((bytes[offset + 7] << 24) >>> 0));
-  return (b1 << 32n) | (b0 & 0xffffffffn);
-}
 
 export function decodeBC7(
   src: Uint8Array,
@@ -192,25 +209,25 @@ function decodeBC7Block(src: Uint8Array, offset: number, outPixels: Uint8Array) 
     return;
   }
 
-  const lowChunk = readUint64LE(src, offset);
-  const highChunk = readUint64LE(src, offset + 8);
+  blockReader.init(src, offset);
+  blockReader.read(mode + 1); // skip mode bits
 
   switch (mode) {
     case 0:
     case 2:
-      unpackBC7Mode0_2(mode, lowChunk, highChunk, outPixels);
+      unpackBC7Mode0_2(mode, blockReader, outPixels);
       break;
     case 1:
     case 3:
     case 7:
-      unpackBC7Mode1_3_7(mode, lowChunk, highChunk, outPixels);
+      unpackBC7Mode1_3_7(mode, blockReader, outPixels);
       break;
     case 4:
     case 5:
-      unpackBC7Mode4_5(mode, lowChunk, highChunk, outPixels);
+      unpackBC7Mode4_5(mode, blockReader, outPixels);
       break;
     case 6:
-      unpackBC7Mode6(lowChunk, highChunk, outPixels);
+      unpackBC7Mode6(blockReader, outPixels);
       break;
     default:
       outPixels.fill(0);
@@ -218,77 +235,56 @@ function decodeBC7Block(src: Uint8Array, offset: number, outPixels: Uint8Array) 
   }
 }
 
-function unpackBC7Mode0_2(mode: number, lowChunk: bigint, highChunk: bigint, outPixels: Uint8Array) {
-  const weightBits = mode === 0 ? 3 : 2;
-  const weightMask = (1 << weightBits) - 1;
-  const endpointBits = mode === 0 ? 4 : 5;
-  const endpointMask = (1 << endpointBits) - 1;
-  const pBits = mode === 0 ? 6 : 0;
-  const partBits = mode === 0 ? 4 : 6;
-  const partMask = (1 << partBits) - 1;
+function unpackBC7Mode0_2(mode: number, reader: BitReader, outPixels: Uint8Array) {
+  const ENDPOINTS = 6;
+  const COMPS = 3;
+  const WEIGHT_BITS = mode === 0 ? 3 : 2;
+  const ENDPOINT_BITS = mode === 0 ? 4 : 5;
+  const PBITS = mode === 0 ? 6 : 0;
+  const WEIGHT_VALS = 1 << WEIGHT_BITS;
 
-  const part = Number((lowChunk >> BigInt(mode + 1)) & BigInt(partMask));
+  const part = reader.read(mode === 0 ? 4 : 6);
 
-  const channelReadChunks: bigint[] = [0n, 0n, 0n];
-  if (mode === 0) {
-    channelReadChunks[0] = lowChunk >> 5n;
-    channelReadChunks[1] = lowChunk >> 29n;
-    channelReadChunks[2] = (lowChunk >> 53n) | (highChunk << 11n);
-  } else {
-    channelReadChunks[0] = lowChunk >> 9n;
-    channelReadChunks[1] = (lowChunk >> 39n) | (highChunk << 25n);
-    channelReadChunks[2] = highChunk >> 5n;
-  }
-
-  const endpoints: number[][] = Array.from({ length: 6 }, () => [0, 0, 0, 255]);
-  for (let c = 0; c < 3; c++) {
-    let chunk = channelReadChunks[c];
-    for (let e = 0; e < 6; e++) {
-      endpoints[e][c] = Number(chunk & BigInt(endpointMask));
-      chunk >>= BigInt(endpointBits);
+  const endpoints: number[][] = Array.from({ length: ENDPOINTS }, () => [0, 0, 0, 255]);
+  for (let c = 0; c < COMPS; c++) {
+    for (let e = 0; e < ENDPOINTS; e++) {
+      endpoints[e][c] = reader.read(ENDPOINT_BITS);
     }
   }
 
   const pbits = [0, 0, 0, 0, 0, 0];
-  if (mode === 0) {
-    const pBitsChunk = Number((highChunk >> 13n) & 0x3fn);
-    for (let p = 0; p < pBits; p++) {
-      pbits[p] = (pBitsChunk >> p) & 1;
-    }
+  for (let p = 0; p < PBITS; p++) {
+    pbits[p] = reader.read(1);
   }
 
-  let weightsReadChunk = highChunk >> BigInt(67 - 16 * weightBits);
-  const anchor1 = Math.min(BC7_ANCHOR3_1[part], BC7_ANCHOR3_2[part]);
-  const anchor2 = Math.max(BC7_ANCHOR3_1[part], BC7_ANCHOR3_2[part]);
-  weightsReadChunk = insertWeightZero(weightsReadChunk, weightBits, 0);
-  weightsReadChunk = insertWeightZero(weightsReadChunk, weightBits, anchor1);
-  weightsReadChunk = insertWeightZero(weightsReadChunk, weightBits, anchor2);
-
-  const weights: number[] = new Array(16);
+  const weights = new Array<number>(16);
+  const a1 = BC7_ANCHOR3_1[part];
+  const a2 = BC7_ANCHOR3_2[part];
   for (let i = 0; i < 16; i++) {
-    weights[i] = Number(weightsReadChunk & BigInt(weightMask));
-    weightsReadChunk >>= BigInt(weightBits);
+    const isAnchor = !i || i === a1 || i === a2;
+    weights[i] = reader.read(isAnchor ? WEIGHT_BITS - 1 : WEIGHT_BITS);
   }
 
-  for (let e = 0; e < 6; e++) {
+  for (let e = 0; e < ENDPOINTS; e++) {
     for (let c = 0; c < 3; c++) {
-      endpoints[e][c] = pBits
-        ? bc7DequantWithPBit(endpoints[e][c], pbits[e], endpointBits)
-        : bc7DequantNoPBit(endpoints[e][c], endpointBits);
+      endpoints[e][c] = PBITS
+        ? bc7DequantWithPBit(endpoints[e][c], pbits[e], ENDPOINT_BITS)
+        : bc7DequantNoPBit(endpoints[e][c], ENDPOINT_BITS);
     }
+    endpoints[e][3] = 255;
   }
 
-  const weightsTable = weightBits === 2 ? BC7_WEIGHTS2 : BC7_WEIGHTS3;
-  const numWeights = 1 << weightBits;
+  const weightsTable = WEIGHT_BITS === 2 ? BC7_WEIGHTS2 : BC7_WEIGHTS3;
   const blockColors: number[][][] = Array.from({ length: 3 }, () =>
-    Array.from({ length: numWeights }, () => [0, 0, 0, 255]),
+    Array.from({ length: WEIGHT_VALS }, () => [0, 0, 0, 255]),
   );
 
   for (let s = 0; s < 3; s++) {
-    for (let i = 0; i < numWeights; i++) {
+    for (let i = 0; i < WEIGHT_VALS; i++) {
       for (let c = 0; c < 3; c++) {
         blockColors[s][i][c] = bc7Interp(endpoints[s * 2][c], endpoints[s * 2 + 1][c], i, weightsTable);
       }
+      blockColors[s][i][3] = 255;
     }
   }
 
@@ -303,82 +299,58 @@ function unpackBC7Mode0_2(mode: number, lowChunk: bigint, highChunk: bigint, out
   }
 }
 
-function unpackBC7Mode1_3_7(mode: number, lowChunk: bigint, highChunk: bigint, outPixels: Uint8Array) {
-  const comps = mode === 7 ? 4 : 3;
-  const weightBits = mode === 1 ? 3 : 2;
-  const weightMask = (1 << weightBits) - 1;
-  const endpointBits = mode === 7 ? 5 : mode === 1 ? 6 : 7;
-  const endpointMask = (1 << endpointBits) - 1;
-  const pBits = mode === 1 ? 2 : 4;
-  const sharedPBits = mode === 1;
+function unpackBC7Mode1_3_7(mode: number, reader: BitReader, outPixels: Uint8Array) {
+  const ENDPOINTS = 4;
+  const COMPS = mode === 7 ? 4 : 3;
+  const WEIGHT_BITS = mode === 1 ? 3 : 2;
+  const ENDPOINT_BITS = mode === 7 ? 5 : mode === 1 ? 6 : 7;
+  const PBITS = mode === 1 ? 2 : 4;
+  const SHARED_PBITS = mode === 1;
+  const WEIGHT_VALS = 1 << WEIGHT_BITS;
 
-  const part = Number((lowChunk >> BigInt(mode + 1)) & 0x3fn);
-  const endpoints: number[][] = Array.from({ length: 4 }, () => [0, 0, 0, 255]);
+  const part = reader.read(6);
 
-  const channelReadChunks: bigint[] = [0n, 0n, 0n, 0n];
-  channelReadChunks[0] = lowChunk >> BigInt(mode + 7);
-  let pReadChunk = 0n;
-  let weightReadChunk = 0n;
-
-  if (mode === 1) {
-    channelReadChunks[1] = lowChunk >> 32n;
-    channelReadChunks[2] = (lowChunk >> 56n) | (highChunk << 8n);
-    pReadChunk = highChunk >> 16n;
-    weightReadChunk = highChunk >> 18n;
-  } else if (mode === 3) {
-    channelReadChunks[1] = (lowChunk >> 38n) | (highChunk << 26n);
-    channelReadChunks[2] = highChunk >> 2n;
-    pReadChunk = highChunk >> 30n;
-    weightReadChunk = highChunk >> 34n;
-  } else {
-    // Mode 7
-    channelReadChunks[1] = lowChunk >> 34n;
-    channelReadChunks[2] = (lowChunk >> 54n) | (highChunk << 10n);
-    channelReadChunks[3] = highChunk >> 10n;
-    pReadChunk = highChunk >> 30n;
-    weightReadChunk = highChunk >> 34n;
-  }
-
-  for (let c = 0; c < comps; c++) {
-    let chunk = channelReadChunks[c];
-    for (let e = 0; e < 4; e++) {
-      endpoints[e][c] = Number(chunk & BigInt(endpointMask));
-      chunk >>= BigInt(endpointBits);
+  const endpoints: number[][] = Array.from({ length: ENDPOINTS }, () => [0, 0, 0, 255]);
+  for (let c = 0; c < COMPS; c++) {
+    for (let e = 0; e < ENDPOINTS; e++) {
+      endpoints[e][c] = reader.read(ENDPOINT_BITS);
     }
   }
 
   const pbits = [0, 0, 0, 0];
-  for (let p = 0; p < pBits; p++) {
-    pbits[p] = Number((pReadChunk >> BigInt(p)) & 1n);
+  for (let p = 0; p < PBITS; p++) {
+    pbits[p] = reader.read(1);
   }
 
-  weightReadChunk = insertWeightZero(weightReadChunk, weightBits, 0);
-  weightReadChunk = insertWeightZero(weightReadChunk, weightBits, BC7_ANCHOR2[part]);
-
-  const weights: number[] = new Array(16);
+  const weights = new Array<number>(16);
+  const a1 = BC7_ANCHOR2[part];
   for (let i = 0; i < 16; i++) {
-    weights[i] = Number(weightReadChunk & BigInt(weightMask));
-    weightReadChunk >>= BigInt(weightBits);
+    const isAnchor = !i || i === a1;
+    weights[i] = reader.read(isAnchor ? WEIGHT_BITS - 1 : WEIGHT_BITS);
   }
 
-  for (let e = 0; e < 4; e++) {
-    const pbit = pbits[sharedPBits ? e >> 1 : e];
-    for (let c = 0; c < comps; c++) {
-      endpoints[e][c] = bc7DequantWithPBit(endpoints[e][c], pbit, endpointBits);
+  for (let e = 0; e < ENDPOINTS; e++) {
+    const pbit = pbits[SHARED_PBITS ? (e >> 1) : e];
+    for (let c = 0; c < 4; c++) {
+      if (c === (mode === 7 ? 4 : 3)) {
+        endpoints[e][c] = 255;
+      } else {
+        endpoints[e][c] = bc7DequantWithPBit(endpoints[e][c], pbit, ENDPOINT_BITS);
+      }
     }
   }
 
-  const weightsTable = weightBits === 2 ? BC7_WEIGHTS2 : BC7_WEIGHTS3;
-  const numWeights = 1 << weightBits;
+  const weightsTable = WEIGHT_BITS === 2 ? BC7_WEIGHTS2 : BC7_WEIGHTS3;
   const blockColors: number[][][] = Array.from({ length: 2 }, () =>
-    Array.from({ length: numWeights }, () => [0, 0, 0, 255]),
+    Array.from({ length: WEIGHT_VALS }, () => [0, 0, 0, 255]),
   );
 
   for (let s = 0; s < 2; s++) {
-    for (let i = 0; i < numWeights; i++) {
-      for (let c = 0; c < comps; c++) {
+    for (let i = 0; i < WEIGHT_VALS; i++) {
+      for (let c = 0; c < COMPS; c++) {
         blockColors[s][i][c] = bc7Interp(endpoints[s * 2][c], endpoints[s * 2 + 1][c], i, weightsTable);
       }
+      blockColors[s][i][3] = COMPS === 3 ? 255 : blockColors[s][i][3];
     }
   }
 
@@ -389,97 +361,72 @@ function unpackBC7Mode1_3_7(mode: number, lowChunk: bigint, highChunk: bigint, o
     outPixels[dIdx] = color[0];
     outPixels[dIdx + 1] = color[1];
     outPixels[dIdx + 2] = color[2];
-    outPixels[dIdx + 3] = comps === 4 ? color[3] : 255;
+    outPixels[dIdx + 3] = COMPS === 4 ? color[3] : 255;
   }
 }
 
-function unpackBC7Mode4_5(mode: number, lowChunk: bigint, highChunk: bigint, outPixels: Uint8Array) {
-  const weightBits = 2;
-  const weightMask = (1 << weightBits) - 1;
-  const aWeightBits = mode === 4 ? 3 : 2;
-  const aWeightMask = (1 << aWeightBits) - 1;
-  const endpointBits = mode === 4 ? 5 : 7;
-  const endpointMask = (1 << endpointBits) - 1;
-  const aEndpointBits = mode === 4 ? 6 : 8;
-  const aEndpointMask = (1 << aEndpointBits) - 1;
+function unpackBC7Mode4_5(mode: number, reader: BitReader, outPixels: Uint8Array) {
+  const ENDPOINTS = 2;
+  const COMPS = 4;
+  const WEIGHT_BITS = 2;
+  const A_WEIGHT_BITS = mode === 4 ? 3 : 2;
+  const ENDPOINT_BITS = mode === 4 ? 5 : 7;
+  const A_ENDPOINT_BITS = mode === 4 ? 6 : 8;
 
-  const compRot = Number((lowChunk >> BigInt(mode + 1)) & 3n);
-  const indexMode = mode === 4 ? Number((lowChunk >> 7n) & 1n) : 0;
+  const compRot = reader.read(2);
+  const indexMode = mode === 4 ? reader.read(1) : 0;
 
-  let colorReadBits = lowChunk >> 8n;
   const endpoints: number[][] = [
     [0, 0, 0, 0],
     [0, 0, 0, 0],
   ];
-
-  for (let c = 0; c < 3; c++) {
-    for (let e = 0; e < 2; e++) {
-      endpoints[e][c] = Number(colorReadBits & BigInt(endpointMask));
-      colorReadBits >>= BigInt(endpointBits);
+  for (let c = 0; c < COMPS; c++) {
+    const nBits = c === 3 ? A_ENDPOINT_BITS : ENDPOINT_BITS;
+    for (let e = 0; e < ENDPOINTS; e++) {
+      endpoints[e][c] = reader.read(nBits);
     }
   }
 
-  let rgbWeightsChunk = 0n;
-  let aWeightsChunk = 0n;
+  const weightBits = [
+    indexMode ? A_WEIGHT_BITS : WEIGHT_BITS,
+    indexMode ? WEIGHT_BITS : A_WEIGHT_BITS,
+  ];
 
-  if (mode === 4) {
-    endpoints[0][3] = Number(colorReadBits & BigInt(aEndpointMask));
-    endpoints[1][3] = Number((colorReadBits >> BigInt(aEndpointBits)) & BigInt(aEndpointMask));
-    rgbWeightsChunk = (lowChunk >> 50n) | (highChunk << 14n);
-    aWeightsChunk = highChunk >> 17n;
-  } else {
-    // Mode 5
-    endpoints[0][3] = Number(colorReadBits & BigInt(aEndpointMask));
-    endpoints[1][3] = Number(((lowChunk >> 58n) | (highChunk << 6n)) & BigInt(aEndpointMask));
-    rgbWeightsChunk = highChunk >> 2n;
-    aWeightsChunk = highChunk >> 33n;
-  }
+  const weights = new Array<number>(16);
+  const aWeights = new Array<number>(16);
 
-  rgbWeightsChunk = insertWeightZero(rgbWeightsChunk, weightBits, 0);
-  aWeightsChunk = insertWeightZero(aWeightsChunk, aWeightBits, 0);
-
-  const effWeightBits = [indexMode ? aWeightBits : weightBits, indexMode ? weightBits : aWeightBits];
-  const effWeightMask = [indexMode ? aWeightMask : weightMask, indexMode ? weightMask : aWeightMask];
-
-  if (indexMode) {
-    const tmp = rgbWeightsChunk;
-    rgbWeightsChunk = aWeightsChunk;
-    aWeightsChunk = tmp;
-  }
-
-  const weights: number[] = new Array(16);
-  const aWeights: number[] = new Array(16);
+  const firstWeights = indexMode ? aWeights : weights;
   for (let i = 0; i < 16; i++) {
-    weights[i] = Number(rgbWeightsChunk & BigInt(effWeightMask[0]));
-    rgbWeightsChunk >>= BigInt(effWeightBits[0]);
-  }
-  for (let i = 0; i < 16; i++) {
-    aWeights[i] = Number(aWeightsChunk & BigInt(effWeightMask[1]));
-    aWeightsChunk >>= BigInt(effWeightBits[1]);
+    firstWeights[i] = reader.read(weightBits[indexMode] - (!i ? 1 : 0));
   }
 
-  for (let e = 0; e < 2; e++) {
+  const secondWeights = indexMode ? weights : aWeights;
+  for (let i = 0; i < 16; i++) {
+    secondWeights[i] = reader.read(weightBits[1 - indexMode] - (!i ? 1 : 0));
+  }
+
+  for (let e = 0; e < ENDPOINTS; e++) {
     for (let c = 0; c < 3; c++) {
-      endpoints[e][c] = bc7DequantNoPBit(endpoints[e][c], endpointBits);
+      endpoints[e][c] = bc7DequantNoPBit(endpoints[e][c], ENDPOINT_BITS);
     }
-    endpoints[e][3] = bc7DequantNoPBit(endpoints[e][3], aEndpointBits);
+    endpoints[e][3] = bc7DequantNoPBit(endpoints[e][3], A_ENDPOINT_BITS);
   }
 
-  const rgbTable = effWeightBits[0] === 3 ? BC7_WEIGHTS3 : BC7_WEIGHTS2;
-  const aTable = effWeightBits[1] === 3 ? BC7_WEIGHTS3 : BC7_WEIGHTS2;
+  const rgbTable = weightBits[0] === 3 ? BC7_WEIGHTS3 : BC7_WEIGHTS2;
+  const aTable = weightBits[1] === 3 ? BC7_WEIGHTS3 : BC7_WEIGHTS2;
 
-  const numRgbWeights = 1 << effWeightBits[0];
-  const numAWeights = 1 << effWeightBits[1];
+  const numRgb = 1 << weightBits[0];
+  const numA = 1 << weightBits[1];
 
-  const blockColorsRgb: number[][] = Array.from({ length: numRgbWeights }, () => [0, 0, 0]);
-  for (let i = 0; i < numRgbWeights; i++) {
+  const blockColorsRgb: number[][] = Array.from({ length: numRgb }, () => [0, 0, 0]);
+  for (let i = 0; i < numRgb; i++) {
     for (let c = 0; c < 3; c++) {
       blockColorsRgb[i][c] = bc7Interp(endpoints[0][c], endpoints[1][c], i, rgbTable);
     }
   }
 
-  const blockColorsA: number[] = new Array(numAWeights);
-  for (let i = 0; i < numAWeights; i++) {
+  const blockColorsA = new Array<number>(numA);
+  for (let i = 0; i < numA; i++) {
     blockColorsA[i] = bc7Interp(endpoints[0][3], endpoints[1][3], i, aTable);
   }
 
@@ -506,59 +453,45 @@ function unpackBC7Mode4_5(mode: number, lowChunk: bigint, highChunk: bigint, out
   }
 }
 
-function unpackBC7Mode6(lowChunk: bigint, highChunk: bigint, outPixels: Uint8Array) {
-  const r0 = Number((lowChunk >> 7n) & 0x7fn);
-  const r1 = Number((lowChunk >> 14n) & 0x7fn);
-  const g0 = Number((lowChunk >> 21n) & 0x7fn);
-  const g1 = Number((lowChunk >> 28n) & 0x7fn);
-  const b0 = Number((lowChunk >> 35n) & 0x7fn);
-  const b1 = Number((lowChunk >> 42n) & 0x7fn);
-  const a0 = Number((lowChunk >> 49n) & 0x7fn);
-  const a1 = Number((lowChunk >> 56n) & 0x7fn);
-  const p0 = Number((lowChunk >> 63n) & 1n);
-  const p1 = Number(highChunk & 1n);
+function unpackBC7Mode6(reader: BitReader, outPixels: Uint8Array) {
+  const r0 = reader.read(7);
+  const r1 = reader.read(7);
+  const g0 = reader.read(7);
+  const g1 = reader.read(7);
+  const b0 = reader.read(7);
+  const b1 = reader.read(7);
+  const a0 = reader.read(7);
+  const a1 = reader.read(7);
+  const p0 = reader.read(1);
+  const p1 = reader.read(1);
 
-  const ep0 = [
-    (r0 << 1) | p0,
-    (g0 << 1) | p0,
-    (b0 << 1) | p0,
-    (a0 << 1) | p0,
-  ];
-  const ep1 = [
-    (r1 << 1) | p1,
-    (g1 << 1) | p1,
-    (b1 << 1) | p1,
-    (a1 << 1) | p1,
-  ];
+  const ep0_r = (r0 << 1) | p0;
+  const ep0_g = (g0 << 1) | p0;
+  const ep0_b = (b0 << 1) | p0;
+  const ep0_a = (a0 << 1) | p0;
 
-  // Precompute 16 interpolated colors
+  const ep1_r = (r1 << 1) | p1;
+  const ep1_g = (g1 << 1) | p1;
+  const ep1_b = (b1 << 1) | p1;
+  const ep1_a = (a1 << 1) | p1;
+
   const tableColors: number[][] = Array.from({ length: 16 }, () => [0, 0, 0, 0]);
   for (let i = 0; i < 16; i++) {
     const w = BC7_WEIGHTS4[i];
     const iw = 64 - w;
-    tableColors[i][0] = (ep0[0] * iw + ep1[0] * w + 32) >> 6;
-    tableColors[i][1] = (ep0[1] * iw + ep1[1] * w + 32) >> 6;
-    tableColors[i][2] = (ep0[2] * iw + ep1[2] * w + 32) >> 6;
-    tableColors[i][3] = (ep0[3] * iw + ep1[3] * w + 32) >> 6;
+    tableColors[i][0] = (ep0_r * iw + ep1_r * w + 32) >> 6;
+    tableColors[i][1] = (ep0_g * iw + ep1_g * w + 32) >> 6;
+    tableColors[i][2] = (ep0_b * iw + ep1_b * w + 32) >> 6;
+    tableColors[i][3] = (ep0_a * iw + ep1_a * w + 32) >> 6;
   }
 
-  // Pixel 0 uses 3 bits (anchor fixup, MSB is 0)
-  const w0 = Number((highChunk >> 1n) & 0x07n);
-  const c0 = tableColors[w0];
-  outPixels[0] = c0[0];
-  outPixels[1] = c0[1];
-  outPixels[2] = c0[2];
-  outPixels[3] = c0[3];
-
-  // Pixels 1-15 use 4 bits each
-  for (let i = 1; i < 16; i++) {
-    const shift = BigInt(4 + (i - 1) * 4);
-    const wi = Number((highChunk >> shift) & 0x0fn);
-    const ci = tableColors[wi];
+  for (let i = 0; i < 16; i++) {
+    const wIdx = reader.read(i === 0 ? 3 : 4);
+    const c = tableColors[wIdx];
     const dIdx = i * 4;
-    outPixels[dIdx] = ci[0];
-    outPixels[dIdx + 1] = ci[1];
-    outPixels[dIdx + 2] = ci[2];
-    outPixels[dIdx + 3] = ci[3];
+    outPixels[dIdx] = c[0];
+    outPixels[dIdx + 1] = c[1];
+    outPixels[dIdx + 2] = c[2];
+    outPixels[dIdx + 3] = c[3];
   }
 }
