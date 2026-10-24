@@ -13,7 +13,7 @@ Migoto Studio는 개발자가 에디터의 기능을 자유롭게 확장하고 �
 
 | 모듈 문서 | 주요 다루는 내용 및 핵심 API | 파일 링크 |
 | :--- | :--- | :---: |
-| **01. 플러그인 구조 & 생명주기** | `plugin.json` 매니페스트, 가상 모듈 링커(ESM 다중 파일), `activate` / `deactivate`, 자동 클린업 | [**01-structure-and-lifecycle.md**](./plugin-api/01-structure-and-lifecycle.md) |
+| **01. 플러그인 구조 & 생명주기** | `plugin.json` 매니페스트(`dependencies` 포함), 가상 모듈 링커(ESM 다중 파일), `activate` / `deactivate`, 종속성 위상 정렬 순서, 자동 클린업 | [**01-structure-and-lifecycle.md**](./plugin-api/01-structure-and-lifecycle.md) |
 | **02. UI 확장 & UI 빌더** | 선언형 폼 탭(`openFormTab`), 커스텀 탭(`openTab`), 서브 윈도우(`openSubWindow`), 네이티브 OS 창(`openNativeWindow`), UI 빌더 위젯(`createButton`, `createInput`, `createKeyInput` 등), 테마 조회/감지 | [**02-ui.md**](./plugin-api/02-ui.md) |
 | **03. INI 파싱 & 스마트 조작** | 3DMigoto/XXMI 파싱, `formatKeyToggle`, `upsertSection`, `deleteSection`, Raw 섹션 조작, 고속 심볼 추출(`extractSymbols`) | [**03-ini.md**](./plugin-api/03-ini.md) |
 | **04. 워크스페이스 & 파일 I/O** | 파일/바이너리 I/O, 디렉터리 순회, glob 검색(`findFiles`), 전역 검색(`search`), 탭 제어, 저장/닫기/메모리 이벤트(`onDidSaveFile`, `onDidCloseTab`, `onDidClearMemory`) | [**04-workspace.md**](./plugin-api/04-workspace.md) |
@@ -22,7 +22,7 @@ Migoto Studio는 개발자가 에디터의 기능을 자유롭게 확장하고 �
 | **07. 린터 & 코드 템플릿** | 허용 리소스/변수 화이트리스트, 커스텀 린트 규칙(`registerRule`), 사후 진단 필터(`registerDiagnosticFilter`), 코드 템플릿 | [**07-linter-and-templates.md**](./plugin-api/07-linter-and-templates.md) |
 | **08. 종합 실전 예제 & 배포** | 단일 파일 실전 예제, 다중 파일 분할 실전 예제, `.zip` 패키징 및 설치 방법 | [**08-examples-and-guides.md**](./plugin-api/08-examples-and-guides.md) |
 | **09. 3D 모델 및 텍스처 슬롯 매칭** | 모드 부위별 슬롯 조회(`context.slots.getSlots`), 커스텀 텍스처 슬롯 리졸버(`registerTextureSlotResolver`), 텍스처 수동 수정, ZZMI SlotFix 연동 | [**09-slots.md**](./plugin-api/09-slots.md) |
-| **10. 플러그인 생명주기 및 상태 관리** | 플러그인 목록 및 상태 조회(`context.plugins.getPlugins`, `isEnabled`), 활성화/비활성화/설치/삭제 이벤트 감지(`onDidChangePlugins`) | [**10-plugins.md**](./plugin-api/10-plugins.md) |
+| **10. 플러그인 생명주기 및 상태 관리** | 플러그인 목록/상태 조회(`context.plugins.getPlugins`), 플러그인 간 API 공유(`registerApi`, `getPluginApi`), 종속성 검사/설치(`checkDependencies`, `installDependency`), 이벤트 감지(`onDidChangePlugins`) | [**10-plugins.md**](./plugin-api/10-plugins.md) |
 
 ---
 

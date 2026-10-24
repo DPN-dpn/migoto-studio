@@ -41,7 +41,11 @@ my-advanced-plugin/
   "icon": "🎛️",
   "category": "tools",
   "location": "좌측 사이드바 탭",
-  "main": "index.js"
+  "main": "index.js",
+  "dependencies": {
+    "shared-lib": "^1.0.0",
+    "asset-viewer": "https://github.com/owner/asset-viewer#>=1.2.0"
+  }
 }
 ```
 
@@ -50,6 +54,7 @@ my-advanced-plugin/
 - `icon`: 이모지(`🎛️`), SVG 마크업 문자열(`<svg>...</svg>`), 이미지 URL 또는 Base64 Data URI를 지원합니다.
 - `category`: `'tools'` | `'assets'` | `'ai'` | `'general'`
 - `location`: 플러그인의 주요 UI 배치 위치 안내 문구 (선택 사항, 예: `'좌측 사이드바 탭'`, `'상단 메뉴 바'`, `'에디터 린터'` 등, 생략 시 기본값 `'좌측 사이드바 탭'`)
+- `dependencies`: 플러그인 실행에 필요한 타 플러그인 종속성 목록 (선택 사항, `{ "플러그인ID": "버전제약식 또는 GitHub URL" }`)
 
 ---
 
@@ -82,3 +87,12 @@ export default {
 > [!TIP]
 > **자동 정리(Auto Cleanup)**  
 > 플러그인이 `context.ui.openTab`, `context.ui.registerMenuItem`, `context.ui.registerSidebarView`, `context.workspace.onDidChangeActiveFile`, `context.workspace.onDidSaveFile` 등을 통해 등록한 UI 요소나 이벤트 리스너는 플러그인이 비활성화되거나 언로드될 때 코어 플랫폼에 의해 자동으로 정리됩니다.
+
+---
+
+## 4. 종속성 해결 및 실행 순서
+
+- **위상 정렬(Topological Sort)**: 플러그인 로드 시 매니페스트의 `dependencies` 관계를 분석하여, 종속된 플러그인이 먼저 활성화됩니다.
+- **조건부 대기**: 필요한 종속 플러그인이 설치되지 않았거나 비활성화되어 있거나 버전이 불일치하는 경우, 플러그인은 로드 대기 상태로 유지되며 종속 플러그인이 활성화될 때 자동으로 로드됩니다.
+- **플러그인 간 API 공유**: `activate(context)`에서 객체를 반환하거나 `context.plugins.registerApi(api)`를 호출하면, 다른 플러그인이 `context.plugins.getPluginApi(pluginId)`로 해당 API를 사용할 수 있습니다.
+

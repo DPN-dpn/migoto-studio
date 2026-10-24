@@ -80,7 +80,10 @@ my-plugin/
   "icon": "🎛️",
   "category": "tools",
   "location": "좌측 사이드바 탭",
-  "main": "index.js"
+  "main": "index.js",
+  "dependencies": {
+    "shared-plugin": "^1.0.0"
+  }
 }
 ```
 - `id`: 고유 ID (소문자, 숫자, 하이픈)
@@ -88,6 +91,7 @@ my-plugin/
 - `category`: `"tools"` | `"assets"` | `"ai"` | `"general"`
 - `location`: 주요 UI 배치 위치 설명 (예: `"좌측 사이드바 탭"`, `"상단 메뉴 바"`, `"에디터 린터"` 등, 선택 사항)
 - `main`: 기본값 `"index.js"`
+- `dependencies`: 타 플러그인 종속성 맵 (선택 사항, 예: `{ "플러그인ID": "버전제약식 또는 GitHub URL" }`)
 
 ---
 

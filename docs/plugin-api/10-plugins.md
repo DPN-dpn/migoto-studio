@@ -100,7 +100,60 @@ if (source?.updateAvailable) {
 
 ---
 
-## 4. 주요 데이터 타입 정의
+## 4. 플러그인 간 API 공유 및 종속성 관리
+
+### `context.plugins.registerApi<T>(api: T)`
+현재 플러그인의 공개 API 객체를 등록하여 다른 플러그인이 사용할 수 있도록 공유합니다.  
+(`activate(context)` 함수에서 객체를 `return`해도 자동으로 동일하게 등록됩니다.)
+
+```typescript
+// 플러그인 A (라이브러리 제공자)
+export default {
+  activate(context) {
+    context.plugins.registerApi({
+      calculateMeshBoundingBox: (meshData) => { /* ... */ },
+    });
+  }
+};
+```
+
+### `context.plugins.getPluginApi<T>(pluginId: string): T | undefined`
+다른 플러그인이 공개한 API 객체를 안전하게 가져옵니다. 대상 플러그인이 활성화되어 있지 않거나 API를 등록하지 않았다면 `undefined`를 반환합니다.
+
+```typescript
+// 플러그인 B (소비자)
+const mathLib = context.plugins.getPluginApi<{ calculateMeshBoundingBox: Function }>('mesh-math-lib');
+if (mathLib) {
+  const bbox = mathLib.calculateMeshBoundingBox(mesh);
+}
+```
+
+### `context.plugins.hasPluginApi(pluginId: string): boolean`
+특정 플러그인의 공개 API 등록 여부를 확인합니다.
+
+### `context.plugins.checkDependencies(pluginId: string): DependencyCheckResult[]`
+특정 플러그인의 매니페스트에 선언된 모든 종속성(`dependencies`)의 충족 상태(정상, 누락, 비활성화, 버전 불일치)를 검사합니다.
+
+```typescript
+const depResults = context.plugins.checkDependencies('my-tool');
+for (const res of depResults) {
+  if (!res.satisfied) {
+    context.logger.warn(`종속성 문제 [${res.id}]: ${res.message} (상태: ${res.status})`);
+  }
+}
+```
+
+### `context.plugins.installDependency(dependencyId: string, spec?: string): Promise<boolean>`
+필요한 종속성 플러그인을 GitHub 또는 지정된 스펙 경로로부터 비동기로 다운로드하여 설치합니다.
+
+```typescript
+// 원격 종속성 자동 설치 시도
+await context.plugins.installDependency('shared-lib', 'https://github.com/owner/shared-lib#>=1.0.0');
+```
+
+---
+
+## 5. 주요 데이터 타입 정의
 
 ```typescript
 export type PluginLifecycleAction = 'activated' | 'deactivated' | 'installed' | 'uninstalled';
@@ -129,4 +182,20 @@ export interface PluginGitHubSource {
   latestZipUrl?: string;
   checkedAt?: number;
 }
+
+export type DependencyStatusReason =
+  | 'ok'
+  | 'missing'
+  | 'disabled'
+  | 'version_mismatch'
+  | 'circular';
+
+export interface DependencyCheckResult {
+  id: string;
+  satisfied: boolean;
+  status: DependencyStatusReason;
+  installedVersion?: string;
+  message: string;
+}
 ```
+

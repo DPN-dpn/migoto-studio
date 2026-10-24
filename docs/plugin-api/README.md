@@ -8,7 +8,7 @@ Migoto Studio 플러그인 개발 및 AI 어시스턴트(ChatGPT, Claude, Cursor
 
 | 모듈 문서 | 주요 다루는 내용 | 권장 사용 시나리오 | 예상 분량 |
 | :--- | :--- | :--- | :---: |
-| **[`01-structure-and-lifecycle.md`](./01-structure-and-lifecycle.md)** | `plugin.json` 매니페스트, 가상 모듈 링커(ESM 다중 파일), `activate` / `deactivate`, 자동 리소스 정리 | 플러그인 최초 생성, 파일 분할 및 생명주기 관리 | ~80줄 |
+| **[`01-structure-and-lifecycle.md`](./01-structure-and-lifecycle.md)** | `plugin.json` 매니페스트(`dependencies` 포함), 가상 모듈 링커(ESM 다중 파일), `activate` / `deactivate`, 종속성 위상 정렬 순서, 자동 리소스 정리 | 플러그인 최초 생성, 파일 분할, 종속성 선언 및 생명주기 관리 | ~90줄 |
 | **[`02-ui.md`](./02-ui.md)** | 선언형 폼 탭(`openFormTab`), 커스텀 탭(`openTab`), 서브 윈도우(`openSubWindow`), 네이티브 OS 창(`openNativeWindow`), UI 빌더 위젯(`createButton`, `createInput`, `createKeyInput`, `createChipGroup` 등), 테마 조회/감지 | GUI 패널, 마법사 폼, 3D/텍스처 프리뷰 창 제작 시 | ~1,000줄 |
 | **[`03-ini.md`](./03-ini.md)** | 3DMigoto/XXMI 파싱, `formatKeyToggle`, `upsertSection`, `deleteSection`, Raw 섹션 조작, 고속 심볼 추출(`extractSymbols`) | INI 수정, 토글 키 생성, 단축키 변환 및 검사 시 | ~95줄 |
 | **[`04-workspace.md`](./04-workspace.md)** | 파일/바이너리 읽기·쓰기, 디렉터리 순회, glob 고속 검색(`findFiles`), 전역 검색(`search`), 탭 제어, 저장/닫기/메모리 이벤트(`onDidSaveFile`, `onDidCloseTab`, `onDidClearMemory`) | 모드 파일 탐색, 캐시 동기화, 백업 생성 시 | ~100줄 |
@@ -17,7 +17,7 @@ Migoto Studio 플러그인 개발 및 AI 어시스턴트(ChatGPT, Claude, Cursor
 | **[`07-linter-and-templates.md`](./07-linter-and-templates.md)** | 전용 리소스/변수 화이트리스트 등록, 커스텀 린트 규칙(`registerRule`), 사후 진단 필터(`registerDiagnosticFilter`), 코드 템플릿 | 프레임워크 문법 검증 확장 및 자동완성 스니펫 등록 시 | ~95줄 |
 | **[`08-examples-and-guides.md`](./08-examples-and-guides.md)** | 단일 파일 실전 플러그인 예제, 다중 파일 모듈화 플러그인 예제, `.zip` 패키징 및 설치 방법 | 완성형 플러그인 보일러플레이트 참조 시 | ~170줄 |
 | **[`09-slots.md`](./09-slots.md)** | 3D 모델 및 텍스처 슬롯 매칭 API (`context.slots`), 부위별 슬롯 조회, 커스텀 텍스처 리졸버(`registerTextureSlotResolver`), 텍스처 수동 수정 | 부위별 모델/텍스처 추적, 게임별 슬롯픽스(ZZMI 등) 확장 시 | ~100줄 |
-| **[`10-plugins.md`](./10-plugins.md)** | 플러그인 생명주기 및 상태 관리 API (`context.plugins`), 플러그인 목록/상태 확인(`getPlugins`, `isEnabled`), 활성화/비활성화/설치/삭제 이벤트 감지(`onDidChangePlugins`) | 플러그인 간 연동, 기능 활성화 상태 동기화 및 알림 시 | ~70줄 |
+| **[`10-plugins.md`](./10-plugins.md)** | 플러그인 생명주기 및 상태 관리 API (`context.plugins`), 플러그인 목록/상태 확인(`getPlugins`, `isEnabled`), 플러그인 간 API 공유(`registerApi`, `getPluginApi`), 종속성 검사/설치, 이벤트 감지 | 플러그인 간 연동, 기능 활성화 상태 동기화 및 알림 시 | ~150줄 |
 
 ---
 
