@@ -1,5 +1,11 @@
 import { parseIni, type IniDocument, type IniSection } from '../ini/ini.ts';
-import { detectPartFromSectionName, PART_LABELS, standard3DMigotoResolver } from './resolver.ts';
+import {
+  detectPartFromSectionName,
+  discoverModParts,
+  formatPartLabel,
+  PART_LABELS,
+  standard3DMigotoResolver,
+} from './resolver.ts';
 import type {
   ModPartType,
   ModelSlot,
@@ -13,7 +19,7 @@ import type { FileExplorer } from '../../ui/panels/explorer.ts';
 import { platform } from '../../platform/index.ts';
 import { appLogger } from '../logger.ts';
 
-const PART_SORT_ORDER: Record<ModPartType, number> = {
+const PART_SORT_ORDER: Record<string, number> = {
   head: 1,
   face: 2,
   hair: 3,
@@ -22,7 +28,7 @@ const PART_SORT_ORDER: Record<ModPartType, number> = {
   weapon: 6,
   extra: 7,
   custom: 8,
-  unknown: 9,
+  unknown: 99,
 };
 
 const STORAGE_MANUAL_MAPPINGS = 'migoto_slot_manual_mappings';
@@ -107,7 +113,7 @@ export class SlotManager {
 
       this.slots.push({
         part: targetPart,
-        partName: PART_LABELS[targetPart] || targetPart,
+        partName: formatPartLabel(targetPart),
         sectionName: item.sectionName,
         filePath: item.filePath,
         startLine: item.startLine,
@@ -124,7 +130,7 @@ export class SlotManager {
       const existing = this.slots.find((s) => s.sectionName === sectionName);
       if (existing) {
         existing.part = targetPart;
-        existing.partName = PART_LABELS[targetPart] || targetPart;
+        existing.partName = formatPartLabel(targetPart);
         existing.isManual = true;
         this.sortSlots();
         this.emit();
@@ -201,55 +207,64 @@ export class SlotManager {
     const newSlots: ModelSlot[] = [];
     const newUnmatched: UnmatchedSection[] = [];
 
+    // 1. 모드 내 모든 후보 오버라이드 섹션 수집
+    const candidates: Array<{ section: IniSection; filePath: string; doc: IniDocument }> = [];
     for (const [filePath, iniDoc] of docs.entries()) {
       for (const section of iniDoc.sections) {
-        if (!this.isModelOrOverrideSection(section)) {
-          continue;
+        if (this.isModelOrOverrideSection(section)) {
+          candidates.push({ section, filePath, doc: iniDoc });
         }
+      }
+    }
 
-        // 1. 부위(Part) 판별 (수동 오버라이드 확인 후 자동 판별)
-        const manualPart = this.manualMappings.get(section.name);
-        const detectedPart = manualPart ?? detectPartFromSectionName(section.name);
+    // 2. 모드 INI 전체 섹션명을 바탕으로 동적 부위 자동 도출
+    const sectionNames = candidates.map((c) => c.section.name);
+    const discoveredParts = discoverModParts(sectionNames);
 
-        // 2. 모델 슬롯 정보 추출
-        const props = section.properties;
-        const ib = props['ib']?.replace(/^ref\s+/i, '').trim();
-        const vb = props['vb']?.replace(/^ref\s+/i, '').trim();
-        const hash = props['hash'];
-        const matchFirstIndex = props['match_first_index'] ? parseInt(props['match_first_index'], 10) : undefined;
-        const drawIndexed = props['drawindexed'];
-        const handling = props['handling'];
+    for (const { section, filePath, doc: iniDoc } of candidates) {
+      // 1. 부위(Part) 판별 (수동 오버라이드 확인 -> 모드 동적 분석 -> 단일 섹션 fallback)
+      const manualPart = this.manualMappings.get(section.name);
+      const dynamicPart = discoveredParts.get(section.name) || detectPartFromSectionName(section.name);
+      const detectedPart = manualPart ?? dynamicPart;
 
-        // 3. 텍스처 슬롯 추출 (등록된 리졸버들을 우선순위순으로 실행)
-        const textureSlots = this.resolveTextureSlotsForSection(section, iniDoc, docs);
+      // 2. 모델 슬롯 정보 추출
+      const props = section.properties;
+      const ib = props['ib']?.replace(/^ref\s+/i, '').trim();
+      const vb = props['vb']?.replace(/^ref\s+/i, '').trim();
+      const hash = props['hash'];
+      const matchFirstIndex = props['match_first_index'] ? parseInt(props['match_first_index'], 10) : undefined;
+      const drawIndexed = props['drawindexed'];
+      const handling = props['handling'];
 
-        // 4. 슬롯 분류 할당
-        if (detectedPart !== 'unknown') {
-          newSlots.push({
-            part: detectedPart,
-            partName: PART_LABELS[detectedPart] || detectedPart,
-            sectionName: section.name,
-            filePath,
-            startLine: section.startLine,
-            ib,
-            vb,
-            hash,
-            matchFirstIndex,
-            drawIndexed,
-            handling,
-            textureSlots,
-            isManual: Boolean(manualPart),
-          });
-        } else {
-          newUnmatched.push({
-            sectionName: section.name,
-            filePath,
-            startLine: section.startLine,
-            ib,
-            hash,
-            textureSlots,
-          });
-        }
+      // 3. 텍스처 슬롯 추출 (등록된 리졸버들을 우선순위순으로 실행)
+      const textureSlots = this.resolveTextureSlotsForSection(section, iniDoc, docs);
+
+      // 4. 슬롯 분류 할당
+      if (detectedPart && detectedPart.toLowerCase() !== 'unknown') {
+        newSlots.push({
+          part: detectedPart,
+          partName: formatPartLabel(detectedPart),
+          sectionName: section.name,
+          filePath,
+          startLine: section.startLine,
+          ib,
+          vb,
+          hash,
+          matchFirstIndex,
+          drawIndexed,
+          handling,
+          textureSlots,
+          isManual: Boolean(manualPart),
+        });
+      } else {
+        newUnmatched.push({
+          sectionName: section.name,
+          filePath,
+          startLine: section.startLine,
+          ib,
+          hash,
+          textureSlots,
+        });
       }
     }
 
@@ -316,10 +331,10 @@ export class SlotManager {
 
   private sortSlots() {
     this.slots.sort((a, b) => {
-      const orderA = PART_SORT_ORDER[a.part] ?? 99;
-      const orderB = PART_SORT_ORDER[b.part] ?? 99;
+      const orderA = PART_SORT_ORDER[a.part.toLowerCase()] ?? 50;
+      const orderB = PART_SORT_ORDER[b.part.toLowerCase()] ?? 50;
       if (orderA !== orderB) return orderA - orderB;
-      return a.sectionName.localeCompare(b.sectionName);
+      return a.part.localeCompare(b.part) || a.sectionName.localeCompare(b.sectionName);
     });
   }
 

@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { parseIni } from '../src/core/ini/ini.ts';
-import { detectPartFromSectionName, standard3DMigotoResolver, findResourceFilename } from '../src/core/slots/resolver.ts';
+import { detectPartFromSectionName, discoverModParts, standard3DMigotoResolver, findResourceFilename } from '../src/core/slots/resolver.ts';
 import { SlotManager } from '../src/core/slots/slot-manager.ts';
 import { createZzmiSlotResolver } from '../default-plugins/zzmi-support/rules.ts';
 
@@ -76,7 +76,7 @@ filename = Head.dds
 
   const result = sm.analyzeDocuments(docsMap);
   assert.equal(result.slots.length, 1);
-  assert.equal(result.slots[0].part, 'head');
+  assert.equal(result.slots[0].part.toLowerCase(), 'head');
   assert.equal(result.slots[0].sectionName, 'TextureOverrideHeroHead');
 
   assert.equal(result.unmatched.length, 1);
@@ -124,7 +124,7 @@ filename = Anby_Body_N.dds
   const result = sm.analyzeDocuments(docsMap);
   assert.equal(result.slots.length, 1);
   const bodySlot = result.slots[0];
-  assert.equal(bodySlot.part, 'body');
+  assert.equal(bodySlot.part.toLowerCase(), 'body');
   assert.equal(bodySlot.textureSlots.length, 4);
 
   const diffSlot = bodySlot.textureSlots.find((t) => t.slotId === 'ZZMI\\Diffuse');
@@ -138,4 +138,52 @@ filename = Anby_Body_N.dds
   assert.equal(fxSlot.slotType, 'fx');
 
   unregister();
+});
+
+test('discoverModParts dynamically extracts arbitrary modder-defined parts per mod INI', () => {
+  const iniSections = [
+    'TextureOverrideJaneDoeBody',
+    'TextureOverrideJaneDoeHead',
+    'TextureOverrideJaneDoeTail',
+    'TextureOverrideJaneDoeJacket',
+    'TextureOverrideJaneDoeKnife',
+  ];
+
+  const map = discoverModParts(iniSections);
+  assert.equal(map.get('TextureOverrideJaneDoeBody'), 'Body');
+  assert.equal(map.get('TextureOverrideJaneDoeHead'), 'Head');
+  assert.equal(map.get('TextureOverrideJaneDoeTail'), 'Tail');
+  assert.equal(map.get('TextureOverrideJaneDoeJacket'), 'Jacket');
+  assert.equal(map.get('TextureOverrideJaneDoeKnife'), 'Knife');
+});
+
+test('SlotManager supports arbitrary dynamic part names in analyzeDocuments and setPartMapping', () => {
+  const sm = new SlotManager();
+  const iniText = `
+[TextureOverrideEllenHair]
+hash = 1001
+diffuse = ResourceHair
+
+[TextureOverrideEllenTail]
+hash = 1002
+diffuse = ResourceTail
+
+[TextureOverrideEllenSharkBlade]
+hash = 1003
+diffuse = ResourceBlade
+`;
+  const doc = parseIni(iniText);
+  const result = sm.analyzeDocuments(new Map([['ellen.ini', doc]]));
+
+  assert.equal(result.slots.length, 3);
+  const parts = result.slots.map((s) => s.part);
+  assert.ok(parts.includes('Hair'));
+  assert.ok(parts.includes('Tail'));
+  assert.ok(parts.includes('Blade'));
+
+  // Custom manual mapping with an arbitrary part name
+  sm.setPartMapping('TextureOverrideEllenTail', 'CyberTail');
+  const tailSlot = sm.getSlot('cybertail');
+  assert.ok(tailSlot);
+  assert.equal(tailSlot.part, 'CyberTail');
 });

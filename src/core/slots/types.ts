@@ -1,15 +1,9 @@
 import type { IniDocument, IniSection } from '../ini/ini.ts';
 
-export type ModPartType =
-  | 'head'
-  | 'body'
-  | 'dress'
-  | 'hair'
-  | 'face'
-  | 'weapon'
-  | 'extra'
-  | 'custom'
-  | 'unknown';
+/**
+ * 동적으로 파악된 모드 부위 식별자 (모더가 지정한 임의의 부위 이름 허용)
+ */
+export type ModPartType = string;
 
 export type TextureSlotType = 'diffuse' | 'normal' | 'light' | 'material' | 'fx' | 'custom';
 

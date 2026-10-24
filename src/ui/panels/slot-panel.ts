@@ -1,6 +1,6 @@
 import { slotManager } from '../../core/slots/slot-manager.ts';
-import { PART_LABELS } from '../../core/slots/resolver.ts';
-import type { ModPartType, ModelSlot, UnmatchedSection } from '../../core/slots/types.ts';
+import { formatPartLabel, getPartColorStyle } from '../../core/slots/resolver.ts';
+import type { ModelSlot, UnmatchedSection } from '../../core/slots/types.ts';
 import type { DocumentManager } from '../../core/workspace/documents.ts';
 import type { FileExplorer } from './explorer.ts';
 import { platform } from '../../platform/index.ts';
@@ -199,9 +199,11 @@ export class SlotMatchingPanel {
     // 카드 헤더
     const cardHeader = document.createElement('div');
     cardHeader.className = 'slot-card-header';
+    const colorStyle = getPartColorStyle(slot.part);
+
     cardHeader.innerHTML = `
       <div class="slot-part-tag">
-        <span class="slot-part-badge ${slot.part}">${PART_LABELS[slot.part] || slot.part}</span>
+        <span class="slot-part-badge" style="background:${colorStyle.bg};color:${colorStyle.color};border:${colorStyle.border}">${slot.partName}</span>
         ${slot.isManual ? '<span class="slot-manual-tag" title="수동 매칭됨">수동</span>' : ''}
       </div>
       <div class="slot-section-title" title="에디터에서 열기 (클릭)">[${slot.sectionName}]</div>
@@ -256,18 +258,22 @@ export class SlotMatchingPanel {
     select.className = 'slot-part-select';
     select.title = '다른 부위로 재지정';
 
-    const partOptions: ModPartType[] = ['body', 'head', 'dress', 'hair', 'face', 'weapon', 'extra', 'custom'];
-    for (const p of partOptions) {
-      const opt = document.createElement('option');
-      opt.value = p;
-      opt.textContent = PART_LABELS[p];
-      if (p === slot.part) opt.selected = true;
-      select.appendChild(opt);
-    }
+    this.populatePartSelect(select, slot.part);
 
     select.addEventListener('change', (e) => {
-      const targetPart = (e.target as HTMLSelectElement).value as ModPartType;
-      slotManager.setPartMapping(slot.sectionName, targetPart);
+      let targetPart = (e.target as HTMLSelectElement).value;
+      if (targetPart === '__custom__') {
+        const entered = prompt('이 섹션에 지정할 부위 이름을 입력하세요 (예: Tail, Jacket, Wings, Ribbon, Sword 등):');
+        if (entered && entered.trim()) {
+          targetPart = entered.trim();
+        } else {
+          this.render();
+          return;
+        }
+      }
+      if (targetPart) {
+        slotManager.setPartMapping(slot.sectionName, targetPart);
+      }
     });
 
     const label = document.createElement('span');
@@ -312,23 +318,19 @@ export class SlotMatchingPanel {
     const select = document.createElement('select');
     select.className = 'slot-part-select match-select';
 
-    const defaultOpt = document.createElement('option');
-    defaultOpt.value = '';
-    defaultOpt.textContent = '부위 선택... (Click to Match)';
-    defaultOpt.disabled = true;
-    defaultOpt.selected = true;
-    select.appendChild(defaultOpt);
-
-    const partOptions: ModPartType[] = ['body', 'head', 'dress', 'hair', 'face', 'weapon', 'extra', 'custom'];
-    for (const p of partOptions) {
-      const opt = document.createElement('option');
-      opt.value = p;
-      opt.textContent = PART_LABELS[p];
-      select.appendChild(opt);
-    }
+    this.populatePartSelect(select);
 
     select.addEventListener('change', (e) => {
-      const targetPart = (e.target as HTMLSelectElement).value as ModPartType;
+      let targetPart = (e.target as HTMLSelectElement).value;
+      if (targetPart === '__custom__') {
+        const entered = prompt('이 섹션에 지정할 부위 이름을 입력하세요 (예: Tail, Jacket, Wings, Ribbon, Sword 등):');
+        if (entered && entered.trim()) {
+          targetPart = entered.trim();
+        } else {
+          this.render();
+          return;
+        }
+      }
       if (targetPart) {
         slotManager.setPartMapping(item.sectionName, targetPart);
       }
@@ -338,6 +340,63 @@ export class SlotMatchingPanel {
     card.appendChild(selectRow);
 
     return card;
+  }
+
+  /**
+   * 부위 선택 드롭다운 채우기 (현재 모드 파악 부위 + 추천 프리셋 + 직접 입력)
+   */
+  private populatePartSelect(select: HTMLSelectElement, currentPart?: string) {
+    select.innerHTML = '';
+
+    if (!currentPart) {
+      const defaultOpt = document.createElement('option');
+      defaultOpt.value = '';
+      defaultOpt.textContent = '부위 선택... (클릭하여 매칭)';
+      defaultOpt.disabled = true;
+      defaultOpt.selected = true;
+      select.appendChild(defaultOpt);
+    }
+
+    // 1. 현재 모드에서 파악된 부위 목록
+    const existingParts = Array.from(new Set(slotManager.getSlots().map((s) => s.part))).filter(Boolean);
+
+    if (existingParts.length > 0) {
+      const optGroupMod = document.createElement('optgroup');
+      optGroupMod.label = '📁 현재 모드에서 파악된 부위';
+      for (const p of existingParts) {
+        const opt = document.createElement('option');
+        opt.value = p;
+        opt.textContent = formatPartLabel(p);
+        if (currentPart && p.toLowerCase() === currentPart.toLowerCase()) {
+          opt.selected = true;
+        }
+        optGroupMod.appendChild(opt);
+      }
+      select.appendChild(optGroupMod);
+    }
+
+    // 2. 자주 쓰이는 추천 표준 부위 프리셋
+    const presetParts = ['Head', 'Body', 'Dress', 'Hair', 'Face', 'Weapon', 'Tail', 'Jacket', 'Accessory'];
+    const optGroupPresets = document.createElement('optgroup');
+    optGroupPresets.label = '✨ 추천 표준 부위 프리셋';
+    for (const p of presetParts) {
+      if (!existingParts.some((ep) => ep.toLowerCase() === p.toLowerCase())) {
+        const opt = document.createElement('option');
+        opt.value = p;
+        opt.textContent = formatPartLabel(p);
+        if (currentPart && p.toLowerCase() === currentPart.toLowerCase()) {
+          opt.selected = true;
+        }
+        optGroupPresets.appendChild(opt);
+      }
+    }
+    select.appendChild(optGroupPresets);
+
+    // 3. 직접 입력 옵션
+    const customOpt = document.createElement('option');
+    customOpt.value = '__custom__';
+    customOpt.textContent = '✏️ 직접 새 부위 이름 입력...';
+    select.appendChild(customOpt);
   }
 
   /**
