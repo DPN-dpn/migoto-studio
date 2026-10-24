@@ -32,10 +32,12 @@ const PART_SORT_ORDER: Record<string, number> = {
 };
 
 const STORAGE_MANUAL_MAPPINGS = 'migoto_slot_manual_mappings';
+const STORAGE_MANUAL_TEXTURES = 'migoto_slot_manual_textures';
 
 export class SlotManager {
   private resolvers: TextureSlotResolver[] = [];
   private manualMappings: Map<string, ModPartType> = new Map();
+  private manualTextureMappings: Map<string, TextureSlot[]> = new Map();
   private slots: ModelSlot[] = [];
   private unmatched: UnmatchedSection[] = [];
   private listeners = new Set<(slots: ModelSlot[]) => void>();
@@ -46,6 +48,7 @@ export class SlotManager {
     // 기본 표준 3DMigoto 리졸버 등록
     this.registerTextureSlotResolver(standard3DMigotoResolver);
     this.loadManualMappings();
+    this.loadManualTextureMappings();
   }
 
   /**
@@ -139,6 +142,77 @@ export class SlotManager {
   }
 
   /**
+   * 특정 섹션의 텍스처 슬롯 파일명을 수동 지정/수정합니다.
+   */
+  setTextureSlot(sectionName: string, slotId: string, textureFile: string, slotType?: any) {
+    let slotsForSec = this.manualTextureMappings.get(sectionName);
+    if (!slotsForSec) {
+      const existing = this.slots.find((s) => s.sectionName === sectionName) ||
+                       this.unmatched.find((u) => u.sectionName === sectionName);
+      slotsForSec = existing ? existing.textureSlots.map((ts) => ({ ...ts })) : [];
+      this.manualTextureMappings.set(sectionName, slotsForSec);
+    }
+
+    const idx = slotsForSec.findIndex((s) => s.slotId.toLowerCase() === slotId.toLowerCase());
+    if (idx !== -1) {
+      slotsForSec[idx].textureFile = textureFile;
+      if (slotType) slotsForSec[idx].slotType = slotType;
+      slotsForSec[idx].isManual = true;
+    } else {
+      slotsForSec.push({
+        slotId,
+        slotType: slotType || 'diffuse',
+        textureFile,
+        sourceSection: sectionName,
+        isManual: true,
+      });
+    }
+
+    this.saveManualTextureMappings();
+
+    const targetModelSlot = this.slots.find((s) => s.sectionName === sectionName);
+    if (targetModelSlot) {
+      targetModelSlot.textureSlots = [...slotsForSec];
+      this.emit();
+    }
+    const targetUnmatched = this.unmatched.find((u) => u.sectionName === sectionName);
+    if (targetUnmatched) {
+      targetUnmatched.textureSlots = [...slotsForSec];
+      this.emit();
+    }
+  }
+
+  /**
+   * 특정 섹션의 텍스처 슬롯을 수동 삭제합니다.
+   */
+  removeTextureSlot(sectionName: string, slotId: string) {
+    let slotsForSec = this.manualTextureMappings.get(sectionName);
+    if (!slotsForSec) {
+      const existing = this.slots.find((s) => s.sectionName === sectionName) ||
+                       this.unmatched.find((u) => u.sectionName === sectionName);
+      slotsForSec = existing ? existing.textureSlots.map((ts) => ({ ...ts })) : [];
+      this.manualTextureMappings.set(sectionName, slotsForSec);
+    }
+
+    const idx = slotsForSec.findIndex((s) => s.slotId.toLowerCase() === slotId.toLowerCase());
+    if (idx !== -1) {
+      slotsForSec.splice(idx, 1);
+    }
+    this.saveManualTextureMappings();
+
+    const targetModelSlot = this.slots.find((s) => s.sectionName === sectionName);
+    if (targetModelSlot) {
+      targetModelSlot.textureSlots = [...slotsForSec];
+      this.emit();
+    }
+    const targetUnmatched = this.unmatched.find((u) => u.sectionName === sectionName);
+    if (targetUnmatched) {
+      targetUnmatched.textureSlots = [...slotsForSec];
+      this.emit();
+    }
+  }
+
+  /**
    * 수동 매칭을 초기화하고 자동 추정으로 되돌립니다.
    */
   removePartMapping(sectionName: string) {
@@ -207,11 +281,11 @@ export class SlotManager {
     const newSlots: ModelSlot[] = [];
     const newUnmatched: UnmatchedSection[] = [];
 
-    // 1. 모드 내 모든 후보 오버라이드 섹션 수집
+    // 1. 모드 내 모델 섹션 수집 (ib = 구문이 있는 섹션만 모델로 파악)
     const candidates: Array<{ section: IniSection; filePath: string; doc: IniDocument }> = [];
     for (const [filePath, iniDoc] of docs.entries()) {
       for (const section of iniDoc.sections) {
-        if (this.isModelOrOverrideSection(section)) {
+        if (this.isModelSection(section)) {
           candidates.push({ section, filePath, doc: iniDoc });
         }
       }
@@ -236,8 +310,11 @@ export class SlotManager {
       const drawIndexed = props['drawindexed'];
       const handling = props['handling'];
 
-      // 3. 텍스처 슬롯 추출 (등록된 리졸버들을 우선순위순으로 실행)
-      const textureSlots = this.resolveTextureSlotsForSection(section, iniDoc, docs);
+      // 3. 텍스처 슬롯 추출 (사용자 수동 설정이 있으면 우선 반영, 없으면 리졸버 체인)
+      const manualTextures = this.manualTextureMappings.get(section.name);
+      const textureSlots = manualTextures && manualTextures.length > 0
+        ? [...manualTextures]
+        : this.resolveTextureSlotsForSection(section, iniDoc, docs);
 
       // 4. 슬롯 분류 할당
       if (detectedPart && detectedPart.toLowerCase() !== 'unknown') {
@@ -314,19 +391,12 @@ export class SlotManager {
   }
 
   /**
-   * 모델 또는 텍스처 오버라이드 섹션인지 검사합니다.
+   * 모델 섹션인지 검사합니다.
+   * 사용자 요구사항: "모델은 ib = 구문이 있는 섹션이니 ib섹션만 파악해서 나타나도록 해야함"
    */
-  private isModelOrOverrideSection(section: IniSection): boolean {
-    const name = section.name.toLowerCase();
-    if (name.startsWith('textureoverride') || name.startsWith('shaderoverride')) {
-      return true;
-    }
+  private isModelSection(section: IniSection): boolean {
     const props = section.properties;
-    // ib, hash, match_first_index, drawindexed 등의 속성이 있는 경우
-    if (props['ib'] || props['vb'] || props['hash'] || props['match_first_index'] || props['drawindexed']) {
-      return true;
-    }
-    return false;
+    return Boolean(props['ib'] || props['IB']);
   }
 
   private sortSlots() {
@@ -375,6 +445,32 @@ export class SlotManager {
         obj[k] = v;
       }
       localStorage.setItem(STORAGE_MANUAL_MAPPINGS, JSON.stringify(obj));
+    } catch {}
+  }
+
+  private loadManualTextureMappings() {
+    try {
+      if (typeof localStorage === 'undefined') return;
+      const raw = localStorage.getItem(STORAGE_MANUAL_TEXTURES);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        for (const [k, v] of Object.entries(parsed)) {
+          if (Array.isArray(v)) {
+            this.manualTextureMappings.set(k, v as TextureSlot[]);
+          }
+        }
+      }
+    } catch {}
+  }
+
+  private saveManualTextureMappings() {
+    try {
+      if (typeof localStorage === 'undefined') return;
+      const obj: Record<string, TextureSlot[]> = {};
+      for (const [k, v] of this.manualTextureMappings.entries()) {
+        obj[k] = v;
+      }
+      localStorage.setItem(STORAGE_MANUAL_TEXTURES, JSON.stringify(obj));
     } catch {}
   }
 }

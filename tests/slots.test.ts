@@ -162,19 +162,27 @@ test('SlotManager supports arbitrary dynamic part names in analyzeDocuments and 
   const iniText = `
 [TextureOverrideEllenHair]
 hash = 1001
+ib = ResourceHairIB
 diffuse = ResourceHair
 
 [TextureOverrideEllenTail]
 hash = 1002
+ib = ResourceTailIB
 diffuse = ResourceTail
 
 [TextureOverrideEllenSharkBlade]
 hash = 1003
+ib = ResourceBladeIB
 diffuse = ResourceBlade
+
+[TextureOverrideNonModelSection]
+hash = 9999
+diffuse = ResourceSomething
 `;
   const doc = parseIni(iniText);
   const result = sm.analyzeDocuments(new Map([['ellen.ini', doc]]));
 
+  // Non-model section without ib property must be ignored
   assert.equal(result.slots.length, 3);
   const parts = result.slots.map((s) => s.part);
   assert.ok(parts.includes('Hair'));
@@ -186,4 +194,19 @@ diffuse = ResourceBlade
   const tailSlot = sm.getSlot('cybertail');
   assert.ok(tailSlot);
   assert.equal(tailSlot.part, 'CyberTail');
+
+  // Manual texture slot editing
+  sm.setTextureSlot('TextureOverrideEllenTail', 'Diffuse', 'Custom_Tail_Diffuse.dds');
+  const updatedTailSlot = sm.getSlot('cybertail');
+  assert.ok(updatedTailSlot);
+  const diffTex = updatedTailSlot.textureSlots.find((t) => t.slotId === 'Diffuse');
+  assert.ok(diffTex);
+  assert.equal(diffTex.textureFile, 'Custom_Tail_Diffuse.dds');
+  assert.equal(diffTex.isManual, true);
+
+  // Manual texture slot removal
+  sm.removeTextureSlot('TextureOverrideEllenTail', 'Diffuse');
+  const afterRemove = sm.getSlot('cybertail');
+  assert.ok(afterRemove);
+  assert.equal(afterRemove.textureSlots.some((t) => t.slotId === 'Diffuse'), false);
 });

@@ -176,7 +176,7 @@ export class SlotMatchingPanel {
 
       const matchedHeader = document.createElement('div');
       matchedHeader.className = 'slot-group-title';
-      matchedHeader.innerHTML = `<span>✨ 매칭된 부위 목록 (${matchedCount})</span>`;
+      matchedHeader.innerHTML = `<span>✨ 모델 슬롯 및 매칭 텍스처 (${matchedCount})</span>`;
       matchedGroup.appendChild(matchedHeader);
 
       for (const slot of slots) {
@@ -191,12 +191,13 @@ export class SlotMatchingPanel {
 
   /**
    * 매칭된 모델 부위 카드 렌더링
+   * (사용자 지침: IB, Hash, Index 정보는 나타날 필요 없이 부위와 텍스처 파일 매칭에 집중)
    */
   private createModelSlotCard(slot: ModelSlot): HTMLElement {
     const card = document.createElement('div');
     card.className = `slot-card part-${slot.part}`;
 
-    // 카드 헤더
+    // 카드 헤더: 부위 배지 + 섹션명 (클릭 시 에디터 이동)
     const cardHeader = document.createElement('div');
     cardHeader.className = 'slot-card-header';
     const colorStyle = getPartColorStyle(slot.part);
@@ -214,21 +215,21 @@ export class SlotMatchingPanel {
     });
     card.appendChild(cardHeader);
 
-    // 모델 슬롯 세부 정보 (IB, Hash, Handling 등)
-    const modelDetails = document.createElement('div');
-    modelDetails.className = 'slot-model-details';
-    const details: string[] = [];
-    if (slot.ib) details.push(`<span class="slot-detail-item"><b>IB:</b> ${slot.ib}</span>`);
-    if (slot.hash) details.push(`<span class="slot-detail-item"><b>Hash:</b> ${slot.hash}</span>`);
-    if (slot.matchFirstIndex !== undefined) details.push(`<span class="slot-detail-item"><b>Index:</b> ${slot.matchFirstIndex}</span>`);
-    if (slot.handling) details.push(`<span class="slot-detail-item"><b>Handling:</b> ${slot.handling}</span>`);
+    // 텍스처 슬롯 목록 (파일 단위로 표시 및 사용자가 수동 수정 가능)
+    const texContainer = document.createElement('div');
+    texContainer.className = 'slot-texture-section';
 
-    if (details.length > 0) {
-      modelDetails.innerHTML = details.join('');
-      card.appendChild(modelDetails);
-    }
+    const texHeader = document.createElement('div');
+    texHeader.className = 'slot-tex-header';
+    texHeader.innerHTML = `
+      <span class="slot-tex-title">매칭된 텍스처 파일</span>
+      <button class="slot-btn-text-action add-tex-btn" title="이 부위에 텍스처 슬롯 추가">➕ 슬롯 추가</button>
+    `;
+    texHeader.querySelector('.add-tex-btn')?.addEventListener('click', () => {
+      this.promptAddTextureSlot(slot.sectionName);
+    });
+    texContainer.appendChild(texHeader);
 
-    // 텍스처 슬롯 목록
     if (slot.textureSlots.length > 0) {
       const texList = document.createElement('div');
       texList.className = 'slot-texture-list';
@@ -236,19 +237,42 @@ export class SlotMatchingPanel {
       for (const tex of slot.textureSlots) {
         const item = document.createElement('div');
         item.className = 'slot-texture-item';
+
+        const fileDisplay = tex.textureFile || tex.resourceRef || '(파일 없음)';
+        const isFileMissing = !tex.textureFile;
+
         item.innerHTML = `
           <span class="slot-tex-type ${tex.slotType}">${tex.slotId}</span>
-          <span class="slot-tex-ref" title="${tex.resourceRef || ''}">${tex.textureFile || tex.resourceRef || '-'}</span>
+          <span class="slot-tex-ref ${isFileMissing ? 'missing' : ''}" title="${tex.resourceRef ? `리소스: ${tex.resourceRef}\n` : ''}클릭하여 파일명 수정">${fileDisplay}</span>
+          <div class="slot-tex-item-actions">
+            <button class="slot-tex-btn edit-btn" title="텍스처 파일명 변경">✏️</button>
+            <button class="slot-tex-btn delete-btn" title="이 슬롯 삭제">🗑️</button>
+          </div>
         `;
+
+        // 파일명 클릭 또는 ✏️ 버튼 시 파일명 수정
+        const onEdit = () => this.promptEditTextureSlot(slot.sectionName, tex.slotId, tex.textureFile || '');
+        item.querySelector('.slot-tex-ref')?.addEventListener('click', onEdit);
+        item.querySelector('.edit-btn')?.addEventListener('click', onEdit);
+
+        // 🗑️ 버튼 시 슬롯 삭제
+        item.querySelector('.delete-btn')?.addEventListener('click', () => {
+          slotManager.removeTextureSlot(slot.sectionName, tex.slotId);
+        });
+
         texList.appendChild(item);
       }
-      card.appendChild(texList);
+      texContainer.appendChild(texList);
     } else {
       const noTex = document.createElement('div');
       noTex.className = 'slot-no-textures';
-      noTex.textContent = '연결된 텍스처 슬롯 없음';
-      card.appendChild(noTex);
+      noTex.innerHTML = `<span>연결된 텍스처 파일 없음</span> <button class="slot-btn-link add-tex-link">추가하기</button>`;
+      noTex.querySelector('.add-tex-link')?.addEventListener('click', () => {
+        this.promptAddTextureSlot(slot.sectionName);
+      });
+      texContainer.appendChild(noTex);
     }
+    card.appendChild(texContainer);
 
     // 부위 재지정 액션 드롭다운
     const actionRow = document.createElement('div');
@@ -298,11 +322,6 @@ export class SlotMatchingPanel {
         <span class="slot-part-badge unknown">미분류</span>
         <div class="slot-section-title" title="에디터에서 열기 (클릭)">[${item.sectionName}]</div>
       </div>
-      <div class="slot-model-details">
-        ${item.ib ? `<span class="slot-detail-item"><b>IB:</b> ${item.ib}</span>` : ''}
-        ${item.hash ? `<span class="slot-detail-item"><b>Hash:</b> ${item.hash}</span>` : ''}
-        <span class="slot-detail-item">텍스처 ${item.textureSlots.length}개 발견</span>
-      </div>
       <div class="slot-match-prompt">
         <label>이 섹션의 부위를 지정하세요:</label>
       </div>
@@ -340,6 +359,39 @@ export class SlotMatchingPanel {
     card.appendChild(selectRow);
 
     return card;
+  }
+
+  /**
+   * 텍스처 파일명 수동 수정 프롬프트
+   */
+  private promptEditTextureSlot(sectionName: string, slotId: string, currentFile: string) {
+    const entered = prompt(
+      `[${sectionName}]의 "${slotId}" 슬롯에 매칭할 텍스처 파일명을 입력하세요 (예: Diffuse.dds):`,
+      currentFile,
+    );
+    if (entered !== null) {
+      const trimmed = entered.trim();
+      slotManager.setTextureSlot(sectionName, slotId, trimmed);
+    }
+  }
+
+  /**
+   * 텍스처 슬롯 신규 추가 프롬프트
+   */
+  private promptAddTextureSlot(sectionName: string) {
+    const slotId = prompt(
+      `추가할 텍스처 슬롯 ID를 입력하세요:\n(예: Diffuse, NormalMap, LightMap, MaterialMap, WEngineFX 등)`,
+      'Diffuse',
+    );
+    if (!slotId || !slotId.trim()) return;
+
+    const textureFile = prompt(
+      `"${slotId.trim()}" 슬롯에 연결할 텍스처 파일명을 입력하세요 (예: Texture_D.dds):`,
+      '',
+    );
+    if (textureFile !== null) {
+      slotManager.setTextureSlot(sectionName, slotId.trim(), textureFile.trim());
+    }
   }
 
   /**

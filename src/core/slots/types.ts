@@ -20,6 +20,8 @@ export interface TextureSlot {
   rawLine?: string;
   /** 해당 텍스처 슬롯이 선언된 섹션명 */
   sourceSection?: string;
+  /** 사용자가 수동으로 매칭/수정한 텍스처 슬롯 여부 */
+  isManual?: boolean;
 }
 
 export interface ModelSlot {

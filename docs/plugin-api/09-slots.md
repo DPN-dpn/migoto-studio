@@ -60,6 +60,21 @@ const updatedSlots = await context.slots.refreshSlots();
 context.slots.setPartMapping('TextureOverrideCustomDressA', 'dress');
 ```
 
+### `context.slots.setTextureSlot(sectionName, slotId, textureFile, slotType?)`
+특정 모델 섹션에 매칭된 텍스처 슬롯의 파일명을 수동으로 지정하거나 새로 추가합니다.
+
+```typescript
+// Diffuse 텍스처 파일 직접 지정
+context.slots.setTextureSlot('TextureOverrideJaneTail', 'Diffuse', 'Jane_Tail_D.dds', 'diffuse');
+```
+
+### `context.slots.removeTextureSlot(sectionName, slotId)`
+특정 모델 섹션의 텍스처 슬롯을 수동 삭제합니다.
+
+```typescript
+context.slots.removeTextureSlot('TextureOverrideJaneTail', 'Diffuse');
+```
+
 ---
 
 ## 2. 커스텀 텍스처 슬롯 리졸버 등록

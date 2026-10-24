@@ -16,7 +16,8 @@ Migoto Studio 플러그인 개발 및 AI 어시스턴트(ChatGPT, Claude, Cursor
 | **[`06-storage-and-system.md`](./06-storage-and-system.md)** | 격리 영구 스토리지(`context.storage`), 외부 프로세스 실행(`context.system.exec`), 전용 콘솔 로거(`context.logger`), `fetch` | 플러그인 설정 저장, Python/CLI 툴 연동, 디버그 로깅 시 | ~55줄 |
 | **[`07-linter-and-templates.md`](./07-linter-and-templates.md)** | 전용 리소스/변수 화이트리스트 등록, 커스텀 린트 규칙(`registerRule`), 사후 진단 필터(`registerDiagnosticFilter`), 코드 템플릿 | 프레임워크 문법 검증 확장 및 자동완성 스니펫 등록 시 | ~95줄 |
 | **[`08-examples-and-guides.md`](./08-examples-and-guides.md)** | 단일 파일 실전 플러그인 예제, 다중 파일 모듈화 플러그인 예제, `.zip` 패키징 및 설치 방법 | 완성형 플러그인 보일러플레이트 참조 시 | ~170줄 |
-| **[`09-slots.md`](./09-slots.md)** | 3D 모델 및 텍스처 슬롯 매칭 API (`context.slots`), 부위별 슬롯 조회, 커스텀 텍스처 리졸버(`registerTextureSlotResolver`) | 부위별 모델/텍스처 추적, 게임별 슬롯픽스(ZZMI 등) 확장 시 | ~100줄 |
+| **[`09-slots.md`](./09-slots.md)** | 3D 모델 및 텍스처 슬롯 매칭 API (`context.slots`), 부위별 슬롯 조회, 커스텀 텍스처 리졸버(`registerTextureSlotResolver`), 텍스처 수동 수정 | 부위별 모델/텍스처 추적, 게임별 슬롯픽스(ZZMI 등) 확장 시 | ~100줄 |
+| **[`10-plugins.md`](./10-plugins.md)** | 플러그인 생명주기 및 상태 관리 API (`context.plugins`), 플러그인 목록/상태 확인(`getPlugins`, `isEnabled`), 활성화/비활성화/설치/삭제 이벤트 감지(`onDidChangePlugins`) | 플러그인 간 연동, 기능 활성화 상태 동기화 및 알림 시 | ~70줄 |
 
 ---
 

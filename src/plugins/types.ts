@@ -2,8 +2,8 @@ import type { IniSection, IniDocument, IniMergeResult, IniSectionLine } from '..
 export type { IniSection, IniDocument, IniMergeResult, IniSectionLine } from '../core/ini/ini.ts';
 import type { PluginLogger } from '../core/logger.ts';
 export type { PluginLogger };
-import type { ModelSlot, ModPartType, TextureSlot, TextureSlotResolver } from '../core/slots/types.ts';
-export type { ModelSlot, ModPartType, TextureSlot, TextureSlotResolver };
+import type { ModelSlot, ModPartType, TextureSlot, TextureSlotType, TextureSlotResolver } from '../core/slots/types.ts';
+export type { ModelSlot, ModPartType, TextureSlot, TextureSlotType, TextureSlotResolver };
 
 export interface PluginManifest {
   id: string;
@@ -568,8 +568,22 @@ export interface PluginContext {
     refreshSlots(): Promise<ModelSlot[]>;
     /** 특정 섹션의 부위를 수동으로 지정/매칭 */
     setPartMapping(sectionName: string, part: ModPartType | string): void;
+    /** 특정 섹션의 텍스처 슬롯 파일명을 수동으로 지정/수정 */
+    setTextureSlot(sectionName: string, slotId: string, textureFile: string, slotType?: TextureSlotType): void;
+    /** 특정 섹션의 텍스처 슬롯을 수동 삭제 */
+    removeTextureSlot(sectionName: string, slotId: string): void;
     /** 게임/엔진별 특수 텍스처 구문(예: ZZMI SlotFix 등)을 해석하기 위한 커스텀 리졸버 등록 */
     registerTextureSlotResolver(resolver: TextureSlotResolver): () => void;
+  };
+
+  // ---- Plugin lifecycle events & state ----
+  plugins: {
+    /** 현재 등록된 모든 플러그인 목록 조회 */
+    getPlugins(): Array<{ id: string; name: string; version: string; enabled: boolean; isBuiltin: boolean }>;
+    /** 특정 플러그인의 활성화 여부 확인 */
+    isEnabled(pluginId: string): boolean;
+    /** 플러그인 활성화/비활성화/설치/삭제 이벤트 리스너 등록 */
+    onDidChangePlugins(listener: (event: PluginLifecycleEvent) => void): () => void;
   };
 
   // ---- System execution (desktop) ----
@@ -610,6 +624,14 @@ export interface RegisteredSidebarView {
 
 import type { CustomViewerDefinition } from '../core/workspace/documents.ts';
 export type { CustomViewerDefinition };
+
+export type PluginLifecycleAction = 'activated' | 'deactivated' | 'installed' | 'uninstalled';
+
+export interface PluginLifecycleEvent {
+  action: PluginLifecycleAction;
+  pluginId: string;
+  manifest: PluginManifest;
+}
 
 export interface PluginInstance {
   manifest: PluginManifest;

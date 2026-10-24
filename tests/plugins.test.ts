@@ -2073,6 +2073,41 @@ test('Plugin UI Builder modal, icon button, chip group, and direct HTMLElement r
   }
 });
 
+test('PluginLifecycleEvent and subscription contracts work properly', () => {
+  type PluginLifecycleAction = import('../src/plugins/types.ts').PluginLifecycleAction;
+  type PluginLifecycleEvent = import('../src/plugins/types.ts').PluginLifecycleEvent;
 
+  const events: PluginLifecycleEvent[] = [];
+  const listeners = new Set<(event: PluginLifecycleEvent) => void>();
 
+  const onDidPluginChange = (listener: (event: PluginLifecycleEvent) => void) => {
+    listeners.add(listener);
+    return () => listeners.delete(listener);
+  };
 
+  const emit = (action: PluginLifecycleAction, pluginId: string, name: string) => {
+    const ev: PluginLifecycleEvent = {
+      action,
+      pluginId,
+      manifest: { id: pluginId, name, version: '1.0.0' },
+    };
+    listeners.forEach((l) => l(ev));
+  };
+
+  const unlisten = onDidPluginChange((e) => events.push(e));
+
+  emit('activated', 'custom-lint', 'Custom Lint');
+  emit('deactivated', 'custom-lint', 'Custom Lint');
+  emit('installed', 'zzmi-support', 'ZZMI Support');
+  emit('uninstalled', 'zzmi-support', 'ZZMI Support');
+
+  assert.equal(events.length, 4);
+  assert.equal(events[0].action, 'activated');
+  assert.equal(events[1].action, 'deactivated');
+  assert.equal(events[2].action, 'installed');
+  assert.equal(events[3].action, 'uninstalled');
+
+  unlisten();
+  emit('activated', 'test', 'Test');
+  assert.equal(events.length, 4);
+});

@@ -88,6 +88,8 @@ import type {
   SubWindowHandle,
   NativeWindowOptions,
   NativeWindowHandle,
+  PluginLifecycleAction,
+  PluginLifecycleEvent,
 } from './types';
 import { createUIBuilder } from './ui-builder';
 import { subWindowManager, nativeWindowManager } from '../window';
@@ -120,6 +122,7 @@ export class PluginManager {
   private customViewers: Map<string, CustomViewerDefinition> = new Map();
   private dynamicTabDisposers: Map<string, () => void> = new Map();
   private listeners: Set<() => void> = new Set();
+  private pluginLifecycleListeners: Set<(event: PluginLifecycleEvent) => void> = new Set();
   private statusBarEl: HTMLElement | null = null;
   private pluginStatusBarItems: Map<string, HTMLElement> = new Map();
   private customLintRules: Map<string, CustomLintRule> = new Map();
@@ -889,12 +892,40 @@ export class PluginManager {
         clearAllowedResources();
       }
       appLogger.info('Plugin', `플러그인 비활성화: "${p.manifest.name}"`);
+      this.emitLifecycle('deactivated', pluginId, p.manifest);
     } else if (p.scriptContent) {
       await this.loadAndActivateScriptPlugin(p, p.scriptContent);
+      this.emitLifecycle('activated', pluginId, p.manifest);
     }
 
     this.notify();
     this.triggerLint();
+  }
+
+  /**
+   * 플러그인 생명주기(활성화, 비활성화, 설치, 삭제) 이벤트 리스너를 등록합니다.
+   */
+  onDidPluginChange(listener: (event: PluginLifecycleEvent) => void): () => void {
+    this.pluginLifecycleListeners.add(listener);
+    return () => this.pluginLifecycleListeners.delete(listener);
+  }
+
+  private emitLifecycle(action: PluginLifecycleAction, pluginId: string, manifest?: PluginManifest) {
+    const m: PluginManifest = manifest || this.plugins.get(pluginId)?.manifest || {
+      id: pluginId,
+      name: pluginId,
+      version: '0.0.0',
+      description: '',
+      author: '',
+    };
+    const event: PluginLifecycleEvent = { action, pluginId, manifest: m };
+    this.pluginLifecycleListeners.forEach((listener) => {
+      try {
+        listener(event);
+      } catch (err) {
+        console.warn(`[PluginManager] plugin lifecycle listener error:`, err);
+      }
+    });
   }
 
   isEnabled(pluginId: string): boolean {
@@ -932,6 +963,7 @@ export class PluginManager {
     } catch { }
 
     this.notify();
+    this.emitLifecycle('uninstalled', pluginId, p.manifest);
     this.showToast(`플러그인 "${p.manifest.name}"이(가) 삭제되었습니다.`, 'info');
     return true;
   }
@@ -1022,6 +1054,8 @@ export class PluginManager {
     if (!this.isEnabled(manifest.id)) {
       await this.togglePlugin(manifest.id, true);
     }
+
+    this.emitLifecycle('installed', manifest.id, manifest);
 
     const extraNote = platform().kind === 'web'
       ? ' (브라우저 저장소에 설치되었습니다)'
@@ -1970,10 +2004,34 @@ export default {
         setPartMapping: (sectionName: string, part: string) => {
           slotManager.setPartMapping(sectionName, part);
         },
+        setTextureSlot: (sectionName: string, slotId: string, textureFile: string, slotType?: any) => {
+          slotManager.setTextureSlot(sectionName, slotId, textureFile, slotType);
+        },
+        removeTextureSlot: (sectionName: string, slotId: string) => {
+          slotManager.removeTextureSlot(sectionName, slotId);
+        },
         registerTextureSlotResolver: (resolver: TextureSlotResolver) => {
           const unregister = slotManager.registerTextureSlotResolver(resolver);
           callbacks.onRegisterCleanup(unregister);
           return unregister;
+        },
+      },
+
+      plugins: {
+        getPlugins: () => {
+          return Array.from(this.plugins.values()).map((p) => ({
+            id: p.manifest.id,
+            name: p.manifest.name,
+            version: p.manifest.version,
+            enabled: p.enabled,
+            isBuiltin: p.isBuiltin,
+          }));
+        },
+        isEnabled: (pluginId: string) => this.isEnabled(pluginId),
+        onDidChangePlugins: (listener: (event: PluginLifecycleEvent) => void) => {
+          const unlisten = this.onDidPluginChange(listener);
+          callbacks.onRegisterCleanup(unlisten);
+          return unlisten;
         },
       },
 
