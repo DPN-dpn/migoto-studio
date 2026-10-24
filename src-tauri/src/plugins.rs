@@ -163,6 +163,77 @@ pub fn download_and_install_update(app: tauri::AppHandle, url: String, version: 
 }
 
 #[tauri::command]
+pub fn download_file_bytes(url: String) -> Result<Vec<u8>, String> {
+  let temp_file = std::env::temp_dir().join(format!(
+    "migoto_dl_{}_{}.tmp",
+    std::time::SystemTime::now()
+      .duration_since(std::time::UNIX_EPOCH)
+      .unwrap_or_default()
+      .as_millis(),
+    std::process::id()
+  ));
+  let dest_path = temp_file.to_string_lossy().to_string();
+
+  #[cfg(windows)]
+  {
+    use std::os::windows::process::CommandExt;
+    // 1. Try curl.exe with follow-redirects (-fL)
+    let mut curl = Command::new("curl.exe");
+    curl.args(["-fL", "-sS", "-o", &dest_path, &url]);
+    curl.creation_flags(0x08000000);
+
+    let curl_res = curl.output();
+    let curl_ok = match &curl_res {
+      Ok(out) => out.status.success() && temp_file.exists() && fs::metadata(&temp_file).map(|m| m.len() > 0).unwrap_or(false),
+      Err(_) => false,
+    };
+
+    if curl_ok {
+      let bytes = fs::read(&temp_file).map_err(|e| format!("다운로드 파일 읽기 실패: {e}"))?;
+      let _ = fs::remove_file(&temp_file);
+      return Ok(bytes);
+    }
+
+    // 2. Fallback to PowerShell WebClient with TLS 1.2
+    let ps_script = format!(
+      "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; (New-Object System.Net.WebClient).DownloadFile('{}', '{}')",
+      url.replace('\'', "''"),
+      dest_path.replace('\'', "''")
+    );
+    let mut ps = Command::new("powershell");
+    ps.args(["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", &ps_script]);
+    ps.creation_flags(0x08000000);
+
+    let ps_res = ps.output();
+    let ps_ok = match &ps_res {
+      Ok(out) => out.status.success() && temp_file.exists() && fs::metadata(&temp_file).map(|m| m.len() > 0).unwrap_or(false),
+      Err(_) => false,
+    };
+
+    if ps_ok {
+      let bytes = fs::read(&temp_file).map_err(|e| format!("다운로드 파일 읽기 실패: {e}"))?;
+      let _ = fs::remove_file(&temp_file);
+      return Ok(bytes);
+    }
+
+    let _ = fs::remove_file(&temp_file);
+
+    let curl_err = curl_res
+      .map(|o| format!("코드: {}, stderr: {}", o.status, String::from_utf8_lossy(&o.stderr).trim()))
+      .unwrap_or_else(|e| e.to_string());
+    let ps_err = ps_res
+      .map(|o| format!("코드: {}, output: {}", o.status, String::from_utf8_lossy(&o.stderr).trim()))
+      .unwrap_or_else(|e| e.to_string());
+
+    Err(format!("파일 다운로드 실패 (curl: {curl_err}, powershell: {ps_err})"))
+  }
+  #[cfg(not(windows))]
+  {
+    Err("Windows 전용 기능입니다.".into())
+  }
+}
+
+#[tauri::command]
 pub fn exec_process(
   command: String,
   args: Vec<String>,

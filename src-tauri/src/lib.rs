@@ -68,6 +68,7 @@ pub fn run() {
       plugins::exec_process,
       plugins::list_disk_plugins,
       plugins::save_disk_plugin,
+      plugins::download_file_bytes,
       open_in_browser,
       relaunch_app,
       exit_app,
