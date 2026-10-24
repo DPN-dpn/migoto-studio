@@ -203,9 +203,11 @@ export const desktop: Platform = {
     return new Uint8Array(bytes);
   },
   downloadBinary: async (url: string): Promise<Uint8Array> => {
-    const dataDir = await invoke<string>('get_data_dir');
+    const rawDataDir = await invoke<string>('get_data_dir');
+    // Strip Windows UNC prefix (\\?\) which causes curl to fail with error 23
+    const cleanDataDir = rawDataDir.replace(/^[\\/]{2}\?[\\/]/, '').replace(/\//g, '\\');
     const tempName = `temp_dl_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.zip`;
-    const tempPath = `${dataDir.replace(/\\/g, '/')}/${tempName}`;
+    const tempPath = `${cleanDataDir}\\${tempName}`;
 
     try {
       // 1. Try curl.exe with -fL (follow redirects, fail on HTTP error, silent)
