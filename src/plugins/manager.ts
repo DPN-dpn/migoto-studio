@@ -1018,15 +1018,19 @@ export class PluginManager {
     bytes: Uint8Array,
     sourceMeta?: { owner: string; repo: string; url: string },
   ): Promise<PluginManifest | null> {
+    appLogger.info('Plugin', `플러그인 압축 파일 분석 중... (${(bytes.byteLength / 1024).toFixed(1)} KB)`);
     let extracted: ExtractedPlugin;
     try {
       extracted = validatePluginZip(bytes);
     } catch (err: any) {
-      this.showToast(err?.message || '유효하지 않은 플러그인 압축파일입니다.', 'error');
+      const msg = err?.message || '유효하지 않은 플러그인 압축파일입니다.';
+      appLogger.error('Plugin', `플러그인 압축 파일 검증 실패: ${msg}`);
+      this.showToast(msg, 'error');
       return null;
     }
 
     const { manifest, files, manifestJson, scriptContent } = extracted;
+    appLogger.info('Plugin', `플러그인 패키지 확인 완료: "${manifest.name}" (ID: ${manifest.id}, v${manifest.version})`);
     const isAlreadyInstalled = this.plugins.has(manifest.id);
     const prevOrder = this.getPluginOrder();
 
@@ -1054,14 +1058,18 @@ export class PluginManager {
           const fullPath = `${baseFolder}/${relPath}`;
           await platform().writeBinaryFile!(fullPath, fileData);
         }
+        appLogger.info('Plugin', `플러그인 파일 설치 완료: ${baseFolder} (${Object.keys(files).length}개 파일 저장됨)`);
       } catch (err) {
+        appLogger.error('Plugin', `플러그인 파일 저장 실패: ${err}`);
         this.showToast(`플러그인 파일 저장 실패: ${err}`, 'error');
         return null;
       }
     } else if (platform().saveDiskPlugin) {
       try {
         await platform().saveDiskPlugin!(manifest.id, manifestJson, scriptContent, textFiles);
+        appLogger.info('Plugin', `플러그인 저장 완료 (웹 스토리지): ${manifest.id}`);
       } catch (err) {
+        appLogger.error('Plugin', `플러그인 저장 실패: ${err}`);
         this.showToast(`플러그인 저장 실패: ${err}`, 'error');
         return null;
       }
@@ -1147,29 +1155,42 @@ export class PluginManager {
    * GitHub 저장소 또는 Release 링크로부터 플러그인을 다운로드하여 설치합니다.
    */
   async installPluginFromGitHub(urlStr: string): Promise<boolean> {
+    appLogger.info('Plugin', `GitHub 플러그인 추가 시도: "${urlStr}"`);
     const ref = parseGitHubUrl(urlStr);
     if (!ref) {
+      appLogger.warn('Plugin', `GitHub 링크 형식이 올바르지 않습니다: "${urlStr}"`);
       this.showToast('올바른 GitHub 저장소 링크를 입력해주세요 (예: https://github.com/owner/repo 또는 owner/repo)', 'warn');
       return false;
     }
 
+    appLogger.info('Plugin', `GitHub 저장소 확인: ${ref.owner}/${ref.repo}${ref.tag ? ` (지정: ${ref.tag})` : ''}`);
     this.showToast(`GitHub 릴리스 정보 확인 중... (${ref.owner}/${ref.repo})`, 'info');
 
     let releaseInfo: GitHubPluginReleaseInfo;
     try {
       releaseInfo = await fetchGitHubPluginRelease(ref);
+      appLogger.info(
+        'Plugin',
+        `GitHub 릴리스 정보 조회 완료: v${releaseInfo.version} (${releaseInfo.isArchiveFallback ? '브랜치 아카이브' : 'Releases 에셋'}) - URL: ${releaseInfo.zipUrl}`,
+      );
     } catch (err: any) {
-      this.showToast(`GitHub 릴리스 확인 실패: ${err?.message || err}`, 'error');
+      const msg = err?.message || String(err);
+      appLogger.error('Plugin', `GitHub 릴리스 확인 실패: ${msg}`);
+      this.showToast(`GitHub 릴리스 확인 실패: ${msg}`, 'error');
       return false;
     }
 
     this.showToast(`플러그인 다운로드 중... (v${releaseInfo.version})`, 'info');
+    appLogger.info('Plugin', `플러그인 ZIP 다운로드 시작: ${releaseInfo.zipUrl}`);
 
     let bytes: Uint8Array;
     try {
       bytes = await downloadZipBytes(releaseInfo.zipUrl);
+      appLogger.info('Plugin', `플러그인 다운로드 완료: ${(bytes.byteLength / 1024).toFixed(1)} KB 수신`);
     } catch (err: any) {
-      this.showToast(`다운로드 실패: ${err?.message || err}`, 'error');
+      const msg = err?.message || String(err);
+      appLogger.error('Plugin', `다운로드 실패: ${msg}`);
+      this.showToast(`다운로드 실패: ${msg}`, 'error');
       return false;
     }
 
@@ -1179,8 +1200,12 @@ export class PluginManager {
       url: urlStr.trim(),
     });
 
-    if (!manifest) return false;
+    if (!manifest) {
+      appLogger.error('Plugin', '플러그인 설치 작업 중단됨');
+      return false;
+    }
 
+    appLogger.info('Plugin', `GitHub 플러그인 "${manifest.name}" (v${manifest.version}) 설치 완료!`);
     this.showToast(`GitHub 플러그인 "${manifest.name}" (v${manifest.version}) 설치가 완료되었습니다!`, 'info');
     return true;
   }
@@ -1215,6 +1240,12 @@ export class PluginManager {
             source.latestZipUrl = update.zipUrl;
             source.checkedAt = Date.now();
             changed = true;
+            if (update.updateAvailable) {
+              appLogger.info(
+                'Plugin',
+                `플러그인 "${inst.manifest.name}" 새 업데이트 발견: v${source.installedVersion} -> v${update.latestVersion}`,
+              );
+            }
           }
         }
       }
@@ -1242,6 +1273,7 @@ export class PluginManager {
     const inst = this.plugins.get(pluginId);
     const pluginName = inst?.manifest.name || pluginId;
 
+    appLogger.info('Plugin', `플러그인 "${pluginName}" GitHub 업데이트 시작 (${source.owner}/${source.repo})`);
     this.showToast(`"${pluginName}" 최신 업데이트 다운로드 중...`, 'info');
 
     try {
@@ -1254,12 +1286,15 @@ export class PluginManager {
       });
 
       if (manifest) {
+        appLogger.info('Plugin', `"${manifest.name}" 플러그인이 v${manifest.version}(으)로 성공적으로 업데이트되었습니다.`);
         this.showToast(`"${manifest.name}" 플러그인이 v${manifest.version}(으)로 성공적으로 업데이트되었습니다!`, 'info');
         return true;
       }
       return false;
     } catch (err: any) {
-      this.showToast(`업데이트 실패: ${err?.message || err}`, 'error');
+      const msg = err?.message || String(err);
+      appLogger.error('Plugin', `업데이트 실패: ${msg}`);
+      this.showToast(`업데이트 실패: ${msg}`, 'error');
       return false;
     }
   }

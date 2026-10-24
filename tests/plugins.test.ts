@@ -2147,6 +2147,19 @@ test('parseGitHubUrl correctly parses various GitHub repository and release URLs
   assert.equal(refDownload.tag, 'v2.1.0');
   assert.ok(refDownload.directZipUrl?.endsWith('plugin.zip'));
 
+  // Tree / branch URL
+  const refTree = parseGitHubUrl('https://github.com/alice/cool-plugin/tree/main');
+  assert.ok(refTree);
+  assert.equal(refTree.owner, 'alice');
+  assert.equal(refTree.repo, 'cool-plugin');
+  assert.equal(refTree.tag, 'main');
+
+  // Trailing slash
+  const refSlash = parseGitHubUrl('https://github.com/alice/cool-plugin/');
+  assert.ok(refSlash);
+  assert.equal(refSlash.owner, 'alice');
+  assert.equal(refSlash.repo, 'cool-plugin');
+
   // Invalid strings
   assert.equal(parseGitHubUrl(''), null);
   assert.equal(parseGitHubUrl('https://google.com/test'), null);

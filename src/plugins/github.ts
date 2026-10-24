@@ -78,7 +78,19 @@ export function parseGitHubUrl(input: string): GitHubRepoRef | null {
     };
   }
 
-  // 4. 일반 저장소 링크 또는 owner/repo 단축 형식
+  // 4. 특정 브랜치/트리 링크: https://github.com/owner/repo/tree/branch-name
+  const treeMatch = trimmed.match(
+    /^https?:\/\/github\.com\/([^/]+)\/([^/]+)\/tree\/([^/?#]+)/i,
+  );
+  if (treeMatch) {
+    return {
+      owner: treeMatch[1],
+      repo: treeMatch[2].replace(/\.git$/i, ''),
+      tag: treeMatch[3],
+    };
+  }
+
+  // 5. 일반 저장소 링크 또는 owner/repo 단축 형식
   const repoMatch = trimmed.match(
     /^(?:https?:\/\/github\.com\/)?([a-zA-Z0-9_.-]+)\/([a-zA-Z0-9_.-]+)$/i,
   );
@@ -158,35 +170,45 @@ export async function fetchGitHubPluginRelease(ref: GitHubRepoRef): Promise<GitH
   }
 
   // 2. Release가 없거나 API 조회가 제한된 경우:
-  // raw plugin.json에서 version 파악 후 메인 브랜치 아카이브 ZIP을 다운로드
+  // raw plugin.json / manifest.json 에서 version 파악 후 메인 브랜치 아카이브 ZIP을 다운로드
+  const candidateBranches: string[] = [];
+  if (tag && tag !== 'latest') {
+    candidateBranches.push(tag);
+  }
+  if (!candidateBranches.includes('main')) candidateBranches.push('main');
+  if (!candidateBranches.includes('master')) candidateBranches.push('master');
+
   let version = '1.0.0';
-  for (const branch of ['main', 'master']) {
-    try {
-      const manifestRes = await fetch(
-        `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/plugin.json`,
-      );
-      if (manifestRes.ok) {
-        const manifest = await manifestRes.json();
-        if (manifest.version) {
-          version = manifest.version;
-          return {
-            owner,
-            repo,
-            version,
-            zipUrl: `https://github.com/${owner}/${repo}/archive/refs/heads/${branch}.zip`,
-            isArchiveFallback: true,
-          };
+  for (const branch of candidateBranches) {
+    for (const manifestName of ['plugin.json', 'manifest.json']) {
+      try {
+        const manifestRes = await fetch(
+          `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${manifestName}`,
+        );
+        if (manifestRes.ok) {
+          const manifest = await manifestRes.json();
+          if (manifest.version) {
+            version = manifest.version;
+            return {
+              owner,
+              repo,
+              version,
+              zipUrl: `https://github.com/${owner}/${repo}/archive/refs/heads/${branch}.zip`,
+              isArchiveFallback: true,
+            };
+          }
         }
-      }
-    } catch {}
+      } catch {}
+    }
   }
 
   // 최종 fallback: main.zip
+  const defaultBranch = candidateBranches[0] || 'main';
   return {
     owner,
     repo,
     version,
-    zipUrl: `https://github.com/${owner}/${repo}/archive/refs/heads/main.zip`,
+    zipUrl: `https://github.com/${owner}/${repo}/archive/refs/heads/${defaultBranch}.zip`,
     isArchiveFallback: true,
   };
 }

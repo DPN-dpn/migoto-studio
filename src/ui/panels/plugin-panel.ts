@@ -1,6 +1,6 @@
 import { platform } from '../../platform';
 import { type PluginManager, type PluginInstance, renderPluginIcon } from '../../plugins';
-import { openConfirmModal } from '../modals/confirm-ui';
+import { openConfirmModal, openPromptModal } from '../modals/confirm-ui';
 
 const CHEVRON_SVG = `
   <svg viewBox="0 0 16 16" width="10" height="10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -115,9 +115,13 @@ export class PluginPanel {
       </svg>
     `;
     addGithubBtn.onclick = async () => {
-      const url = prompt(
-        '설치할 플러그인의 GitHub 링크를 입력하세요:\n(예: https://github.com/owner/repo 또는 owner/repo)',
-      );
+      const url = await openPromptModal({
+        title: 'GitHub 플러그인 추가',
+        message: '설치할 플러그인의 GitHub 저장소 또는 Release 링크를 입력하세요:',
+        placeholder: 'https://github.com/owner/repo 또는 owner/repo',
+        confirmText: '설치',
+        cancelText: '취소',
+      });
       if (url && url.trim()) {
         await this.manager.installPluginFromGitHub(url.trim());
       }
