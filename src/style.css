@@ -7374,6 +7374,49 @@ button.has-icon {
   border-color: var(--accent);
 }
 
+.slot-part-input {
+  flex: 1;
+  max-width: 150px;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 500;
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 2px 7px;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.slot-part-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.unmatched-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.unmatched-actions .slot-part-input.match-input {
+  max-width: none;
+  flex: 1;
+}
+
+.unmatched-actions .apply-btn {
+  background: var(--accent);
+  color: #fff;
+  padding: 3px 8px;
+  border-radius: 4px;
+}
+
+.unmatched-actions .apply-btn:hover {
+  filter: brightness(1.1);
+  background: var(--accent);
+}
+
 .slot-match-prompt {
   display: flex;
   align-items: center;

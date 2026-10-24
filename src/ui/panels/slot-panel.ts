@@ -289,37 +289,41 @@ export class SlotMatchingPanel {
     }
     card.appendChild(texContainer);
 
-    // 부위 재지정 액션 드롭다운
+    // 부위명 직접 문자열 수정 입력창
     const actionRow = document.createElement('div');
     actionRow.className = 'slot-card-actions';
 
-    const select = document.createElement('select');
-    select.className = 'slot-part-select';
-    select.title = '다른 부위로 재지정';
-
-    this.populatePartSelect(select, slot.part);
-
-    select.addEventListener('change', (e) => {
-      let targetPart = (e.target as HTMLSelectElement).value;
-      if (targetPart === '__custom__') {
-        const entered = prompt('이 섹션에 지정할 부위 이름을 입력하세요 (예: Tail, Jacket, Wings, Ribbon, Sword 등):');
-        if (entered && entered.trim()) {
-          targetPart = entered.trim();
-        } else {
-          this.render();
-          return;
-        }
-      }
-      if (targetPart) {
-        slotManager.setPartMapping(slot.sectionName, targetPart);
-      }
-    });
-
     const label = document.createElement('span');
     label.className = 'slot-action-label';
-    label.textContent = '부위 변경:';
+    label.textContent = '부위명:';
 
-    actionRow.append(label, select);
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'slot-part-input';
+    input.value = slot.part;
+    input.placeholder = '부위명 (예: BodyA, Head, Tail...)';
+    input.title = '부위 이름을 입력하고 Enter를 누르거나 벗어나면 적용됩니다';
+
+    const applyChange = () => {
+      const entered = input.value.trim();
+      if (entered && entered !== slot.part) {
+        slotManager.setPartMapping(slot.sectionName, entered);
+      } else if (!entered) {
+        input.value = slot.part;
+      }
+    };
+
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        input.blur();
+      } else if (e.key === 'Escape') {
+        input.value = slot.part;
+        input.blur();
+      }
+    });
+    input.addEventListener('blur', applyChange);
+
+    actionRow.append(label, input);
     card.appendChild(actionRow);
 
     return card;
@@ -338,7 +342,7 @@ export class SlotMatchingPanel {
         <div class="slot-section-title" title="에디터에서 열기 (클릭)">[${item.sectionName}]</div>
       </div>
       <div class="slot-match-prompt">
-        <label>이 섹션의 부위를 지정하세요:</label>
+        <label>이 섹션의 부위명을 입력하세요:</label>
       </div>
     `;
 
@@ -346,32 +350,34 @@ export class SlotMatchingPanel {
       this.openSectionInEditor(item.filePath, item.startLine);
     });
 
-    const selectRow = document.createElement('div');
-    selectRow.className = 'slot-card-actions';
+    const inputRow = document.createElement('div');
+    inputRow.className = 'slot-card-actions unmatched-actions';
 
-    const select = document.createElement('select');
-    select.className = 'slot-part-select match-select';
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'slot-part-input match-input';
+    input.placeholder = '지정할 부위명 입력 (예: BodyA, Head...)';
 
-    this.populatePartSelect(select);
+    const applyBtn = document.createElement('button');
+    applyBtn.className = 'slot-btn-text-action apply-btn';
+    applyBtn.textContent = '부위 지정';
 
-    select.addEventListener('change', (e) => {
-      let targetPart = (e.target as HTMLSelectElement).value;
-      if (targetPart === '__custom__') {
-        const entered = prompt('이 섹션에 지정할 부위 이름을 입력하세요 (예: Tail, Jacket, Wings, Ribbon, Sword 등):');
-        if (entered && entered.trim()) {
-          targetPart = entered.trim();
-        } else {
-          this.render();
-          return;
-        }
+    const applyMatch = () => {
+      const entered = input.value.trim();
+      if (entered) {
+        slotManager.setPartMapping(item.sectionName, entered);
       }
-      if (targetPart) {
-        slotManager.setPartMapping(item.sectionName, targetPart);
+    };
+
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        applyMatch();
       }
     });
+    applyBtn.addEventListener('click', applyMatch);
 
-    selectRow.appendChild(select);
-    card.appendChild(selectRow);
+    inputRow.append(input, applyBtn);
+    card.appendChild(inputRow);
 
     return card;
   }
@@ -434,63 +440,6 @@ export class SlotMatchingPanel {
 
     // 슬롯만 추가하고 파일은 드롭다운에서 선택할 수 있도록 빈 문자열로 슬롯 생성
     slotManager.setTextureSlot(sectionName, slotId.trim(), '');
-  }
-
-  /**
-   * 부위 선택 드롭다운 채우기 (현재 모드 파악 부위 + 추천 프리셋 + 직접 입력)
-   */
-  private populatePartSelect(select: HTMLSelectElement, currentPart?: string) {
-    select.innerHTML = '';
-
-    if (!currentPart) {
-      const defaultOpt = document.createElement('option');
-      defaultOpt.value = '';
-      defaultOpt.textContent = '부위 선택... (클릭하여 매칭)';
-      defaultOpt.disabled = true;
-      defaultOpt.selected = true;
-      select.appendChild(defaultOpt);
-    }
-
-    // 1. 현재 모드에서 파악된 부위 목록
-    const existingParts = Array.from(new Set(slotManager.getSlots().map((s) => s.part))).filter(Boolean);
-
-    if (existingParts.length > 0) {
-      const optGroupMod = document.createElement('optgroup');
-      optGroupMod.label = '📁 현재 모드에서 파악된 부위';
-      for (const p of existingParts) {
-        const opt = document.createElement('option');
-        opt.value = p;
-        opt.textContent = formatPartLabel(p);
-        if (currentPart && p.toLowerCase() === currentPart.toLowerCase()) {
-          opt.selected = true;
-        }
-        optGroupMod.appendChild(opt);
-      }
-      select.appendChild(optGroupMod);
-    }
-
-    // 2. 자주 쓰이는 추천 표준 부위 프리셋
-    const presetParts = ['Head', 'Body', 'Dress', 'Hair', 'Face', 'Weapon', 'Tail', 'Jacket', 'Accessory'];
-    const optGroupPresets = document.createElement('optgroup');
-    optGroupPresets.label = '✨ 추천 표준 부위 프리셋';
-    for (const p of presetParts) {
-      if (!existingParts.some((ep) => ep.toLowerCase() === p.toLowerCase())) {
-        const opt = document.createElement('option');
-        opt.value = p;
-        opt.textContent = formatPartLabel(p);
-        if (currentPart && p.toLowerCase() === currentPart.toLowerCase()) {
-          opt.selected = true;
-        }
-        optGroupPresets.appendChild(opt);
-      }
-    }
-    select.appendChild(optGroupPresets);
-
-    // 3. 직접 입력 옵션
-    const customOpt = document.createElement('option');
-    customOpt.value = '__custom__';
-    customOpt.textContent = '✏️ 직접 새 부위 이름 입력...';
-    select.appendChild(customOpt);
   }
 
   /**
