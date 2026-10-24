@@ -1,12 +1,26 @@
 # 릴리스 노트 (Release Notes)
 
-## [다음 버전]
+## [0.12.12] - 2026-10-24
 
 ### 신규 기능
+- 플러그인 종속성 관리 및 버전 검사 시스템:
+  - 플러그인 매니페스트(`plugin.json`)에 `dependencies` 필드 규격 추가
+  - 시맨틱 버저닝 제약식(`^1.0.0`, `~1.2.0`, `>=1.0.0`, `*`, `1.2.3`) 및 GitHub URL(`https://github.com/owner/repo#>=1.0.0`) 종속성 선언 지원
+  - 플러그인 로드 시 DFS 기반 위상 정렬(Topological Sort)을 수행하여 종속 플러그인이 항상 먼저 활성화되도록 순서 보장
+  - 순환 종속성(Circular Dependency) 자동 감지 및 콘솔 경고 처리
+  - 종속 플러그인이 미설치, 비활성화, 버전 불일치 상태인 경우 플러그인 활성화를 안전하게 대기하고 종속 플러그인이 활성화될 때 자동 재로드
+  - 플러그인 간 공개 API 공유 지원 (`context.plugins.registerApi`, `context.plugins.getPluginApi`, `context.plugins.hasPluginApi`) 및 `activate()` 반환값 자동 등록 지원
+  - 플러그인 종속성 검사 및 원격 설치 API 지원 (`context.plugins.checkDependencies`, `context.plugins.installDependency`)
 
 ### 기능 개선
+- 내장 텍스처 뷰어 플러그인 리팩터링 및 명칭 변경:
+  - 기존 `asset-viewer` 내장 플러그인의 식별자(ID) 및 명칭을 `texture-library` ("텍스처 라이브러리")로 직관적으로 변경
+  - 플랫폼별 기본 플러그인 순서 목록(`DEFAULT_PLUGIN_ORDER`, `DEFAULT_WEB_PLUGINS`) 및 번들 빌드 파이프라인 동기화
+- 모듈형 플러그인 공식 문서(`docs/plugin-api/`) 및 GitHub Wiki 문서 최신화
 
 ### 버그 수정
+- NSIS 설치 패키징 빌드 시 변경된 플러그인 경로(`texture-library`) 미반영으로 인한 makensis 파일 누락 오류 해결
+- 플러그인 매니저(`PluginManager`)의 린트 트리거(`lintTrigger`) 프로퍼티 선언 누락 타입 오류 수정
 
 ---
 
