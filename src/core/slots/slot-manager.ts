@@ -350,15 +350,17 @@ export class SlotManager {
     const texFilesSet = new Set<string>();
     for (const iniDoc of docs.values()) {
       for (const section of iniDoc.sections) {
-        // [Resource...] 섹션의 filename 프로퍼티 우선 수집
+        // [Resource...] 섹션의 filename 프로퍼티 중 이미지 파일만 수집
         if (section.properties['filename']) {
           const fn = section.properties['filename'].replace(/['"]/g, '').trim();
-          if (fn) texFilesSet.add(fn);
+          if (fn && /\.(dds|png|tga|jpg|jpeg|webp|bmp)$/i.test(fn)) {
+            texFilesSet.add(fn);
+          }
         }
         // 섹션 내 모든 프로퍼티에서 이미지 확장자 파일명 수집
         for (const val of Object.values(section.properties)) {
           const cleanVal = val.replace(/['"]/g, '').trim();
-          if (/\.(dds|png|tga|jpg|jpeg|webp)$/i.test(cleanVal)) {
+          if (/\.(dds|png|tga|jpg|jpeg|webp|bmp)$/i.test(cleanVal)) {
             texFilesSet.add(cleanVal);
           }
         }

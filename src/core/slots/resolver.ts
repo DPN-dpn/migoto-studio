@@ -382,7 +382,10 @@ export function findResourceFilename(resourceName: string, doc: IniDocument, all
     for (const name of candidates) {
       const sec = d.getSection(name);
       if (sec && sec.properties['filename']) {
-        return sec.properties['filename'].replace(/['"]/g, '').trim();
+        const fn = sec.properties['filename'].replace(/['"]/g, '').trim();
+        if (/\.(dds|png|tga|jpg|jpeg|webp|bmp)$/i.test(fn)) {
+          return fn;
+        }
       }
     }
     return undefined;

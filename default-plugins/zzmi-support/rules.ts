@@ -99,7 +99,10 @@ export function createZzmiSlotResolver(): TextureSlotResolver {
         for (const name of candidates) {
           const sec = doc.getSection(name);
           if (sec && sec.properties['filename']) {
-            return sec.properties['filename'].replace(/['"]/g, '').trim();
+            const fn = sec.properties['filename'].replace(/['"]/g, '').trim();
+            if (/\.(dds|png|tga|jpg|jpeg|webp|bmp)$/i.test(fn)) {
+              return fn;
+            }
           }
         }
         if (allDocs) {
@@ -107,7 +110,10 @@ export function createZzmiSlotResolver(): TextureSlotResolver {
             for (const name of candidates) {
               const sec = otherDoc.getSection(name);
               if (sec && sec.properties['filename']) {
-                return sec.properties['filename'].replace(/['"]/g, '').trim();
+                const fn = sec.properties['filename'].replace(/['"]/g, '').trim();
+                if (/\.(dds|png|tga|jpg|jpeg|webp|bmp)$/i.test(fn)) {
+                  return fn;
+                }
               }
             }
           }

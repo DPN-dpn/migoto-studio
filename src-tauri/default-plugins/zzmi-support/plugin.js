@@ -57,11 +57,17 @@ function createZzmiSlotResolver() {
 				];
 				for (const name of candidates) {
 					const sec = doc.getSection(name);
-					if (sec && sec.properties["filename"]) return sec.properties["filename"].replace(/['"]/g, "").trim();
+					if (sec && sec.properties["filename"]) {
+						const fn = sec.properties["filename"].replace(/['"]/g, "").trim();
+						if (/\.(dds|png|tga|jpg|jpeg|webp|bmp)$/i.test(fn)) return fn;
+					}
 				}
 				if (allDocs) for (const otherDoc of allDocs.values()) for (const name of candidates) {
 					const sec = otherDoc.getSection(name);
-					if (sec && sec.properties["filename"]) return sec.properties["filename"].replace(/['"]/g, "").trim();
+					if (sec && sec.properties["filename"]) {
+						const fn = sec.properties["filename"].replace(/['"]/g, "").trim();
+						if (/\.(dds|png|tga|jpg|jpeg|webp|bmp)$/i.test(fn)) return fn;
+					}
 				}
 			};
 			const checkProperties = (pRecord, srcSec) => {
