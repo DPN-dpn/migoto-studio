@@ -69,7 +69,11 @@ export const DXGI_FORMAT_BC7_TYPELESS = 97;
 export const DXGI_FORMAT_BC7_UNORM = 98;
 export const DXGI_FORMAT_BC7_UNORM_SRGB = 99;
 
-export function decodeDDS(buffer: Uint8Array | ArrayBuffer): DecodedDDS {
+export interface DecodeDDSOptions {
+  ignoreAlpha?: boolean;
+}
+
+export function decodeDDS(buffer: Uint8Array | ArrayBuffer, options?: DecodeDDSOptions): DecodedDDS {
   const bytes = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
   if (bytes.byteLength < 4) {
     throw new Error('유효한 DDS 파일이 아닙니다 (데이터 크기 부족).');
@@ -249,6 +253,12 @@ export function decodeDDS(buffer: Uint8Array | ArrayBuffer): DecodedDDS {
     } else {
       formatName = `FourCC 0x${fourCC.toString(16)}`;
       decodeDXT1(bytes, dataOffset, width, height, rgba); // Fallback attempt
+    }
+  }
+
+  if (options?.ignoreAlpha) {
+    for (let i = 3; i < rgba.length; i += 4) {
+      rgba[i] = 255;
     }
   }
 

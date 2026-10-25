@@ -2913,7 +2913,7 @@ var FOURCC_BC5S = 1395999554;
 var FOURCC_DX10 = 808540228;
 var FOURCC_BC7 = 540492610;
 var FOURCC_BC7_ALT = 3621698;
-function decodeDDS(buffer) {
+function decodeDDS(buffer, options) {
 	const bytes = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
 	if (bytes.byteLength < 4) throw new Error("유효한 DDS 파일이 아닙니다 (데이터 크기 부족).");
 	const header = new DataView(bytes.buffer, bytes.byteOffset, Math.min(bytes.byteLength, 148));
@@ -3066,6 +3066,7 @@ function decodeDDS(buffer) {
 		formatName = `FourCC 0x${fourCC.toString(16)}`;
 		decodeDXT1(bytes, dataOffset, width, height, rgba);
 	}
+	if (options?.ignoreAlpha) for (let i = 3; i < rgba.length; i += 4) rgba[i] = 255;
 	return {
 		width,
 		height,
@@ -3110,7 +3111,7 @@ var ImageViewer = class {
 	imageHeight = 0;
 	sourceIsSRGB = true;
 	colorSpaceMode = "sRGB";
-	channelMode = "RGBA";
+	channelMode = "RGB";
 	colorSpaceBtns = /* @__PURE__ */ new Map();
 	channelBtns = /* @__PURE__ */ new Map();
 	cleanups = [];
@@ -3128,6 +3129,7 @@ var ImageViewer = class {
 		this.panY = 0;
 		this.colorSpaceBtns.clear();
 		this.channelBtns.clear();
+		this.channelMode = "RGB";
 		const isDds = /\.dds$/i.test(info.name);
 		let format = isDds ? "DDS" : info.name.split(".").pop()?.toUpperCase() ?? "IMAGE";
 		const sizeBytes = info.bytes.byteLength;
@@ -3185,8 +3187,8 @@ var ImageViewer = class {
 		const chGroup = document.createElement("div");
 		chGroup.className = "image-viewer-toolbar-group";
 		for (const ch of [
-			"RGBA",
 			"RGB",
+			"RGBA",
 			"R",
 			"G",
 			"B",
@@ -3280,6 +3282,7 @@ var ImageViewer = class {
 						this.rawRgba = new Uint8ClampedArray(imgData.data);
 					}
 					this.updateButtonsUI();
+					this.renderFilteredImage();
 					this.fitToViewport(this.imageWidth, this.imageHeight);
 				};
 				img.onerror = (e) => {

@@ -47,7 +47,7 @@ export class ImageViewer {
   private imageHeight = 0;
   private sourceIsSRGB = true;
   private colorSpaceMode: ColorSpaceMode = 'sRGB';
-  private channelMode: ChannelMode = 'RGBA';
+  private channelMode: ChannelMode = 'RGB';
 
   private colorSpaceBtns: Map<ColorSpaceMode, HTMLButtonElement> = new Map();
   private channelBtns: Map<ChannelMode, HTMLButtonElement> = new Map();
@@ -68,6 +68,7 @@ export class ImageViewer {
     this.panY = 0;
     this.colorSpaceBtns.clear();
     this.channelBtns.clear();
+    this.channelMode = 'RGB';
 
     const isDds = /\.dds$/i.test(info.name);
     let format = isDds ? 'DDS' : (info.name.split('.').pop()?.toUpperCase() ?? 'IMAGE');
@@ -141,7 +142,7 @@ export class ImageViewer {
     const chGroup = document.createElement('div');
     chGroup.className = 'image-viewer-toolbar-group';
 
-    const chModes: ChannelMode[] = ['RGBA', 'RGB', 'R', 'G', 'B', 'A'];
+    const chModes: ChannelMode[] = ['RGB', 'RGBA', 'R', 'G', 'B', 'A'];
     for (const ch of chModes) {
       const btn = document.createElement('button');
       btn.className = 'img-tool-btn';
@@ -264,6 +265,7 @@ export class ImageViewer {
           }
 
           this.updateButtonsUI();
+          this.renderFilteredImage();
           this.fitToViewport(this.imageWidth, this.imageHeight);
         };
         img.onerror = (e) => {
