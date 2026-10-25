@@ -502,6 +502,24 @@ LangString secPluginZZMI ${LANG_ENGLISH} "ZZMI Support (Zenless Zone Zero)"
 LangString secPluginZZMIDesc ${LANG_KOREAN} "ZZMI 슬롯픽스 템플릿 및 전용 네임스페이스 인식을 지원합니다."
 LangString secPluginZZMIDesc ${LANG_ENGLISH} "ZZMI texture slotfix templates and dedicated namespace linting support."
 
+LangString secPluginToggle ${LANG_KOREAN} "토글 키 매니저 (GitHub)"
+LangString secPluginToggle ${LANG_ENGLISH} "Toggle Key Manager (GitHub)"
+
+LangString secPluginToggleDesc ${LANG_KOREAN} "GitHub(DPN-dpn/toggle-editor-for-migoto-studio)에서 최신 버전을 내려받아 설치합니다. 토글 키, 변수, 순환 상태 시각화 및 편집을 지원합니다."
+LangString secPluginToggleDesc ${LANG_ENGLISH} "Downloads and installs the latest version from GitHub (toggle-editor-for-migoto-studio)."
+
+LangString secPluginToggleDownloading ${LANG_KOREAN} "토글 키 매니저 플러그인 다운로드 중 (GitHub)..."
+LangString secPluginToggleDownloading ${LANG_ENGLISH} "Downloading Toggle Key Manager plugin from GitHub..."
+
+LangString secPluginViewer3D ${LANG_KOREAN} "3D 모드 뷰어 (GitHub)"
+LangString secPluginViewer3D ${LANG_ENGLISH} "3D Mod Viewer (GitHub)"
+
+LangString secPluginViewer3DDesc ${LANG_KOREAN} "GitHub(DPN-dpn/mod-viewer-for-migoto-studio)에서 최신 버전을 내려받아 설치합니다. 모드 3D 모델 및 텍스처를 독립 창에서 시각화합니다."
+LangString secPluginViewer3DDesc ${LANG_ENGLISH} "Downloads and installs the latest version from GitHub (mod-viewer-for-migoto-studio)."
+
+LangString secPluginViewer3DDownloading ${LANG_KOREAN} "3D 모드 뷰어 플러그인 다운로드 중 (GitHub)..."
+LangString secPluginViewer3DDownloading ${LANG_ENGLISH} "Downloading 3D Mod Viewer plugin from GitHub..."
+
 Function .onInit
   ${GetOptions} $CMDLINE "/P" $PassiveMode
   ${IfNot} ${Errors}
@@ -817,6 +835,22 @@ SectionGroup "$(secDefaultPlugins)" SecGroupPlugins
     SetOutPath "$APPDATA\MigotoStudio\plugins\zzmi-support"
     File /r "${DEFAULT_PLUGINS_DIR}\zzmi-support\*.*"
   SectionEnd
+
+  Section "$(secPluginToggle)" SecPluginToggle
+    SetShellVarContext current
+    DetailPrint "$(secPluginToggleDownloading)"
+    InitPluginsDir
+    File /oname=$PLUGINSDIR\download-github-plugin.ps1 "${__FILEDIR__}\download-github-plugin.ps1"
+    nsExec::Exec 'powershell.exe -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "$PLUGINSDIR\download-github-plugin.ps1" -RepoUrl "https://github.com/DPN-dpn/toggle-editor-for-migoto-studio" -TargetDir "$APPDATA\MigotoStudio\plugins\toggle-manager"'
+  SectionEnd
+
+  Section "$(secPluginViewer3D)" SecPluginViewer3D
+    SetShellVarContext current
+    DetailPrint "$(secPluginViewer3DDownloading)"
+    InitPluginsDir
+    File /oname=$PLUGINSDIR\download-github-plugin.ps1 "${__FILEDIR__}\download-github-plugin.ps1"
+    nsExec::Exec 'powershell.exe -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "$PLUGINSDIR\download-github-plugin.ps1" -RepoUrl "https://github.com/DPN-dpn/mod-viewer-for-migoto-studio" -TargetDir "$APPDATA\MigotoStudio\plugins\mod-3d-viewer"'
+  SectionEnd
 SectionGroupEnd
 
 !insertmacro MUI_FUNCTION_DESCRIPTION_BEGIN
@@ -827,6 +861,8 @@ SectionGroupEnd
   !insertmacro MUI_DESCRIPTION_TEXT ${SecPluginPython} $(secPluginPythonDesc)
   !insertmacro MUI_DESCRIPTION_TEXT ${SecPluginLint} $(secPluginLintDesc)
   !insertmacro MUI_DESCRIPTION_TEXT ${SecPluginZZMI} $(secPluginZZMIDesc)
+  !insertmacro MUI_DESCRIPTION_TEXT ${SecPluginToggle} $(secPluginToggleDesc)
+  !insertmacro MUI_DESCRIPTION_TEXT ${SecPluginViewer3D} $(secPluginViewer3DDesc)
 !insertmacro MUI_FUNCTION_DESCRIPTION_END
 
 Function .onInstSuccess
