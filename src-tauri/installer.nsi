@@ -840,7 +840,7 @@ SectionGroup "$(secDefaultPlugins)" SecGroupPlugins
     SetShellVarContext current
     DetailPrint "$(secPluginToggleDownloading)"
     InitPluginsDir
-    File /oname=$PLUGINSDIR\download-github-plugin.ps1 "${__FILEDIR__}\download-github-plugin.ps1"
+    File /oname=$PLUGINSDIR\download-github-plugin.ps1 "${DOWNLOAD_PLUGIN_SCRIPT}"
     nsExec::Exec 'powershell.exe -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "$PLUGINSDIR\download-github-plugin.ps1" -RepoUrl "https://github.com/DPN-dpn/toggle-editor-for-migoto-studio" -TargetDir "$APPDATA\MigotoStudio\plugins\toggle-manager"'
   SectionEnd
 
@@ -848,7 +848,7 @@ SectionGroup "$(secDefaultPlugins)" SecGroupPlugins
     SetShellVarContext current
     DetailPrint "$(secPluginViewer3DDownloading)"
     InitPluginsDir
-    File /oname=$PLUGINSDIR\download-github-plugin.ps1 "${__FILEDIR__}\download-github-plugin.ps1"
+    File /oname=$PLUGINSDIR\download-github-plugin.ps1 "${DOWNLOAD_PLUGIN_SCRIPT}"
     nsExec::Exec 'powershell.exe -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "$PLUGINSDIR\download-github-plugin.ps1" -RepoUrl "https://github.com/DPN-dpn/mod-viewer-for-migoto-studio" -TargetDir "$APPDATA\MigotoStudio\plugins\mod-3d-viewer"'
   SectionEnd
 SectionGroupEnd

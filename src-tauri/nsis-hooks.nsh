@@ -1,6 +1,7 @@
 ; NSIS custom installer & uninstaller hooks for Migoto Studio
 
 !define DEFAULT_PLUGINS_DIR "${__FILEDIR__}\default-plugins"
+!define DOWNLOAD_PLUGIN_SCRIPT "${__FILEDIR__}\download-github-plugin.ps1"
 
 !macro NSIS_HOOK_POSTUNINSTALL
   ; If the user checked the "Delete app data" checkbox on the uninstaller screen,
