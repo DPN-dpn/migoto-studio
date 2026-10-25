@@ -421,6 +421,14 @@ pub fn list_disk_plugins() -> Result<Vec<PluginDiskInfo>, String> {
         let mut files = std::collections::HashMap::new();
         collect_plugin_files(&p, &p, &mut files);
 
+        // .github-source.json 파일은 숨김 파일 규칙(.으로 시작)에 의해 제외되지 않고 출처 복원을 위해 명시적으로 수집
+        let github_source_file = p.join(".github-source.json");
+        if github_source_file.exists() && github_source_file.is_file() {
+          if let Ok(content) = fs::read_to_string(&github_source_file) {
+            files.insert(".github-source.json".to_string(), content);
+          }
+        }
+
         list.push(PluginDiskInfo {
           id,
           path: p.to_string_lossy().to_string(),

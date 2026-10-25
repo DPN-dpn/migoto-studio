@@ -410,6 +410,17 @@ export class PluginManager {
       const obj = Object.fromEntries(this.githubSources);
       localStorage.setItem(STORAGE_PLUGIN_GITHUB_SOURCES, JSON.stringify(obj));
     } catch {}
+
+    // 데스크톱 환경에서는 각 플러그인 폴더 내 .github-source.json 파일도 항상 동기화
+    if (platform().kind === 'desktop' && platform().getPluginsDir && platform().writeBinaryFile) {
+      platform().getPluginsDir!().then((pluginsDir) => {
+        const encoder = new TextEncoder();
+        for (const [pluginId, source] of this.githubSources.entries()) {
+          const metaPath = `${pluginsDir.replace(/\\/g, '/')}/${pluginId}/.github-source.json`;
+          platform().writeBinaryFile!(metaPath, encoder.encode(JSON.stringify(source, null, 2))).catch(() => {});
+        }
+      }).catch(() => {});
+    }
   }
 
   getGitHubSource(pluginId: string): PluginGitHubSource | undefined {

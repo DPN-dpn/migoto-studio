@@ -111,11 +111,9 @@ export function parseGitHubUrl(input: string): GitHubRepoRef | null {
  */
 async function fetchTextSafe(url: string, headers?: Record<string, string>): Promise<string> {
   if (platform().downloadBinary) {
-    try {
-      const bytes = await platform().downloadBinary!(url);
-      const decoder = new TextDecoder('utf-8');
-      return decoder.decode(bytes);
-    } catch {}
+    const bytes = await platform().downloadBinary!(url);
+    const decoder = new TextDecoder('utf-8');
+    return decoder.decode(bytes);
   }
 
   // 웹 브라우저 환경에서는 CORS OPTIONS 프리플라이트 403을 피하기 위해 헤더를 최소화하여 요청
