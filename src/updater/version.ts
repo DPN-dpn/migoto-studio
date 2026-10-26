@@ -1,4 +1,4 @@
-export const CURRENT_APP_VERSION = '0.12.14';
+export const CURRENT_APP_VERSION = '0.13.0';
 
 /**
  * Compare two semver strings (e.g. '0.1.0' vs '0.1.1').
