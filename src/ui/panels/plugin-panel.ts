@@ -478,7 +478,7 @@ export class PluginPanel {
       let message = `플러그인 "${p.manifest.name}"을(를) 삭제하시겠습니까?`;
       if (dependents.length > 0) {
         const depNames = dependents.map((d) => `• ${d.manifest.name}`).join('\n');
-        message += `\n\n경고: 이 플러그인을 필수 종속성으로 요구하는 다음 플러그인의 작동이 중단되거나 오류가 발생할 수 있습니다:\n\n${depNames}\n\n그래도 삭제하시겠습니까?`;
+        message += `\n\n경고: 이 플러그인을 필수 종속성으로 요구하는 다음 플러그인도 함께 비활성화됩니다:\n\n${depNames}\n\n그래도 삭제하시겠습니까?`;
       }
       const ok = await openConfirmModal({
         title: dependents.length > 0 ? '종속 플러그인 영향 경고 및 삭제' : '플러그인 삭제',
@@ -506,8 +506,8 @@ export class PluginPanel {
         if (activeDeps.length > 0) {
           const depNames = activeDeps.map((d) => `• ${d.manifest.name}`).join('\n');
           const ok = await openConfirmModal({
-            title: '종속 플러그인 작동 중단 경고',
-            message: `"${p.manifest.name}" 플러그인을 비활성화하면, 이를 필수 종속성으로 사용하는 다음 플러그인의 작동이 중단됩니다:\n\n${depNames}\n\n그래도 비활성화하시겠습니까?`,
+            title: '종속 플러그인 비활성화 경고',
+            message: `"${p.manifest.name}" 플러그인을 비활성화하면, 이를 필수 종속성으로 사용하는 다음 플러그인도 함께 비활성화됩니다:\n\n${depNames}\n\n그래도 비활성화하시겠습니까?`,
             confirmText: '비활성화',
             cancelText: '취소',
             variant: 'danger',

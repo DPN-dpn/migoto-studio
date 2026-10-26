@@ -1049,16 +1049,13 @@ export class PluginManager {
       appLogger.info('Plugin', `플러그인 비활성화: "${p.manifest.name}"`);
       this.emitLifecycle('deactivated', pluginId, p.manifest);
 
-      // 종속하고 있던 활성화 플러그인들의 작동 중단 처리
+      // 종속하고 있던 활성화 플러그인들의 작동 중단 및 자동 비활성화 처리
       for (const dep of this.getActiveDependents(pluginId)) {
-        dep.cleanup?.();
-        dep.cleanup = undefined;
-        dep.instance = undefined;
-        this.pluginMenuItems.delete(dep.manifest.id);
-        dep.dependencyErrors = this.checkPluginDependencies(dep.manifest.id);
-        dep.error = `종속성 미충족: ${dep.dependencyErrors.filter((r) => !r.satisfied).map((r) => r.id).join(', ')}`;
-        appLogger.warn('Plugin', `종속 플러그인 "${dep.manifest.name}"의 필수 종속성(${p.manifest.name}) 비활성화로 작동이 중단되었습니다.`);
-        this.emitLifecycle('deactivated', dep.manifest.id, dep.manifest);
+        appLogger.info(
+          'Plugin',
+          `종속 플러그인 "${dep.manifest.name}"의 필수 종속성(${p.manifest.name}) 비활성화에 따라 함께 비활성화되었습니다.`,
+        );
+        await this.togglePlugin(dep.manifest.id, false);
       }
     } else if (p.scriptContent && !p.instance) {
       await this.loadAndActivateScriptPlugin(p, p.scriptContent);
