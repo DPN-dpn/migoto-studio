@@ -1,6 +1,6 @@
 [package]
 name = "app"
-version = "0.13.0"
+version = "0.13.1"
 description = "XXMI/3DMigoto INI editor"
 authors = ["Migoto Studio contributors"]
 license = "GPL-3.0-or-later"

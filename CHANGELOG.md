@@ -1,6 +1,6 @@
 # 릴리스 노트 (Release Notes)
 
-## [다음 버전]
+## [0.13.1] - 2026-10-26
 
 ### 버그 수정
 - 에디터 인라인 Diff 검토(`context.editor.proposeChanges`) 시 개별 청크 `[수락]`이 반영되지 않던 결함 수정:
