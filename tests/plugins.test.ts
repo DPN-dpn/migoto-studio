@@ -1897,6 +1897,59 @@ test('computeLineDiff calculates accurate line additions and deletions', async (
   assert.deepEqual(deleteHunks[0].modifiedLines, []);
 });
 
+test('Inline review individual hunk accept and revert correctly updates baseline and model', async () => {
+  const { computeLineDiff } = await import('../src/core/editor/diff.ts');
+
+  const initialOriginalText = [
+    '[Section1]',
+    'key1 = val1',
+    '[Section2]',
+    'key2 = val2',
+  ].join('\n');
+
+  // Proposed text has 2 hunks:
+  // Hunk 0: key1 = val1 -> key1 = val1_new
+  // Hunk 1: key2 = val2 -> key2 = val2_new
+  let modelText = [
+    '[Section1]',
+    'key1 = val1_new',
+    '[Section2]',
+    'key2 = val2_new',
+  ].join('\n');
+
+  let baselineOriginalText = initialOriginalText;
+  let hunks = computeLineDiff(baselineOriginalText, modelText);
+  assert.equal(hunks.length, 2);
+
+  // 1. Accept Hunk 0 (key1 = val1_new)
+  // When accepted: update baselineOriginalText so Hunk 0 is no longer a diff
+  const hunk0 = hunks[0];
+  const origLines = baselineOriginalText.split(/\r?\n/);
+  origLines.splice(hunk0.originalStart - 1, hunk0.originalLines.length, ...hunk0.modifiedLines);
+  baselineOriginalText = origLines.join('\n');
+
+  hunks = computeLineDiff(baselineOriginalText, modelText);
+  assert.equal(hunks.length, 1, 'Hunk 0 must be removed after acceptance');
+  assert.equal(hunks[0].modifiedLines[0], 'key2 = val2_new', 'Only Hunk 1 should remain');
+
+  // 2. Revert Hunk 1 (key2 = val2_new -> key2 = val2)
+  // When reverted: update modelText to restore original lines
+  const hunk1 = hunks[0];
+  const modelLines = modelText.split(/\r?\n/);
+  modelLines.splice(hunk1.modifiedStart - 1, hunk1.modifiedLines.length, ...hunk1.originalLines);
+  modelText = modelLines.join('\n');
+
+  hunks = computeLineDiff(baselineOriginalText, modelText);
+  assert.equal(hunks.length, 0, 'All hunks must be resolved');
+
+  // Final document text must have Section1 modified, Section2 original
+  assert.equal(
+    modelText,
+    ['[Section1]', 'key1 = val1_new', '[Section2]', 'key2 = val2'].join('\n'),
+    'Model must retain accepted Hunk 0 and discard reverted Hunk 1',
+  );
+});
+
 test('Plugin UI Builder modal, icon button, chip group, and direct HTMLElement return work properly', () => {
   const createElement = (tag: string) => {
     const el: any = {

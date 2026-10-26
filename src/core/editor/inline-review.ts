@@ -18,6 +18,7 @@ interface TabReviewSession {
   editor: monaco.editor.IStandaloneCodeEditor;
   model: monaco.editor.ITextModel;
   originalText: string;
+  initialOriginalText: string;
   wasCleanBefore: boolean;
   hunks: DiffHunk[];
   decorationIds: string[];
@@ -322,10 +323,10 @@ function finishSession(session: TabReviewSession, accepted: boolean) {
   }
 
   if (!accepted) {
-    // Revert model text
+    // Revert model text to initial original text
     session.editor.pushUndoStop();
     session.editor.executeEdits('propose-changes-discard', [
-      { range: session.model.getFullModelRange(), text: session.originalText },
+      { range: session.model.getFullModelRange(), text: session.initialOriginalText },
     ]);
     session.editor.pushUndoStop();
 
@@ -345,70 +346,63 @@ function resolveSingleHunk(session: TabReviewSession, hunkIdx: number, acceptHun
   const editor = session.editor;
   const model = session.model;
 
-  if (!acceptHunk) {
-    // Revert this hunk back to original lines
-    const modStart = hunk.modifiedStart;
-    const modCount = hunk.modifiedLines.length;
-    const origText = hunk.originalLines.join(model.getEOL());
+  if (acceptHunk) {
+    // [수락] 해당 변경 사항을 기준 원본(originalText)에 반영하여 diff 재계산 시 제외되도록 처리
+    const origLines = session.originalText.split(/\r?\n/);
+    origLines.splice(hunk.originalStart - 1, hunk.originalLines.length, ...hunk.modifiedLines);
+    session.originalText = origLines.join(model.getEOL());
+  } else {
+    // [되돌리기] 해당 변경 사항을 에디터 모델에서 원래 줄로 복구
+    const viewState = editor.saveViewState();
+    const modelLines = model.getValue().split(/\r?\n/);
+    modelLines.splice(hunk.modifiedStart - 1, hunk.modifiedLines.length, ...hunk.originalLines);
+    const newModelText = modelLines.join(model.getEOL());
 
     editor.pushUndoStop();
-    if (modCount > 0) {
-      const modEnd = modStart + modCount - 1;
-      const range = new monaco.Range(modStart, 1, modEnd, model.getLineMaxColumn(modEnd));
-      editor.executeEdits('revert-hunk', [{ range, text: origText }]);
-    } else {
-      const range = new monaco.Range(modStart, 1, modStart, 1);
-      editor.executeEdits('revert-hunk', [{ range, text: origText.length ? origText + model.getEOL() : '' }]);
-    }
+    editor.executeEdits('revert-hunk', [{ range: model.getFullModelRange(), text: newModelText }]);
     editor.pushUndoStop();
+    if (viewState) {
+      editor.restoreViewState(viewState);
+    }
   }
 
-  session.hunks.splice(hunkIdx, 1);
+  // 기준 원본과 현재 모델 내용 간의 diff 재계산
+  const updatedText = model.getValue();
+  session.hunks = computeLineDiff(session.originalText, updatedText);
 
   if (session.hunks.length === 0) {
-    const isOriginal = model.getValue() === session.originalText;
-    finishSession(session, acceptHunk);
-    if (isOriginal && session.wasCleanBefore && globalDoc) {
+    const hasChangesAccepted = updatedText !== session.initialOriginalText;
+    finishSession(session, hasChangesAccepted);
+    if (!hasChangesAccepted && session.wasCleanBefore && globalDoc) {
       globalDoc.markTabClean(session.tabId);
     }
-  } else {
-    // Recompute diff on current content
-    const updatedText = model.getValue();
-    session.hunks = computeLineDiff(session.originalText, updatedText);
-    if (session.hunks.length === 0) {
-      const isOriginal = updatedText === session.originalText;
-      finishSession(session, true);
-      if (isOriginal && session.wasCleanBefore && globalDoc) {
-        globalDoc.markTabClean(session.tabId);
-      }
-      return;
-    }
-
-    // Re-highlight modified lines (green decorations)
-    const decorations: monaco.editor.IModelDeltaDecoration[] = [];
-    for (const h of session.hunks) {
-      if (h.modifiedLines.length > 0) {
-        const startLine = h.modifiedStart;
-        const endLine = h.modifiedStart + h.modifiedLines.length - 1;
-        decorations.push({
-          range: new monaco.Range(startLine, 1, endLine, model.getLineMaxColumn(endLine)),
-          options: {
-            isWholeLine: true,
-            className: 'inline-diff-line-insert',
-            linesDecorationsClassName: 'inline-diff-gutter-insert',
-            overviewRuler: {
-              color: 'rgba(46, 160, 67, 0.6)',
-              position: monaco.editor.OverviewRulerLane.Left,
-            },
-          },
-        });
-      }
-    }
-    session.decorationIds = editor.deltaDecorations(session.decorationIds, decorations);
-
-    // Re-attach zones & update sticky bar
-    attachSession(session);
+    return;
   }
+
+  // 남은 변경 사항에 대한 녹색 하이라이트(데코레이션) 갱신
+  const decorations: monaco.editor.IModelDeltaDecoration[] = [];
+  for (const h of session.hunks) {
+    if (h.modifiedLines.length > 0) {
+      const startLine = h.modifiedStart;
+      const endLine = h.modifiedStart + h.modifiedLines.length - 1;
+      decorations.push({
+        range: new monaco.Range(startLine, 1, endLine, model.getLineMaxColumn(endLine)),
+        options: {
+          isWholeLine: true,
+          className: 'inline-diff-line-insert',
+          linesDecorationsClassName: 'inline-diff-gutter-insert',
+          overviewRuler: {
+            color: 'rgba(46, 160, 67, 0.6)',
+            position: monaco.editor.OverviewRulerLane.Left,
+          },
+        },
+      });
+    }
+  }
+  session.decorationIds = editor.deltaDecorations(session.decorationIds, decorations);
+
+  // 뷰존 재배치 및 스티키 바 갱신
+  attachSession(session);
 }
 
 export function syncInlineReviewForTab(activeTabId: string) {
@@ -540,6 +534,7 @@ export async function proposeEditorChanges(
       editor,
       model,
       originalText,
+      initialOriginalText: originalText,
       wasCleanBefore,
       hunks,
       decorationIds,
