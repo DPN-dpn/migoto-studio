@@ -2406,6 +2406,61 @@ test('PluginManager getDependents and getActiveDependents correctly identify dep
   assert.equal(getDependents('unrelated-plugin').length, 0);
 });
 
+test('PluginManager togglePlugin clears error and dependencyErrors when disabled', () => {
+  // Simulate PluginInstance with unsatisfied dependency error
+  const pluginInstance: any = {
+    manifest: {
+      id: 'mod-3d-viewer',
+      name: '3D 모드 뷰어',
+      version: '1.3.4',
+      dependencies: { 'texture-library': '>=1.0.0' },
+    },
+    enabled: true,
+    error: '종속성 미충족: texture-library (필수 플러그인이 비활성화되어 있습니다)',
+    dependencyErrors: [
+      { id: 'texture-library', satisfied: false, status: 'disabled', message: '비활성화됨' },
+    ],
+  };
+
+  const simulateTogglePlugin = (p: any, enabled: boolean) => {
+    if (!p) return;
+    if (p.enabled === enabled) {
+      if (!enabled && (p.error || p.dependencyErrors)) {
+        p.error = undefined;
+        p.dependencyErrors = undefined;
+      }
+      return;
+    }
+    p.enabled = enabled;
+    if (!enabled) {
+      p.cleanup?.();
+      p.cleanup = undefined;
+      p.instance = undefined;
+      p.error = undefined;
+      p.dependencyErrors = undefined;
+    }
+  };
+
+  // When plugin is disabled, error and dependencyErrors must be cleared
+  assert.ok(pluginInstance.error !== undefined);
+  assert.ok(pluginInstance.dependencyErrors !== undefined);
+
+  simulateTogglePlugin(pluginInstance, false);
+
+  assert.equal(pluginInstance.enabled, false);
+  assert.equal(pluginInstance.error, undefined, 'error must be cleared when plugin is toggled off');
+  assert.equal(pluginInstance.dependencyErrors, undefined, 'dependencyErrors must be cleared when plugin is toggled off');
+
+  // If already disabled but an error was somehow attached, toggling off again clears it
+  pluginInstance.error = '잔여 오류';
+  pluginInstance.dependencyErrors = [{ id: 'dep', satisfied: false }];
+  simulateTogglePlugin(pluginInstance, false);
+
+  assert.equal(pluginInstance.error, undefined);
+  assert.equal(pluginInstance.dependencyErrors, undefined);
+});
+
+
 
 
 

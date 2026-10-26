@@ -1022,7 +1022,16 @@ export class PluginManager {
 
   async togglePlugin(pluginId: string, enabled: boolean): Promise<void> {
     const p = this.plugins.get(pluginId);
-    if (!p || p.enabled === enabled) return;
+    if (!p) return;
+
+    if (p.enabled === enabled) {
+      if (!enabled && (p.error || p.dependencyErrors)) {
+        p.error = undefined;
+        p.dependencyErrors = undefined;
+        this.notify();
+      }
+      return;
+    }
 
     p.enabled = enabled;
 
@@ -1040,6 +1049,8 @@ export class PluginManager {
       p.cleanup?.();
       p.cleanup = undefined;
       p.instance = undefined;
+      p.error = undefined;
+      p.dependencyErrors = undefined;
       this.pluginApis.delete(pluginId);
       this.pluginMenuItems.delete(pluginId);
       if (this.customLintRules.size === 0) {
@@ -1058,6 +1069,8 @@ export class PluginManager {
         await this.togglePlugin(dep.manifest.id, false);
       }
     } else if (p.scriptContent && !p.instance) {
+      p.error = undefined;
+      p.dependencyErrors = undefined;
       await this.loadAndActivateScriptPlugin(p, p.scriptContent);
       this.emitLifecycle('activated', pluginId, p.manifest);
       await this.retryActivatingDependents(pluginId);
