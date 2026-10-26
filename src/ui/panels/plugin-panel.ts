@@ -474,9 +474,15 @@ export class PluginPanel {
     `;
     deleteBtn.onclick = async (e) => {
       e.stopPropagation();
+      const dependents = this.manager.getDependents(p.manifest.id);
+      let message = `플러그인 "${p.manifest.name}"을(를) 삭제하시겠습니까?`;
+      if (dependents.length > 0) {
+        const depNames = dependents.map((d) => `• ${d.manifest.name}`).join('\n');
+        message += `\n\n경고: 이 플러그인을 필수 종속성으로 요구하는 다음 플러그인의 작동이 중단되거나 오류가 발생할 수 있습니다:\n\n${depNames}\n\n그래도 삭제하시겠습니까?`;
+      }
       const ok = await openConfirmModal({
-        title: '플러그인 삭제',
-        message: `플러그인 "${p.manifest.name}"을(를) 삭제하시겠습니까?`,
+        title: dependents.length > 0 ? '종속 플러그인 영향 경고 및 삭제' : '플러그인 삭제',
+        message,
         confirmText: '삭제',
         cancelText: '취소',
         variant: 'danger',
@@ -493,8 +499,26 @@ export class PluginPanel {
     const toggleInput = document.createElement('input');
     toggleInput.type = 'checkbox';
     toggleInput.checked = p.enabled;
-    toggleInput.onchange = () => {
-      this.manager.togglePlugin(p.manifest.id, toggleInput.checked);
+    toggleInput.onchange = async () => {
+      const willEnable = toggleInput.checked;
+      if (!willEnable) {
+        const activeDeps = this.manager.getActiveDependents(p.manifest.id);
+        if (activeDeps.length > 0) {
+          const depNames = activeDeps.map((d) => `• ${d.manifest.name}`).join('\n');
+          const ok = await openConfirmModal({
+            title: '종속 플러그인 작동 중단 경고',
+            message: `"${p.manifest.name}" 플러그인을 비활성화하면, 이를 필수 종속성으로 사용하는 다음 플러그인의 작동이 중단됩니다:\n\n${depNames}\n\n그래도 비활성화하시겠습니까?`,
+            confirmText: '비활성화',
+            cancelText: '취소',
+            variant: 'danger',
+          });
+          if (!ok) {
+            toggleInput.checked = true;
+            return;
+          }
+        }
+      }
+      await this.manager.togglePlugin(p.manifest.id, willEnable);
     };
     const slider = document.createElement('span');
     slider.className = 'slider';

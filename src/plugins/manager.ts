@@ -1592,6 +1592,19 @@ export class PluginManager {
   }
 
   /**
+   * 특정 플러그인을 종속성으로 선언하고 있는 모든 플러그인(활성/비활성 포함) 목록을 반환합니다.
+   */
+  getDependents(pluginId: string): PluginInstance[] {
+    const list: PluginInstance[] = [];
+    for (const p of this.plugins.values()) {
+      if (p.manifest.dependencies && pluginId in p.manifest.dependencies) {
+        list.push(p);
+      }
+    }
+    return list;
+  }
+
+  /**
    * 플러그인 종속성을 설치하거나 활성화합니다.
    * 로컬에 이미 있으나 비활성화된 경우 활성화하고, GitHub URL이 지정된 경우 다운로드하여 설치합니다.
    */

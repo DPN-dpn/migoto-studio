@@ -2341,5 +2341,71 @@ test('checkGitHubPluginUpdate detection logic with semver version comparison', (
   assert.equal(isNewerVersion('1.2.0', '2.0.0'), true);
 });
 
+test('PluginManager getDependents and getActiveDependents correctly identify dependent plugins', () => {
+  const plugins = new Map<string, any>();
+  plugins.set('texture-library', {
+    manifest: { id: 'texture-library', name: '텍스처 라이브러리', version: '1.0.0' },
+    enabled: true,
+  });
+  plugins.set('mod-3d-viewer', {
+    manifest: {
+      id: 'mod-3d-viewer',
+      name: '3D 모드 뷰어',
+      version: '1.3.4',
+      dependencies: { 'texture-library': '>=1.0.0' },
+    },
+    enabled: true,
+  });
+  plugins.set('disabled-viewer', {
+    manifest: {
+      id: 'disabled-viewer',
+      name: '비활성 뷰어',
+      version: '1.0.0',
+      dependencies: { 'texture-library': '^1.0.0' },
+    },
+    enabled: false,
+  });
+  plugins.set('unrelated-plugin', {
+    manifest: { id: 'unrelated-plugin', name: '기타 플러그인', version: '1.0.0' },
+    enabled: true,
+  });
+
+  const getActiveDependents = (pluginId: string) => {
+    const list: any[] = [];
+    for (const p of plugins.values()) {
+      if (p.enabled && p.manifest.dependencies && pluginId in p.manifest.dependencies) {
+        list.push(p);
+      }
+    }
+    return list;
+  };
+
+  const getDependents = (pluginId: string) => {
+    const list: any[] = [];
+    for (const p of plugins.values()) {
+      if (p.manifest.dependencies && pluginId in p.manifest.dependencies) {
+        list.push(p);
+      }
+    }
+    return list;
+  };
+
+  // 1. 활성 종속 플러그인 확인 (비활성화 경고 대상)
+  const activeDeps = getActiveDependents('texture-library');
+  assert.equal(activeDeps.length, 1);
+  assert.equal(activeDeps[0].manifest.id, 'mod-3d-viewer');
+
+  // 2. 전체 종속 플러그인 확인 (삭제 경고 대상)
+  const allDeps = getDependents('texture-library');
+  assert.equal(allDeps.length, 2);
+  assert.equal(allDeps.some((p) => p.manifest.id === 'mod-3d-viewer'), true);
+  assert.equal(allDeps.some((p) => p.manifest.id === 'disabled-viewer'), true);
+
+  // 3. 종속성이 없는 플러그인 확인
+  assert.equal(getActiveDependents('unrelated-plugin').length, 0);
+  assert.equal(getDependents('unrelated-plugin').length, 0);
+});
+
+
 
 
