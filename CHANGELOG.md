@@ -2,11 +2,10 @@
 
 ## [다음 버전]
 
-### 신규 기능
-
 ### 기능 개선
-
-### 버그 수정
+- Tauri 데스크톱 실행 바이너리 및 패키지 명칭 변경 (`app.exe` → `migoto-studio.exe`):
+  - Windows Defender 등 보안 소프트웨어의 모호한 파일명(`app.exe`) 기반 머신러닝 오탐(`Bearfoos.B!ml`) 방지를 위해 Cargo 패키지명과 빌드 바이너리 명칭을 고유한 `migoto-studio`로 변경
+  - NSIS 설치 프로그램 바로가기 및 설치 타깃 바이너리 이름 동기화
 
 ---
 
