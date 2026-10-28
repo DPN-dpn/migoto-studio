@@ -3,10 +3,18 @@
 ## [다음 버전]
 
 ### 신규 기능
+- **XXMI 레거시 `help.ini` 내장 구문 지원**:
+  - `CustomShader\ShaderFixes\help.ini\FormatText`, `$\ShaderFixes\help.ini\notification_timeout`, `Resource\ShaderFixes\help.ini\...` 등 XXMI 엔진 내장 help.ini 구문을 정규 빌트인 구문으로 인식하여 미선언 및 네임스페이스 경고 없이 작성 가능
+- **SRMI (붕괴: 스타레일) 전용 모딩 문법 지원**:
+  - `$\SRMI\vertex_count = ...` 버텍스 수 오버라이드 구문 및 `Resource\SRMI\PositionBuffer`, `Resource\SRMI\BlendBuffer` 컴퓨트 셰이더 버퍼 구문을 정규 빌트인 문법으로 자동 인식하여 네임스페이스 부재 경고 방지
 
 ### 기능 개선
-
-### 버그 수정
+- **커스텀 린트 플러그인(`custom-lint` v1.5.0) 모듈화 및 `zzmi-support` 통합**:
+  - `custom-lint` 플러그인을 기능별 하위 모듈(`builtin-syntax`, `file-check`, `namespace-check`, `zzmi`, `srmi`)로 재구조화
+  - 기존 단독 플러그인이었던 `zzmi-support`를 `custom-lint`의 하위 모듈(`zzmi/`)로 통합하여, 플러그인 파편화 없이 ZZMI 텍스처 슬롯픽스 리졸버, WEngineFX, TTL 투명도 문법 및 코드 템플릿을 단일 플러그인에서 통합 제공
+  - 기본 내장 플러그인 목록을 4개(`custom-lint`, `texture-library`, `python-runner`, `ai-assistant`)로 최적화하고 설치 프로그램 및 앱 로더에서 구 `zzmi-support` 폴더 자동 정리 지원
+- **데스크톱 플러그인 다중 모듈 ES 파일 배포 지원**:
+  - 데스크톱 설치본의 기본 플러그인을 단일 번들 파일 대신 가상 모듈 링커(Virtual Module Linker) 기반 다중 모듈 ES 파일(`index.js` + 서브모듈들) 구조로 빌드 및 설치되도록 개선하여 코드 학습성과 확장성 강화
 
 ---
 
