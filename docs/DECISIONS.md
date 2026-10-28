@@ -132,13 +132,10 @@
 
 ### 모딩 문법 플러그인의 역할 분담 원칙 (완료)
 - **커스텀 린트 플러그인 (`custom-lint`)**:
-  - 원본 3Dmigoto ini 확장 문법에 포함되지 않은 **범용 XXMI 기본 문법**에 대응합니다.
-  - 네임스페이스(`namespace = ...`), 네임스페이스 변수/커맨드리스트 참조(`$\Namespace\var`, `CommandList\Namespace\Action`), 모드 폴더 내 리소스 파일 실재성 검사, 크로스 파일 심볼 색인 및 이동 등 모든 XXMI 계열 모드에 공통 적용되는 기본 표준을 다룹니다.
-  - 특정 게임이나 전용 라이브러리(ZZMI, TTL 등)의 하드코딩이나 고유 문법은 일절 포함하지 않는 **순수 게임 중립적** 플러그인입니다.
-- **게임/라이브러리 전용 지원 플러그인 (예: `zzmi-support`)**:
-  - XXMI 기본 문법은 이미 커스텀 린트 플러그인 및 코어에서 충족된다고 가정합니다.
-  - 해당 게임이나 전용 라이브러리의 **특화 문법 및 템플릿**(예: ZZMI 슬롯픽스 `Resource\ZZMI\...`, WEngineFX, TTL 라이브러리의 `CommandList\TTL\Draw`, `Resource\TTL\TransparencyTex`, `$\TTL\alpha` 등)을 전담합니다.
-  - `context.linter.registerAllowedResource` / `context.linter.registerAllowedVariable` 등의 동적 확장 API를 통해 코어나 범용 린터를 오염시키지 않고 독립적으로 동작합니다.
+  - 원본 3Dmigoto ini 확장 문법에 포함되지 않은 **범용 XXMI/ZZMI/SRMI 모딩 문법**에 대응합니다.
+  - 네임스페이스(`namespace = ...`), 네임스페이스 변수/커맨드리스트 참조(`$\Namespace\var`, `CommandList\Namespace\Action`), 모드 폴더 내 리소스 파일 실재성 검사, 크로스 파일 심볼 색인 및 이동 등 기본 검사를 다룹니다.
+  - 기능별/도메인별 관심사를 하위 모듈(`builtin-syntax/`, `file-check/`, `namespace-check/`, `zzmi/`, `srmi/`)로 완벽히 분리하여, 단일 플러그인 내에서 `ShaderFixes\help.ini`, ZZMI 텍스처 슬롯픽스/TTL 투명도, SRMI 버텍스 오버라이드(`$\SRMI\vertex_count`)를 체계적으로 관리합니다.
+  - 게임별/런처별 고유 문법 및 슬롯픽스 리졸버는 `custom-lint`의 해당 도메인 모듈(`zzmi/`, `srmi/`)에서 동적 확장 API(`context.linter`, `context.slots`, `context.templates`)를 통해 등록됩니다.
 
 ### 플러그인 코어 API 및 UI 빌더 구조 개선 (완료)
 - **배경**: 복잡한 모딩 관리 플러그인(토글 키 및 메쉬 매니저 등) 개발 과정에서 체감된 위젯 최상위 엘리먼트 속성명 불일치, 단축키 텍스트 정제 기능 부재, 다중 동일 키/조건문 블록 보존 한계, 스플릿 뷰 Flex 레이아웃 붕괴, 입력 필드 인라인 에러 피드백 부재 등의 구조적 한계를 해소.
@@ -228,7 +225,7 @@
   - `TextureOverridePearlbodyA` / `TextureOverridePearlbodyB`처럼 서브메시 인덱스(`A`, `B`, `1`, `2` 등)가 붙은 경우, 공통 접두사가 부위 어간을 침범하지 않도록 안전 후퇴(`backOffPrefix`) 알고리즘을 적용하여 `BodyA`, `BodyB` 형태로 온전히 부위를 식별합니다.
 - **코어 탈종속화 원칙 준수**:
   - 코어 에디터(`src/core/slots/`)는 범용 표준 3DMigoto 구문(`ps-t0`, `diffuse = ...`, 섹션 이름 휴리스틱)만 처리합니다.
-  - 특정 게임이나 런처에 종속된 텍스처 문법(예: ZZMI SlotFix `Resource\ZZMI\Diffuse = ref ...`, TTL `Resource\TTL\TransparencyTex`)은 코어에 하드코딩하지 않고, 전용 플러그인(`zzmi-support`)이 `context.slots.registerTextureSlotResolver`를 통해 동적으로 리졸버를 등록합니다.
+  - 특정 게임이나 런처에 종속된 텍스처 문법(예: ZZMI SlotFix `Resource\ZZMI\Diffuse = ref ...`, TTL `Resource\TTL\TransparencyTex`)은 코어에 하드코딩하지 않고, 전용 플러그인 모듈(`custom-lint`의 `zzmi` 모듈)이 `context.slots.registerTextureSlotResolver`를 통해 동적으로 리졸버를 등록합니다.
 - **수동 매칭 및 인터페이스**:
   - 추천 프리셋 드롭다운 대신, 액티비티 바의 **슬롯 매칭(Slot Matching)** 사이드바 패널에서 사용자가 직접 **자유로운 텍스트 문자열 입력**으로 부위명을 즉시 수정하거나 지정할 수 있습니다.
   - 연결할 텍스처 파일은 INI 내에서 감지된 이미지 파일 목록 드롭다운에서 선택하거나 직접 입력하여 지정할 수 있습니다.
