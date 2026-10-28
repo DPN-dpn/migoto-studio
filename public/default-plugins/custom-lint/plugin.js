@@ -709,6 +709,66 @@ function createReferenceProvider(context, isActive) {
 	} };
 }
 //#endregion
+//#region default-plugins/custom-lint/srmi/rules.ts
+/**
+* SRMI (붕괴: 스타레일 - Star Rail Model Importer) 변수 정규식
+* 예: $\SRMI\vertex_count, \SRMI\vertex_count, $SRMI\vertex_count 등
+*/
+var SRMI_VAR_REGEX = /^\\?srmi\\/i;
+/**
+* SRMI 리소스 및 커맨드리스트 정규식
+* 예: Resource\SRMI\PositionBuffer, Resource\SRMI\BlendBuffer, CommandList\SRMI\...
+*/
+var SRMI_RESOURCE_REGEX = /^(?:resource|commandlist)\\srmi\\/i;
+/**
+* 주어진 변수명이 SRMI 전용 변수 구문인지 검사합니다.
+* (대소문자 무관, 접두어 $, \ 무시)
+*/
+function isSrmiVariable(name) {
+	if (!name) return false;
+	return name.trim().toLowerCase().replace(/^[\\$]+/, "").startsWith("srmi\\");
+}
+/**
+* 주어진 리소스/커맨드리스트 이름이 SRMI 전용 구문인지 검사합니다.
+*/
+function isSrmiResource(name) {
+	if (!name) return false;
+	const clean = name.trim().toLowerCase().replace(/^[\\\/]+/, "");
+	return clean.startsWith("resource\\srmi\\") || clean.startsWith("commandlist\\srmi\\") || clean.startsWith("srmi\\");
+}
+/**
+* SRMI (Star Rail Model Importer) 전용 린트 규칙 및 허용 리소스/변수를 등록합니다.
+*/
+function registerSrmiRules(context) {
+	const cleanups = [];
+	if (context.linter?.registerAllowedResource) {
+		cleanups.push(context.linter.registerAllowedResource(SRMI_RESOURCE_REGEX));
+		cleanups.push(context.linter.registerAllowedResource((name) => isSrmiResource(name)));
+		cleanups.push(context.linter.registerAllowedResource("Resource\\SRMI\\PositionBuffer"));
+		cleanups.push(context.linter.registerAllowedResource("Resource\\SRMI\\BlendBuffer"));
+	}
+	if (context.linter?.registerAllowedVariable) {
+		cleanups.push(context.linter.registerAllowedVariable(SRMI_VAR_REGEX));
+		cleanups.push(context.linter.registerAllowedVariable((name) => isSrmiVariable(name)));
+	}
+	if (context.linter?.registerAllowedUsedVariable) cleanups.push(context.linter.registerAllowedUsedVariable((name) => isSrmiVariable(name)));
+	if (context.linter?.registerAllowedUsedResource) {
+		cleanups.push(context.linter.registerAllowedUsedResource(SRMI_RESOURCE_REGEX));
+		cleanups.push(context.linter.registerAllowedUsedResource((name) => isSrmiResource(name)));
+	}
+	if (context.linter?.registerDiagnosticFilter) cleanups.push(context.linter.registerDiagnosticFilter((diag, ctx) => {
+		const msg = diag.message || "";
+		if (msg.includes("'SRMI'") || msg.includes("'srmi'")) return false;
+		if (/\bsrmi[\\_]/i.test(msg) || /\$?\\?srmi\\/i.test(msg)) return false;
+		if (ctx?.model && diag.startLineNumber) {
+			const lineContent = ctx.model.getLineContent(diag.startLineNumber) || "";
+			if (/\\?srmi\\/i.test(lineContent) && /srmi/i.test(msg)) return false;
+		}
+		return true;
+	}));
+	return cleanups;
+}
+//#endregion
 //#region default-plugins/custom-lint/namespace-check/index.ts
 function createNamespaceRegistrationState() {
 	return {
@@ -874,7 +934,7 @@ function registerNamespaceCheck(context, isActive, state) {
 							const nsName = parts.slice(0, -1).join("\\");
 							const varName = parts[parts.length - 1];
 							const nsData = namespaceMap.get(nsName.toLowerCase());
-							if (nsName.toLowerCase() === "shaderfixes\\help.ini" || isHelpIniVariable(fullVar) || (ctx.isAllowedVariable ? ctx.isAllowedVariable(fullVar) : false)) continue;
+							if (nsName.toLowerCase() === "shaderfixes\\help.ini" || nsName.toLowerCase() === "srmi" || isHelpIniVariable(fullVar) || isSrmiVariable(fullVar) || (ctx.isAllowedVariable ? ctx.isAllowedVariable(fullVar) : false)) continue;
 							if (!nsData) diagnostics.push({
 								severity: "warning",
 								message: `모드 폴더 내에서 네임스페이스 '${nsName}'을(를) 찾을 수 없습니다. (해당 ini 파일에 'namespace = ${nsName}' 선언이 있는지 확인하세요)`,
@@ -900,7 +960,7 @@ function registerNamespaceCheck(context, isActive, state) {
 					if (target.includes("\\")) {
 						const parts = target.split("\\").filter(Boolean);
 						const prefix = parts[0];
-						if (!(isBuiltinResource(target) || isHelpIniResource(target) || prefix.toLowerCase().startsWith("builtin") || (ctx.isAllowedResource ? ctx.isAllowedResource(target) : false)) && parts.length >= 3) {
+						if (!(isBuiltinResource(target) || isHelpIniResource(target) || isSrmiResource(target) || prefix.toLowerCase().startsWith("builtin") || prefix.toLowerCase() === "srmi" || (ctx.isAllowedResource ? ctx.isAllowedResource(target) : false)) && parts.length >= 3) {
 							const nsName = parts.slice(1, -1).join("\\");
 							const actionName = parts[parts.length - 1];
 							const nsData = namespaceMap.get(nsName.toLowerCase());
@@ -1145,20 +1205,55 @@ function registerZzmiSupport(context) {
 	return cleanups;
 }
 //#endregion
+//#region default-plugins/custom-lint/srmi/templates.ts
+var SRMI_TEMPLATES = [{
+	id: "srmi_vertex_count",
+	group: "SRMI (붕괴: 스타레일)",
+	label: "SRMI 버텍스 카운트 ($SRMI\vertex_count)",
+	description: "SRMI 모델 버텍스 수 지정 구문 (포지션 .buf 파일 크기 / stride)",
+	body: ["; SRMI Vertex Count Override", "$\\SRMI\\vertex_count = ${1:41428}"].join("\n") + "\n"
+}, {
+	id: "srmi_buffer_override",
+	group: "SRMI (붕괴: 스타레일)",
+	label: "SRMI 버퍼 오버라이드 (Position & Blend)",
+	description: "SRMI 컴퓨트 셰이더 버퍼 및 버텍스 수 매핑 구문",
+	body: [
+		"; SRMI Compute Shader Buffer Override",
+		"Resource\\SRMI\\PositionBuffer = ref Resource${1:Model}PositionCS",
+		"Resource\\SRMI\\BlendBuffer = ref Resource${1:Model}BlendCS",
+		"$\\SRMI\\vertex_count = ${2:41428}"
+	].join("\n") + "\n"
+}];
+//#endregion
+//#region default-plugins/custom-lint/srmi/index.ts
+/**
+* SRMI (붕괴: 스타레일 - Star Rail Model Importer) 모딩 지원 기능을 등록합니다.
+* ($\\SRMI\\vertex_count 등 전용 변수, Resource\\SRMI\\... 전용 리소스 및 템플릿)
+*/
+function registerSrmiSupport(context) {
+	const cleanups = [];
+	cleanups.push(...registerSrmiRules(context));
+	context.logger?.info(`SRMI (붕괴: 스타레일) 모딩 지원 활성화 (템플릿 ${SRMI_TEMPLATES.length}개 등록)`);
+	if (context.templates?.registerTemplate) for (const tpl of SRMI_TEMPLATES) context.templates.registerTemplate(tpl);
+	return cleanups;
+}
+//#endregion
 //#region default-plugins/custom-lint/index.ts
 var isPluginActive = false;
 var unregisterBuiltinList = [];
 var unregisterFileCheck = void 0;
 var unregisterZzmiList = [];
+var unregisterSrmiList = [];
 var namespaceState = createNamespaceRegistrationState();
 var plugin = {
 	activate(context) {
 		isPluginActive = true;
-		context.logger?.info("커스텀 린터 (내장문법 / 파일실재성 / 네임스페이스 / ZZMI지원) 활성화됨");
+		context.logger?.info("커스텀 린터 (내장문법 / 파일실재성 / 네임스페이스 / ZZMI / SRMI지원) 활성화됨");
 		unregisterBuiltinList = registerBuiltinSyntax(context);
 		unregisterFileCheck = registerFileCheckRule(context);
 		registerNamespaceCheck(context, () => isPluginActive, namespaceState);
 		unregisterZzmiList = registerZzmiSupport(context);
+		unregisterSrmiList = registerSrmiSupport(context);
 	},
 	deactivate() {
 		isPluginActive = false;
@@ -1181,7 +1276,13 @@ var plugin = {
 			} catch {}
 			unregisterZzmiList = [];
 		}
+		if (unregisterSrmiList.length > 0) {
+			for (const cleanup of unregisterSrmiList) try {
+				cleanup();
+			} catch {}
+			unregisterSrmiList = [];
+		}
 	}
 };
 //#endregion
-export { ZZMI_TEMPLATES, buildWorkspaceIndex, collectIniFiles, createZzmiSlotResolver, plugin as default, isBuiltinResource, isHelpIniResource, isHelpIniVariable, parseIniExports, readIniText, registerZzmiRules };
+export { SRMI_TEMPLATES, ZZMI_TEMPLATES, buildWorkspaceIndex, collectIniFiles, createZzmiSlotResolver, plugin as default, isBuiltinResource, isHelpIniResource, isHelpIniVariable, isSrmiResource, isSrmiVariable, parseIniExports, readIniText, registerSrmiRules, registerZzmiRules };

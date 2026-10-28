@@ -8,6 +8,7 @@ import {
   type NamespaceRegistrationState,
 } from './namespace-check/index.ts';
 import { registerZzmiSupport, registerZzmiRules, ZZMI_TEMPLATES } from './zzmi/index.ts';
+import { registerSrmiSupport, registerSrmiRules, isSrmiVariable, isSrmiResource, SRMI_TEMPLATES } from './srmi/index.ts';
 
 // 외부 및 테스트 호환성을 위한 심볼 re-export
 export { isBuiltinResource, isHelpIniResource, isHelpIniVariable } from './builtin-syntax/index.ts';
@@ -15,17 +16,19 @@ export { parseIniExports } from './namespace-check/parser.ts';
 export { collectIniFiles, readIniText, buildWorkspaceIndex } from './namespace-check/indexer.ts';
 export type { SymbolLocationRecord, NamespaceExport, NamespaceGroup } from './namespace-check/types.ts';
 export { registerZzmiRules, createZzmiSlotResolver, ZZMI_TEMPLATES } from './zzmi/index.ts';
+export { registerSrmiRules, isSrmiVariable, isSrmiResource, SRMI_TEMPLATES } from './srmi/index.ts';
 
 let isPluginActive = false;
 let unregisterBuiltinList: (() => void)[] = [];
 let unregisterFileCheck: (() => void) | void = undefined;
 let unregisterZzmiList: (() => void)[] = [];
+let unregisterSrmiList: (() => void)[] = [];
 const namespaceState: NamespaceRegistrationState = createNamespaceRegistrationState();
 
 const plugin: MigotoPlugin = {
   activate(context: PluginContext) {
     isPluginActive = true;
-    context.logger?.info('커스텀 린터 (내장문법 / 파일실재성 / 네임스페이스 / ZZMI지원) 활성화됨');
+    context.logger?.info('커스텀 린터 (내장문법 / 파일실재성 / 네임스페이스 / ZZMI / SRMI지원) 활성화됨');
 
     // 1. 내장함수 문법 추가: XXMI 표준 내장 커맨드리스트 및 ShaderFixes\help.ini 허용 등록
     unregisterBuiltinList = registerBuiltinSyntax(context);
@@ -38,6 +41,9 @@ const plugin: MigotoPlugin = {
 
     // 4. ZZMI 모딩 지원: 슬롯픽스 템플릿, 슬롯픽스 리졸버, TTL 변수/리소스, 진단 필터 등록
     unregisterZzmiList = registerZzmiSupport(context);
+
+    // 5. SRMI 모딩 지원: $\SRMI\vertex_count 등 전용 변수, Resource\SRMI\... 전용 리소스 등록
+    unregisterSrmiList = registerSrmiSupport(context);
   },
 
   deactivate() {
@@ -66,6 +72,14 @@ const plugin: MigotoPlugin = {
         try { cleanup(); } catch {}
       }
       unregisterZzmiList = [];
+    }
+
+    // 5. SRMI 지원 정리
+    if (unregisterSrmiList.length > 0) {
+      for (const cleanup of unregisterSrmiList) {
+        try { cleanup(); } catch {}
+      }
+      unregisterSrmiList = [];
     }
   },
 };

@@ -477,7 +477,17 @@ handling = skip
     ...nsCtxBase,
     model: ttlModel,
   });
-  assert.equal(nsDiagsTtl.length, 3, 'custom-lint independently flags unknown namespace TTL when unassisted');
+  // 2-h. SRMI vertex_count is recognized as built-in syntax (0 diagnostics)
+  const srmiModel = {
+    getLineCount: () => 1,
+    getLineContent: () => '$\\SRMI\\vertex_count = 41428',
+    getValue: () => '$\\SRMI\\vertex_count = 41428',
+  };
+  const nsDiagsSrmi = await nsRule.check({
+    ...nsCtxBase,
+    model: srmiModel,
+  });
+  assert.equal(nsDiagsSrmi.length, 0, 'SRMI vertex_count syntax should produce 0 diagnostics in namespace rule');
 });
 
 test('custom-lint incorporates zzmi support and help.ini built-in syntax', () => {
@@ -572,6 +582,26 @@ test('custom-lint incorporates zzmi support and help.ini built-in syntax', () =>
   assert.ok(templateIds.includes('zzmi_slot_fix'));
   assert.ok(templateIds.includes('zzmi_ttl_draw'));
   assert.ok(templateIds.includes('zzmi_ttl_texture'));
+
+  // 3. Verify SRMI (Honkai: Star Rail) features
+  assert.ok(checkVar('$\\SRMI\\vertex_count'), 'SRMI vertex_count must be allowed variable');
+  assert.ok(checkVar('\\SRMI\\vertex_count'), 'SRMI vertex_count with backslash must be allowed');
+  assert.ok(checkVar('srmi\\vertex_count'), 'Normalized srmi\\vertex_count must be allowed');
+  assert.ok(checkResource('Resource\\SRMI\\PositionBuffer'), 'Resource\\SRMI\\PositionBuffer must be allowed resource');
+  assert.ok(checkResource('Resource\\SRMI\\BlendBuffer'), 'Resource\\SRMI\\BlendBuffer must be allowed resource');
+  assert.ok(templateIds.includes('srmi_vertex_count'), 'srmi_vertex_count template must be registered');
+  assert.ok(templateIds.includes('srmi_buffer_override'), 'srmi_buffer_override template must be registered');
+
+  const srmiDiag = { message: "모드 폴더 내에서 네임스페이스 'SRMI'을(를) 찾을 수 없습니다.", startLineNumber: 1 };
+  const srmiCtx = {
+    model: {
+      getLineCount: () => 1,
+      getLineContent: () => '$\\SRMI\\vertex_count = 41428',
+      getValue: () => '$\\SRMI\\vertex_count = 41428',
+    },
+  };
+  const srmiFilter = registeredFilters.find((f) => !f(srmiDiag, srmiCtx));
+  assert.ok(srmiFilter, 'SRMI diagnostic filter should suppress SRMI namespace warning');
 });
 
 test('default-plugins directory contains all 4 standalone plugins ready for installation', async () => {

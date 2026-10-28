@@ -4,6 +4,7 @@ import { buildWorkspaceIndex } from './indexer.ts';
 import { createDefinitionProvider, createReferenceProvider } from './providers.ts';
 import { isBuiltinResource } from '../builtin-syntax/matcher.ts';
 import { isHelpIniResource, isHelpIniVariable } from '../builtin-syntax/help-ini.ts';
+import { isSrmiResource, isSrmiVariable } from '../srmi/rules.ts';
 
 export interface NamespaceRegistrationState {
   unregisterAllowedVars: (() => void) | null;
@@ -243,7 +244,11 @@ export function registerNamespaceCheck(
               const nsData = namespaceMap.get(nsName.toLowerCase());
 
               // 빌트인 네임스페이스이거나 코어에서 허용된 변수인 경우 검사 제외
-              const isBuiltInNs = nsName.toLowerCase() === 'shaderfixes\\help.ini' || isHelpIniVariable(fullVar);
+              const isBuiltInNs =
+                nsName.toLowerCase() === 'shaderfixes\\help.ini' ||
+                nsName.toLowerCase() === 'srmi' ||
+                isHelpIniVariable(fullVar) ||
+                isSrmiVariable(fullVar);
               if (isBuiltInNs || (ctx.isAllowedVariable ? ctx.isAllowedVariable(fullVar) : false)) {
                 continue;
               }
@@ -281,7 +286,9 @@ export function registerNamespaceCheck(
             const isBuiltIn =
               isBuiltinResource(target) ||
               isHelpIniResource(target) ||
+              isSrmiResource(target) ||
               prefix.toLowerCase().startsWith('builtin') ||
+              prefix.toLowerCase() === 'srmi' ||
               (ctx.isAllowedResource ? ctx.isAllowedResource(target) : false);
 
             if (!isBuiltIn && parts.length >= 3) {
