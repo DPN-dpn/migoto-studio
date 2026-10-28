@@ -1,4 +1,5 @@
 import { isBuiltinResource } from "../builtin-syntax/matcher.js";
+import { isHelpIniResource, isHelpIniVariable } from "../builtin-syntax/help-ini.js";
 import { parseIniExports, stripComments } from "./parser.js";
 import { buildWorkspaceIndex } from "./indexer.js";
 import { createDefinitionProvider, createReferenceProvider } from "./providers.js";
@@ -167,6 +168,7 @@ function registerNamespaceCheck(context, isActive, state) {
 							const nsName = parts.slice(0, -1).join("\\");
 							const varName = parts[parts.length - 1];
 							const nsData = namespaceMap.get(nsName.toLowerCase());
+							if (nsName.toLowerCase() === "shaderfixes\\help.ini" || isHelpIniVariable(fullVar) || (ctx.isAllowedVariable ? ctx.isAllowedVariable(fullVar) : false)) continue;
 							if (!nsData) diagnostics.push({
 								severity: "warning",
 								message: `모드 폴더 내에서 네임스페이스 '${nsName}'을(를) 찾을 수 없습니다. (해당 ini 파일에 'namespace = ${nsName}' 선언이 있는지 확인하세요)`,
@@ -192,7 +194,7 @@ function registerNamespaceCheck(context, isActive, state) {
 					if (target.includes("\\")) {
 						const parts = target.split("\\").filter(Boolean);
 						const prefix = parts[0];
-						if (!(isBuiltinResource(target) || prefix.toLowerCase().startsWith("builtin") || (ctx.isAllowedResource ? ctx.isAllowedResource(target) : false)) && parts.length >= 3) {
+						if (!(isBuiltinResource(target) || isHelpIniResource(target) || prefix.toLowerCase().startsWith("builtin") || (ctx.isAllowedResource ? ctx.isAllowedResource(target) : false)) && parts.length >= 3) {
 							const nsName = parts.slice(1, -1).join("\\");
 							const actionName = parts[parts.length - 1];
 							const nsData = namespaceMap.get(nsName.toLowerCase());

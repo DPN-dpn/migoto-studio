@@ -26,11 +26,15 @@ pub fn plugins_dir() -> PathBuf {
   let p = crate::storage::data_dir().join("plugins");
   let _ = fs::create_dir_all(&p);
 
-  // Auto-prune legacy "resource-checker" folder and ensure "custom-lint" is freshly installed
+  // Auto-prune legacy "resource-checker" and "zzmi-support" folders
   let legacy_checker = p.join("resource-checker");
   let had_legacy = legacy_checker.exists();
   if had_legacy {
     let _ = fs::remove_dir_all(&legacy_checker);
+  }
+  let legacy_zzmi = p.join("zzmi-support");
+  if legacy_zzmi.exists() {
+    let _ = fs::remove_dir_all(&legacy_zzmi);
   }
 
   let custom_lint_dir = p.join("custom-lint");
@@ -414,7 +418,7 @@ pub fn list_disk_plugins() -> Result<Vec<PluginDiskInfo>, String> {
         };
 
         let id = p.file_name().unwrap_or_default().to_string_lossy().to_string();
-        if id == "resource-checker" || id == "asset-viewer" {
+        if id == "resource-checker" || id == "asset-viewer" || id == "zzmi-support" {
           continue;
         }
 

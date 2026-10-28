@@ -490,17 +490,11 @@ LangString secPluginPython ${LANG_ENGLISH} "Python Runner"
 LangString secPluginPythonDesc ${LANG_KOREAN} "Python 코드를 에디터에서 직접 실행하고 결과를 확인합니다."
 LangString secPluginPythonDesc ${LANG_ENGLISH} "Run Python scripts within the editor and inspect execution outputs."
 
-LangString secPluginLint ${LANG_KOREAN} "커스텀 린트"
-LangString secPluginLint ${LANG_ENGLISH} "Custom Linter"
+LangString secPluginLint ${LANG_KOREAN} "커스텀 린트 (XXMI & ZZMI)"
+LangString secPluginLint ${LANG_ENGLISH} "Custom Linter (XXMI & ZZMI)"
 
-LangString secPluginLintDesc ${LANG_KOREAN} "리소스 파일 실재성 및 XXMI 네임스페이스 유효성을 실시간으로 검사합니다."
-LangString secPluginLintDesc ${LANG_ENGLISH} "Real-time verification for resource file existence and XXMI namespace validity."
-
-LangString secPluginZZMI ${LANG_KOREAN} "ZZMI 지원 (젠레스 존 제로)"
-LangString secPluginZZMI ${LANG_ENGLISH} "ZZMI Support (Zenless Zone Zero)"
-
-LangString secPluginZZMIDesc ${LANG_KOREAN} "ZZMI 슬롯픽스 템플릿 및 전용 네임스페이스 인식을 지원합니다."
-LangString secPluginZZMIDesc ${LANG_ENGLISH} "ZZMI texture slotfix templates and dedicated namespace linting support."
+LangString secPluginLintDesc ${LANG_KOREAN} "리소스 파일 실재성, XXMI/help.ini 네임스페이스 및 ZZMI 슬롯픽스/TTL 문법을 실시간으로 검사하고 템플릿을 제공합니다."
+LangString secPluginLintDesc ${LANG_ENGLISH} "Real-time verification for resource existence, XXMI/help.ini namespace, and ZZMI SlotFix/TTL support."
 
 LangString secPluginToggle ${LANG_KOREAN} "토글 키 매니저 (GitHub)"
 LangString secPluginToggle ${LANG_ENGLISH} "Toggle Key Manager (GitHub)"
@@ -822,18 +816,11 @@ SectionGroup "$(secDefaultPlugins)" SecGroupPlugins
   Section "$(secPluginLint)" SecPluginLint
     SetShellVarContext current
     RMDir /r "$APPDATA\MigotoStudio\plugins\resource-checker"
+    RMDir /r "$APPDATA\MigotoStudio\plugins\zzmi-support"
     RMDir /r "$APPDATA\MigotoStudio\plugins\custom-lint"
     CreateDirectory "$APPDATA\MigotoStudio\plugins\custom-lint"
     SetOutPath "$APPDATA\MigotoStudio\plugins\custom-lint"
     File /r "${DEFAULT_PLUGINS_DIR}\custom-lint\*.*"
-  SectionEnd
-
-  Section "$(secPluginZZMI)" SecPluginZZMI
-    SetShellVarContext current
-    RMDir /r "$APPDATA\MigotoStudio\plugins\zzmi-support"
-    CreateDirectory "$APPDATA\MigotoStudio\plugins\zzmi-support"
-    SetOutPath "$APPDATA\MigotoStudio\plugins\zzmi-support"
-    File /r "${DEFAULT_PLUGINS_DIR}\zzmi-support\*.*"
   SectionEnd
 
   Section "$(secPluginToggle)" SecPluginToggle
@@ -860,7 +847,6 @@ SectionGroupEnd
   !insertmacro MUI_DESCRIPTION_TEXT ${SecPluginViewer} $(secPluginViewerDesc)
   !insertmacro MUI_DESCRIPTION_TEXT ${SecPluginPython} $(secPluginPythonDesc)
   !insertmacro MUI_DESCRIPTION_TEXT ${SecPluginLint} $(secPluginLintDesc)
-  !insertmacro MUI_DESCRIPTION_TEXT ${SecPluginZZMI} $(secPluginZZMIDesc)
   !insertmacro MUI_DESCRIPTION_TEXT ${SecPluginToggle} $(secPluginToggleDesc)
   !insertmacro MUI_DESCRIPTION_TEXT ${SecPluginViewer3D} $(secPluginViewer3DDesc)
 !insertmacro MUI_FUNCTION_DESCRIPTION_END

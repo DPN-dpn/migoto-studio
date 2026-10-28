@@ -1,4 +1,4 @@
-import type { PluginTemplate } from '../../src/plugins/types.ts';
+import type { PluginTemplate } from '../../../src/plugins/types.ts';
 
 export const ZZMI_TEMPLATES: PluginTemplate[] = [
   {

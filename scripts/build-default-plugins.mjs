@@ -5,7 +5,6 @@ import { existsSync } from 'node:fs';
 
 const plugins = [
   'custom-lint',
-  'zzmi-support',
   'texture-library',
   'python-runner',
   'ai-assistant',
@@ -13,7 +12,6 @@ const plugins = [
 
 const webCompatiblePlugins = [
   'custom-lint',
-  'zzmi-support',
   'texture-library',
   'ai-assistant',
 ];
@@ -168,7 +166,7 @@ async function buildDefaultPlugins() {
     console.log(`[build-default-plugins] Built ${id} (Desktop modular index.js + Web bundled plugin.js)`);
   }
 
-  // Ensure desktop-only plugins or legacy renamed plugins are pruned
+  // Ensure desktop-only plugins or legacy renamed/merged plugins are pruned
   const pruneDirs = [
     resolve(rootDir, 'public/default-plugins', 'python-runner'),
     resolve(rootDir, 'public/default-plugins', 'resource-checker'),
@@ -177,14 +175,20 @@ async function buildDefaultPlugins() {
     resolve(rootDir, 'public/default-plugins', 'asset-viewer'),
     resolve(rootDir, 'src-tauri/default-plugins', 'asset-viewer'),
     resolve(rootDir, 'data/plugins', 'asset-viewer'),
+    resolve(rootDir, 'public/default-plugins', 'zzmi-support'),
+    resolve(rootDir, 'src-tauri/default-plugins', 'zzmi-support'),
+    resolve(rootDir, 'data/plugins', 'zzmi-support'),
   ];
   if (process.env.APPDATA) {
     pruneDirs.push(resolve(process.env.APPDATA, 'MigotoStudio', 'plugins', 'resource-checker'));
     pruneDirs.push(resolve(process.env.APPDATA, 'MigotoStudio', 'plugins', 'asset-viewer'));
+    pruneDirs.push(resolve(process.env.APPDATA, 'MigotoStudio', 'plugins', 'zzmi-support'));
   }
   for (const dir of pruneDirs) {
     if (existsSync(dir)) {
-      await rm(dir, { recursive: true, force: true });
+      try {
+        await rm(dir, { recursive: true, force: true });
+      } catch {}
     }
   }
 

@@ -1,4 +1,4 @@
-//#region default-plugins/zzmi-support/rules.ts
+//#region default-plugins/custom-lint/zzmi/rules.ts
 function registerZzmiRules(context) {
 	const cleanups = [];
 	if (context.linter?.registerAllowedResource) {

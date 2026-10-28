@@ -6,7 +6,6 @@ import pythonRunnerPlugin from '../default-plugins/python-runner/index.ts';
 import textureLibraryPlugin from '../default-plugins/texture-library/index.ts';
 import aiAssistantPlugin from '../default-plugins/ai-assistant/index.ts';
 import customLintPlugin from '../default-plugins/custom-lint/index.ts';
-import zzmiSupportPlugin from '../default-plugins/zzmi-support/index.ts';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
@@ -15,7 +14,6 @@ const BUILTIN_PLUGINS = [
   { manifest: JSON.parse(readFileSync(resolve(process.cwd(), 'default-plugins/texture-library/plugin.json'), 'utf8')), createPlugin: () => textureLibraryPlugin },
   { manifest: JSON.parse(readFileSync(resolve(process.cwd(), 'default-plugins/ai-assistant/plugin.json'), 'utf8')), createPlugin: () => aiAssistantPlugin },
   { manifest: JSON.parse(readFileSync(resolve(process.cwd(), 'default-plugins/custom-lint/plugin.json'), 'utf8')), createPlugin: () => customLintPlugin },
-  { manifest: JSON.parse(readFileSync(resolve(process.cwd(), 'default-plugins/zzmi-support/plugin.json'), 'utf8')), createPlugin: () => zzmiSupportPlugin },
 ];
 import { validatePluginZip } from '../src/plugins/zip.ts';
 import { definePlugin } from '../src/plugins/api.ts';
@@ -482,8 +480,8 @@ handling = skip
   assert.equal(nsDiagsTtl.length, 3, 'custom-lint independently flags unknown namespace TTL when unassisted');
 });
 
-test('zzmi-support plugin activates and registers allowed resource, code template, and diagnostic filter', () => {
-  const def = BUILTIN_PLUGINS.find((p) => p.manifest.id === 'zzmi-support')!;
+test('custom-lint incorporates zzmi support and help.ini built-in syntax', () => {
+  const def = BUILTIN_PLUGINS.find((p) => p.manifest.id === 'custom-lint')!;
   assert.ok(def);
   const plugin = def.createPlugin();
 
@@ -495,19 +493,34 @@ test('zzmi-support plugin activates and registers allowed resource, code templat
 
   const mockContext: any = {
     manifest: def.manifest,
+    logger: { info: () => {}, warn: () => {}, error: () => {} },
     linter: {
+      registerRule: () => () => {},
       registerAllowedResource: (pattern: any) => {
         allowedResources.push(pattern);
+        return () => {};
       },
       registerAllowedVariable: (pattern: any) => {
         allowedVars.push(pattern);
+        return () => {};
       },
-      registerAllowedUsedVariable: () => {},
-      registerAllowedUsedResource: () => {},
+      registerAllowedUsedVariable: (pattern: any) => {
+        allowedVars.push(pattern);
+        return () => {};
+      },
+      registerAllowedUsedResource: (pattern: any) => {
+        allowedResources.push(pattern);
+        return () => {};
+      },
       registerDiagnosticFilter: (filter: any) => {
         registeredFilters.push(filter);
         return () => {};
       },
+      registerDefinitionProvider: () => () => {},
+      registerReferenceProvider: () => () => {},
+    },
+    slots: {
+      registerTextureSlotResolver: () => () => {},
     },
     templates: {
       registerTemplate: (template: any) => {
@@ -525,12 +538,19 @@ test('zzmi-support plugin activates and registers allowed resource, code templat
   };
 
   plugin.activate(mockContext);
-  assert.ok(allowedResources.length >= 4);
-  assert.ok(allowedVars.length >= 1);
-  assert.ok(registeredTemplates.length >= 3);
-  assert.ok(registeredFilters.length >= 1, 'zzmi-support should register a diagnostic filter');
 
-  // Verify that the zzmi diagnostic filter suppresses TTL warnings from custom-lint
+  // 1. Verify ShaderFixes\help.ini built-in syntax is recognized
+  const checkResource = (name: string) => allowedResources.some((p) => (typeof p === 'function' ? p(name) : p instanceof RegExp ? p.test(name) : p.toLowerCase() === name.toLowerCase()));
+  const checkVar = (name: string) => allowedVars.some((p) => (typeof p === 'function' ? p(name) : p instanceof RegExp ? p.test(name) : p.toLowerCase() === name.toLowerCase()));
+
+  assert.ok(checkResource('CustomShader\\ShaderFixes\\help.ini\\FormatText'), 'help.ini FormatText must be allowed as built-in resource');
+  assert.ok(checkResource('Resource\\ShaderFixes\\help.ini\\Notification'), 'help.ini Notification must be allowed as built-in resource');
+  assert.ok(checkVar('\\ShaderFixes\\help.ini\\notification_timeout'), 'help.ini notification_timeout must be allowed as built-in variable');
+
+  // 2. Verify ZZMI features (templates, allowed resources, diagnostic filters)
+  assert.ok(registeredTemplates.length >= 3, 'custom-lint should register ZZMI templates');
+  assert.ok(registeredFilters.length >= 1, 'custom-lint should register ZZMI diagnostic filter');
+
   const filter = registeredFilters[0];
   const ttlDiag1 = { message: "모드 폴더 내에서 네임스페이스 'TTL'을(를) 찾을 수 없습니다. (해당 ini 파일에 'namespace = TTL' 선언이 있는지 확인하세요)", startLineNumber: 1 };
   const ttlDiag2 = { message: "선언되지 않은 변수 '$\\TTL\\alpha'입니다.", startLineNumber: 1 };
@@ -544,36 +564,23 @@ test('zzmi-support plugin activates and registers allowed resource, code templat
     },
   };
 
-  assert.equal(filter(ttlDiag1, mockCtx), false, 'TTL namespace warning should be corrected/suppressed by zzmi-support');
-  assert.equal(filter(ttlDiag2, mockCtx), false, 'TTL variable warning should be corrected/suppressed by zzmi-support');
+  assert.equal(filter(ttlDiag1, mockCtx), false, 'TTL namespace warning should be corrected/suppressed by zzmi filter');
+  assert.equal(filter(ttlDiag2, mockCtx), false, 'TTL variable warning should be corrected/suppressed by zzmi filter');
   assert.equal(filter(nonTtlDiag, mockCtx), true, 'Non-TTL diagnostic must be preserved');
+
   const templateIds = registeredTemplates.map((t) => t.id);
   assert.ok(templateIds.includes('zzmi_slot_fix'));
   assert.ok(templateIds.includes('zzmi_ttl_draw'));
   assert.ok(templateIds.includes('zzmi_ttl_texture'));
-
-  const slotFix = registeredTemplates.find((t) => t.id === 'zzmi_slot_fix')!;
-  assert.ok(slotFix.body.includes('CommandList\\ZZMI\\SetTextures'));
-  assert.ok(slotFix.body.includes('Resource\\ZZMI\\WEngineFX'));
-
-  const ttlDraw = registeredTemplates.find((t) => t.id === 'zzmi_ttl_draw')!;
-  assert.ok(ttlDraw.body.includes('CommandList\\TTL\\Draw'));
-  assert.ok(ttlDraw.body.includes('$\\TTL\\alpha'));
-
-  const ttlTexture = registeredTemplates.find((t) => t.id === 'zzmi_ttl_texture')!;
-  assert.ok(ttlTexture.body.includes('Resource\\TTL\\TransparencyTex'));
-  assert.ok(ttlTexture.body.includes('$\\TTL\\mask_channel'));
-
-  assert.equal(registeredView, null);
 });
 
-test('default-plugins directory contains all 5 standalone plugins ready for installation', async () => {
+test('default-plugins directory contains all 4 standalone plugins ready for installation', async () => {
   const fs = await import('node:fs');
   const path = await import('node:path');
   const url = await import('node:url');
   const { linkPluginModules } = await import('../src/plugins/module-linker.ts');
 
-  const defaultIds = ['custom-lint', 'zzmi-support', 'texture-library', 'python-runner', 'ai-assistant'];
+  const defaultIds = ['custom-lint', 'texture-library', 'python-runner', 'ai-assistant'];
   const baseDir = path.resolve(process.cwd(), 'default-plugins');
 
   for (const id of defaultIds) {
@@ -631,8 +638,9 @@ test('public/default-plugins contains web-compatible plugins and excludes python
   assert.ok(fs.existsSync(indexJson), 'index.json must exist');
   const indexList = JSON.parse(fs.readFileSync(indexJson, 'utf8'));
 
-  assert.deepEqual(indexList, ['custom-lint', 'zzmi-support', 'texture-library', 'ai-assistant']);
+  assert.deepEqual(indexList, ['custom-lint', 'texture-library', 'ai-assistant']);
   assert.equal(fs.existsSync(path.join(pubDir, 'python-runner')), false, 'python-runner must not exist in public/default-plugins');
+  assert.equal(fs.existsSync(path.join(pubDir, 'zzmi-support')), false, 'zzmi-support must not exist in public/default-plugins (merged into custom-lint)');
 
   for (const id of indexList) {
     assert.ok(fs.existsSync(path.join(pubDir, id, 'plugin.json')), `plugin.json must exist for ${id} in public/`);
@@ -2193,8 +2201,8 @@ test('PluginLifecycleEvent and subscription contracts work properly', () => {
 
   emit('activated', 'custom-lint', 'Custom Lint');
   emit('deactivated', 'custom-lint', 'Custom Lint');
-  emit('installed', 'zzmi-support', 'ZZMI Support');
-  emit('uninstalled', 'zzmi-support', 'ZZMI Support');
+  emit('installed', 'texture-library', 'Texture Library');
+  emit('uninstalled', 'texture-library', 'Texture Library');
 
   assert.equal(events.length, 4);
   assert.equal(events[0].action, 'activated');

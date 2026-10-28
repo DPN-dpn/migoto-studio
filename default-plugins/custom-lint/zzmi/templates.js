@@ -1,4 +1,4 @@
-//#region default-plugins/zzmi-support/templates.ts
+//#region default-plugins/custom-lint/zzmi/templates.ts
 var ZZMI_TEMPLATES = [
 	{
 		id: "zzmi_slot_fix",

@@ -3,6 +3,7 @@ import { parseIniExports, stripComments } from './parser.ts';
 import { buildWorkspaceIndex } from './indexer.ts';
 import { createDefinitionProvider, createReferenceProvider } from './providers.ts';
 import { isBuiltinResource } from '../builtin-syntax/matcher.ts';
+import { isHelpIniResource, isHelpIniVariable } from '../builtin-syntax/help-ini.ts';
 
 export interface NamespaceRegistrationState {
   unregisterAllowedVars: (() => void) | null;
@@ -241,6 +242,12 @@ export function registerNamespaceCheck(
               const varName = parts[parts.length - 1];
               const nsData = namespaceMap.get(nsName.toLowerCase());
 
+              // 빌트인 네임스페이스이거나 코어에서 허용된 변수인 경우 검사 제외
+              const isBuiltInNs = nsName.toLowerCase() === 'shaderfixes\\help.ini' || isHelpIniVariable(fullVar);
+              if (isBuiltInNs || (ctx.isAllowedVariable ? ctx.isAllowedVariable(fullVar) : false)) {
+                continue;
+              }
+
               if (!nsData) {
                 diagnostics.push({
                   severity: 'warning',
@@ -273,6 +280,7 @@ export function registerNamespaceCheck(
             const prefix = parts[0];
             const isBuiltIn =
               isBuiltinResource(target) ||
+              isHelpIniResource(target) ||
               prefix.toLowerCase().startsWith('builtin') ||
               (ctx.isAllowedResource ? ctx.isAllowedResource(target) : false);
 

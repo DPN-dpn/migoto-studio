@@ -1,4 +1,4 @@
-import type { PluginContext, TextureSlotResolver, TextureSlot, IniSection, IniDocument } from '../../src/plugins/types.ts';
+import type { PluginContext, TextureSlotResolver, TextureSlot, IniSection, IniDocument } from '../../../src/plugins/types.ts';
 
 export function registerZzmiRules(context: PluginContext): (() => void)[] {
   const cleanups: (() => void)[] = [];
@@ -194,4 +194,3 @@ export function createZzmiSlotResolver(): TextureSlotResolver {
     },
   };
 }
-

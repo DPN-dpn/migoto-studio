@@ -9,10 +9,55 @@ function isBuiltinResource(name) {
 	return norm.startsWith("builtincommandlist") || norm.startsWith("builtin_commandlist") || norm.startsWith("builtin\\") || norm.startsWith("commandlist\\builtin") || norm.startsWith("commandlist\\skintexture") || norm === "commandlistskintexture" || norm === "builtin";
 }
 //#endregion
+//#region default-plugins/custom-lint/builtin-syntax/help-ini.ts
+/**
+* help-ini.ts
+* XXMI 레거시 빌트인 구문(ShaderFixes\help.ini 네임스페이스)을 전담 지원합니다.
+*
+* 예시:
+* - pre run = CustomShader\ShaderFixes\help.ini\FormatText
+* - pre Resource\ShaderFixes\help.ini\Notification = ResourceCreditInfo
+* - pre $\ShaderFixes\help.ini\notification_timeout = time + 5.0
+*/
+var HELP_INI_RESOURCE_REGEX = /^(?:customshader|resource|commandlist)\\shaderfixes\\help\.ini\\/i;
+var HELP_INI_VARIABLE_REGEX = /^\\?shaderfixes\\help\.ini\\/i;
+function isHelpIniResource(name) {
+	if (!name) return false;
+	const clean = name.toLowerCase().replace(/^[\\\/]+/, "");
+	return HELP_INI_RESOURCE_REGEX.test(clean) || clean.startsWith("shaderfixes\\help.ini\\");
+}
+function isHelpIniVariable(name) {
+	if (!name) return false;
+	const clean = name.toLowerCase().replace(/^[\\\$]+/, "");
+	return HELP_INI_VARIABLE_REGEX.test(clean);
+}
+/**
+* ShaderFixes\help.ini 빌트인 리소스, 커맨드, 셰이더 및 변수를 에디터 린터에 허용 등록합니다.
+*/
+function registerHelpIniSyntax(context) {
+	const unregisterCallbacks = [];
+	if (context.linter?.registerAllowedResource) {
+		unregisterCallbacks.push(context.linter.registerAllowedResource(HELP_INI_RESOURCE_REGEX));
+		unregisterCallbacks.push(context.linter.registerAllowedResource((name) => isHelpIniResource(name)));
+	}
+	if (context.linter?.registerAllowedVariable) {
+		unregisterCallbacks.push(context.linter.registerAllowedVariable(HELP_INI_VARIABLE_REGEX));
+		unregisterCallbacks.push(context.linter.registerAllowedVariable((name) => isHelpIniVariable(name)));
+	}
+	if (context.linter?.registerAllowedUsedResource) {
+		unregisterCallbacks.push(context.linter.registerAllowedUsedResource(HELP_INI_RESOURCE_REGEX));
+		unregisterCallbacks.push(context.linter.registerAllowedUsedResource((name) => isHelpIniResource(name)));
+	}
+	if (context.linter?.registerAllowedUsedVariable) {
+		unregisterCallbacks.push(context.linter.registerAllowedUsedVariable(HELP_INI_VARIABLE_REGEX));
+		unregisterCallbacks.push(context.linter.registerAllowedUsedVariable((name) => isHelpIniVariable(name)));
+	}
+	return unregisterCallbacks;
+}
+//#endregion
 //#region default-plugins/custom-lint/builtin-syntax/index.ts
 /**
-* XXMI 표준 내장 커맨드리스트 및 함수 문법을 에디터 린터에 허용 등록합니다.
-* (BuiltinCommandList~, CommandListSkinTexture 등)
+* XXMI 표준 내장 커맨드리스트, 함수 및 레거시 빌트인 구문(ShaderFixes\help.ini 등)을 에디터 린터에 허용 등록합니다.
 */
 function registerBuiltinSyntax(context) {
 	const unregisterCallbacks = [];
@@ -28,6 +73,7 @@ function registerBuiltinSyntax(context) {
 	];
 	if (context.linter?.registerAllowedResource) for (const pat of patterns) unregisterCallbacks.push(context.linter.registerAllowedResource(pat));
 	if (context.linter?.registerAllowedUsedResource) for (const pat of patterns) unregisterCallbacks.push(context.linter.registerAllowedUsedResource(pat));
+	unregisterCallbacks.push(...registerHelpIniSyntax(context));
 	return unregisterCallbacks;
 }
 //#endregion
@@ -828,6 +874,7 @@ function registerNamespaceCheck(context, isActive, state) {
 							const nsName = parts.slice(0, -1).join("\\");
 							const varName = parts[parts.length - 1];
 							const nsData = namespaceMap.get(nsName.toLowerCase());
+							if (nsName.toLowerCase() === "shaderfixes\\help.ini" || isHelpIniVariable(fullVar) || (ctx.isAllowedVariable ? ctx.isAllowedVariable(fullVar) : false)) continue;
 							if (!nsData) diagnostics.push({
 								severity: "warning",
 								message: `모드 폴더 내에서 네임스페이스 '${nsName}'을(를) 찾을 수 없습니다. (해당 ini 파일에 'namespace = ${nsName}' 선언이 있는지 확인하세요)`,
@@ -853,7 +900,7 @@ function registerNamespaceCheck(context, isActive, state) {
 					if (target.includes("\\")) {
 						const parts = target.split("\\").filter(Boolean);
 						const prefix = parts[0];
-						if (!(isBuiltinResource(target) || prefix.toLowerCase().startsWith("builtin") || (ctx.isAllowedResource ? ctx.isAllowedResource(target) : false)) && parts.length >= 3) {
+						if (!(isBuiltinResource(target) || isHelpIniResource(target) || prefix.toLowerCase().startsWith("builtin") || (ctx.isAllowedResource ? ctx.isAllowedResource(target) : false)) && parts.length >= 3) {
 							const nsName = parts.slice(1, -1).join("\\");
 							const actionName = parts[parts.length - 1];
 							const nsData = namespaceMap.get(nsName.toLowerCase());
@@ -896,18 +943,222 @@ function registerNamespaceCheck(context, isActive, state) {
 	else if (context.linter?.registerReferenceProvider) state.unregisterRefProvider = context.linter.registerReferenceProvider(referenceProvider);
 }
 //#endregion
+//#region default-plugins/custom-lint/zzmi/rules.ts
+function registerZzmiRules(context) {
+	const cleanups = [];
+	if (context.linter?.registerAllowedResource) {
+		cleanups.push(context.linter.registerAllowedResource(/^commandlist\\zzmi\\/i));
+		cleanups.push(context.linter.registerAllowedResource(/^resource\\zzmi\\/i));
+		cleanups.push(context.linter.registerAllowedResource("CommandList\\ZZMI\\SetTextures"));
+		cleanups.push(context.linter.registerAllowedResource("CommandListSkinTexture"));
+		cleanups.push(context.linter.registerAllowedResource(/^commandlist\\ttl\\/i));
+		cleanups.push(context.linter.registerAllowedResource(/^resource\\ttl\\/i));
+		cleanups.push(context.linter.registerAllowedResource("CommandList\\TTL\\Draw"));
+		cleanups.push(context.linter.registerAllowedResource("Resource\\TTL\\TransparencyTex"));
+	}
+	if (context.linter?.registerAllowedVariable) {
+		cleanups.push(context.linter.registerAllowedVariable((name) => {
+			return name.toLowerCase().replace(/^[\\$]+/, "").startsWith("ttl\\");
+		}));
+		cleanups.push(context.linter.registerAllowedVariable(/^\\?ttl\\/i));
+	}
+	if (context.linter?.registerAllowedUsedVariable) cleanups.push(context.linter.registerAllowedUsedVariable((name) => {
+		return name.toLowerCase().replace(/^[\\$]+/, "").startsWith("ttl\\");
+	}));
+	if (context.linter?.registerAllowedUsedResource) {
+		cleanups.push(context.linter.registerAllowedUsedResource(/^resource\\ttl\\/i));
+		cleanups.push(context.linter.registerAllowedUsedResource(/^commandlist\\ttl\\/i));
+	}
+	if (context.linter?.registerDiagnosticFilter) cleanups.push(context.linter.registerDiagnosticFilter((diag, ctx) => {
+		const msg = diag.message || "";
+		if (msg.includes("'TTL'") || msg.includes("'ttl'")) return false;
+		if (/\bttl[\\_]/i.test(msg) || /\$?\\?ttl\\/i.test(msg)) return false;
+		if (ctx?.model && diag.startLineNumber) {
+			const lineContent = ctx.model.getLineContent(diag.startLineNumber) || "";
+			if (/\\?TTL\\/i.test(lineContent) && /ttl/i.test(msg)) return false;
+		}
+		return true;
+	}));
+	if (context.slots?.registerTextureSlotResolver) cleanups.push(context.slots.registerTextureSlotResolver(createZzmiSlotResolver()));
+	return cleanups;
+}
+/**
+* ZZMI 슬롯픽스(SlotFix) 및 TTL 구문을 해석하는 텍스처 슬롯 리졸버 생성
+*/
+function createZzmiSlotResolver() {
+	return {
+		id: "zzmi-slotfix",
+		name: "ZZMI 슬롯픽스 리졸버 (SlotFix & TTL)",
+		priority: 10,
+		resolveSlots: (section, doc, allDocs) => {
+			const slots = [];
+			const props = section.properties;
+			const resolveFilename = (resName) => {
+				const clean = resName.replace(/^[\\$]+/, "").replace(/^ref\s+/i, "").trim();
+				const candidates = [
+					clean,
+					`Resource${clean}`,
+					`Resource\\${clean}`
+				];
+				for (const name of candidates) {
+					const sec = doc.getSection(name);
+					if (sec && sec.properties["filename"]) {
+						const fn = sec.properties["filename"].replace(/['"]/g, "").trim();
+						if (/\.(dds|png|tga|jpg|jpeg|webp|bmp)$/i.test(fn)) return fn;
+					}
+				}
+				if (allDocs) for (const otherDoc of allDocs.values()) for (const name of candidates) {
+					const sec = otherDoc.getSection(name);
+					if (sec && sec.properties["filename"]) {
+						const fn = sec.properties["filename"].replace(/['"]/g, "").trim();
+						if (/\.(dds|png|tga|jpg|jpeg|webp|bmp)$/i.test(fn)) return fn;
+					}
+				}
+			};
+			const checkProperties = (pRecord, srcSec) => {
+				for (const [key, rawVal] of Object.entries(pRecord)) {
+					const cleanKey = key.trim();
+					const cleanVal = rawVal.replace(/^ref\s+/i, "").trim();
+					const zzmiMatch = cleanKey.match(/^Resource\\ZZMI\\(.+)$/i);
+					if (zzmiMatch) {
+						const slotName = zzmiMatch[1].trim();
+						const lowerSlot = slotName.toLowerCase();
+						let slotType = "custom";
+						let displaySlotName = slotName;
+						if (lowerSlot.includes("diffuse")) {
+							slotType = "diffuse";
+							displaySlotName = "Diffuse";
+						} else if (lowerSlot.includes("normal")) {
+							slotType = "normal";
+							displaySlotName = "NormalMap";
+						} else if (lowerSlot.includes("light")) {
+							slotType = "light";
+							displaySlotName = "LightMap";
+						} else if (lowerSlot.includes("material")) {
+							slotType = "material";
+							displaySlotName = "MaterialMap";
+						} else if (lowerSlot.includes("fx") || lowerSlot.includes("wengine")) {
+							slotType = "fx";
+							displaySlotName = "WEngineFX";
+						}
+						slots.push({
+							slotId: `ZZMI\\${displaySlotName}`,
+							slotType,
+							resourceRef: cleanVal,
+							textureFile: resolveFilename(cleanVal),
+							sourceSection: srcSec,
+							rawLine: `${key} = ${rawVal}`
+						});
+						continue;
+					}
+					const ttlMatch = cleanKey.match(/^Resource\\TTL\\(.+)$/i);
+					if (ttlMatch) {
+						const slotName = ttlMatch[1].trim();
+						const lowerTtl = slotName.toLowerCase();
+						let displayTtl = slotName;
+						if (lowerTtl.includes("transparency")) displayTtl = "TransparencyTex";
+						slots.push({
+							slotId: `TTL\\${displayTtl}`,
+							slotType: "custom",
+							resourceRef: cleanVal,
+							textureFile: resolveFilename(cleanVal),
+							sourceSection: srcSec,
+							rawLine: `${key} = ${rawVal}`
+						});
+						continue;
+					}
+				}
+			};
+			checkProperties(props, section.name);
+			if (props["run"]) {
+				const cmdName = props["run"].trim();
+				const cmdSec = doc.getSection(cmdName) || (allDocs ? (() => {
+					for (const otherDoc of allDocs.values()) {
+						const s = otherDoc.getSection(cmdName);
+						if (s) return s;
+					}
+				})() : void 0);
+				if (cmdSec) checkProperties(cmdSec.properties, cmdSec.name);
+			}
+			return slots.length > 0 ? slots : null;
+		}
+	};
+}
+//#endregion
+//#region default-plugins/custom-lint/zzmi/templates.ts
+var ZZMI_TEMPLATES = [
+	{
+		id: "zzmi_slot_fix",
+		group: "ZZMI (젠레스 존 제로)",
+		label: "ZZMI 텍스처 슬롯픽스 (SlotFix)",
+		description: "ZZMI 텍스처 슬롯 매핑 및 WEngineFX 이펙트 슬롯 구문",
+		body: [
+			"; ZZMI SlotFix (Texture Slot Mapping)",
+			"Resource\\ZZMI\\Diffuse = ref Resource${1:Diffuse}",
+			"Resource\\ZZMI\\NormalMap = ref Resource${2:NormalMap}",
+			"Resource\\ZZMI\\LightMap = ref Resource${3:LightMap}",
+			"Resource\\ZZMI\\MaterialMap = ref Resource${4:MaterialMap}",
+			"Resource\\ZZMI\\WEngineFX = ref Resource${5:WEngineFX}",
+			"run = CommandList\\ZZMI\\SetTextures"
+		].join("\n") + "\n"
+	},
+	{
+		id: "zzmi_ttl_draw",
+		group: "ZZMI (젠레스 존 제로)",
+		label: "ZZMI TTL 투명도 드로우 (단일 투명도)",
+		description: "Transparency Texture Lib (TTL) 단일 알파 투명도 렌더링 구문 (No Texture)",
+		body: [
+			"; ZZMI TTL (Transparency Texture Lib - Uniform Alpha)",
+			"$\\TTL\\alpha = ${1:0.5}",
+			"$\\TTL\\_1 = ${2:IndexCount}",
+			"$\\TTL\\_2 = ${3:FirstIndex}",
+			"run = CommandList\\TTL\\Draw"
+		].join("\n") + "\n"
+	},
+	{
+		id: "zzmi_ttl_texture",
+		group: "ZZMI (젠레스 존 제로)",
+		label: "ZZMI TTL 텍스처 마스크 투명도 (Texture Mask)",
+		description: "Transparency Texture Lib (TTL) 텍스처 마스크 및 채널 기반 투명도 렌더링 구문",
+		body: [
+			"; ZZMI TTL (Transparency Texture Lib - Texture Mask)",
+			"Resource\\TTL\\TransparencyTex = ref Resource${1:Transparency}",
+			"$\\TTL\\_1 = ${2:IndexCount}",
+			"$\\TTL\\_2 = ${3:FirstIndex}",
+			"$\\TTL\\mask_channel = ${4:3}",
+			"$\\TTL\\mask_invert = ${5:0}",
+			"run = CommandList\\TTL\\Draw"
+		].join("\n") + "\n"
+	}
+];
+//#endregion
+//#region default-plugins/custom-lint/zzmi/index.ts
+/**
+* ZZMI (젠레스 존 제로) 및 TTL (Transparency Texture Lib) 지원 기능을 등록합니다.
+* (슬롯픽스 리졸버, 리소스/변수 허용, 진단 필터, 템플릿 등)
+*/
+function registerZzmiSupport(context) {
+	const cleanups = [];
+	cleanups.push(...registerZzmiRules(context));
+	context.logger?.info(`ZZMI 모딩 지원 활성화 (슬롯픽스 템플릿 ${ZZMI_TEMPLATES.length}개 등록)`);
+	if (context.templates?.registerTemplate) for (const tpl of ZZMI_TEMPLATES) context.templates.registerTemplate(tpl);
+	return cleanups;
+}
+//#endregion
 //#region default-plugins/custom-lint/index.ts
 var isPluginActive = false;
 var unregisterBuiltinList = [];
 var unregisterFileCheck = void 0;
+var unregisterZzmiList = [];
 var namespaceState = createNamespaceRegistrationState();
 var plugin = {
 	activate(context) {
 		isPluginActive = true;
-		context.logger?.info("커스텀 린터 (내장문법 / 파일실재성 / 네임스페이스) 활성화됨");
+		context.logger?.info("커스텀 린터 (내장문법 / 파일실재성 / 네임스페이스 / ZZMI지원) 활성화됨");
 		unregisterBuiltinList = registerBuiltinSyntax(context);
 		unregisterFileCheck = registerFileCheckRule(context);
 		registerNamespaceCheck(context, () => isPluginActive, namespaceState);
+		unregisterZzmiList = registerZzmiSupport(context);
 	},
 	deactivate() {
 		isPluginActive = false;
@@ -924,7 +1175,13 @@ var plugin = {
 			unregisterFileCheck = void 0;
 		}
 		cleanupNamespaceState(namespaceState);
+		if (unregisterZzmiList.length > 0) {
+			for (const cleanup of unregisterZzmiList) try {
+				cleanup();
+			} catch {}
+			unregisterZzmiList = [];
+		}
 	}
 };
 //#endregion
-export { buildWorkspaceIndex, collectIniFiles, plugin as default, isBuiltinResource, parseIniExports, readIniText };
+export { ZZMI_TEMPLATES, buildWorkspaceIndex, collectIniFiles, createZzmiSlotResolver, plugin as default, isBuiltinResource, isHelpIniResource, isHelpIniVariable, parseIniExports, readIniText, registerZzmiRules };

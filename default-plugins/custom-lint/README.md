@@ -15,13 +15,18 @@
 2. **모드 리소스 파일 실재성 검사**
    - 모드 폴더를 열고 `.ini` 파일을 작성할 때, `filename = Textures/Diffuse.dds` 등 대상 파일이 실제로 존재하지 않으면 에디터에 즉시 경고를 표시합니다.
 
-3. **XXMI 공통 표준 내장 함수 지원**
-   - `BuiltinCommandList...` 및 `CommandListSkinTexture` 등 XXMI 공통 엔진 내장 커맨드리스트 호출 시 미정의 섹션 오류 없이 정상 구문으로 인식합니다.
+4. **XXMI 빌트인 ShaderFixes\help.ini 레거시 지원**
+   - `CustomShader\ShaderFixes\help.ini\FormatText`, `Resource\ShaderFixes\help.ini\...`, `$\ShaderFixes\help.ini\notification_timeout` 등 XXMI 엔진 내장 help.ini 구문을 정상 구문으로 인식합니다.
+
+5. **ZZMI (젠레스 존 제로) 및 TTL 지원**
+   - `CommandList\ZZMI\SetTextures`, `Resource\ZZMI\...` 슬롯픽스 구문 및 `TTL` (Transparency Texture Lib) 투명도 문법 인식
+   - 텍스처 슬롯픽스(SlotFix) 리졸버 및 코드 템플릿(스니펫) 자동 등록
 
 ## 코드 구조 (모듈화)
 
-- `builtin-syntax/`: XXMI 내장 커맨드리스트 및 함수 문법 허용 등록 (`isBuiltinResource`, `registerBuiltinSyntax`)
+- `builtin-syntax/`: XXMI 내장 커맨드리스트, 함수 및 ShaderFixes\help.ini 빌트인 구문 허용 (`matcher.ts`, `help-ini.ts`, `registerBuiltinSyntax`)
 - `file-check/`: 모드 리소스 파일 실재성 검사 (`missing-resource-files`, `registerFileCheckRule`)
 - `namespace-check/`: XXMI 네임스페이스 및 변수 유효성 검사, 크로스 파일 심볼 인덱싱 및 정의/참조 Provider (`xxmi-namespace-check`, `parser`, `indexer`, `providers`)
+- `zzmi/`: ZZMI 텍스처 슬롯픽스 템플릿/리졸버 및 TTL 지원 (`rules`, `templates`, `registerZzmiSupport`)
 
 

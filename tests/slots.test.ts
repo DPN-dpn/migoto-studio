@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { parseIni } from '../src/core/ini/ini.ts';
 import { detectPartFromSectionName, discoverModParts, standard3DMigotoResolver, findResourceFilename } from '../src/core/slots/resolver.ts';
 import { SlotManager } from '../src/core/slots/slot-manager.ts';
-import { createZzmiSlotResolver } from '../default-plugins/zzmi-support/rules.ts';
+import { createZzmiSlotResolver } from '../default-plugins/custom-lint/zzmi/rules.ts';
 
 test('detectPartFromSectionName correctly extracts modder part names without forcing fixed categories', () => {
   assert.equal(detectPartFromSectionName('TextureOverrideRoxyHead'), 'Head');
