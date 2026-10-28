@@ -248,4 +248,24 @@
 - **플러그인 간 API 공유 (`context.plugins`)**:
   - `registerApi(api)` 및 `activate()` 반환값을 통해 공개 API를 등록하고, `getPluginApi(id)`로 다른 플러그인이 안전하게 공유받아 사용할 수 있습니다.
 
+## 코어 린터 모듈화 및 범용 구문 이관 (`src/core/lint/`)
+
+- **배경 및 목적**:
+  - 기존에는 범용 XXMI 내장 구문, `ShaderFixes\help.ini` 레거시 구문, 리소스 파일 실재성 검사, 워크스페이스 네임스페이스 인덱싱/진단 및 심볼 이동 기능이 `custom-lint` 플러그인에 위치해 있어, 플러그인을 끄거나 제거했을 때 코어 에디터의 필수 분석 기능이 누락되는 "코어 탈종속화" 원칙 위배 문제가 있었습니다.
+  - 또한 기존 코어 린터 파일(`src/core/ini/lint.ts`)이 600줄 이상의 단일 파일로 작성되어 있어 유지보수성과 확장성이 저하되었습니다.
+- **아키텍처 개선 (`src/core/lint/`)**:
+  - **코어로의 범용 기능 완전 이관**: XXMI 내장 구문(`CommandListSkinTexture` 등), `ShaderFixes\help.ini`, 리소스 파일(`filename = ...`) 실재성 검사, 워크스페이스 네임스페이스 인덱싱 및 크로스 파일 심볼 점프(F12 / Shift+F12)를 코어 네이티브 기능으로 승격했습니다. 모든 플러그인이 비활성화되어도 코어 에디터는 다중 파일 모드를 완벽히 분석합니다.
+  - **기능별 전용 디렉터리 모듈화**:
+    - `builtin-syntax/`: XXMI 표준 내장 커맨드리스트 및 `help.ini` 매칭 로직
+    - `file-check/`: 리소스 파일 실재성 비동기 검사
+    - `namespace-check/`: 네임스페이스 파싱, 인덱싱, 진단, 정의/참조 제공자
+    - `rules/`: 인용부호(`quotes`), 섹션(`sections`), 조건문 블록(`conditions`), 변수(`variables`), 리소스(`resources`) 단위의 독립 규칙 모듈
+    - `registry.ts`: 동적 허용 리소스/변수 등록 레지스트리
+    - `engine.ts`: 단일 텍스트 모델 오케스트레이터 (`lintModel`)
+    - `index.ts`: 통합 엔트리포인트
+  - **하위 호환성 유지**: 기존 `src/core/ini/lint.ts`, `src/core/ini/builtin-syntax.ts`, `src/core/workspace/file-check.ts`, `src/core/workspace/namespace/`는 모듈화된 `src/core/lint/`를 투명하게 re-export하도록 구성하여 기존 코드 및 단위 테스트 호환성을 100% 보장합니다.
+- **플러그인의 역할 재정립 (`custom-lint` v2.0.0)**:
+  - `custom-lint` 플러그인은 특정 게임/툴에 종속된 전용 모딩 기능(ZZMI 텍스처 슬롯픽스 리졸버, WEngineFX/TTL 템플릿, SRMI `vertex_count` 문법)만 포함하도록 슬림화되어, 서드파티 플러그인 개발자를 위한 모범적인 공식 확장 예제(Reference Implementation)로 운영됩니다.
+
+
 
