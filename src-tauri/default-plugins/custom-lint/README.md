@@ -18,3 +18,10 @@
 3. **XXMI 공통 표준 내장 함수 지원**
    - `BuiltinCommandList...` 및 `CommandListSkinTexture` 등 XXMI 공통 엔진 내장 커맨드리스트 호출 시 미정의 섹션 오류 없이 정상 구문으로 인식합니다.
 
+## 코드 구조 (모듈화)
+
+- `builtin-syntax/`: XXMI 내장 커맨드리스트 및 함수 문법 허용 등록 (`isBuiltinResource`, `registerBuiltinSyntax`)
+- `file-check/`: 모드 리소스 파일 실재성 검사 (`missing-resource-files`, `registerFileCheckRule`)
+- `namespace-check/`: XXMI 네임스페이스 및 변수 유효성 검사, 크로스 파일 심볼 인덱싱 및 정의/참조 Provider (`xxmi-namespace-check`, `parser`, `indexer`, `providers`)
+
+

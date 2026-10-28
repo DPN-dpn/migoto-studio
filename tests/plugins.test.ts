@@ -598,13 +598,20 @@ test('default-plugins directory contains all 5 standalone plugins ready for inst
 
     // Verify modular multi-file linking works on desktop distribution
     const pluginDir = path.join(process.cwd(), 'src-tauri/default-plugins', id);
-    const diskFiles = fs.readdirSync(pluginDir);
     const filesMap: Record<string, string> = {};
-    for (const f of diskFiles) {
-      if (f.endsWith('.js') || f.endsWith('.json')) {
-        filesMap[f] = fs.readFileSync(path.join(pluginDir, f), 'utf8');
+    const collectFiles = (dir: string, prefix = '') => {
+      const entries = fs.readdirSync(dir, { withFileTypes: true });
+      for (const entry of entries) {
+        const rel = prefix ? `${prefix}/${entry.name}` : entry.name;
+        const full = path.join(dir, entry.name);
+        if (entry.isDirectory()) {
+          collectFiles(full, rel);
+        } else if (entry.isFile() && (entry.name.endsWith('.js') || entry.name.endsWith('.json'))) {
+          filesMap[rel] = fs.readFileSync(full, 'utf8');
+        }
       }
-    }
+    };
+    collectFiles(pluginDir);
     const linked = linkPluginModules(filesMap['index.js'], 'index.js', filesMap);
     const modularMod = await import(linked.entryUrl);
     const modularPlugin = modularMod.default || modularMod;

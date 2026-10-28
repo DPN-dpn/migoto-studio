@@ -1,4 +1,92 @@
-//#region default-plugins/custom-lint/parser.ts
+//#region default-plugins/custom-lint/builtin-syntax/matcher.ts
+/**
+* matcher.ts
+* GIMI / ZZMI / XXMI 내장 리소스 및 내장 커맨드리스트 여부를 판별합니다.
+*/
+function isBuiltinResource(name) {
+	if (!name) return false;
+	const norm = name.toLowerCase().replace(/^[\\\/]+/, "");
+	return norm.startsWith("builtincommandlist") || norm.startsWith("builtin_commandlist") || norm.startsWith("builtin\\") || norm.startsWith("commandlist\\builtin") || norm.startsWith("commandlist\\skintexture") || norm === "commandlistskintexture" || norm === "builtin";
+}
+//#endregion
+//#region default-plugins/custom-lint/builtin-syntax/index.ts
+/**
+* XXMI 표준 내장 커맨드리스트 및 함수 문법을 에디터 린터에 허용 등록합니다.
+* (BuiltinCommandList~, CommandListSkinTexture 등)
+*/
+function registerBuiltinSyntax(context) {
+	const unregisterCallbacks = [];
+	const patterns = [
+		(name) => isBuiltinResource(name),
+		/^builtincommandlist/i,
+		"CommandListSkinTexture",
+		/^(?:builtin\\)?commandlistskintexture$/i,
+		/^commandlist\\(?:builtin\\)?skintexture$/i,
+		/^builtin\\skintexture$/i,
+		/^(?:commandlist\\)?builtin\\/i,
+		/^builtin\\/i
+	];
+	if (context.linter?.registerAllowedResource) for (const pat of patterns) unregisterCallbacks.push(context.linter.registerAllowedResource(pat));
+	if (context.linter?.registerAllowedUsedResource) for (const pat of patterns) unregisterCallbacks.push(context.linter.registerAllowedUsedResource(pat));
+	return unregisterCallbacks;
+}
+//#endregion
+//#region default-plugins/custom-lint/file-check/index.ts
+/**
+* 주석을 제거하고 유효 코드 문자열을 반환합니다.
+*/
+function stripComments$1(line) {
+	let inQuote = null;
+	for (let i = 0; i < line.length; i++) {
+		const ch = line[i];
+		if (inQuote) {
+			if (ch === inQuote) inQuote = null;
+		} else if (ch === "\"" || ch === "'") inQuote = ch;
+		else if (ch === ";" || ch === "/" && line[i + 1] === "/") return line.slice(0, i);
+	}
+	return line;
+}
+/**
+* 모드 리소스 파일 실재성 검사 규칙을 등록합니다.
+* filename = ... 구문에서 지정된 파일이 모드 폴더 내에 실제로 존재하는지 검사합니다.
+*/
+function registerFileCheckRule(context) {
+	return context.linter.registerRule({
+		id: "missing-resource-files",
+		name: "모드 리소스 파일 실재성 검사",
+		check: async (ctx) => {
+			if (!ctx.folder) return [];
+			const diagnostics = [];
+			const count = ctx.model.getLineCount();
+			for (let line = 1; line <= count; line++) {
+				const raw = ctx.model.getLineContent(line);
+				const code = stripComments$1(raw);
+				if (!code.trim()) continue;
+				const match = /^\s*filename\s*=\s*(.+)$/i.exec(code);
+				if (!match) continue;
+				let target = match[1].trim();
+				if (target.startsWith("\"") && target.endsWith("\"") || target.startsWith("'") && target.endsWith("'")) target = target.slice(1, -1).trim();
+				if (!target) continue;
+				if (!await ctx.fileExists(target)) {
+					const rawIdx = raw.indexOf(match[1]);
+					const startCol = rawIdx !== -1 ? rawIdx + 1 : 1;
+					const endCol = startCol + match[1].length;
+					diagnostics.push({
+						severity: "warning",
+						message: `참조된 파일 "${target}"을(를) 모드 폴더에서 찾을 수 없습니다. (파일명 및 확장자 확인 필요)`,
+						startLineNumber: line,
+						startColumn: startCol,
+						endLineNumber: line,
+						endColumn: endCol
+					});
+				}
+			}
+			return diagnostics;
+		}
+	});
+}
+//#endregion
+//#region default-plugins/custom-lint/namespace-check/parser.ts
 function stripComments(line) {
 	let inQuote = null;
 	for (let i = 0; i < line.length; i++) {
@@ -15,11 +103,6 @@ function stripComments(line) {
 		code: line,
 		commentIndex: line.length
 	};
-}
-function isBuiltinResource(name) {
-	if (!name) return false;
-	const norm = name.toLowerCase().replace(/^[\\\/]+/, "");
-	return norm.startsWith("builtincommandlist") || norm.startsWith("builtin_commandlist") || norm.startsWith("builtin\\") || norm.startsWith("commandlist\\builtin") || norm.startsWith("commandlist\\skintexture") || norm === "commandlistskintexture" || norm === "builtin";
 }
 function parseIniExports(text, filePath) {
 	const lines = text.split(/\r?\n/);
@@ -361,7 +444,7 @@ function parseIniExports(text, filePath) {
 	};
 }
 //#endregion
-//#region default-plugins/custom-lint/indexer.ts
+//#region default-plugins/custom-lint/namespace-check/indexer.ts
 /**
 * 모드 워크스페이스 내 모든 INI/3dm/migoto 파일 경로를 수집합니다.
 */
@@ -442,7 +525,7 @@ async function buildWorkspaceIndex(ctx, context) {
 	};
 }
 //#endregion
-//#region default-plugins/custom-lint/providers.ts
+//#region default-plugins/custom-lint/namespace-check/providers.ts
 function matchesSymbol(target, rec) {
 	const targetNameClean = (target.cleanName || target.name || "").replace(/^[\[\]\$]+|[\[\]\$]+$/g, "").toLowerCase();
 	const targetBase = targetNameClean.includes("\\") ? targetNameClean.split("\\").pop() || targetNameClean : targetNameClean;
@@ -580,41 +663,59 @@ function createReferenceProvider(context, isActive) {
 	} };
 }
 //#endregion
-//#region default-plugins/custom-lint/rules.ts
-function registerLintRules(context, isActive, state) {
-	context.linter.registerRule({
-		id: "missing-resource-files",
-		name: "모드 리소스 파일 실재성 검사",
-		check: async (ctx) => {
-			if (!ctx.folder) return [];
-			const diagnostics = [];
-			const count = ctx.model.getLineCount();
-			for (let line = 1; line <= count; line++) {
-				const raw = ctx.model.getLineContent(line);
-				const { code } = stripComments(raw);
-				if (!code.trim()) continue;
-				const match = /^\s*filename\s*=\s*(.+)$/i.exec(code);
-				if (!match) continue;
-				let target = match[1].trim();
-				if (target.startsWith("\"") && target.endsWith("\"") || target.startsWith("'") && target.endsWith("'")) target = target.slice(1, -1).trim();
-				if (!target) continue;
-				if (!await ctx.fileExists(target)) {
-					const rawIdx = raw.indexOf(match[1]);
-					const startCol = rawIdx !== -1 ? rawIdx + 1 : 1;
-					const endCol = startCol + match[1].length;
-					diagnostics.push({
-						severity: "warning",
-						message: `참조된 파일 "${target}"을(를) 모드 폴더에서 찾을 수 없습니다. (파일명 및 확장자 확인 필요)`,
-						startLineNumber: line,
-						startColumn: startCol,
-						endLineNumber: line,
-						endColumn: endCol
-					});
-				}
-			}
-			return diagnostics;
-		}
-	});
+//#region default-plugins/custom-lint/namespace-check/index.ts
+function createNamespaceRegistrationState() {
+	return {
+		unregisterAllowedVars: null,
+		unregisterAllowedGroupResources: null,
+		unregisterAllowedUsedVars: null,
+		unregisterAllowedUsedResources: null,
+		unregisterDefProvider: null,
+		unregisterRefProvider: null
+	};
+}
+function cleanupNamespaceState(state) {
+	if (state.unregisterAllowedVars) {
+		try {
+			state.unregisterAllowedVars();
+		} catch {}
+		state.unregisterAllowedVars = null;
+	}
+	if (state.unregisterAllowedGroupResources) {
+		try {
+			state.unregisterAllowedGroupResources();
+		} catch {}
+		state.unregisterAllowedGroupResources = null;
+	}
+	if (state.unregisterAllowedUsedVars) {
+		try {
+			state.unregisterAllowedUsedVars();
+		} catch {}
+		state.unregisterAllowedUsedVars = null;
+	}
+	if (state.unregisterAllowedUsedResources) {
+		try {
+			state.unregisterAllowedUsedResources();
+		} catch {}
+		state.unregisterAllowedUsedResources = null;
+	}
+	if (state.unregisterDefProvider) {
+		try {
+			state.unregisterDefProvider();
+		} catch {}
+		state.unregisterDefProvider = null;
+	}
+	if (state.unregisterRefProvider) {
+		try {
+			state.unregisterRefProvider();
+		} catch {}
+		state.unregisterRefProvider = null;
+	}
+}
+/**
+* XXMI 네임스페이스 및 변수 유효성 검사 린트 규칙과 정의/참조 Provider를 등록합니다.
+*/
+function registerNamespaceCheck(context, isActive, state) {
 	context.linter.registerRule({
 		id: "xxmi-namespace-check",
 		name: "XXMI 네임스페이스 및 변수 검사",
@@ -787,85 +888,42 @@ function registerLintRules(context, isActive, state) {
 			return diagnostics;
 		}
 	});
+	const definitionProvider = createDefinitionProvider(context, isActive);
+	if (context.editor?.registerDefinitionProvider) state.unregisterDefProvider = context.editor.registerDefinitionProvider(definitionProvider);
+	else if (context.linter?.registerDefinitionProvider) state.unregisterDefProvider = context.linter.registerDefinitionProvider(definitionProvider);
+	const referenceProvider = createReferenceProvider(context, isActive);
+	if (context.editor?.registerReferenceProvider) state.unregisterRefProvider = context.editor.registerReferenceProvider(referenceProvider);
+	else if (context.linter?.registerReferenceProvider) state.unregisterRefProvider = context.linter.registerReferenceProvider(referenceProvider);
 }
 //#endregion
 //#region default-plugins/custom-lint/index.ts
 var isPluginActive = false;
-var unregisterBuiltinResources = [];
-var dynamicState = {
-	unregisterAllowedVars: null,
-	unregisterAllowedGroupResources: null,
-	unregisterAllowedUsedVars: null,
-	unregisterAllowedUsedResources: null
-};
-var unregisterDefProvider = null;
-var unregisterRefProvider = null;
+var unregisterBuiltinList = [];
+var unregisterFileCheck = void 0;
+var namespaceState = createNamespaceRegistrationState();
 var plugin = {
 	activate(context) {
 		isPluginActive = true;
-		context.logger?.info("커스텀 린터 및 크로스 파일 심볼 추적기 활성화됨");
-		if (context.linter?.registerAllowedResource) {
-			const u1 = context.linter.registerAllowedResource((name) => isBuiltinResource(name));
-			const u2 = context.linter.registerAllowedResource(/^builtincommandlist/i);
-			const u3 = context.linter.registerAllowedResource("CommandListSkinTexture");
-			const u4 = context.linter.registerAllowedResource(/^(?:builtin\\)?commandlistskintexture$/i);
-			const u5 = context.linter.registerAllowedResource(/^commandlist\\(?:builtin\\)?skintexture$/i);
-			const u6 = context.linter.registerAllowedResource(/^builtin\\skintexture$/i);
-			const u7 = context.linter.registerAllowedResource(/^(?:commandlist\\)?builtin\\/i);
-			const u8 = context.linter.registerAllowedResource(/^builtin\\/i);
-			unregisterBuiltinResources.push(u1, u2, u3, u4, u5, u6, u7, u8);
-		}
-		if (context.linter?.registerAllowedUsedResource) {
-			const u1 = context.linter.registerAllowedUsedResource((name) => isBuiltinResource(name));
-			const u2 = context.linter.registerAllowedUsedResource(/^builtincommandlist/i);
-			const u3 = context.linter.registerAllowedUsedResource("CommandListSkinTexture");
-			const u4 = context.linter.registerAllowedUsedResource(/^(?:builtin\\)?commandlistskintexture$/i);
-			const u5 = context.linter.registerAllowedUsedResource(/^commandlist\\(?:builtin\\)?skintexture$/i);
-			const u6 = context.linter.registerAllowedUsedResource(/^builtin\\skintexture$/i);
-			const u7 = context.linter.registerAllowedUsedResource(/^(?:commandlist\\)?builtin\\/i);
-			const u8 = context.linter.registerAllowedUsedResource(/^builtin\\/i);
-			unregisterBuiltinResources.push(u1, u2, u3, u4, u5, u6, u7, u8);
-		}
-		registerLintRules(context, () => isPluginActive, dynamicState);
-		const definitionProvider = createDefinitionProvider(context, () => isPluginActive);
-		if (context.editor?.registerDefinitionProvider) unregisterDefProvider = context.editor.registerDefinitionProvider(definitionProvider);
-		else if (context.linter?.registerDefinitionProvider) unregisterDefProvider = context.linter.registerDefinitionProvider(definitionProvider);
-		const referenceProvider = createReferenceProvider(context, () => isPluginActive);
-		if (context.editor?.registerReferenceProvider) unregisterRefProvider = context.editor.registerReferenceProvider(referenceProvider);
-		else if (context.linter?.registerReferenceProvider) unregisterRefProvider = context.linter.registerReferenceProvider(referenceProvider);
+		context.logger?.info("커스텀 린터 (내장문법 / 파일실재성 / 네임스페이스) 활성화됨");
+		unregisterBuiltinList = registerBuiltinSyntax(context);
+		unregisterFileCheck = registerFileCheckRule(context);
+		registerNamespaceCheck(context, () => isPluginActive, namespaceState);
 	},
 	deactivate() {
 		isPluginActive = false;
-		if (unregisterBuiltinResources.length > 0) {
-			for (const cleanup of unregisterBuiltinResources) try {
+		if (unregisterBuiltinList.length > 0) {
+			for (const cleanup of unregisterBuiltinList) try {
 				cleanup();
 			} catch {}
-			unregisterBuiltinResources = [];
+			unregisterBuiltinList = [];
 		}
-		if (dynamicState.unregisterAllowedVars) {
-			dynamicState.unregisterAllowedVars();
-			dynamicState.unregisterAllowedVars = null;
+		if (typeof unregisterFileCheck === "function") {
+			try {
+				unregisterFileCheck();
+			} catch {}
+			unregisterFileCheck = void 0;
 		}
-		if (dynamicState.unregisterAllowedGroupResources) {
-			dynamicState.unregisterAllowedGroupResources();
-			dynamicState.unregisterAllowedGroupResources = null;
-		}
-		if (dynamicState.unregisterAllowedUsedVars) {
-			dynamicState.unregisterAllowedUsedVars();
-			dynamicState.unregisterAllowedUsedVars = null;
-		}
-		if (dynamicState.unregisterAllowedUsedResources) {
-			dynamicState.unregisterAllowedUsedResources();
-			dynamicState.unregisterAllowedUsedResources = null;
-		}
-		if (unregisterDefProvider) {
-			unregisterDefProvider();
-			unregisterDefProvider = null;
-		}
-		if (unregisterRefProvider) {
-			unregisterRefProvider();
-			unregisterRefProvider = null;
-		}
+		cleanupNamespaceState(namespaceState);
 	}
 };
 //#endregion

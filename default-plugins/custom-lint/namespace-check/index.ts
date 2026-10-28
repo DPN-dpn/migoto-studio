@@ -1,69 +1,65 @@
-import type { LintDiagnostic, PluginContext } from '../../src/plugins/types.ts';
-import { parseIniExports, isBuiltinResource, stripComments } from './parser.ts';
+import type { LintDiagnostic, PluginContext } from '../../../src/plugins/types.ts';
+import { parseIniExports, stripComments } from './parser.ts';
 import { buildWorkspaceIndex } from './indexer.ts';
+import { createDefinitionProvider, createReferenceProvider } from './providers.ts';
+import { isBuiltinResource } from '../builtin-syntax/matcher.ts';
 
-export interface DynamicRegistrationState {
+export interface NamespaceRegistrationState {
   unregisterAllowedVars: (() => void) | null;
   unregisterAllowedGroupResources: (() => void) | null;
   unregisterAllowedUsedVars: (() => void) | null;
   unregisterAllowedUsedResources: (() => void) | null;
+  unregisterDefProvider: (() => void) | null;
+  unregisterRefProvider: (() => void) | null;
 }
 
-export function registerLintRules(
+export function createNamespaceRegistrationState(): NamespaceRegistrationState {
+  return {
+    unregisterAllowedVars: null,
+    unregisterAllowedGroupResources: null,
+    unregisterAllowedUsedVars: null,
+    unregisterAllowedUsedResources: null,
+    unregisterDefProvider: null,
+    unregisterRefProvider: null,
+  };
+}
+
+export function cleanupNamespaceState(state: NamespaceRegistrationState) {
+  if (state.unregisterAllowedVars) {
+    try { state.unregisterAllowedVars(); } catch {}
+    state.unregisterAllowedVars = null;
+  }
+  if (state.unregisterAllowedGroupResources) {
+    try { state.unregisterAllowedGroupResources(); } catch {}
+    state.unregisterAllowedGroupResources = null;
+  }
+  if (state.unregisterAllowedUsedVars) {
+    try { state.unregisterAllowedUsedVars(); } catch {}
+    state.unregisterAllowedUsedVars = null;
+  }
+  if (state.unregisterAllowedUsedResources) {
+    try { state.unregisterAllowedUsedResources(); } catch {}
+    state.unregisterAllowedUsedResources = null;
+  }
+  if (state.unregisterDefProvider) {
+    try { state.unregisterDefProvider(); } catch {}
+    state.unregisterDefProvider = null;
+  }
+  if (state.unregisterRefProvider) {
+    try { state.unregisterRefProvider(); } catch {}
+    state.unregisterRefProvider = null;
+  }
+}
+
+/**
+ * XXMI 네임스페이스 및 변수 유효성 검사 린트 규칙과 정의/참조 Provider를 등록합니다.
+ */
+export function registerNamespaceCheck(
   context: PluginContext,
   isActive: () => boolean,
-  state: DynamicRegistrationState,
+  state: NamespaceRegistrationState,
 ) {
-  // 1. 에디터 린트 규칙: 모드 리소스 파일 실재성 검사
-  context.linter.registerRule({
-    id: 'missing-resource-files',
-    name: '모드 리소스 파일 실재성 검사',
-    check: async (ctx) => {
-      if (!ctx.folder) {
-        return [];
-      }
-
-      const diagnostics: LintDiagnostic[] = [];
-      const count = ctx.model.getLineCount();
-
-      for (let line = 1; line <= count; line++) {
-        const raw = ctx.model.getLineContent(line);
-        const { code } = stripComments(raw);
-        const trimmed = code.trim();
-        if (!trimmed) continue;
-
-        const match = /^\s*filename\s*=\s*(.+)$/i.exec(code);
-        if (!match) continue;
-
-        let target = match[1].trim();
-        if ((target.startsWith('"') && target.endsWith('"')) || (target.startsWith("'") && target.endsWith("'"))) {
-          target = target.slice(1, -1).trim();
-        }
-
-        if (!target) continue;
-
-        const exists = await ctx.fileExists(target);
-        if (!exists) {
-          const rawIdx = raw.indexOf(match[1]);
-          const startCol = rawIdx !== -1 ? rawIdx + 1 : 1;
-          const endCol = startCol + match[1].length;
-
-          diagnostics.push({
-            severity: 'warning',
-            message: `참조된 파일 "${target}"을(를) 모드 폴더에서 찾을 수 없습니다. (파일명 및 확장자 확인 필요)`,
-            startLineNumber: line,
-            startColumn: startCol,
-            endLineNumber: line,
-            endColumn: endCol,
-          });
-        }
-      }
-
-      return diagnostics;
-    },
-  });
-
-  // 2. 에디터 린트 규칙: XXMI 네임스페이스 변수 및 함수 유효성 검사
+  // 1. 에디터 린트 규칙: XXMI 네임스페이스 변수 및 함수 유효성 검사
   context.linter.registerRule({
     id: 'xxmi-namespace-check',
     name: 'XXMI 네임스페이스 및 변수 검사',
@@ -325,4 +321,19 @@ export function registerLintRules(
       return diagnostics;
     },
   });
+
+  // 2. 크로스 파일 심볼 정의(선언) 및 참조 Provider 등록
+  const definitionProvider = createDefinitionProvider(context, isActive);
+  if (context.editor?.registerDefinitionProvider) {
+    state.unregisterDefProvider = context.editor.registerDefinitionProvider(definitionProvider);
+  } else if (context.linter?.registerDefinitionProvider) {
+    state.unregisterDefProvider = context.linter.registerDefinitionProvider(definitionProvider);
+  }
+
+  const referenceProvider = createReferenceProvider(context, isActive);
+  if (context.editor?.registerReferenceProvider) {
+    state.unregisterRefProvider = context.editor.registerReferenceProvider(referenceProvider);
+  } else if (context.linter?.registerReferenceProvider) {
+    state.unregisterRefProvider = context.linter.registerReferenceProvider(referenceProvider);
+  }
 }

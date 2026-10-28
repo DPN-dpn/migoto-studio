@@ -1,40 +1,60 @@
-import { isBuiltinResource, parseIniExports, stripComments } from "./parser.js";
+import { isBuiltinResource } from "../builtin-syntax/matcher.js";
+import { parseIniExports, stripComments } from "./parser.js";
 import { buildWorkspaceIndex } from "./indexer.js";
-//#region default-plugins/custom-lint/rules.ts
-function registerLintRules(context, isActive, state) {
-	context.linter.registerRule({
-		id: "missing-resource-files",
-		name: "모드 리소스 파일 실재성 검사",
-		check: async (ctx) => {
-			if (!ctx.folder) return [];
-			const diagnostics = [];
-			const count = ctx.model.getLineCount();
-			for (let line = 1; line <= count; line++) {
-				const raw = ctx.model.getLineContent(line);
-				const { code } = stripComments(raw);
-				if (!code.trim()) continue;
-				const match = /^\s*filename\s*=\s*(.+)$/i.exec(code);
-				if (!match) continue;
-				let target = match[1].trim();
-				if (target.startsWith("\"") && target.endsWith("\"") || target.startsWith("'") && target.endsWith("'")) target = target.slice(1, -1).trim();
-				if (!target) continue;
-				if (!await ctx.fileExists(target)) {
-					const rawIdx = raw.indexOf(match[1]);
-					const startCol = rawIdx !== -1 ? rawIdx + 1 : 1;
-					const endCol = startCol + match[1].length;
-					diagnostics.push({
-						severity: "warning",
-						message: `참조된 파일 "${target}"을(를) 모드 폴더에서 찾을 수 없습니다. (파일명 및 확장자 확인 필요)`,
-						startLineNumber: line,
-						startColumn: startCol,
-						endLineNumber: line,
-						endColumn: endCol
-					});
-				}
-			}
-			return diagnostics;
-		}
-	});
+import { createDefinitionProvider, createReferenceProvider } from "./providers.js";
+//#region default-plugins/custom-lint/namespace-check/index.ts
+function createNamespaceRegistrationState() {
+	return {
+		unregisterAllowedVars: null,
+		unregisterAllowedGroupResources: null,
+		unregisterAllowedUsedVars: null,
+		unregisterAllowedUsedResources: null,
+		unregisterDefProvider: null,
+		unregisterRefProvider: null
+	};
+}
+function cleanupNamespaceState(state) {
+	if (state.unregisterAllowedVars) {
+		try {
+			state.unregisterAllowedVars();
+		} catch {}
+		state.unregisterAllowedVars = null;
+	}
+	if (state.unregisterAllowedGroupResources) {
+		try {
+			state.unregisterAllowedGroupResources();
+		} catch {}
+		state.unregisterAllowedGroupResources = null;
+	}
+	if (state.unregisterAllowedUsedVars) {
+		try {
+			state.unregisterAllowedUsedVars();
+		} catch {}
+		state.unregisterAllowedUsedVars = null;
+	}
+	if (state.unregisterAllowedUsedResources) {
+		try {
+			state.unregisterAllowedUsedResources();
+		} catch {}
+		state.unregisterAllowedUsedResources = null;
+	}
+	if (state.unregisterDefProvider) {
+		try {
+			state.unregisterDefProvider();
+		} catch {}
+		state.unregisterDefProvider = null;
+	}
+	if (state.unregisterRefProvider) {
+		try {
+			state.unregisterRefProvider();
+		} catch {}
+		state.unregisterRefProvider = null;
+	}
+}
+/**
+* XXMI 네임스페이스 및 변수 유효성 검사 린트 규칙과 정의/참조 Provider를 등록합니다.
+*/
+function registerNamespaceCheck(context, isActive, state) {
 	context.linter.registerRule({
 		id: "xxmi-namespace-check",
 		name: "XXMI 네임스페이스 및 변수 검사",
@@ -207,6 +227,12 @@ function registerLintRules(context, isActive, state) {
 			return diagnostics;
 		}
 	});
+	const definitionProvider = createDefinitionProvider(context, isActive);
+	if (context.editor?.registerDefinitionProvider) state.unregisterDefProvider = context.editor.registerDefinitionProvider(definitionProvider);
+	else if (context.linter?.registerDefinitionProvider) state.unregisterDefProvider = context.linter.registerDefinitionProvider(definitionProvider);
+	const referenceProvider = createReferenceProvider(context, isActive);
+	if (context.editor?.registerReferenceProvider) state.unregisterRefProvider = context.editor.registerReferenceProvider(referenceProvider);
+	else if (context.linter?.registerReferenceProvider) state.unregisterRefProvider = context.linter.registerReferenceProvider(referenceProvider);
 }
 //#endregion
-export { registerLintRules };
+export { cleanupNamespaceState, createNamespaceRegistrationState, registerNamespaceCheck };

@@ -1,5 +1,5 @@
 import { parseIniExports } from "./parser.js";
-//#region default-plugins/custom-lint/indexer.ts
+//#region default-plugins/custom-lint/namespace-check/indexer.ts
 /**
 * 모드 워크스페이스 내 모든 INI/3dm/migoto 파일 경로를 수집합니다.
 */

@@ -3,10 +3,11 @@ import type {
   CustomReferenceProvider,
   PluginContext,
   SymbolLocation,
-} from '../../src/plugins/types.ts';
+} from '../../../src/plugins/types.ts';
 import type { SymbolLocationRecord } from './types.ts';
-import { parseIniExports, isBuiltinResource } from './parser.ts';
+import { parseIniExports } from './parser.ts';
 import { buildWorkspaceIndex } from './indexer.ts';
+import { isBuiltinResource } from '../builtin-syntax/matcher.ts';
 
 function matchesSymbol(target: any, rec: SymbolLocationRecord): boolean {
   const targetNameClean = (target.cleanName || target.name || '')

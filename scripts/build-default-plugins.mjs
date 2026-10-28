@@ -132,6 +132,13 @@ async function buildDefaultPlugins() {
     }
 
     for (const dir of desktopDirs) {
+      // Clean build targets (src-tauri and data) so obsolete files from refactorings are removed
+      const isProjectInternalTarget = dir === resolve(rootDir, 'src-tauri/default-plugins', id) || dir === resolve(rootDir, 'data/plugins', id);
+      if (isProjectInternalTarget && existsSync(dir)) {
+        try {
+          await rm(dir, { recursive: true, force: true });
+        } catch {}
+      }
       await mkdir(dir, { recursive: true });
 
       // Copy all modular files (*.js)

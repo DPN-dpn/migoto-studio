@@ -1,6 +1,7 @@
-import { isBuiltinResource, parseIniExports } from "./parser.js";
+import { isBuiltinResource } from "../builtin-syntax/matcher.js";
+import { parseIniExports } from "./parser.js";
 import { buildWorkspaceIndex } from "./indexer.js";
-//#region default-plugins/custom-lint/providers.ts
+//#region default-plugins/custom-lint/namespace-check/providers.ts
 function matchesSymbol(target, rec) {
 	const targetNameClean = (target.cleanName || target.name || "").replace(/^[\[\]\$]+|[\[\]\$]+$/g, "").toLowerCase();
 	const targetBase = targetNameClean.includes("\\") ? targetNameClean.split("\\").pop() || targetNameClean : targetNameClean;

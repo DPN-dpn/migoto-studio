@@ -1,4 +1,7 @@
 import type { NamespaceExport, SymbolLocationRecord } from './types.ts';
+import { isBuiltinResource } from '../builtin-syntax/matcher.ts';
+
+export { isBuiltinResource };
 
 export function stripComments(line: string): { code: string; commentIndex: number } {
   let inQuote: '"' | "'" | null = null;
@@ -15,20 +18,6 @@ export function stripComments(line: string): { code: string; commentIndex: numbe
     }
   }
   return { code: line, commentIndex: line.length };
-}
-
-export function isBuiltinResource(name: string): boolean {
-  if (!name) return false;
-  const norm = name.toLowerCase().replace(/^[\\\/]+/, '');
-  return (
-    norm.startsWith('builtincommandlist') ||
-    norm.startsWith('builtin_commandlist') ||
-    norm.startsWith('builtin\\') ||
-    norm.startsWith('commandlist\\builtin') ||
-    norm.startsWith('commandlist\\skintexture') ||
-    norm === 'commandlistskintexture' ||
-    norm === 'builtin'
-  );
 }
 
 export function parseIniExports(text: string, filePath: string): NamespaceExport {

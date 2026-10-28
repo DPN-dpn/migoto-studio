@@ -1,4 +1,5 @@
-//#region default-plugins/custom-lint/parser.ts
+import "../builtin-syntax/matcher.js";
+//#region default-plugins/custom-lint/namespace-check/parser.ts
 function stripComments(line) {
 	let inQuote = null;
 	for (let i = 0; i < line.length; i++) {
@@ -15,11 +16,6 @@ function stripComments(line) {
 		code: line,
 		commentIndex: line.length
 	};
-}
-function isBuiltinResource(name) {
-	if (!name) return false;
-	const norm = name.toLowerCase().replace(/^[\\\/]+/, "");
-	return norm.startsWith("builtincommandlist") || norm.startsWith("builtin_commandlist") || norm.startsWith("builtin\\") || norm.startsWith("commandlist\\builtin") || norm.startsWith("commandlist\\skintexture") || norm === "commandlistskintexture" || norm === "builtin";
 }
 function parseIniExports(text, filePath) {
 	const lines = text.split(/\r?\n/);
@@ -361,4 +357,4 @@ function parseIniExports(text, filePath) {
 	};
 }
 //#endregion
-export { isBuiltinResource, parseIniExports, stripComments };
+export { parseIniExports, stripComments };

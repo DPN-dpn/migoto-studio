@@ -1,4 +1,4 @@
-import type { DirEntry, PluginContext } from '../../src/plugins/types.ts';
+import type { DirEntry, PluginContext } from '../../../src/plugins/types.ts';
 import type { NamespaceExport, NamespaceGroup } from './types.ts';
 import { parseIniExports } from './parser.ts';
 
