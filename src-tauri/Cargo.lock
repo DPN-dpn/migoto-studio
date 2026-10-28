@@ -1924,7 +1924,7 @@ dependencies = [
 
 [[package]]
 name = "migoto-studio"
-version = "0.13.2"
+version = "0.13.3"
 dependencies = [
  "encoding_rs",
  "log",
