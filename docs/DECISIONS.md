@@ -263,7 +263,7 @@
     - `registry.ts`: 동적 허용 리소스/변수 등록 레지스트리
     - `engine.ts`: 단일 텍스트 모델 오케스트레이터 (`lintModel`)
     - `index.ts`: 통합 엔트리포인트
-  - **하위 호환성 유지**: 기존 `src/core/ini/lint.ts`, `src/core/ini/builtin-syntax.ts`, `src/core/workspace/file-check.ts`, `src/core/workspace/namespace/`는 모듈화된 `src/core/lint/`를 투명하게 re-export하도록 구성하여 기존 코드 및 단위 테스트 호환성을 100% 보장합니다.
+  - **직접 임포트 표준화**: 불필요한 `export *` 전용 더미 래퍼 파일(`src/core/ini/lint.ts` 등)을 모두 제거하고, 모든 에디터 코어 및 테스트에서 `src/core/lint`를 직접 명확히 참조하도록 정리했습니다.
 - **플러그인의 역할 재정립 (`custom-lint` v2.0.0)**:
   - `custom-lint` 플러그인은 특정 게임/툴에 종속된 전용 모딩 기능(ZZMI 텍스처 슬롯픽스 리졸버, WEngineFX/TTL 템플릿, SRMI `vertex_count` 문법)만 포함하도록 슬림화되어, 서드파티 플러그인 개발자를 위한 모범적인 공식 확장 예제(Reference Implementation)로 운영됩니다.
 

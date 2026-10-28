@@ -12,7 +12,7 @@ import {
   registerAllowedUsedResource,
   type TextModelLike,
   type LintOptions,
-} from '../src/core/ini/lint.ts';
+} from '../src/core/lint/index.ts';
 
 function createMockModel(content: string): TextModelLike {
   const lines = content.split(/\r?\n/);

@@ -45,11 +45,15 @@ import {
   registerAllowedVariable,
   registerAllowedUsedVariable,
   registerAllowedUsedResource,
-} from '../src/core/ini/lint.ts';
-import { checkResourceFileExistence } from '../src/core/workspace/file-check.ts';
-import { checkNamespaceFolderConsistency, buildWorkspaceIndex } from '../src/core/workspace/namespace/index.ts';
-import { createNamespaceDefinitionProvider, createNamespaceReferenceProvider } from '../src/core/workspace/namespace/providers.ts';
-import { isBuiltinResource, isHelpIniResource, isHelpIniVariable } from '../src/core/ini/builtin-syntax.ts';
+  checkResourceFileExistence,
+  checkNamespaceFolderConsistency,
+  buildWorkspaceIndex,
+  createNamespaceDefinitionProvider,
+  createNamespaceReferenceProvider,
+  isBuiltinResource,
+  isHelpIniResource,
+  isHelpIniVariable,
+} from '../src/core/lint/index.ts';
 
 test('decodeDDS throws on invalid magic buffer', () => {
   const invalid = new Uint8Array([0, 1, 2, 3]);

@@ -23,7 +23,17 @@ import { OutlinePanel } from './ui/panels/outline';
 import { registerSnippetCompletions, initCustomTemplates } from './core/ini/templates';
 import { openSettings } from './ui/modals/settings-ui';
 import { openHelp } from './ui/modals/help-ui';
-import { lintModel, optionsFromSettings, isAllowedResource, isAllowedVariable } from './core/ini/lint';
+import {
+  lintModel,
+  optionsFromSettings,
+  isAllowedResource,
+  isAllowedVariable,
+  buildWorkspaceIndex,
+  createCoreDefinitionProvider,
+  createCoreReferenceProvider,
+  checkNamespaceDiagnostics,
+  checkResourceFileExistence,
+} from './core/lint';
 import { registerSmartCompletions } from './core/editor/completions';
 import { registerFoldingProvider } from './core/editor/folding';
 import { DiffViewer } from './ui/views/diff-viewer';
@@ -37,13 +47,6 @@ import {
   setCoreDefinitionResolver,
   setCoreReferencesResolver,
 } from './core/ini/symbol-nav';
-import {
-  buildWorkspaceIndex,
-  createCoreDefinitionProvider,
-  createCoreReferenceProvider,
-  checkNamespaceDiagnostics,
-} from './core/workspace/namespace';
-import { checkResourceFileExistence } from './core/workspace/file-check';
 import { initPwa } from './pwa';
 import { checkOnStartup } from './updater/updater';
 import { CURRENT_APP_VERSION } from './updater/version';

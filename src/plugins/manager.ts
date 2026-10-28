@@ -26,7 +26,7 @@ import {
   clearAllowedResources,
   isAllowedResource,
   isAllowedVariable,
-} from '../core/ini/lint';
+} from '../core/lint';
 import { registerPluginTemplate } from '../core/ini/templates';
 import {
   parseIni,
