@@ -27,6 +27,11 @@ my-advanced-plugin/
 └── style.css         # 전용 스타일시트 (import './style.css' 시 자동 주입 및 플러그인 언로드 시 자동 정리)
 ```
 
+> [!NOTE]
+> **기본 플러그인(Built-in) 배포 방식**  
+> - **데스크톱 (설치본 / 포터블)**: 기본 제공 플러그인(`texture-library`, `custom-lint`, `zzmi-support` 등) 역시 단일 번들 파일이 아닌 위와 같은 **다중 모듈 ES 파일(`index.js` + 서브모듈들)** 형태로 `%APPDATA%\MigotoStudio\plugins` 및 `data/plugins`에 설치됩니다. 모더와 개발자는 실제 작동하는 플러그인 폴더를 직접 열어보며 깨끗하게 모듈화된 코드를 학습하거나 손쉽게 수정할 수 있습니다.
+> - **웹 버전**: 브라우저 네트워크 전송 효율 및 로딩 속도를 위해 단일 번들(`plugin.js`) 형태로 제공됩니다.
+
 ---
 
 ## 2. `plugin.json` 매니페스트 규격

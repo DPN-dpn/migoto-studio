@@ -1,5 +1,21 @@
-import { stripComments } from '../../src/core/ini/lint.ts';
 import type { NamespaceExport, SymbolLocationRecord } from './types.ts';
+
+export function stripComments(line: string): { code: string; commentIndex: number } {
+  let inQuote: '"' | "'" | null = null;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (inQuote) {
+      if (ch === inQuote) inQuote = null;
+    } else {
+      if (ch === '"' || ch === "'") {
+        inQuote = ch;
+      } else if (ch === ';' || (ch === '/' && line[i + 1] === '/')) {
+        return { code: line.slice(0, i), commentIndex: i };
+      }
+    }
+  }
+  return { code: line, commentIndex: line.length };
+}
 
 export function isBuiltinResource(name: string): boolean {
   if (!name) return false;

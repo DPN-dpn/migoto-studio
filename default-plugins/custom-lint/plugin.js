@@ -1,8 +1,4 @@
-//#region src/core/ini/lint.ts
-/**
-* Strips comments from a line while respecting single and double quotes.
-* Returns the code part and the 0-based index where the comment started (or line.length if none).
-*/
+//#region default-plugins/custom-lint/parser.ts
 function stripComments(line) {
 	let inQuote = null;
 	for (let i = 0; i < line.length; i++) {
@@ -20,8 +16,6 @@ function stripComments(line) {
 		commentIndex: line.length
 	};
 }
-//#endregion
-//#region default-plugins/custom-lint/parser.ts
 function isBuiltinResource(name) {
 	if (!name) return false;
 	const norm = name.toLowerCase().replace(/^[\\\/]+/, "");

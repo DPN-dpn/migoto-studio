@@ -1,6 +1,5 @@
-import { stripComments } from '../../src/core/ini/lint.ts';
 import type { LintDiagnostic, PluginContext } from '../../src/plugins/types.ts';
-import { parseIniExports, isBuiltinResource } from './parser.ts';
+import { parseIniExports, isBuiltinResource, stripComments } from './parser.ts';
 import { buildWorkspaceIndex } from './indexer.ts';
 
 export interface DynamicRegistrationState {

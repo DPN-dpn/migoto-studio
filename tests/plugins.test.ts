@@ -571,27 +571,45 @@ test('default-plugins directory contains all 5 standalone plugins ready for inst
   const fs = await import('node:fs');
   const path = await import('node:path');
   const url = await import('node:url');
+  const { linkPluginModules } = await import('../src/plugins/module-linker.ts');
 
   const defaultIds = ['custom-lint', 'zzmi-support', 'texture-library', 'python-runner', 'ai-assistant'];
   const baseDir = path.resolve(process.cwd(), 'default-plugins');
 
   for (const id of defaultIds) {
     const pJson = path.join(baseDir, id, 'plugin.json');
+    const pIndex = path.join(baseDir, id, 'index.js');
     const pJs = path.join(baseDir, id, 'plugin.js');
 
     assert.ok(fs.existsSync(pJson), `plugin.json must exist for ${id}`);
-    assert.ok(fs.existsSync(pJs), `plugin.js must exist for ${id}`);
+    assert.ok(fs.existsSync(pIndex), `index.js must exist for ${id}`);
+    assert.ok(fs.existsSync(pJs), `plugin.js fallback must exist for ${id}`);
 
     const manifest = JSON.parse(fs.readFileSync(pJson, 'utf8'));
     assert.equal(manifest.id, id);
-    assert.equal(manifest.main, 'plugin.js');
+    assert.equal(manifest.main, 'index.js');
     assert.ok(manifest.icon && manifest.icon.includes('<svg'), `Plugin ${id} manifest must embed SVG icon`);
 
-    // Dynamically import standalone bundle
+    // Dynamically import standalone bundle (fallback compatibility)
     const fileUrl = url.pathToFileURL(pJs).href;
     const mod = await import(fileUrl);
     const plugin = mod.default || mod;
-    assert.equal(typeof plugin.activate, 'function', `Plugin ${id} must export activate function`);
+    assert.equal(typeof plugin.activate, 'function', `Plugin ${id} standalone bundle must export activate function`);
+
+    // Verify modular multi-file linking works on desktop distribution
+    const pluginDir = path.join(process.cwd(), 'src-tauri/default-plugins', id);
+    const diskFiles = fs.readdirSync(pluginDir);
+    const filesMap: Record<string, string> = {};
+    for (const f of diskFiles) {
+      if (f.endsWith('.js') || f.endsWith('.json')) {
+        filesMap[f] = fs.readFileSync(path.join(pluginDir, f), 'utf8');
+      }
+    }
+    const linked = linkPluginModules(filesMap['index.js'], 'index.js', filesMap);
+    const modularMod = await import(linked.entryUrl);
+    const modularPlugin = modularMod.default || modularMod;
+    assert.equal(typeof modularPlugin.activate, 'function', `Plugin ${id} modular files must link and export activate`);
+    linked.dispose();
   }
 });
 
