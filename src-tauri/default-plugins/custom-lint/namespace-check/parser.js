@@ -121,7 +121,7 @@ function parseIniExports(text, filePath) {
 			}
 			continue;
 		}
-		const varDeclRe = /\b(?:global|persist|local)\s+\$([a-zA-Z0-9_\\]+)/gi;
+		const varDeclRe = /\b(?:global|persist|local)\s+\$([a-zA-Z0-9_\\/](?:[a-zA-Z0-9_.\-\\\/]*[a-zA-Z0-9_\\/])?)/gi;
 		let vm;
 		let foundExplicit = false;
 		while ((vm = varDeclRe.exec(code)) !== null) {
@@ -162,7 +162,7 @@ function parseIniExports(text, filePath) {
 		}
 		const isConstants = currentSection.toLowerCase() === "constants";
 		if (isConstants && !foundExplicit) {
-			const constLineMatch = /^\s*(?:persist\s+|global\s+|local\s+)*\$([a-zA-Z0-9_\\]+)/i.exec(code);
+			const constLineMatch = /^\s*(?:persist\s+|global\s+|local\s+)*\$([a-zA-Z0-9_\\/](?:[a-zA-Z0-9_.\-\\\/]*[a-zA-Z0-9_\\/])?)/i.exec(code);
 			if (constLineMatch) {
 				const vName = constLineMatch[1].toLowerCase();
 				const parts = vName.split("\\").filter(Boolean);
@@ -199,7 +199,7 @@ function parseIniExports(text, filePath) {
 			}
 		}
 		const eqIdx = code.indexOf("=");
-		const varRefRe = /\$([a-zA-Z0-9_\\]+)/g;
+		const varRefRe = /\$([a-zA-Z0-9_\\/](?:[a-zA-Z0-9_.\-\\\/]*[a-zA-Z0-9_\\/])?)/g;
 		let vum;
 		while ((vum = varRefRe.exec(code)) !== null) {
 			if (eqIdx !== -1 && vum.index < eqIdx) {

@@ -365,4 +365,30 @@ handling = skip
   assert.equal(unusedInfo.length, 0, 'Section names with dot should not be marked as unused when referenced');
 });
 
+test('variables with dot and extension (e.g. $\\ShaderFixes\\help.ini\\notification_timeout) are matched completely and recognized when allowed', () => {
+  const model = createMockModel(`[Present]
+if $\\ShaderFixes\\help.ini\\notification_timeout !== null
+  $\\ShaderFixes\\help.ini\\notification_timeout = -1
+endif
+`);
+
+  // Without allowance, reports undeclared variable with the FULL variable name, NOT truncated at dot
+  const markersBefore = lintModel(model, defaultOptions);
+  assert.ok(
+    markersBefore.some((m) => m.message.includes('notification_timeout')),
+    'Undeclared message should include full variable name including notification_timeout'
+  );
+  assert.ok(
+    !markersBefore.some((m) => m.message.includes("'$\\ShaderFixes\\help'")),
+    'Variable name must not be truncated at dot (e.g. $\\ShaderFixes\\help)'
+  );
+
+  // When registered as allowed variable (as done by custom-lint help.ini support)
+  const unreg = registerAllowedVariable(/^\\?shaderfixes\\help\.ini\\/i);
+  const markersAfter = lintModel(model, defaultOptions);
+  const warnings = markersAfter.filter((m) => m.severity === MarkerSeverity.Warning);
+  assert.equal(warnings.length, 0, 'Should not report any warnings when help.ini variable is allowed');
+  unreg();
+});
+
 

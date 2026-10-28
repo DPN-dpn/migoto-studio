@@ -92,7 +92,7 @@ export function extractSymbols(model: TextModelLike): SymbolIndex {
 
     // Check variable declarations in [Constants] or with global/persist/local
     const isConst = currentSection.toLowerCase() === 'constants';
-    const explicitDecl = /\b(?:global|persist|local)\s+\$([a-zA-Z0-9_\\]+)(?:\s*=\s*([^;\r\n]+))?/gi;
+    const explicitDecl = /\b(?:global|persist|local)\s+\$([a-zA-Z0-9_\\/](?:[a-zA-Z0-9_.\-\\\/]*[a-zA-Z0-9_\\/])?)(?:\s*=\s*([^;\r\n]+))?/gi;
     let em: RegExpExecArray | null;
     let foundExplicit = false;
 
@@ -104,7 +104,7 @@ export function extractSymbols(model: TextModelLike): SymbolIndex {
     }
 
     if (isConst && !foundExplicit) {
-      const constAssign = /^\s*\$([a-zA-Z0-9_\\]+)(?:\s*=\s*([^;\r\n]+))?/i.exec(code);
+      const constAssign = /^\s*\$([a-zA-Z0-9_\\/](?:[a-zA-Z0-9_.\-\\\/]*[a-zA-Z0-9_\\/])?)(?:\s*=\s*([^;\r\n]+))?/i.exec(code);
       if (constAssign) {
         const vName = constAssign[1];
         const val = constAssign[2]?.trim() ?? '';
@@ -114,7 +114,7 @@ export function extractSymbols(model: TextModelLike): SymbolIndex {
 
     // Key cycle variables: $var = 0,1,2
     if (/^key/i.test(currentSection)) {
-      const cycleMatch = /^\s*\$([a-zA-Z0-9_\\]+)\s*=\s*([0-9,\s]+)/i.exec(code);
+      const cycleMatch = /^\s*\$([a-zA-Z0-9_\\/](?:[a-zA-Z0-9_.\-\\\/]*[a-zA-Z0-9_\\/])?)\s*=\s*([0-9,\s]+)/i.exec(code);
       if (cycleMatch) {
         variables.set(cycleMatch[1], `키 순환 값: ${cycleMatch[2].trim()}`);
       }

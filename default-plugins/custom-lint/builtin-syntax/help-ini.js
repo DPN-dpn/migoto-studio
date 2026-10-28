@@ -12,13 +12,13 @@ var HELP_INI_RESOURCE_REGEX = /^(?:customshader|resource|commandlist)\\shaderfix
 var HELP_INI_VARIABLE_REGEX = /^\\?shaderfixes\\help\.ini\\/i;
 function isHelpIniResource(name) {
 	if (!name) return false;
-	const clean = name.toLowerCase().replace(/^[\\\/]+/, "");
+	const clean = name.toLowerCase().replace(/^[\\\/$]+/, "").replace(/[\/]/g, "\\");
 	return HELP_INI_RESOURCE_REGEX.test(clean) || clean.startsWith("shaderfixes\\help.ini\\");
 }
 function isHelpIniVariable(name) {
 	if (!name) return false;
-	const clean = name.toLowerCase().replace(/^[\\\$]+/, "");
-	return HELP_INI_VARIABLE_REGEX.test(clean);
+	const clean = name.toLowerCase().replace(/^[\\\/$]+/, "").replace(/[\/]/g, "\\");
+	return HELP_INI_VARIABLE_REGEX.test(clean) || clean.startsWith("shaderfixes\\help.ini\\");
 }
 /**
 * ShaderFixes\help.ini 빌트인 리소스, 커맨드, 셰이더 및 변수를 에디터 린터에 허용 등록합니다.

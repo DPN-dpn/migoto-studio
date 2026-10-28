@@ -18,14 +18,14 @@ export const HELP_INI_VARIABLE_REGEX = /^\\?shaderfixes\\help\.ini\\/i;
 
 export function isHelpIniResource(name: string): boolean {
   if (!name) return false;
-  const clean = name.toLowerCase().replace(/^[\\\/]+/, '');
+  const clean = name.toLowerCase().replace(/^[\\\/$]+/, '').replace(/[\/]/g, '\\');
   return HELP_INI_RESOURCE_REGEX.test(clean) || clean.startsWith('shaderfixes\\help.ini\\');
 }
 
 export function isHelpIniVariable(name: string): boolean {
   if (!name) return false;
-  const clean = name.toLowerCase().replace(/^[\\\$]+/, '');
-  return HELP_INI_VARIABLE_REGEX.test(clean);
+  const clean = name.toLowerCase().replace(/^[\\\/$]+/, '').replace(/[\/]/g, '\\');
+  return HELP_INI_VARIABLE_REGEX.test(clean) || clean.startsWith('shaderfixes\\help.ini\\');
 }
 
 /**

@@ -146,7 +146,7 @@ export function parseIniExports(text: string, filePath: string): NamespaceExport
     }
 
     // Variables declaration
-    const varDeclRe = /\b(?:global|persist|local)\s+\$([a-zA-Z0-9_\\]+)/gi;
+    const varDeclRe = /\b(?:global|persist|local)\s+\$([a-zA-Z0-9_\\/](?:[a-zA-Z0-9_.\-\\\/]*[a-zA-Z0-9_\\/])?)/gi;
     let vm: RegExpExecArray | null;
     let foundExplicit = false;
     while ((vm = varDeclRe.exec(code)) !== null) {
@@ -194,7 +194,7 @@ export function parseIniExports(text: string, filePath: string): NamespaceExport
     // In [Constants], lines like `$costume = 1` or `$active`
     const isConstants = currentSection.toLowerCase() === 'constants';
     if (isConstants && !foundExplicit) {
-      const constLineMatch = /^\s*(?:persist\s+|global\s+|local\s+)*\$([a-zA-Z0-9_\\]+)/i.exec(code);
+      const constLineMatch = /^\s*(?:persist\s+|global\s+|local\s+)*\$([a-zA-Z0-9_\\/](?:[a-zA-Z0-9_.\-\\\/]*[a-zA-Z0-9_\\/])?)/i.exec(code);
       if (constLineMatch) {
         const vName = constLineMatch[1].toLowerCase();
         const parts = vName.split('\\').filter(Boolean);
@@ -238,7 +238,7 @@ export function parseIniExports(text: string, filePath: string): NamespaceExport
 
     // Variable usages
     const eqIdx = code.indexOf('=');
-    const varRefRe = /\$([a-zA-Z0-9_\\]+)/g;
+    const varRefRe = /\$([a-zA-Z0-9_\\/](?:[a-zA-Z0-9_.\-\\\/]*[a-zA-Z0-9_\\/])?)/g;
     let vum: RegExpExecArray | null;
     while ((vum = varRefRe.exec(code)) !== null) {
       if (eqIdx !== -1 && vum.index < eqIdx) {

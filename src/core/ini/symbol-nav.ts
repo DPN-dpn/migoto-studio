@@ -85,24 +85,24 @@ export function getSymbolAtPosition(
     }
   }
 
-  // 2. Variable reference or declaration: `\$[a-zA-Z0-9_\\]+`
-  const varRe = /\$([a-zA-Z0-9_\\]+)/g;
+  // 2. Variable reference or declaration: `\$[a-zA-Z0-9_.\-\\]+`
+  const varRe = /\$([a-zA-Z0-9_\\/](?:[a-zA-Z0-9_.\-\\\/]*[a-zA-Z0-9_\\/])?)/g;
   let vm: RegExpExecArray | null;
   while ((vm = varRe.exec(code)) !== null) {
     const startCol = vm.index + 1; // 1-based
     const endCol = startCol + vm[0].length;
     if (col >= startCol && col <= endCol) {
-      const rawVar = vm[0]; // e.g. "$swapvar" or "$\Raiden\costume"
-      const content = vm[1]; // e.g. "swapvar" or "\Raiden\costume" or "Raiden\costume"
+      const rawVar = vm[0]; // e.g. "$swapvar" or "$\Raiden\costume" or "$\ShaderFixes\help.ini\notification_timeout"
+      const content = vm[1]; // e.g. "swapvar" or "\Raiden\costume"
 
-      // Check namespace: $\Raiden\costume or $Raiden\costume
+      // Check namespace: $\Raiden\costume or $\ShaderFixes\help.ini\notification_timeout
       let namespace: string | undefined;
       let cleanVar = content;
       if (content.includes('\\')) {
         const parts = content.split('\\').filter(Boolean);
         if (parts.length >= 2) {
-          namespace = parts[0];
-          cleanVar = parts.slice(1).join('\\');
+          namespace = parts.slice(0, -1).join('\\');
+          cleanVar = parts[parts.length - 1];
         }
       }
 
@@ -298,7 +298,7 @@ export function scanModelOccurrences(
 
     // 2. Scan variable occurrences
     if (target.kind === 'variable') {
-      const varRe = /\$([a-zA-Z0-9_\\]+)/g;
+      const varRe = /\$([a-zA-Z0-9_\\/](?:[a-zA-Z0-9_.\-\\\/]*[a-zA-Z0-9_\\/])?)/g;
       let vm: RegExpExecArray | null;
 
       while ((vm = varRe.exec(code)) !== null) {
@@ -319,8 +319,8 @@ export function scanModelOccurrences(
           // Line has global/persist/local $var, or is in [Constants] $var = ...
           const isConstSec = currentSection.toLowerCase() === 'constants';
           const isDeclModifier = /\b(?:global|persist|local)\s+\$/i.test(code);
-          const isAssign = /^\s*(?:persist\s+|global\s+|local\s+)*\$[a-zA-Z0-9_\\]+\s*=/i.test(code);
-          const isKeyCycle = /^key/i.test(currentSection) && /^\s*\$[a-zA-Z0-9_\\]+\s*=\s*[0-9,\s]+/i.test(code);
+          const isAssign = /^\s*(?:persist\s+|global\s+|local\s+)*\$[a-zA-Z0-9_.\-\\\/]+\s*=/i.test(code);
+          const isKeyCycle = /^key/i.test(currentSection) && /^\s*\$[a-zA-Z0-9_.\-\\\/]+\s*=\s*[0-9,\s]+/i.test(code);
 
           const isDef = (isDeclModifier && isAssign) || (isConstSec && isAssign) || isKeyCycle;
 

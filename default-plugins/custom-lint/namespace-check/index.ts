@@ -221,7 +221,7 @@ export function registerNamespaceCheck(
         }
 
         // A. 네임스페이스 변수 검사
-        const varRefRe = /\$([a-zA-Z0-9_\\]+)/g;
+        const varRefRe = /\$([a-zA-Z0-9_\\/](?:[a-zA-Z0-9_.\-\\\/]*[a-zA-Z0-9_\\/])?)/g;
         let vm: RegExpExecArray | null;
         while ((vm = varRefRe.exec(code)) !== null) {
           const fullVar = vm[1];

@@ -302,7 +302,7 @@ export function lintModel(model: TextModelLike, options: LintOptions): monaco.ed
 
     // Variable declaration check
     // Lines like: global persist $swapvar = 0, or in [Constants]: $swapvar = 0
-    const varDeclRe = /\b(?:global|persist|local)\s+\$([a-zA-Z0-9_\\]+)/gi;
+    const varDeclRe = /\b(?:global|persist|local)\s+\$([a-zA-Z0-9_\\/](?:[a-zA-Z0-9_.\-\\\/]*[a-zA-Z0-9_\\/])?)/gi;
     let vdm: RegExpExecArray | null;
     let foundExplicitDecl = false;
     while ((vdm = varDeclRe.exec(code)) !== null) {
@@ -314,7 +314,7 @@ export function lintModel(model: TextModelLike, options: LintOptions): monaco.ed
 
     if (isConstantsSection && !foundExplicitDecl) {
       // In [Constants], lines like `$costume = 1` or `$active` are declarations
-      const constLineRe = /^\s*(?:persist\s+|global\s+|local\s+)*\$([a-zA-Z0-9_\\]+)/i.exec(code);
+      const constLineRe = /^\s*(?:persist\s+|global\s+|local\s+)*\$([a-zA-Z0-9_\\/](?:[a-zA-Z0-9_.\-\\\/]*[a-zA-Z0-9_\\/])?)/i.exec(code);
       if (constLineRe) {
         const vName = constLineRe[1].toLowerCase();
         const dollarIdx = code.indexOf('$' + constLineRe[1]);
@@ -325,7 +325,7 @@ export function lintModel(model: TextModelLike, options: LintOptions): monaco.ed
     }
 
     // Collect all $var references on this line
-    const varRefRe = /\$([a-zA-Z0-9_\\]+)/g;
+    const varRefRe = /\$([a-zA-Z0-9_\\/](?:[a-zA-Z0-9_.\-\\\/]*[a-zA-Z0-9_\\/])?)/g;
     let vm: RegExpExecArray | null;
     while ((vm = varRefRe.exec(code)) !== null) {
       const vName = vm[1].toLowerCase();

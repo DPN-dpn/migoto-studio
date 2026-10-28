@@ -152,7 +152,7 @@ function registerNamespaceCheck(context, isActive, state) {
 					activeSection = secMatch[1].trim();
 					continue;
 				}
-				const varRefRe = /\$([a-zA-Z0-9_\\]+)/g;
+				const varRefRe = /\$([a-zA-Z0-9_\\/](?:[a-zA-Z0-9_.\-\\\/]*[a-zA-Z0-9_\\/])?)/g;
 				let vm;
 				while ((vm = varRefRe.exec(code)) !== null) {
 					const fullVar = vm[1];

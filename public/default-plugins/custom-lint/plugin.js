@@ -23,13 +23,13 @@ var HELP_INI_RESOURCE_REGEX = /^(?:customshader|resource|commandlist)\\shaderfix
 var HELP_INI_VARIABLE_REGEX = /^\\?shaderfixes\\help\.ini\\/i;
 function isHelpIniResource(name) {
 	if (!name) return false;
-	const clean = name.toLowerCase().replace(/^[\\\/]+/, "");
+	const clean = name.toLowerCase().replace(/^[\\\/$]+/, "").replace(/[\/]/g, "\\");
 	return HELP_INI_RESOURCE_REGEX.test(clean) || clean.startsWith("shaderfixes\\help.ini\\");
 }
 function isHelpIniVariable(name) {
 	if (!name) return false;
-	const clean = name.toLowerCase().replace(/^[\\\$]+/, "");
-	return HELP_INI_VARIABLE_REGEX.test(clean);
+	const clean = name.toLowerCase().replace(/^[\\\/$]+/, "").replace(/[\/]/g, "\\");
+	return HELP_INI_VARIABLE_REGEX.test(clean) || clean.startsWith("shaderfixes\\help.ini\\");
 }
 /**
 * ShaderFixes\help.ini 빌트인 리소스, 커맨드, 셰이더 및 변수를 에디터 린터에 허용 등록합니다.
@@ -254,7 +254,7 @@ function parseIniExports(text, filePath) {
 			}
 			continue;
 		}
-		const varDeclRe = /\b(?:global|persist|local)\s+\$([a-zA-Z0-9_\\]+)/gi;
+		const varDeclRe = /\b(?:global|persist|local)\s+\$([a-zA-Z0-9_\\/](?:[a-zA-Z0-9_.\-\\\/]*[a-zA-Z0-9_\\/])?)/gi;
 		let vm;
 		let foundExplicit = false;
 		while ((vm = varDeclRe.exec(code)) !== null) {
@@ -295,7 +295,7 @@ function parseIniExports(text, filePath) {
 		}
 		const isConstants = currentSection.toLowerCase() === "constants";
 		if (isConstants && !foundExplicit) {
-			const constLineMatch = /^\s*(?:persist\s+|global\s+|local\s+)*\$([a-zA-Z0-9_\\]+)/i.exec(code);
+			const constLineMatch = /^\s*(?:persist\s+|global\s+|local\s+)*\$([a-zA-Z0-9_\\/](?:[a-zA-Z0-9_.\-\\\/]*[a-zA-Z0-9_\\/])?)/i.exec(code);
 			if (constLineMatch) {
 				const vName = constLineMatch[1].toLowerCase();
 				const parts = vName.split("\\").filter(Boolean);
@@ -332,7 +332,7 @@ function parseIniExports(text, filePath) {
 			}
 		}
 		const eqIdx = code.indexOf("=");
-		const varRefRe = /\$([a-zA-Z0-9_\\]+)/g;
+		const varRefRe = /\$([a-zA-Z0-9_\\/](?:[a-zA-Z0-9_.\-\\\/]*[a-zA-Z0-9_\\/])?)/g;
 		let vum;
 		while ((vum = varRefRe.exec(code)) !== null) {
 			if (eqIdx !== -1 && vum.index < eqIdx) {
@@ -917,7 +917,7 @@ function registerNamespaceCheck(context, isActive, state) {
 					activeSection = secMatch[1].trim();
 					continue;
 				}
-				const varRefRe = /\$([a-zA-Z0-9_\\]+)/g;
+				const varRefRe = /\$([a-zA-Z0-9_\\/](?:[a-zA-Z0-9_.\-\\\/]*[a-zA-Z0-9_\\/])?)/g;
 				let vm;
 				while ((vm = varRefRe.exec(code)) !== null) {
 					const fullVar = vm[1];
