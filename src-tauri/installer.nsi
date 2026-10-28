@@ -490,8 +490,8 @@ LangString secPluginPython ${LANG_ENGLISH} "Python Runner"
 LangString secPluginPythonDesc ${LANG_KOREAN} "Python 코드를 에디터에서 직접 실행하고 결과를 확인합니다."
 LangString secPluginPythonDesc ${LANG_ENGLISH} "Run Python scripts within the editor and inspect execution outputs."
 
-LangString secPluginLint ${LANG_KOREAN} "커스텀 린트 (XXMI & ZZMI)"
-LangString secPluginLint ${LANG_ENGLISH} "Custom Linter (XXMI & ZZMI)"
+LangString secPluginLint ${LANG_KOREAN} "커스텀 린트"
+LangString secPluginLint ${LANG_ENGLISH} "Custom Linter"
 
 LangString secPluginLintDesc ${LANG_KOREAN} "리소스 파일 실재성, XXMI/help.ini 네임스페이스 및 ZZMI 슬롯픽스/TTL 문법을 실시간으로 검사하고 템플릿을 제공합니다."
 LangString secPluginLintDesc ${LANG_ENGLISH} "Real-time verification for resource existence, XXMI/help.ini namespace, and ZZMI SlotFix/TTL support."
