@@ -286,23 +286,26 @@ this = ResourceNotExist
   );
 });
 
-test('CommandListSkinTexture is recognized as valid when allowed', () => {
+test('CommandListSkinTexture is recognized as valid core built-in, and custom allowed resources work dynamically', () => {
   clearAllowedResources();
-  const unregister = registerAllowedResource('CommandListSkinTexture');
 
-  const model = createMockModel('[TextureOverrideFace]\nhash = 12345678\nrun = CommandListSkinTexture\n');
-  const markers = lintModel(model, defaultOptions);
+  // 1. Built-in command list recognized without registering anything
+  const modelBuiltin = createMockModel('[TextureOverrideFace]\nhash = 12345678\nrun = CommandListSkinTexture\n');
+  const markersBuiltin = lintModel(modelBuiltin, defaultOptions);
+  assert.equal(markersBuiltin.filter((m) => m.severity === MarkerSeverity.Error).length, 0);
+  assert.equal(markersBuiltin.filter((m) => m.severity === MarkerSeverity.Warning).length, 0);
 
-  const errors = markers.filter((m) => m.severity === MarkerSeverity.Error);
-  const warnings = markers.filter((m) => m.severity === MarkerSeverity.Warning);
-  assert.equal(errors.length, 0, 'No errors for CommandListSkinTexture');
-  assert.equal(warnings.length, 0, 'No warnings for allowed CommandListSkinTexture');
+  // 2. Dynamic registration for non-builtin custom resource
+  const unregister = registerAllowedResource('CustomCommandListAction');
+  const modelCustom = createMockModel('[TextureOverrideFace]\nhash = 12345678\nrun = CustomCommandListAction\n');
+  const markersAllowed = lintModel(modelCustom, defaultOptions);
+  assert.equal(markersAllowed.filter((m) => m.severity === MarkerSeverity.Warning).length, 0);
 
   unregister();
-  const markersAfter = lintModel(model, defaultOptions);
+  const markersAfter = lintModel(modelCustom, defaultOptions);
   assert.ok(
-    markersAfter.some((m) => m.message.includes('CommandListSkinTexture')),
-    'Should report warning when CommandListSkinTexture is not allowed'
+    markersAfter.some((m) => m.message.includes('CustomCommandListAction')),
+    'Should report warning when CustomCommandListAction is not allowed'
   );
 });
 
@@ -365,29 +368,36 @@ handling = skip
   assert.equal(unusedInfo.length, 0, 'Section names with dot should not be marked as unused when referenced');
 });
 
-test('variables with dot and extension (e.g. $\\ShaderFixes\\help.ini\\notification_timeout) are matched completely and recognized when allowed', () => {
-  const model = createMockModel(`[Present]
+test('variables with dot and extension (e.g. $\\ShaderFixes\\help.ini\\notification_timeout) are matched completely and recognized in core', () => {
+  // 1. Core built-in help.ini variable has 0 warnings by default
+  const modelHelp = createMockModel(`[Present]
 if $\\ShaderFixes\\help.ini\\notification_timeout !== null
   $\\ShaderFixes\\help.ini\\notification_timeout = -1
 endif
 `);
+  const markersHelp = lintModel(modelHelp, defaultOptions);
+  assert.equal(markersHelp.filter((m) => m.severity === MarkerSeverity.Warning).length, 0);
 
-  // Without allowance, reports undeclared variable with the FULL variable name, NOT truncated at dot
-  const markersBefore = lintModel(model, defaultOptions);
+  // 2. Custom dotted variable without allowance reports full variable name (not truncated at dot)
+  const modelCustom = createMockModel(`[Present]
+if $\\CustomMod\\sub.ini\\custom_var !== null
+  $\\CustomMod\\sub.ini\\custom_var = -1
+endif
+`);
+  const markersCustom = lintModel(modelCustom, defaultOptions);
   assert.ok(
-    markersBefore.some((m) => m.message.includes('notification_timeout')),
-    'Undeclared message should include full variable name including notification_timeout'
+    markersCustom.some((m) => m.message.includes('custom_var')),
+    'Undeclared message should include full variable name including custom_var'
   );
   assert.ok(
-    !markersBefore.some((m) => m.message.includes("'$\\ShaderFixes\\help'")),
-    'Variable name must not be truncated at dot (e.g. $\\ShaderFixes\\help)'
+    !markersCustom.some((m) => m.message.includes("'$\\CustomMod\\sub'")),
+    'Variable name must not be truncated at dot'
   );
 
-  // When registered as allowed variable (as done by custom-lint help.ini support)
-  const unreg = registerAllowedVariable(/^\\?shaderfixes\\help\.ini\\/i);
-  const markersAfter = lintModel(model, defaultOptions);
-  const warnings = markersAfter.filter((m) => m.severity === MarkerSeverity.Warning);
-  assert.equal(warnings.length, 0, 'Should not report any warnings when help.ini variable is allowed');
+  // Dynamic allowance of dotted variable
+  const unreg = registerAllowedVariable(/^\\?custommod\\sub\.ini\\/i);
+  const markersAfter = lintModel(modelCustom, defaultOptions);
+  assert.equal(markersAfter.filter((m) => m.severity === MarkerSeverity.Warning).length, 0);
   unreg();
 });
 

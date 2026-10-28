@@ -46,6 +46,10 @@ import {
   registerAllowedUsedVariable,
   registerAllowedUsedResource,
 } from '../src/core/ini/lint.ts';
+import { checkResourceFileExistence } from '../src/core/workspace/file-check.ts';
+import { checkNamespaceFolderConsistency, buildWorkspaceIndex } from '../src/core/workspace/namespace/index.ts';
+import { createNamespaceDefinitionProvider, createNamespaceReferenceProvider } from '../src/core/workspace/namespace/providers.ts';
+import { isBuiltinResource, isHelpIniResource, isHelpIniVariable } from '../src/core/ini/builtin-syntax.ts';
 
 test('decodeDDS throws on invalid magic buffer', () => {
   const invalid = new Uint8Array([0, 1, 2, 3]);
@@ -269,95 +273,95 @@ test('validatePluginZip throws when script is missing', () => {
   assert.throws(() => validatePluginZip(zip), /실행 스크립트.*없습니다/);
 });
 
-test('custom-lint plugin activates and registers both resource and xxmi namespace lint rules', async () => {
+test('custom-lint plugin activates and registers ZZMI and SRMI modding extensions', async () => {
   const def = BUILTIN_PLUGINS.find((p) => p.manifest.id === 'custom-lint')!;
   assert.ok(def);
   assert.equal(def.manifest.name, '커스텀 린트');
   const plugin = def.createPlugin();
 
-  const registeredRules: any[] = [];
   const allowedResources: any[] = [];
-  let registeredView: any = null;
+  const allowedVars: any[] = [];
+  const registeredFilters: any[] = [];
+  const registeredTemplates: any[] = [];
 
   const mockContext: any = {
     manifest: def.manifest,
+    logger: { info: () => {}, warn: () => {}, error: () => {} },
     linter: {
-      registerRule: (rule: any) => {
-        registeredRules.push(rule);
-      },
+      registerRule: () => () => {},
       registerAllowedResource: (pattern: any) => {
         allowedResources.push(pattern);
-        return registerAllowedResource(pattern);
+        return () => {};
       },
       registerAllowedVariable: (pattern: any) => {
-        return registerAllowedVariable(pattern);
+        allowedVars.push(pattern);
+        return () => {};
       },
       registerAllowedUsedVariable: (pattern: any) => {
-        return registerAllowedUsedVariable(pattern);
+        allowedVars.push(pattern);
+        return () => {};
       },
       registerAllowedUsedResource: (pattern: any) => {
-        return registerAllowedUsedResource(pattern);
+        allowedResources.push(pattern);
+        return () => {};
+      },
+      registerDiagnosticFilter: (filter: any) => {
+        registeredFilters.push(filter);
+        return () => {};
+      },
+    },
+    slots: {
+      registerTextureSlotResolver: () => () => {},
+    },
+    templates: {
+      registerTemplate: (template: any) => {
+        registeredTemplates.push(template);
       },
     },
     ui: {
-      registerSidebarView: (view: any) => {
-        registeredView = view;
-      },
-    },
-    workspace: {
-      getCurrentFolder: () => 'D:/Mods/Test',
-      getCurrentFile: () => ({ name: 'test.ini', path: 'D:/Mods/Test/test.ini', location: 'disk' }),
-      readDirectory: async () => [],
-      readTextFile: async () => '',
+      registerSidebarView: () => {},
     },
     editor: {
-      getText: () => 'filename = Meshes/NotExist.buf\n',
-      setCursor: () => {},
+      insertText: () => {},
     },
   };
 
   plugin.activate(mockContext);
-  assert.equal(registeredRules.length, 2);
-  assert.equal(registeredView, null);
-  assert.ok(allowedResources.includes('CommandListSkinTexture'));
-  assert.ok(isAllowedResource('CommandListSkinTexture'));
-  assert.ok(isAllowedUsedResource('CommandListSkinTexture'));
-  assert.ok(isAllowedResource('BuiltinCommandListSkinTexture'));
-  assert.ok(isAllowedResource('BuiltinCommandListDraw'));
-  assert.ok(isAllowedResource('builtincommandlist_dispatch'));
-  assert.ok(isAllowedResource('CommandList\\Builtin\\Action'));
-  assert.ok(isAllowedUsedResource('BuiltinCommandListSkinTexture'));
-  assert.ok(isAllowedUsedResource('BuiltinCommandListDraw'));
 
-  const resourceRule = registeredRules.find((r) => r.id === 'missing-resource-files')!;
-  const nsRule = registeredRules.find((r) => r.id === 'xxmi-namespace-check')!;
-  assert.ok(resourceRule);
-  assert.ok(nsRule);
+  assert.ok(registeredTemplates.length >= 3, 'custom-lint registers ZZMI templates');
+  assert.ok(registeredFilters.length >= 2, 'custom-lint registers ZZMI & SRMI diagnostic filters');
 
-  // 1. Test missing resource rule
-  const diags = await resourceRule.check({
-    model: {
+  const checkVar = (name: string) => allowedVars.some((p) => (typeof p === 'function' ? p(name) : p instanceof RegExp ? p.test(name) : p.toLowerCase() === name.toLowerCase()));
+  const checkResource = (name: string) => allowedResources.some((p) => (typeof p === 'function' ? p(name) : p instanceof RegExp ? p.test(name) : p.toLowerCase() === name.toLowerCase()));
+
+  assert.ok(checkVar('$\\SRMI\\vertex_count'), 'SRMI vertex_count variable allowed');
+  assert.ok(checkResource('Resource\\SRMI\\PositionBuffer'), 'Resource\\SRMI resource allowed');
+  assert.ok(checkVar('$\\TTL\\alpha'), 'TTL variable allowed');
+});
+
+test('core workspace features: resource file check and xxmi namespace linting', async () => {
+  // 1. Test missing resource file check in Core
+  const diags = await checkResourceFileExistence(
+    {
       getLineCount: () => 1,
       getLineContent: () => 'filename = Meshes/NotExist.buf',
-    },
-    folder: 'D:/Mods/Test',
-    fileExists: async () => false,
-  });
+    } as any,
+    async () => false,
+  );
   assert.equal(diags.length, 1);
-  assert.equal(diags[0].severity, 'warning');
+  assert.equal(diags[0].severity, 4); // MarkerSeverity.Warning
   assert.ok(diags[0].message.includes('Meshes/NotExist.buf'));
 
-  const diagsOk = await resourceRule.check({
-    model: {
+  const diagsOk = await checkResourceFileExistence(
+    {
       getLineCount: () => 1,
       getLineContent: () => 'filename = Meshes/Exists.buf',
-    },
-    folder: 'D:/Mods/Test',
-    fileExists: async () => true,
-  });
+    } as any,
+    async () => true,
+  );
   assert.equal(diagsOk.length, 0);
 
-  // 2. Test XXMI namespace rule
+  // 2. Test XXMI namespace check in Core
   const otherIniContent = `
 namespace = RaidenMod
 [Constants]
@@ -368,15 +372,19 @@ global $active = 1
 handling = skip
 `;
 
+  const filesMap: Record<string, string> = {
+    'Raiden.ini': otherIniContent,
+    'test.ini': '',
+  };
+
   const nsCtxBase = {
     folder: 'D:/Mods/Test',
+    file: { name: 'test.ini', path: 'D:/Mods/Test/test.ini', location: 'disk' as const },
     getAllFiles: () => ['Raiden.ini', 'test.ini'],
     readTextFile: async (path: string) => {
-      if (path.includes('Raiden.ini')) return otherIniContent;
-      return '';
+      const base = path.split(/[\\/]/).pop()!;
+      return filesMap[base] || '';
     },
-    file: { name: 'test.ini', path: 'D:/Mods/Test/test.ini', location: 'disk' },
-    fileExists: async () => true,
   };
 
   // 2-a. Valid namespaced variable & commandlist
@@ -389,7 +397,7 @@ handling = skip
     },
     getValue: () => 'if $\\RaidenMod\\costume == 1\nrun = CommandList\\RaidenMod\\SwapWeapon\nendif',
   };
-  const nsDiagsValid = await nsRule.check({ ...nsCtxBase, model: validModel });
+  const nsDiagsValid = await checkNamespaceFolderConsistency(validModel as any, nsCtxBase);
   assert.equal(nsDiagsValid.length, 0, 'Valid namespace variable and commandlist should have 0 diagnostics');
 
   // 2-b. Unknown namespace
@@ -398,7 +406,7 @@ handling = skip
     getLineContent: () => 'if $\\UnknownMod\\costume == 1',
     getValue: () => 'if $\\UnknownMod\\costume == 1',
   };
-  const nsDiagsUnknown = await nsRule.check({ ...nsCtxBase, model: unknownNsModel });
+  const nsDiagsUnknown = await checkNamespaceFolderConsistency(unknownNsModel as any, nsCtxBase);
   assert.equal(nsDiagsUnknown.length, 1);
   assert.ok(nsDiagsUnknown[0].message.includes("네임스페이스 'UnknownMod'을(를) 찾을 수 없습니다"));
 
@@ -408,21 +416,11 @@ handling = skip
     getLineContent: () => 'if $\\RaidenMod\\nonexistent == 1',
     getValue: () => 'if $\\RaidenMod\\nonexistent == 1',
   };
-  const nsDiagsUndeclared = await nsRule.check({ ...nsCtxBase, model: undeclaredVarModel });
+  const nsDiagsUndeclared = await checkNamespaceFolderConsistency(undeclaredVarModel as any, nsCtxBase);
   assert.equal(nsDiagsUndeclared.length, 1);
   assert.ok(nsDiagsUndeclared[0].message.includes("네임스페이스 'RaidenMod'에 선언되지 않은 변수 '$nonexistent'"));
 
-  // 2-d. Single ini mode (folder = null) returns 0 (handled by core linter)
-  const singleIniDiags = await nsRule.check({
-    ...nsCtxBase,
-    folder: null,
-    model: undeclaredVarModel,
-  });
-  assert.equal(singleIniDiags.length, 0);
-
-  // 2-e. Shared namespace across multiple INI files:
-  // If test.ini also declares namespace = RaidenMod, variables and sections from Raiden.ini
-  // are accessible directly ($costume, run = CommandListSwapWeapon)
+  // 2-d. Shared namespace across multiple INI files:
   const sharedNsModel = {
     getLineCount: () => 4,
     getLineContent: (n: number) => {
@@ -433,25 +431,10 @@ handling = skip
     },
     getValue: () => 'namespace = RaidenMod\nif $costume == 1\n    run = CommandListSwapWeapon\nendif',
   };
-  const sharedNsDiags = await nsRule.check({ ...nsCtxBase, model: sharedNsModel });
+  const sharedNsDiags = await checkNamespaceFolderConsistency(sharedNsModel as any, nsCtxBase);
   assert.equal(sharedNsDiags.length, 0, 'Shared namespace should have 0 diagnostics for shared variables and sections');
-  assert.ok(isAllowedVariable('costume'), 'costume should be allowed variable via shared namespace');
-  assert.ok(isAllowedResource('CommandListSwapWeapon'), 'CommandListSwapWeapon should be allowed resource via shared namespace');
 
-  // If another file has a different namespace, bare $costume is NOT allowed
-  const diffNsModel = {
-    getLineCount: () => 2,
-    getLineContent: (n: number) => {
-      if (n === 1) return 'namespace = AyakaMod';
-      return 'if $costume == 1';
-    },
-    getValue: () => 'namespace = AyakaMod\nif $costume == 1',
-  };
-  await nsRule.check({ ...nsCtxBase, model: diffNsModel });
-  assert.equal(isAllowedVariable('costume'), false, 'costume should not be allowed as bare variable in different namespace');
-  assert.ok(isAllowedVariable('\\RaidenMod\\costume'), 'Fully qualified \\RaidenMod\\costume should still be allowed');
-
-  // 2-f. BuiltinCommandList calls produce 0 diagnostics
+  // 2-e. BuiltinCommandList calls produce 0 diagnostics
   const builtinModel = {
     getLineCount: () => 2,
     getLineContent: (n: number) => {
@@ -460,34 +443,8 @@ handling = skip
     },
     getValue: () => 'run = BuiltinCommandListSkinTexture\npost run = BuiltinCommandListDraw',
   };
-  const nsDiagsBuiltin = await nsRule.check({ ...nsCtxBase, model: builtinModel });
+  const nsDiagsBuiltin = await checkNamespaceFolderConsistency(builtinModel as any, nsCtxBase);
   assert.equal(nsDiagsBuiltin.length, 0, 'BuiltinCommandList calls should produce 0 diagnostics');
-
-  // 2-g. custom-lint independently emits namespace warning for TTL when namespace = TTL is absent in folder
-  const ttlModel = {
-    getLineCount: () => 3,
-    getLineContent: (n: number) => {
-      if (n === 1) return '$\\TTL\\alpha = 0.4';
-      if (n === 2) return '$\\TTL\\_1 = 192';
-      return '$\\TTL\\_2 = 71646';
-    },
-    getValue: () => '$\\TTL\\alpha = 0.4\n$\\TTL\\_1 = 192\n$\\TTL\\_2 = 71646',
-  };
-  const nsDiagsTtl = await nsRule.check({
-    ...nsCtxBase,
-    model: ttlModel,
-  });
-  // 2-h. SRMI vertex_count is recognized as built-in syntax (0 diagnostics)
-  const srmiModel = {
-    getLineCount: () => 1,
-    getLineContent: () => '$\\SRMI\\vertex_count = 41428',
-    getValue: () => '$\\SRMI\\vertex_count = 41428',
-  };
-  const nsDiagsSrmi = await nsRule.check({
-    ...nsCtxBase,
-    model: srmiModel,
-  });
-  assert.equal(nsDiagsSrmi.length, 0, 'SRMI vertex_count syntax should produce 0 diagnostics in namespace rule');
 });
 
 test('custom-lint incorporates zzmi support and help.ini built-in syntax', () => {
@@ -549,13 +506,13 @@ test('custom-lint incorporates zzmi support and help.ini built-in syntax', () =>
 
   plugin.activate(mockContext);
 
-  // 1. Verify ShaderFixes\help.ini built-in syntax is recognized
   const checkResource = (name: string) => allowedResources.some((p) => (typeof p === 'function' ? p(name) : p instanceof RegExp ? p.test(name) : p.toLowerCase() === name.toLowerCase()));
   const checkVar = (name: string) => allowedVars.some((p) => (typeof p === 'function' ? p(name) : p instanceof RegExp ? p.test(name) : p.toLowerCase() === name.toLowerCase()));
 
-  assert.ok(checkResource('CustomShader\\ShaderFixes\\help.ini\\FormatText'), 'help.ini FormatText must be allowed as built-in resource');
-  assert.ok(checkResource('Resource\\ShaderFixes\\help.ini\\Notification'), 'help.ini Notification must be allowed as built-in resource');
-  assert.ok(checkVar('\\ShaderFixes\\help.ini\\notification_timeout'), 'help.ini notification_timeout must be allowed as built-in variable');
+  // 1. Verify ShaderFixes\help.ini built-in syntax is recognized in Core
+  assert.ok(isHelpIniResource('CustomShader\\ShaderFixes\\help.ini\\FormatText'), 'help.ini FormatText must be allowed as built-in resource');
+  assert.ok(isHelpIniResource('Resource\\ShaderFixes\\help.ini\\Notification'), 'help.ini Notification must be allowed as built-in resource');
+  assert.ok(isHelpIniVariable('\\ShaderFixes\\help.ini\\notification_timeout'), 'help.ini notification_timeout must be allowed as built-in variable');
 
   // 2. Verify ZZMI features (templates, allowed resources, diagnostic filters)
   assert.ok(registeredTemplates.length >= 3, 'custom-lint should register ZZMI templates');
@@ -755,64 +712,9 @@ test('web listDiskPlugins sanitizes stale localStorage, purges python-runner, an
   }
 });
 
-test('custom-lint provides cross-file definition and references for same namespace symbols', async () => {
-  const def = BUILTIN_PLUGINS.find((p) => p.manifest.id === 'custom-lint')!;
-  assert.ok(def);
-  const plugin = def.createPlugin();
-
-  let registeredDefProvider: any = null;
-  let registeredRefProvider: any = null;
-  const registeredActions: any[] = [];
-  let openedFilePath = '';
-  let openedFileLine = 0;
-
-  const mockContext: any = {
-    manifest: def.manifest,
-    editor: {
-      getCursor: () => ({ lineNumber: 3, column: 5 }),
-      getLine: () => '$costume = 2',
-      getLineCount: () => 3,
-      getText: () => '$costume = 2',
-      registerContextMenuAction: (action: any) => {
-        registeredActions.push(action);
-        return () => {};
-      },
-    },
-    ui: {
-      showModal: () => {},
-      showToast: () => {},
-    },
-    linter: {
-      registerRule: () => () => {},
-      registerAllowedResource: () => () => {},
-      registerAllowedVariable: () => () => {},
-      registerAllowedUsedResource: () => () => {},
-      registerAllowedUsedVariable: () => () => {},
-      registerDefinitionProvider: (p: any) => {
-        registeredDefProvider = p;
-        return () => {};
-      },
-      registerReferenceProvider: (p: any) => {
-        registeredRefProvider = p;
-        return () => {};
-      },
-    },
-    workspace: {
-      readDirectory: async () => [],
-      readTextFile: async () => '',
-      openFile: async (path: string, line?: number) => {
-        openedFilePath = path;
-        openedFileLine = line || 0;
-      },
-      getCurrentFile: () => ({ name: 'Skill.ini', path: 'Skill.ini', location: 'disk' }),
-      getCurrentFolder: () => 'D:/Mods/Test',
-    },
-  };
-
-  plugin.activate(mockContext);
-  assert.ok(registeredDefProvider, 'Definition provider should be registered');
-  assert.ok(registeredRefProvider, 'Reference provider should be registered');
-  assert.equal(registeredActions.length, 0, 'Should not register extra context menu actions (core F12/Shift+F12 are used instead)');
+test('core provides cross-file definition and references for same namespace symbols', async () => {
+  const registeredDefProvider = createNamespaceDefinitionProvider();
+  const registeredRefProvider = createNamespaceReferenceProvider();
 
   const raidenIni = [
     'namespace = RaidenMod',
@@ -906,19 +808,7 @@ test('custom-lint provides cross-file definition and references for same namespa
     { name: 'CommandListSwapWeapon', cleanName: 'CommandListSwapWeapon', kind: 'section' },
     raidenCtx,
   );
-  // 6. Deactivate and verify clean teardown and in-flight cancellation safety
-  plugin.deactivate();
-  const defAfterDeactivate = await registeredDefProvider.provideDefinition(
-    { name: '$costume', cleanName: 'costume', kind: 'variable' },
-    skillCtx,
-  );
-  assert.equal(defAfterDeactivate, null, 'provideDefinition must return null after deactivate');
-
-  const refsAfterDeactivate = await registeredRefProvider.provideReferences(
-    { name: '$costume', cleanName: 'costume', kind: 'variable' },
-    raidenCtx,
-  );
-  assert.deepEqual(refsAfterDeactivate, [], 'provideReferences must return empty array after deactivate');
+  assert.ok(refsSec.length >= 2, 'CommandListSwapWeapon references should include definition and usage');
 });
 
 test('Plugin UI API FormConfig schema and value aggregation works properly', () => {

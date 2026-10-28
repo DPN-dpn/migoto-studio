@@ -493,8 +493,8 @@ LangString secPluginPythonDesc ${LANG_ENGLISH} "Run Python scripts within the ed
 LangString secPluginLint ${LANG_KOREAN} "커스텀 린트"
 LangString secPluginLint ${LANG_ENGLISH} "Custom Linter"
 
-LangString secPluginLintDesc ${LANG_KOREAN} "리소스 파일 실재성, XXMI/help.ini 네임스페이스 및 ZZMI 슬롯픽스/TTL 문법을 실시간으로 검사하고 템플릿을 제공합니다."
-LangString secPluginLintDesc ${LANG_ENGLISH} "Real-time verification for resource existence, XXMI/help.ini namespace, and ZZMI SlotFix/TTL support."
+LangString secPluginLintDesc ${LANG_KOREAN} "ZZMI 슬롯픽스/TTL 투명도 및 SRMI 전용 문법을 검사하고 모드 템플릿을 제공합니다."
+LangString secPluginLintDesc ${LANG_ENGLISH} "Verifies ZZMI SlotFix/TTL opacity and SRMI syntax, providing modding templates."
 
 LangString secPluginToggle ${LANG_KOREAN} "토글 키 매니저 (GitHub)"
 LangString secPluginToggle ${LANG_ENGLISH} "Toggle Key Manager (GitHub)"

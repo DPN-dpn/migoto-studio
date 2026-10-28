@@ -1,5 +1,5 @@
 import type { NamespaceExport, SymbolLocationRecord } from './types.ts';
-import { isBuiltinResource } from '../builtin-syntax/matcher.ts';
+import { isBuiltinResource } from '../../ini/builtin-syntax.ts';
 
 export { isBuiltinResource };
 

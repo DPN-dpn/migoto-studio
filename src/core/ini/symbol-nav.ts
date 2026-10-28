@@ -471,6 +471,8 @@ export type CustomReferencesResolver = (
 
 let customDefinitionResolver: CustomDefinitionResolver | null = null;
 let customReferencesResolver: CustomReferencesResolver | null = null;
+let coreDefinitionResolver: CustomDefinitionResolver | null = null;
+let coreReferencesResolver: CustomReferencesResolver | null = null;
 
 export function setCustomDefinitionResolver(resolver: CustomDefinitionResolver | null) {
   customDefinitionResolver = resolver;
@@ -478,6 +480,14 @@ export function setCustomDefinitionResolver(resolver: CustomDefinitionResolver |
 
 export function setCustomReferencesResolver(resolver: CustomReferencesResolver | null) {
   customReferencesResolver = resolver;
+}
+
+export function setCoreDefinitionResolver(resolver: CustomDefinitionResolver | null) {
+  coreDefinitionResolver = resolver;
+}
+
+export function setCoreReferencesResolver(resolver: CustomReferencesResolver | null) {
+  coreReferencesResolver = resolver;
 }
 
 /**
@@ -497,7 +507,7 @@ export async function jumpToDefinition(
     return false;
   }
 
-  // 1. Try plugin-provided definition resolver (e.g. cross-file same namespace from custom-lint)
+  // 1. Try plugin-provided definition resolver (e.g. custom plugins)
   let def: SymbolOccurrence | null = null;
   if (customDefinitionResolver) {
     try {
@@ -507,7 +517,16 @@ export async function jumpToDefinition(
     }
   }
 
-  // 2. Fallback to core single-file synchronous definition search
+  // 2. Try core workspace namespace definition resolver (cross-file across mod folder)
+  if (!def && coreDefinitionResolver) {
+    try {
+      def = await coreDefinitionResolver(target, model, doc);
+    } catch (err) {
+      console.warn('[symbol-nav] Core definition resolver error:', err);
+    }
+  }
+
+  // 3. Fallback to core single-file synchronous definition search
   if (!def) {
     def = findDefinitionSync(target, model, doc);
   }
@@ -594,7 +613,7 @@ export async function showReferencesDialog(
     return;
   }
 
-  // 1. Try plugin-provided references resolver (e.g. cross-file same namespace from custom-lint)
+  // 1. Try plugin-provided references resolver (e.g. custom plugins)
   let occs: SymbolOccurrence[] = [];
   if (customReferencesResolver) {
     try {
@@ -604,7 +623,16 @@ export async function showReferencesDialog(
     }
   }
 
-  // 2. Fallback to core single-file synchronous references search
+  // 2. Try core workspace namespace references resolver (cross-file across mod folder)
+  if (occs.length === 0 && coreReferencesResolver) {
+    try {
+      occs = await coreReferencesResolver(target, model, doc);
+    } catch (err) {
+      console.warn('[symbol-nav] Core reference resolver error:', err);
+    }
+  }
+
+  // 3. Fallback to core single-file synchronous references search
   if (occs.length === 0) {
     occs = findAllOccurrencesSync(target, model, doc);
   }
@@ -639,6 +667,11 @@ export function registerSymbolProviders(
           def = await customDefinitionResolver(target, model, doc);
         } catch {}
       }
+      if (!def && coreDefinitionResolver) {
+        try {
+          def = await coreDefinitionResolver(target, model, doc);
+        } catch {}
+      }
       if (!def) {
         def = findDefinitionSync(target, model, doc);
       }
@@ -661,6 +694,11 @@ export function registerSymbolProviders(
       if (customReferencesResolver) {
         try {
           occs = await customReferencesResolver(target, model, doc);
+        } catch {}
+      }
+      if (occs.length === 0 && coreReferencesResolver) {
+        try {
+          occs = await coreReferencesResolver(target, model, doc);
         } catch {}
       }
       if (occs.length === 0) {

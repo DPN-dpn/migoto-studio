@@ -1,5 +1,5 @@
 export interface SymbolLocationRecord {
-  name: string;        // Lowercase name or clean name
+  name: string; // Lowercase name or clean name
   rawName: string;
   kind: 'variable' | 'section';
   line: number;

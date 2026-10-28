@@ -1,5 +1,20 @@
 import type { monaco } from '../editor/monaco';
 import type { Settings } from '../workspace/settings';
+import {
+  isBuiltinResource,
+  isHelpIniResource,
+  isHelpIniVariable,
+  HELP_INI_RESOURCE_REGEX,
+  HELP_INI_VARIABLE_REGEX,
+} from './builtin-syntax.ts';
+
+export {
+  isBuiltinResource,
+  isHelpIniResource,
+  isHelpIniVariable,
+  HELP_INI_RESOURCE_REGEX,
+  HELP_INI_VARIABLE_REGEX,
+};
 
 export const MarkerSeverity = {
   Hint: 1,
@@ -547,6 +562,7 @@ export function registerAllowedResource(
 }
 
 export function isAllowedResource(name: string): boolean {
+  if (isBuiltinResource(name) || isHelpIniResource(name)) return true;
   const norm = name.toLowerCase();
   return registeredAllowedResources.some((p) => {
     if (typeof p === 'function') return p(name) || p(norm);
@@ -570,6 +586,7 @@ export function registerAllowedVariable(pattern: string | RegExp | ((name: strin
 }
 
 export function isAllowedVariable(name: string): boolean {
+  if (isHelpIniVariable(name)) return true;
   const norm = name.toLowerCase();
   const trimmed = norm.startsWith('\\') ? norm.slice(1) : norm;
   return registeredAllowedVariables.some((p) => {
@@ -602,6 +619,7 @@ export function registerAllowedUsedVariable(
 }
 
 export function isAllowedUsedVariable(name: string): boolean {
+  if (isHelpIniVariable(name)) return true;
   const norm = name.toLowerCase();
   const trimmed = norm.startsWith('\\') ? norm.slice(1) : norm;
   return registeredAllowedUsedVariables.some((p) => {
@@ -633,6 +651,7 @@ export function registerAllowedUsedResource(
 }
 
 export function isAllowedUsedResource(name: string): boolean {
+  if (isBuiltinResource(name) || isHelpIniResource(name)) return true;
   const norm = name.toLowerCase();
   const trimmed = norm.startsWith('\\') ? norm.slice(1) : norm;
   return registeredAllowedUsedResources.some((p) => {

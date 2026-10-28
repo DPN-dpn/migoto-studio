@@ -23,7 +23,7 @@ import { OutlinePanel } from './ui/panels/outline';
 import { registerSnippetCompletions, initCustomTemplates } from './core/ini/templates';
 import { openSettings } from './ui/modals/settings-ui';
 import { openHelp } from './ui/modals/help-ui';
-import { lintModel, optionsFromSettings } from './core/ini/lint';
+import { lintModel, optionsFromSettings, isAllowedResource, isAllowedVariable } from './core/ini/lint';
 import { registerSmartCompletions } from './core/editor/completions';
 import { registerFoldingProvider } from './core/editor/folding';
 import { DiffViewer } from './ui/views/diff-viewer';
@@ -34,7 +34,16 @@ import {
   registerSymbolProviders,
   jumpToDefinition,
   showReferencesDialog,
+  setCoreDefinitionResolver,
+  setCoreReferencesResolver,
 } from './core/ini/symbol-nav';
+import {
+  buildWorkspaceIndex,
+  createCoreDefinitionProvider,
+  createCoreReferenceProvider,
+  checkNamespaceDiagnostics,
+} from './core/workspace/namespace';
+import { checkResourceFileExistence } from './core/workspace/file-check';
 import { initPwa } from './pwa';
 import { checkOnStartup } from './updater/updater';
 import { CURRENT_APP_VERSION } from './updater/version';
@@ -141,6 +150,67 @@ async function boot() {
   const explorer = new FileExplorer($('sidebar-panel-explorer'), doc);
   const searchPanel = new SearchPanel($('sidebar-panel-search'), doc, editor, explorer);
   new TemplatePanel($('sidebar-panel-templates'), editor, doc);
+
+  // Core Workspace Namespace & Cross-file Navigation Providers
+  const workspaceHelper = {
+    readDirectory: async () => (explorer && explorer.hasFolder ? (explorer as any).readDirectory?.() ?? [] : []),
+    readTextFile: async (path: string) => (explorer && explorer.hasFolder ? (explorer as any).readTextFile?.(path) ?? '' : ''),
+  };
+  const coreDefProvider = createCoreDefinitionProvider(workspaceHelper);
+  const coreRefProvider = createCoreReferenceProvider(workspaceHelper);
+
+  setCoreDefinitionResolver(async (target, currentModel, currentDoc) => {
+    const ctx = {
+      folder: explorer && explorer.hasFolder,
+      file: currentDoc.file ? { path: currentDoc.file.id, name: currentDoc.fileName } : undefined,
+      model: currentModel,
+      getAllFiles: () => (explorer && explorer.hasFolder ? (explorer as any).getAllFiles?.() ?? [] : []),
+    };
+    const loc = await coreDefProvider.provideDefinition(target, ctx);
+    if (!loc) return null;
+    return {
+      title: loc.filePath.split(/[\\/]/).pop() || loc.filePath,
+      filePath: loc.filePath,
+      uri: monaco.Uri.file(loc.filePath),
+      range: {
+        startLineNumber: loc.lineNumber,
+        startColumn: loc.startColumn,
+        endLineNumber: loc.lineNumber,
+        endColumn: loc.endColumn,
+      },
+      lineContent: loc.lineContent || '',
+      section: loc.section || '',
+      isDefinition: true,
+      kind: target.kind,
+      matchedText: target.name,
+    };
+  });
+
+  setCoreReferencesResolver(async (target, currentModel, currentDoc) => {
+    const ctx = {
+      folder: explorer && explorer.hasFolder,
+      file: currentDoc.file ? { path: currentDoc.file.id, name: currentDoc.fileName } : undefined,
+      model: currentModel,
+      getAllFiles: () => (explorer && explorer.hasFolder ? (explorer as any).getAllFiles?.() ?? [] : []),
+    };
+    const locs = await coreRefProvider.provideReferences(target, ctx);
+    return locs.map((loc) => ({
+      title: loc.filePath.split(/[\\/]/).pop() || loc.filePath,
+      filePath: loc.filePath,
+      uri: monaco.Uri.file(loc.filePath),
+      range: {
+        startLineNumber: loc.lineNumber,
+        startColumn: loc.startColumn,
+        endLineNumber: loc.lineNumber,
+        endColumn: loc.endColumn,
+      },
+      lineContent: loc.lineContent || '',
+      section: loc.section || '',
+      isDefinition: Boolean(loc.isDefinition),
+      kind: target.kind,
+      matchedText: target.name,
+    }));
+  });
 
   let activityBar: ActivityBar;
 
@@ -328,21 +398,53 @@ async function boot() {
     const model = editor.getModel();
     if (!model) return;
     const s = getSettings();
-    const hasFolder = Boolean(explorer && explorer.hasFolder);
+    const baseMarkers = lintModel(model, optionsFromSettings(s, explorer.hasFolder));
+    const coreFolderMarkers: monaco.editor.IMarkerData[] = [];
+
+    if (explorer.hasFolder && s.lintEnabled) {
+      try {
+        const wsHelper = {
+          readDirectory: async () => (explorer as any).readDirectory?.() ?? [],
+          readTextFile: async (p: string) => (explorer as any).readTextFile?.(p) ?? '',
+        };
+        const wsCtx = {
+          folder: explorer.hasFolder,
+          file: doc.file ? { path: doc.file.id, name: doc.fileName } : undefined,
+          model,
+          getAllFiles: () => (explorer as any).getAllFiles?.() ?? [],
+        };
+
+        const index = await buildWorkspaceIndex(wsCtx, wsHelper);
+        if (currentRunId !== lintRunId) return;
+
+        const nsMarkers = checkNamespaceDiagnostics(model, index, {
+          isAllowedVariable,
+          isAllowedResource,
+        });
+        const fileMarkers = await checkResourceFileExistence(model, async (relPath) => {
+          return pluginManager.checkFileExists(relPath);
+        });
+
+        coreFolderMarkers.push(...nsMarkers, ...fileMarkers);
+      } catch (err) {
+        console.warn('[main] Core workspace lint error:', err);
+      }
+    }
+
     const customMarkers = await pluginManager.runCustomLintRules(model);
     if (currentRunId !== lintRunId) {
       // Discard stale result if a newer lint run has started
       return;
     }
-    const baseMarkers = lintModel(model, optionsFromSettings(s, hasFolder));
-    const rawMarkers = [...baseMarkers, ...customMarkers];
+
+    const rawMarkers = [...baseMarkers, ...coreFolderMarkers, ...customMarkers];
     currentMarkers = pluginManager.filterDiagnostics(rawMarkers, model);
     monaco.editor.setModelMarkers(model, 'migoto-lint', currentMarkers);
 
     // Also refresh markers for any other open text tabs
     for (const tab of doc.allTabs) {
       if (tab.kind === 'text' && tab.model !== model) {
-        const markers = lintModel(tab.model, optionsFromSettings(s, hasFolder));
+        const markers = lintModel(tab.model, optionsFromSettings(s, explorer.hasFolder));
         const filtered = pluginManager.filterDiagnostics(markers, tab.model);
         monaco.editor.setModelMarkers(tab.model, 'migoto-lint', filtered);
       }

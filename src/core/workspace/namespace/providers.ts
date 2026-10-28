@@ -1,15 +1,18 @@
-import type {
-  CustomDefinitionProvider,
-  CustomReferenceProvider,
-  PluginContext,
-  SymbolLocation,
-} from '../../../src/plugins/types.ts';
 import type { SymbolLocationRecord } from './types.ts';
 import { parseIniExports } from './parser.ts';
-import { buildWorkspaceIndex } from './indexer.ts';
-import { isBuiltinResource } from '../builtin-syntax/matcher.ts';
+import { buildWorkspaceIndex, type WorkspaceContextLike } from './indexer.ts';
 
-function matchesSymbol(target: any, rec: SymbolLocationRecord): boolean {
+export interface CoreSymbolLocation {
+  filePath: string;
+  lineNumber: number;
+  startColumn: number;
+  endColumn: number;
+  lineContent?: string;
+  section?: string;
+  isDefinition?: boolean;
+}
+
+export function matchesSymbol(target: any, rec: SymbolLocationRecord): boolean {
   const targetNameClean = (target.cleanName || target.name || '')
     .replace(/^[\[\]\$]+|[\[\]\$]+$/g, '')
     .toLowerCase();
@@ -42,19 +45,21 @@ function matchesSymbol(target: any, rec: SymbolLocationRecord): boolean {
   return false;
 }
 
-export function createDefinitionProvider(
-  context: PluginContext,
-  isActive: () => boolean,
-): CustomDefinitionProvider {
+export function createCoreDefinitionProvider(
+  workspaceHelper?: {
+    readDirectory?: () => Promise<any[]>;
+    readTextFile?: (path: string) => Promise<string>;
+  },
+) {
   return {
-    provideDefinition: async (target, ctx) => {
-      if (!isActive() || !target) return null;
-      const { allSummaries } = await buildWorkspaceIndex(ctx, context);
-      if (!isActive() || allSummaries.length === 0) return null;
+    provideDefinition: async (target: any, ctx: WorkspaceContextLike): Promise<CoreSymbolLocation | null> => {
+      if (!target) return null;
+      const { allSummaries } = await buildWorkspaceIndex(ctx, workspaceHelper);
+      if (allSummaries.length === 0) return null;
 
       const curPath = (ctx.file?.path || ctx.file?.name || '').toLowerCase();
       let currentNs = target.namespace ? target.namespace.toLowerCase() : '';
-      if (!currentNs) {
+      if (!currentNs && ctx.model) {
         const curExp = parseIniExports(ctx.model.getValue(), ctx.file?.path || ctx.file?.name || '');
         if (curExp.namespace) {
           currentNs = curExp.namespace.toLowerCase();
@@ -110,7 +115,7 @@ export function createDefinitionProvider(
         }
       }
 
-      // Phase 3: Global / all files search fallback
+      // Phase 3: Global search fallback
       for (const s of allSummaries) {
         const found = s.declarations.find((d) => matchesSymbol(target, d));
         if (found) {
@@ -131,76 +136,48 @@ export function createDefinitionProvider(
   };
 }
 
-export function createReferenceProvider(
-  context: PluginContext,
-  isActive: () => boolean,
-): CustomReferenceProvider {
+export function createCoreReferenceProvider(
+  workspaceHelper?: {
+    readDirectory?: () => Promise<any[]>;
+    readTextFile?: (path: string) => Promise<string>;
+  },
+) {
   return {
-    provideReferences: async (target, ctx) => {
-      if (!isActive() || !target) return [];
-      const { allSummaries } = await buildWorkspaceIndex(ctx, context);
-      if (!isActive() || allSummaries.length === 0) return [];
+    provideReferences: async (target: any, ctx: WorkspaceContextLike): Promise<CoreSymbolLocation[]> => {
+      if (!target) return [];
+      const { allSummaries } = await buildWorkspaceIndex(ctx, workspaceHelper);
+      if (allSummaries.length === 0) return [];
 
-      const curPath = (ctx.file?.path || ctx.file?.name || '').toLowerCase();
-      let currentNs = target.namespace ? target.namespace.toLowerCase() : '';
-      if (!currentNs) {
-        const curExp = parseIniExports(ctx.model.getValue(), ctx.file?.path || ctx.file?.name || '');
-        if (curExp.namespace) {
-          currentNs = curExp.namespace.toLowerCase();
-        } else {
-          const currentSummary = allSummaries.find((s) => {
-            const p = s.filePath.toLowerCase();
-            return p === curPath || p.endsWith(`/${curPath}`) || curPath.endsWith(`/${p}`);
-          });
-          if (currentSummary && currentSummary.namespace) {
-            currentNs = currentSummary.namespace.toLowerCase();
-          }
-        }
-      }
-
-      const targetNameClean = (target.cleanName || target.name || '')
-        .replace(/^[\[\]\$]+|[\[\]\$]+$/g, '')
-        .toLowerCase();
-
-      const results: SymbolLocation[] = [];
-      const seen = new Set<string>();
-
-      const addLocation = (rec: SymbolLocationRecord, isDef: boolean) => {
-        const key = `${rec.filePath}:${rec.line}:${rec.startCol}`;
-        if (seen.has(key)) return;
-        seen.add(key);
-        results.push({
-          filePath: rec.filePath,
-          lineNumber: rec.line,
-          startColumn: rec.startCol,
-          endColumn: rec.endCol,
-          lineContent: rec.lineContent,
-          section: rec.section,
-          isDefinition: isDef,
-        });
-      };
-
-      const isBuiltinTarget = isBuiltinResource(targetNameClean);
+      const results: CoreSymbolLocation[] = [];
 
       for (const s of allSummaries) {
-        const fileNs = s.namespace ? s.namespace.toLowerCase() : '';
-        const isSameNs = currentNs ? fileNs === currentNs : !fileNs;
+        // Collect definitions
+        for (const d of s.declarations) {
+          if (matchesSymbol(target, d)) {
+            results.push({
+              filePath: d.filePath,
+              lineNumber: d.line,
+              startColumn: d.startCol,
+              endColumn: d.endCol,
+              lineContent: d.lineContent,
+              section: d.section,
+              isDefinition: true,
+            });
+          }
+        }
 
-        if (isBuiltinTarget || isSameNs) {
-          // 1. Same namespace or builtin: collect declarations & usages
-          for (const d of s.declarations) {
-            if (matchesSymbol(target, d)) addLocation(d, true);
-          }
-          for (const u of s.usages) {
-            if (matchesSymbol(target, u)) addLocation(u, false);
-          }
-        } else if (currentNs) {
-          // 2. Different namespace: collect usages that explicitly prefix currentNs
-          for (const u of s.usages) {
-            const uNs = u.namespace ? u.namespace.toLowerCase() : '';
-            if (uNs === currentNs && matchesSymbol(target, u)) {
-              addLocation(u, false);
-            }
+        // Collect usages
+        for (const u of s.usages) {
+          if (matchesSymbol(target, u)) {
+            results.push({
+              filePath: u.filePath,
+              lineNumber: u.line,
+              startColumn: u.startCol,
+              endColumn: u.endCol,
+              lineContent: u.lineContent,
+              section: u.section,
+              isDefinition: false,
+            });
           }
         }
       }
@@ -209,3 +186,6 @@ export function createReferenceProvider(
     },
   };
 }
+
+export const createNamespaceDefinitionProvider = createCoreDefinitionProvider;
+export const createNamespaceReferenceProvider = createCoreReferenceProvider;
