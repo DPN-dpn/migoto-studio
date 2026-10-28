@@ -9,7 +9,6 @@ import { cleanupNamespaceState, createNamespaceRegistrationState, registerNamesp
 import { createZzmiSlotResolver, registerZzmiRules } from "./zzmi/rules.js";
 import { ZZMI_TEMPLATES } from "./zzmi/templates.js";
 import { registerZzmiSupport } from "./zzmi/index.js";
-import { SRMI_TEMPLATES } from "./srmi/templates.js";
 import { registerSrmiSupport } from "./srmi/index.js";
 //#region default-plugins/custom-lint/index.ts
 var isPluginActive = false;
@@ -58,4 +57,4 @@ var plugin = {
 	}
 };
 //#endregion
-export { SRMI_TEMPLATES, ZZMI_TEMPLATES, buildWorkspaceIndex, collectIniFiles, createZzmiSlotResolver, plugin as default, isBuiltinResource, isHelpIniResource, isHelpIniVariable, isSrmiResource, isSrmiVariable, parseIniExports, readIniText, registerSrmiRules, registerZzmiRules };
+export { ZZMI_TEMPLATES, buildWorkspaceIndex, collectIniFiles, createZzmiSlotResolver, plugin as default, isBuiltinResource, isHelpIniResource, isHelpIniVariable, isSrmiResource, isSrmiVariable, parseIniExports, readIniText, registerSrmiRules, registerZzmiRules };

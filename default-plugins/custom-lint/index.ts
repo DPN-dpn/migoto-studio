@@ -8,7 +8,7 @@ import {
   type NamespaceRegistrationState,
 } from './namespace-check/index.ts';
 import { registerZzmiSupport, registerZzmiRules, ZZMI_TEMPLATES } from './zzmi/index.ts';
-import { registerSrmiSupport, registerSrmiRules, isSrmiVariable, isSrmiResource, SRMI_TEMPLATES } from './srmi/index.ts';
+import { registerSrmiSupport, registerSrmiRules, isSrmiVariable, isSrmiResource } from './srmi/index.ts';
 
 // 외부 및 테스트 호환성을 위한 심볼 re-export
 export { isBuiltinResource, isHelpIniResource, isHelpIniVariable } from './builtin-syntax/index.ts';
@@ -16,7 +16,7 @@ export { parseIniExports } from './namespace-check/parser.ts';
 export { collectIniFiles, readIniText, buildWorkspaceIndex } from './namespace-check/indexer.ts';
 export type { SymbolLocationRecord, NamespaceExport, NamespaceGroup } from './namespace-check/types.ts';
 export { registerZzmiRules, createZzmiSlotResolver, ZZMI_TEMPLATES } from './zzmi/index.ts';
-export { registerSrmiRules, isSrmiVariable, isSrmiResource, SRMI_TEMPLATES } from './srmi/index.ts';
+export { registerSrmiRules, isSrmiVariable, isSrmiResource } from './srmi/index.ts';
 
 let isPluginActive = false;
 let unregisterBuiltinList: (() => void)[] = [];

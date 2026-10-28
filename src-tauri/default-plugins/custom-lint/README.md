@@ -24,7 +24,6 @@
 
 6. **SRMI (붕괴: 스타레일) 지원**
    - `$\SRMI\vertex_count`, `Resource\SRMI\PositionBuffer`, `Resource\SRMI\BlendBuffer` 등 SRMI 전용 문법 및 버텍스 수 오버라이드 지원
-   - SRMI 전용 코드 템플릿(스니펫) 등록
 
 ## 코드 구조 (모듈화)
 
@@ -32,6 +31,6 @@
 - `file-check/`: 모드 리소스 파일 실재성 검사 (`missing-resource-files`, `registerFileCheckRule`)
 - `namespace-check/`: XXMI 네임스페이스 및 변수 유효성 검사, 크로스 파일 심볼 인덱싱 및 정의/참조 Provider (`xxmi-namespace-check`, `parser`, `indexer`, `providers`)
 - `zzmi/`: ZZMI 텍스처 슬롯픽스 템플릿/리졸버 및 TTL 지원 (`rules`, `templates`, `registerZzmiSupport`)
-- `srmi/`: SRMI 전용 변수/리소스 문법 및 버텍스 오버라이드 템플릿 (`rules`, `templates`, `registerSrmiSupport`)
+- `srmi/`: SRMI 전용 변수/리소스 문법 지원 (`rules`, `registerSrmiSupport`)
 
 

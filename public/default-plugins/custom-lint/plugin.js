@@ -1205,36 +1205,15 @@ function registerZzmiSupport(context) {
 	return cleanups;
 }
 //#endregion
-//#region default-plugins/custom-lint/srmi/templates.ts
-var SRMI_TEMPLATES = [{
-	id: "srmi_vertex_count",
-	group: "SRMI (붕괴: 스타레일)",
-	label: "SRMI 버텍스 카운트 ($SRMI\vertex_count)",
-	description: "SRMI 모델 버텍스 수 지정 구문 (포지션 .buf 파일 크기 / stride)",
-	body: ["; SRMI Vertex Count Override", "$\\SRMI\\vertex_count = ${1:41428}"].join("\n") + "\n"
-}, {
-	id: "srmi_buffer_override",
-	group: "SRMI (붕괴: 스타레일)",
-	label: "SRMI 버퍼 오버라이드 (Position & Blend)",
-	description: "SRMI 컴퓨트 셰이더 버퍼 및 버텍스 수 매핑 구문",
-	body: [
-		"; SRMI Compute Shader Buffer Override",
-		"Resource\\SRMI\\PositionBuffer = ref Resource${1:Model}PositionCS",
-		"Resource\\SRMI\\BlendBuffer = ref Resource${1:Model}BlendCS",
-		"$\\SRMI\\vertex_count = ${2:41428}"
-	].join("\n") + "\n"
-}];
-//#endregion
 //#region default-plugins/custom-lint/srmi/index.ts
 /**
 * SRMI (붕괴: 스타레일 - Star Rail Model Importer) 모딩 지원 기능을 등록합니다.
-* ($\\SRMI\\vertex_count 등 전용 변수, Resource\\SRMI\\... 전용 리소스 및 템플릿)
+* ($\\SRMI\\vertex_count 등 전용 변수 및 Resource\\SRMI\\... 전용 리소스 허용 규칙)
 */
 function registerSrmiSupport(context) {
 	const cleanups = [];
 	cleanups.push(...registerSrmiRules(context));
-	context.logger?.info(`SRMI (붕괴: 스타레일) 모딩 지원 활성화 (템플릿 ${SRMI_TEMPLATES.length}개 등록)`);
-	if (context.templates?.registerTemplate) for (const tpl of SRMI_TEMPLATES) context.templates.registerTemplate(tpl);
+	context.logger?.info("SRMI (붕괴: 스타레일) 모딩 지원 활성화 (vertex_count 등 전용 문법 등록)");
 	return cleanups;
 }
 //#endregion
@@ -1285,4 +1264,4 @@ var plugin = {
 	}
 };
 //#endregion
-export { SRMI_TEMPLATES, ZZMI_TEMPLATES, buildWorkspaceIndex, collectIniFiles, createZzmiSlotResolver, plugin as default, isBuiltinResource, isHelpIniResource, isHelpIniVariable, isSrmiResource, isSrmiVariable, parseIniExports, readIniText, registerSrmiRules, registerZzmiRules };
+export { ZZMI_TEMPLATES, buildWorkspaceIndex, collectIniFiles, createZzmiSlotResolver, plugin as default, isBuiltinResource, isHelpIniResource, isHelpIniVariable, isSrmiResource, isSrmiVariable, parseIniExports, readIniText, registerSrmiRules, registerZzmiRules };

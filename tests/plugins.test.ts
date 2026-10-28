@@ -589,8 +589,6 @@ test('custom-lint incorporates zzmi support and help.ini built-in syntax', () =>
   assert.ok(checkVar('srmi\\vertex_count'), 'Normalized srmi\\vertex_count must be allowed');
   assert.ok(checkResource('Resource\\SRMI\\PositionBuffer'), 'Resource\\SRMI\\PositionBuffer must be allowed resource');
   assert.ok(checkResource('Resource\\SRMI\\BlendBuffer'), 'Resource\\SRMI\\BlendBuffer must be allowed resource');
-  assert.ok(templateIds.includes('srmi_vertex_count'), 'srmi_vertex_count template must be registered');
-  assert.ok(templateIds.includes('srmi_buffer_override'), 'srmi_buffer_override template must be registered');
 
   const srmiDiag = { message: "모드 폴더 내에서 네임스페이스 'SRMI'을(를) 찾을 수 없습니다.", startLineNumber: 1 };
   const srmiCtx = {
