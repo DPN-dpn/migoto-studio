@@ -345,4 +345,24 @@ type = Buffer
   assert.equal(unusedRestored.length, 2, 'Should report unused warnings after unregistering');
 });
 
+test('section names with dot and hyphen (e.g. ResourceTest.01, CommandListTest.01) are matched completely without false missing or unused warning', () => {
+  const model = createMockModel(`[TextureOverrideBody]
+this = ResourceTest.01
+run = CommandListTest.01
+
+[ResourceTest.01]
+filename = Textures/test.dds
+
+[CommandListTest.01]
+handling = skip
+`);
+
+  const markers = lintModel(model, defaultOptions);
+  const warnings = markers.filter((m) => m.severity === MarkerSeverity.Warning);
+  assert.equal(warnings.length, 0, 'Section names with dot should match completely without missing section warning');
+
+  const unusedInfo = markers.filter((m) => m.severity === MarkerSeverity.Info && m.message.includes('참조되지 않았습니다'));
+  assert.equal(unusedInfo.length, 0, 'Section names with dot should not be marked as unused when referenced');
+});
+
 

@@ -294,7 +294,7 @@ export function parseIniExports(text: string, filePath: string): NamespaceExport
     }
 
     // Section references (run = ..., ps-t0 = ..., Resource = ..., etc.)
-    const resRefMatch = /^\s*(?:(?:pre\s+|post\s+)?run|this|vb\d+|ib|[a-z]{2}-(?:[tu]|cb)\d+|Resource(?:\\[a-zA-Z0-9_]+)*|(?:cs|vs|ps|hs|ds|gs))\s*=\s*(?:ref\s+|copy\s+)?([a-zA-Z0-9_\\]+)/i.exec(code);
+    const resRefMatch = /^\s*(?:(?:pre\s+|post\s+)?run|this|vb\d+|ib|[a-z]{2}-(?:[tu]|cb)\d+|Resource(?:\\[a-zA-Z0-9_.\-]+)*|(?:cs|vs|ps|hs|ds|gs))\s*=\s*(?:ref\s+|copy\s+)?([a-zA-Z0-9_.\-\\\/]+)/i.exec(code);
     if (resRefMatch) {
       const target = resRefMatch[1].trim();
       const targetLower = target.toLowerCase();
@@ -346,7 +346,7 @@ export function parseIniExports(text: string, filePath: string): NamespaceExport
       }
     }
 
-    const refCopyRe = /\b(?:ref|copy)\s+([a-zA-Z0-9_\\]+)/gi;
+    const refCopyRe = /\b(?:ref|copy)\s+([a-zA-Z0-9_.\-\\\/]+)/gi;
     let rcm: RegExpExecArray | null;
     while ((rcm = refCopyRe.exec(code)) !== null) {
       const target = rcm[1].trim();

@@ -277,7 +277,7 @@ export function registerNamespaceCheck(
         }
 
         // B. CommandList 및 Function 호출 검사 (예: run = CommandList\Namespace\Action)
-        const runMatch = /^\s*(?:(?:pre\s+|post\s+)?run)\s*=\s*(?:ref\s+)?([a-zA-Z0-9_\\]+)/i.exec(code);
+        const runMatch = /^\s*(?:(?:pre\s+|post\s+)?run)\s*=\s*(?:ref\s+)?([a-zA-Z0-9_.\-\\\/]+)/i.exec(code);
         if (runMatch) {
           const target = runMatch[1].trim();
           if (target.includes('\\')) {

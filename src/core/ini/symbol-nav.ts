@@ -124,23 +124,55 @@ export function getSymbolAtPosition(
 
   // 3. Section references on key/value lines:
   // e.g. run = CommandListSwap, vb0 = ResourceIB, ref TargetSection
-  // or CommandList\Raiden\Action
+  // or CommandList\Raiden\Action, ResourceTest.01
   const wordAtPos = model.getWordAtPosition(position);
-  if (wordAtPos && wordAtPos.word) {
-    const word = wordAtPos.word;
-    const startCol = wordAtPos.startColumn;
-    const endCol = wordAtPos.endColumn;
+  let candidateWord = wordAtPos?.word ?? '';
+  let tokenStartCol = wordAtPos?.startColumn ?? col;
+  let tokenEndCol = wordAtPos?.endColumn ?? col;
 
+  if (!candidateWord && col - 1 < code.length && /[a-zA-Z0-9_.\-\\]/.test(code[col - 1])) {
+    let start = col - 1;
+    let end = col - 1;
+    while (start > 0 && /[a-zA-Z0-9_.\-\\]/.test(code[start - 1])) {
+      start--;
+    }
+    while (end < code.length && /[a-zA-Z0-9_.\-\\]/.test(code[end])) {
+      end++;
+    }
+    const token = code.slice(start, end).replace(/^[.\-]+|[.\-]+$/g, '');
+    if (token) {
+      candidateWord = token;
+      tokenStartCol = start + 1;
+      tokenEndCol = tokenStartCol + token.length;
+    }
+  } else if (candidateWord) {
+    let start = tokenStartCol - 1;
+    let end = tokenEndCol - 1;
+    while (start > 0 && /[a-zA-Z0-9_.\-\\]/.test(code[start - 1])) {
+      start--;
+    }
+    while (end < code.length && /[a-zA-Z0-9_.\-\\]/.test(code[end])) {
+      end++;
+    }
+    const expanded = code.slice(start, end).replace(/^[.\-]+|[.\-]+$/g, '');
+    if (expanded && expanded.length > candidateWord.length) {
+      candidateWord = expanded;
+      tokenStartCol = start + 1;
+      tokenEndCol = tokenStartCol + expanded.length;
+    }
+  }
+
+  if (candidateWord) {
     // Check if the line has section assignment or if word starts with common 3DMigoto section prefixes
     const isSectionContext =
       /(?:(?:pre\s+|post\s+)?run|vb\d+|ib|[a-z]{2}-[tu]\d+|Resource|ref)\s*=/i.test(code) ||
       /\bref\s+/i.test(code);
 
     const isKnownSectionPrefix =
-      /^(?:commandlist|resource|textureoverride|shaderoverride|shaderregex|customshader|constants|key)/i.test(word);
+      /^(?:commandlist|resource|textureoverride|shaderoverride|shaderregex|customshader|constants|key)/i.test(candidateWord);
 
     // Also check namespace pattern like CommandList\Raiden\Action on line
-    const nsSecMatch = /(?:CommandList|Resource)\\[a-zA-Z0-9_\\]+/i.exec(code);
+    const nsSecMatch = /(?:CommandList|Resource)\\[a-zA-Z0-9_.\-\\\/]+/i.exec(code);
     if (nsSecMatch) {
       const matchStart = nsSecMatch.index + 1;
       const matchEnd = matchStart + nsSecMatch[0].length;
@@ -166,32 +198,32 @@ export function getSymbolAtPosition(
 
     if (isSectionContext || isKnownSectionPrefix) {
       return {
-        name: word,
-        cleanName: word,
+        name: candidateWord,
+        cleanName: candidateWord,
         kind: 'section',
-        rawMatch: word,
+        rawMatch: candidateWord,
         range: {
           startLineNumber: lineNum,
-          startColumn: startCol,
+          startColumn: tokenStartCol,
           endLineNumber: lineNum,
-          endColumn: endCol,
+          endColumn: tokenEndCol,
         },
       };
     }
 
-    // Check if word matches an existing section header in this model
-    const secExistRe = new RegExp(`^\\s*\\[\\s*${escapeRegExp(word)}\\s*\\]`, 'im');
+    // Check if candidateWord matches an existing section header in this model
+    const secExistRe = new RegExp(`^\\s*\\[\\s*${escapeRegExp(candidateWord)}\\s*\\]`, 'im');
     if (secExistRe.test(model.getValue())) {
       return {
-        name: word,
-        cleanName: word,
+        name: candidateWord,
+        cleanName: candidateWord,
         kind: 'section',
-        rawMatch: word,
+        rawMatch: candidateWord,
         range: {
           startLineNumber: lineNum,
-          startColumn: startCol,
+          startColumn: tokenStartCol,
           endLineNumber: lineNum,
-          endColumn: endCol,
+          endColumn: tokenEndCol,
         },
       };
     }
@@ -316,7 +348,7 @@ export function scanModelOccurrences(
 
     // 3. Scan section references
     if (target.kind === 'section') {
-      const wordRe = new RegExp(`\\b${escapeRegExp(target.cleanName)}\\b`, 'gi');
+      const wordRe = new RegExp(`(?<![a-zA-Z0-9_.\-])${escapeRegExp(target.cleanName)}(?![a-zA-Z0-9_.\-])`, 'gi');
       let wm: RegExpExecArray | null;
 
       while ((wm = wordRe.exec(code)) !== null) {
