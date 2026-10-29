@@ -1,12 +1,18 @@
 # 릴리스 노트 (Release Notes)
 
-## [다음 버전]
-
-### 신규 기능
+## [0.13.5] - 2026-10-29
 
 ### 기능 개선
+- **Windows 바이너리 PE 메타데이터 및 설치 프로그램 정보 보강**:
+  - `tauri.conf.json` 내 `publisher`, `copyright`, `shortDescription`, `longDescription`, `category`, `homepage`, `license`를 등록하여 실행 파일 속성에 제작자 및 프로그램 상세 정보가 정상 표기되도록 개선
+  - NSIS 설치 프로그램(`installer.nsi`)에 `CompanyName`을 명시하여 Windows Defender 및 탐색기에서 "게시자: 알 수 없음"으로 표시되던 문제 완화
+- **Rust 릴리스 컴파일 프로필 최적화 (보안 오탐 완화)**:
+  - `Cargo.toml`에 `[profile.release]`를 적용하여 `lto = "thin"`, `codegen-units = 1`, `panic = "abort"`, `strip = true` 설정
+  - 불필요한 디버그 심볼과 경로 문자열을 제거하고 단일 최적화 단위로 컴파일하여 Windows Defender 머신러닝(!ml)의 코드 분할 오탐률 완화
 
 ### 버그 수정
+- **포터블 릴리스 패키지 바이너리 누락 결함 수정**:
+  - CI 워크플로(`.github/workflows/release.yml`)에서 이름이 변경된 실행 바이너리(`migoto-studio.exe`)를 감지하지 못해 포터블 Zip 생성 시 실행 파일이 누락되던 결함 수정
 
 ---
 
