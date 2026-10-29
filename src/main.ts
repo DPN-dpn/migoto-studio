@@ -394,7 +394,6 @@ async function boot() {
   let currentMarkers: monaco.editor.IMarkerData[] = [];
   let lintTimer = 0;
   let lintRunId = 0;
-  let lastLintSummary = '';
 
   const runLint = async () => {
     const currentRunId = ++lintRunId;
@@ -471,14 +470,6 @@ async function boot() {
       lintBtn.textContent = `${prefix}${parts.join(', ')}`;
       lintBtn.className = `status-btn ${errors.length > 0 ? 'has-error' : warnings.length > 0 ? 'has-warn' : 'has-info'}`;
       lintBtn.title = '클릭하여 다음 문제 위치로 이동';
-    }
-
-    const summary = `${errors.length}-${warnings.length}`;
-    if (lastLintSummary !== summary) {
-      lastLintSummary = summary;
-      if (errors.length > 0 || warnings.length > 0) {
-        appLogger.warn('Linter', `검사 완료: 오류 ${errors.length}개, 경고 ${warnings.length}개 발견`);
-      }
     }
   };
 
