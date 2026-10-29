@@ -108,7 +108,9 @@ jobs:
           New-Item -ItemType Directory -Force -Path $dirName | Out-Null
           
           # Locate built binary
-          if (Test-Path "src-tauri\target\release\app.exe") {
+          if (Test-Path "src-tauri\target\release\migoto-studio.exe") {
+            Copy-Item "src-tauri\target\release\migoto-studio.exe" "$dirName\Migoto Studio.exe"
+          } elseif (Test-Path "src-tauri\target\release\app.exe") {
             Copy-Item "src-tauri\target\release\app.exe" "$dirName\Migoto Studio.exe"
           } elseif (Test-Path "src-tauri\target\release\Migoto Studio.exe") {
             Copy-Item "src-tauri\target\release\Migoto Studio.exe" "$dirName\Migoto Studio.exe"

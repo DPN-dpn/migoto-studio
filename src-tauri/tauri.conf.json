@@ -29,6 +29,13 @@
   "bundle": {
     "active": true,
     "createUpdaterArtifacts": true,
+    "publisher": "Migoto Studio",
+    "copyright": "Copyright © 2026 Migoto Studio Contributors. Licensed under GPL-3.0-or-later.",
+    "category": "DeveloperTool",
+    "shortDescription": "Modern XXMI/3DMigoto Mod INI Editor",
+    "longDescription": "Migoto Studio is a modern, lightweight desktop IDE and editor for 3DMigoto and XXMI mod INI scripts.",
+    "homepage": "https://github.com/DPN-dpn/migoto-studio",
+    "license": "GPL-3.0-or-later",
     "targets": [
       "nsis"
     ],
