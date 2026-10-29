@@ -150,6 +150,7 @@ export class ConsolePanel {
 
     const titleEl = document.createElement('div');
     titleEl.className = 'console-title';
+    titleEl.title = '콘솔 출력';
     titleEl.innerHTML = `
       <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <polyline points="4 17 10 11 4 5"></polyline>
@@ -166,6 +167,7 @@ export class ConsolePanel {
     this.errorBadge = document.createElement('span');
     this.errorBadge.className = 'console-count-badge error';
     this.errorBadge.textContent = '오류 0';
+    this.errorBadge.title = '오류 로그 필터링';
     this.errorBadge.hidden = true;
     this.errorBadge.addEventListener('click', () => {
       this.setLevelFilter('error');
@@ -174,6 +176,7 @@ export class ConsolePanel {
     this.warnBadge = document.createElement('span');
     this.warnBadge.className = 'console-count-badge warn';
     this.warnBadge.textContent = '경고 0';
+    this.warnBadge.title = '경고 로그 필터링';
     this.warnBadge.hidden = true;
     this.warnBadge.addEventListener('click', () => {
       this.setLevelFilter('warn');
@@ -352,6 +355,7 @@ export class ConsolePanel {
 
     if (errCount > 0) {
       this.errorBadge.textContent = `오류 ${errCount}`;
+      this.errorBadge.title = `오류 로그 ${errCount}건 (클릭하여 오류 필터링)`;
       this.errorBadge.hidden = false;
     } else {
       this.errorBadge.hidden = true;
@@ -359,6 +363,7 @@ export class ConsolePanel {
 
     if (warnCount > 0) {
       this.warnBadge.textContent = `경고 ${warnCount}`;
+      this.warnBadge.title = `경고 로그 ${warnCount}건 (클릭하여 경고 필터링)`;
       this.warnBadge.hidden = false;
     } else {
       this.warnBadge.hidden = true;

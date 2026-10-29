@@ -6807,6 +6807,8 @@ button.has-icon {
   overflow: hidden;
   flex-shrink: 0;
   font-family: 'Cascadia Code', 'D2Coding', Consolas, monospace;
+  container-type: inline-size;
+  container-name: console-panel;
 }
 
 .console-header {
@@ -6822,6 +6824,7 @@ button.has-icon {
   font-family: inherit;
   font-size: 12px;
   gap: 8px;
+  overflow: hidden;
 }
 
 .console-header-left {
@@ -6829,6 +6832,7 @@ button.has-icon {
   align-items: center;
   gap: 6px;
   flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .console-title {
@@ -6838,6 +6842,7 @@ button.has-icon {
   font-weight: 600;
   font-size: 11px;
   color: var(--fg);
+  flex-shrink: 0;
 }
 
 .console-count-badge {
@@ -6847,6 +6852,7 @@ button.has-icon {
   font-weight: 600;
   background: var(--bg-hover);
   color: var(--fg-dim);
+  white-space: nowrap;
 }
 
 .console-count-badge.error {
@@ -6894,6 +6900,7 @@ button.has-icon {
   border-radius: 3px;
   cursor: pointer;
   transition: all 0.1s;
+  white-space: nowrap;
 }
 
 .console-filter-btn.active {
@@ -6913,6 +6920,7 @@ button.has-icon {
   color: var(--fg);
   outline: none;
   max-width: 130px;
+  flex-shrink: 1;
 }
 
 .console-search-input {
@@ -6936,11 +6944,13 @@ button.has-icon {
   align-items: center;
   gap: 4px;
   flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .console-action-btn {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 4px;
   font-size: 11px;
   padding: 2px 6px;
@@ -6951,6 +6961,7 @@ button.has-icon {
   background: transparent;
   cursor: pointer;
   transition: all 0.12s;
+  flex-shrink: 0;
 }
 
 .console-action-btn:hover {
@@ -6966,6 +6977,65 @@ button.has-icon {
 
 .console-action-btn.close:hover {
   color: #ef4444;
+}
+
+/* ---- 반응형 헤더 (너비 축소 시 점진적 축소/아이콘화) ---- */
+
+/* 1단계 (너비 760px 이하): 우측 액션 버튼 한글 텍스트 숨김 -> 24x24 컴팩트 아이콘 버튼화 */
+@container console-panel (max-width: 760px) {
+  .console-action-btn span {
+    display: none;
+  }
+  .console-action-btn {
+    width: 24px;
+    height: 24px;
+    padding: 0;
+  }
+}
+
+/* 2단계 (너비 620px 이하): 좌측 "콘솔 출력" 텍스트 숨김 (아이콘 및 배지 유지), 소스 셀렉트 축소 */
+@container console-panel (max-width: 620px) {
+  .console-title span {
+    display: none;
+  }
+  .console-source-select {
+    max-width: 100px;
+  }
+}
+
+/* 3단계 (너비 520px 이하): 검색창 최소폭 축소, 레벨 필터 버튼 패딩 컴팩트화 */
+@container console-panel (max-width: 520px) {
+  .console-header {
+    gap: 6px;
+    padding: 0 6px;
+  }
+  .console-header-center {
+    gap: 6px;
+  }
+  .console-filter-btn {
+    padding: 2px 5px;
+    font-size: 10.5px;
+  }
+  .console-source-select {
+    max-width: 85px;
+  }
+  .console-search-input {
+    min-width: 60px;
+  }
+}
+
+/* 4단계 (너비 440px 이하 초소형 분할창): 소스 셀렉트 숨김, 배지 여백 축소 */
+@container console-panel (max-width: 440px) {
+  .console-source-select {
+    display: none;
+  }
+  .console-search-input {
+    min-width: 50px;
+  }
+  .console-count-badge {
+    padding: 1px 4px;
+    font-size: 9.5px;
+  }
 }
 
 .console-logs-container {
